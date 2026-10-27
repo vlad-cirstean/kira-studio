@@ -380,8 +380,7 @@ The bundle assertion lives only in `release.yml`'s own "Assert packaged bundle a
 2. `pr-auto-merge.yml` refuses a malformed head or an existing tag, then enables squash auto-merge.
 3. `pr.yml` runs. `pr-rerun-flaky.yml` reruns failed jobs while `run_attempt < 3`, only for the
    PR's current head and newest run. A cancelled run reruns only when a job hit its timeout, never
-   when superseded or cancelled by hand (P365; pending
-   `docs/pending-changes/.github__workflows__pr-rerun-flaky.yml.patch`).
+   when superseded or cancelled by hand (P365).
 4. Once the ruleset's required checks pass, GitHub merges.
 5. `release-on-merge.yml` tags the squash commit (`merge_commit_sha`) as `vX.Y.Z`, dispatches
    `pages.yml` and `cache-warm.yml` (once per merge, deduplicated by the warm run's title), and

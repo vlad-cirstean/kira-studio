@@ -14,8 +14,12 @@ printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::h
 MIRRORS=/etc/apt/apt-mirrors.txt
 round=1
 while :; do
-  if retry 3 45 sudo apt-get update &&
-    sudo timeout --kill-after=10 150 apt-get install -y "$@"; then
+  # Only the download is bounded: killing dpkg mid-unpack leaves it interrupted and every retry fails.
+  # The unpack and configure run unbounded; the calling step's timeout-minutes covers them.
+  if sudo dpkg --configure -a &&
+    retry 3 45 sudo apt-get update &&
+    retry 1 150 sudo apt-get install --download-only -y "$@" &&
+    sudo apt-get install -y "$@"; then
     exit 0
   fi
   [ "$round" -lt 2 ] || { echo "ci-apt-install: failed after $round rounds" >&2; exit 1; }

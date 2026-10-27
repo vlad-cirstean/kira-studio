@@ -55,7 +55,8 @@ runs:
     - name: Download Go modules on a cache miss (retried; go has no retry of its own)
       if: steps.gomod.outputs.cache-hit != 'true' && steps.gomod-restore.outputs.cache-hit != 'true'
       shell: bash
-      run: sh scripts/retry.sh 3 300 go mod download
+      # Worst case 3 x 120 s + 30 s sleeps = 390 s; with the apt step it fits the caller's 10-minute step.
+      run: sh scripts/retry.sh 3 120 go mod download
     - name: Cache Go build and test results (saved per commit, restored from the newest entry; setup-go's go.sum-keyed entry is never refreshed and goes stale)
       if: inputs.go-cache != '' && inputs.cache-save == 'true'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
