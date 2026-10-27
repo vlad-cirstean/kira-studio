@@ -11,7 +11,7 @@ Source: user request. Phases run top to bottom.
 | P376 | Terminal: Shift+Enter inserts newline | Done |
 | P377 | Foreign-branch review tasks: convert to work item, open normal task view | Done |
 | P378 | Finished/stopped agents behind a dropdown | Done |
-| P379 | ADE tasks: customizable statuses, manual moves both ways | Todo |
+| P379 | ADE tasks: customizable statuses, manual moves both ways | Done |
 | P380 | Automation scripts reuse one tab per script | Todo |
 | P381 | Reorder collections and other folders | Todo |
 | P382 | MCP show-results customizable per connection | Todo |
@@ -58,6 +58,8 @@ Result: plan `plans/P378.md`. New `AdeStoppedMenu` popover (`ade-stopped-trigger
 ### P379 ADE task statuses
 
 Customizable statuses per ADE task. User moves a task back and forth between statuses manually.
+
+Result: plan `plans/P379.md`. Status now stored: table `ade_task_statuses` (migration 0051; 4 seeds, 6 tones, categories todo/active/review/done, 1-20 rows), tasks hold `status_id`, `status_by`, `status_step`. Engine `syncStatus` re-applies a step's status only when the workflow position key changes; manual move (`UpdateTask statusId`) sticks until then. Blocked is a derived chip. Step `status:` holds an id; legacy names load. New `AdeTaskService.SaveStatuses` (65 methods). UI: menu `Status` submenu, `AdeStatusPicker` in Task tab, Settings `Task statuses` pane (add, rename, tone, category, reorder, delete with reassign), inspector list with `Edit statuses`. Tests: `TestTaskStatuses` (contract `ade-task-statuses`), migration 0051 backfill test, `ade-v2-task-status.spec.ts` (10). Checks: lint, typecheck, lint:go, lint:dead, Go tests incl. all flows, build:space, full Space UI suite (703 + 10 new), mobile (81), unit pass. Deviations from plan: tracker `OnStarted` hook (first TUI session counts as started); backfill treats NULL `workflow_json` as todo; repo `insertTask` defaults status so CreateTask, AddExistingBranch, Promote inherit it; inspector status select landed in commit 1; `SaveStatuses` errors map to BadRequest with raw text; flow test adds `qa` as active (plan said review, which would block removing the only active status). Contract diff beyond the new file: step status ids and task `statusId`/`statusBy` only. Not done: phone status writes, kanban board.
 
 ### P380 Automation scripts reuse one tab per script
 
