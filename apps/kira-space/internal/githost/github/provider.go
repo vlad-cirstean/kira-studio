@@ -26,6 +26,8 @@ type Provider struct{ client *Client }
 var (
 	_ githost.Provider          = (*Provider)(nil)
 	_ githost.ChangeRequestSync = (*Provider)(nil)
+
+	_ githost.ChangeRequestReviews = (*Provider)(nil)
 )
 
 // New builds the GitHub provider over the `gh` CLI.
@@ -165,4 +167,17 @@ func (p *Provider) Probe(ctx context.Context, r githost.Repo, etag string) (bool
 func (p *Provider) Checks(ctx context.Context, r githost.Repo, nodeIDs []string) ([]githost.ChangeRequest, githost.Status) {
 	prs, s := p.client.PullsByNodeID(ctx, Repo(r), nodeIDs)
 	return toChangeRequests(prs), toStatus(s)
+}
+
+func (p *Provider) ReviewTarget(ctx context.Context, r githost.Repo, number int) (githost.ReviewTarget, githost.Status) {
+	pr, s := p.client.PullForReview(ctx, Repo(r), number)
+	return githost.ReviewTarget{State: pr.State, HeadSha: pr.HeadSha, Author: pr.Author}, toStatus(s)
+}
+
+func (p *Provider) SubmitReview(ctx context.Context, r githost.Repo, number int, rv githost.Review) githost.Status {
+	return toStatus(p.client.SubmitReview(ctx, Repo(r), number, rv.Event, rv.Body, rv.CommitSHA))
+}
+
+func (p *Provider) Comment(ctx context.Context, r githost.Repo, number int, body string) githost.Status {
+	return toStatus(p.client.CommentOnPull(ctx, Repo(r), number, body))
 }

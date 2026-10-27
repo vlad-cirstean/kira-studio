@@ -133,6 +133,39 @@ type ChangeRequestSync interface {
 	Checks(ctx context.Context, r Repo, nodeIDs []string) ([]ChangeRequest, Status)
 }
 
+// Review events.
+const (
+	ReviewApprove        = "approve"
+	ReviewComment        = "comment"
+	ReviewRequestChanges = "requestChanges"
+)
+
+// MaxHostCommentBytes bounds a review or change request comment body. GitHub caps one at 65,536
+// characters; a byte cap never exceeds that.
+const MaxHostCommentBytes = 64 << 10
+
+// Review is one submitted review. CommitSHA is the head it applies to.
+type Review struct {
+	Event     string
+	Body      string // "" only for ReviewApprove
+	CommitSHA string
+}
+
+// ReviewTarget is one change request's current review facts, read fresh.
+type ReviewTarget struct {
+	State   string // "open" | "draft" | "merged" | "closed"
+	HeadSha string
+	Author  string // host login; "" when the host has none (a deleted account)
+}
+
+// ChangeRequestReviews is optional: a provider that reviews change requests and comments on their
+// conversation. Every call reports failure in Status, never an error.
+type ChangeRequestReviews interface {
+	ReviewTarget(ctx context.Context, r Repo, number int) (ReviewTarget, Status)
+	SubmitReview(ctx context.Context, r Repo, number int, rv Review) Status
+	Comment(ctx context.Context, r Repo, number int, body string) Status
+}
+
 // ChangeRequestPage is one page of a ChangeRequestSync.Page walk.
 type ChangeRequestPage struct {
 	Items     []ChangeRequest
