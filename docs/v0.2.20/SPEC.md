@@ -7,7 +7,7 @@ Source: user request. Phases run top to bottom.
 | Phase | Title | Status |
 |---|---|---|
 | P374 | Script params redesign + shared branch-style components | Done |
-| P375 | Studio keeps filter value and results across tab changes | Todo |
+| P375 | Studio keeps filter value and results across tab changes | Done |
 | P376 | Terminal: Shift+Enter inserts newline | Todo |
 | P377 | Foreign-branch review tasks: convert to work item, open normal task view | Todo |
 | P378 | Finished/stopped agents behind a dropdown | Todo |
@@ -34,6 +34,8 @@ Result: plan `plans/P374.md`. Dropped `label` (Go `Param`, zod, hover, fixtures,
 ### P375 Studio keeps filter value and results across tab changes
 
 Changing tabs in studio drops the filter value and filtered results. Keep both per tab.
+
+Result: plan `plans/P375.md`. Root cause: Studio tab views unmount on switch; filter inputs sat in component refs and find bars cleared scans on unmount. Inputs and open flags now live in per-view runtime stores (session-only, cleared on tab close). Find bar (grid, documents, key-value, console, stream): query, options, filter-rows toggle kept; `isOpen` prop tells tab switch from close; scan kept, rescans on remount only when page changed (`WeakRef` of scanned page). Also kept: browse and definition filters, HTTP/gRPC field, header, cookie, schema and history filters, variable set and environments filter, unapplied grid/document/stream filter-row drafts (`tab-next` shortcut fires no blur). New `tests/ui/tab-filter-state.spec.ts` (6 scenarios; fail without fix). Checks: lint, typecheck, lint:dead, build:studio, 223 UI specs across touched components, unit tests pass. Not done: gRPC and variable-tab UI scenarios (covered by the HTTP one, same pattern).
 
 ### P376 Terminal: Shift+Enter inserts newline
 
