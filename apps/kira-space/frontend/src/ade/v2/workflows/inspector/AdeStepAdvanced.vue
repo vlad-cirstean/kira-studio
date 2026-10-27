@@ -4,8 +4,9 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
-import { ref, watch } from 'vue';
-import { formatTools, parseTools, STATUS_OPTIONS } from '../../board/workflowForm';
+import { computed, ref, watch } from 'vue';
+import { formatTools, parseTools } from '../../board/workflowForm';
+import { useBoard } from '../../queries';
 import { useAdeWorkflowDraftStore } from '../../state/adeWorkflowDraft';
 import type { WorkflowStep } from '../../wire';
 import AdeStepSandbox from './AdeStepSandbox.vue';
@@ -13,6 +14,8 @@ import AdeStepSandbox from './AdeStepSandbox.vue';
 const props = defineProps<{ step: WorkflowStep }>();
 const emit = defineEmits<{ patch: [p: Partial<WorkflowStep>] }>();
 const draft = useAdeWorkflowDraftStore();
+const board = useBoard();
+const statuses = computed(() => board.data.value?.statuses ?? []);
 const id = (k: string): string => `ade-wf-step-${k}-${props.step.id}`;
 
 const toolsText = ref(formatTools(props.step.allowedTools));
@@ -70,7 +73,7 @@ function onTools(v: string | number): void {
       data-testid="ade-wf-step-status"
       @update:model-value="(v) => emit('patch', { status: String(v) as WorkflowStep['status'] })"
     >
-      <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
+      <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
     </NativeSelect>
   </div>
   <div class="flex items-center gap-2">

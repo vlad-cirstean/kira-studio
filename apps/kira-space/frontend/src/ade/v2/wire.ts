@@ -55,7 +55,8 @@ export interface FolderImportResult {
 
 // ---- workflows (§5.1.1, D2, D6, D13)
 export type StepKind = 'agent' | 'script' | 'review' | 'manual';
-export type TaskStatus = 'To do' | 'In progress' | 'In review' | 'Done';
+/** A status id from the user's set, such as 'in-progress'. */
+export type TaskStatus = string;
 export type RunsOn = 'once' | 'each repo' | `only ${string}` /* nickname */;
 /** A result a step may report through finish_step. `next` is 'next' | 'end' | 'stop' or a step id of the workflow; `loop` says the route goes back to the step or an earlier one (a return, counted against the step's `maxReturns`). */
 export interface StepResult {
@@ -389,6 +390,16 @@ export interface Task {
   branchIds: string[];
   runs: Run[];
   createdAt: number;
+  statusId: TaskStatus;
+  /** Who set the status last: a step change ('auto') or the user. */
+  statusBy: 'auto' | 'user';
+}
+/** One status of the user's set. `category` decides which status automation picks. */
+export interface TaskStatusDef {
+  id: TaskStatus;
+  name: string;
+  tone: 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
+  category: 'todo' | 'active' | 'review' | 'done';
 }
 export interface Plan {
   day: Record<string, string> /* taskId -> ISO date; absent = Later */;
@@ -411,6 +422,7 @@ export interface RepoState {
 }
 export interface Board {
   tasks: Task[];
+  statuses: TaskStatusDef[];
   branches: Branch[];
   plan: Plan;
   pairs: Pair[];
@@ -686,6 +698,15 @@ export interface TaskPatch {
   notes: string | null;
   color: number | null;
   kind: 'task' | 'parked' | null;
+  statusId: TaskStatus | null;
+}
+/** `id` '' = a new status. `reassign` maps a removed id to the id its tasks move to; without an entry they go to the first kept status of its category. */
+export interface SaveStatusesArgs {
+  statuses: TaskStatusDef[];
+  reassign: Record<string, string>;
+}
+export interface SaveStatusesResult {
+  statuses: TaskStatusDef[];
 }
 export interface UpdateTaskArgs {
   taskId: string;

@@ -12,7 +12,7 @@ import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
-import { STATUS_TONE, statusLabel as statusText, tagLabel } from '../board/actions';
+import { tagLabel } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import { statusWhy, taskPatch } from '../board/panelFacts';
 import { useHostLabels } from '../hostLabels';
@@ -26,7 +26,7 @@ import AdeLinkRow from './AdeLinkRow.vue';
 import AdeWorkflowBlock from './AdeWorkflowBlock.vue';
 import { useLinkFields } from './useLinkFields';
 
-// Task tab: the editable fields, then the branches. Status is read-only (D10).
+// Task tab: the editable fields, then the branches.
 const props = defineProps<{ card: CardModel }>();
 const { liveNow } = usePlanModel();
 
@@ -53,11 +53,9 @@ async function write(patch: Partial<TaskPatch>): Promise<boolean> {
 }
 
 // ---- status
-const statusTone = computed(() => (props.card.parked ? 'grey' : STATUS_TONE[props.card.status]));
-const statusLabel = computed(() =>
-  props.card.parked ? t('space.ade.board.notMerging.label') : statusText(props.card.status),
+const why = computed(() =>
+  statusWhy(task.value, props.card.status, props.card.blocked, props.card.progress),
 );
-const why = computed(() => statusWhy(task.value, props.card.status, props.card.progress));
 
 // ---- links
 const jira = computed(() => task.value.jira);
@@ -113,7 +111,13 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
     <KeyValueList class="items-center">
       <dt>{{ t('common.field.status.label') }}</dt>
       <dd class="flex min-h-row items-center gap-2">
-        <AdeChip :label="statusLabel" :tone="statusTone" />
+        <AdeChip :label="card.status.name" :tone="card.status.tone" />
+        <AdeChip
+          v-if="card.blocked"
+          :label="t('space.common.status.blocked.status')"
+          tone="red"
+          data-testid="ade-task-blocked"
+        />
         <span class="text-kira-sm text-subtle" data-testid="ade-task-status-why">{{ why }}</span>
       </dd>
       <AdeLinkRow

@@ -46,6 +46,7 @@ const (
 // TaskBoardDeps is NewTaskBoard's construction seam.
 type TaskBoardDeps struct {
 	Tasks           *repos.AdeTaskRepo
+	Statuses        *repos.AdeStatusRepo
 	Backlog         *repos.AdeBacklogRepo
 	RepoConfig      *repos.AdeRepoConfigRepo
 	Facts           *repos.AdeFactsRepo
@@ -345,6 +346,7 @@ func (b *TaskBoard) openRepo(ctx context.Context, codeRepoID string) (*gitsessio
 // boardData is one consistent read of the task store.
 type boardData struct {
 	tasks      []model.AdeTask
+	statuses   []model.AdeTaskStatus
 	branches   []model.AdeTaskBranch
 	plan       []model.AdeTaskPlanRow
 	runs       map[string][]model.AdeRun
@@ -358,6 +360,9 @@ func (b *TaskBoard) load() (boardData, error) {
 	var d boardData
 	var err error
 	if d.tasks, err = b.deps.Tasks.ListLive(); err != nil {
+		return d, err
+	}
+	if d.statuses, err = b.deps.Statuses.List(); err != nil {
 		return d, err
 	}
 	if d.branches, err = b.deps.Tasks.BranchesLive(); err != nil {
@@ -508,7 +513,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 		autofetch = b.deps.AutofetchMinutes()
 	}
 	return adewire.Board{
-		Tasks: tasks, Branches: branches, Plan: plan, Pairs: pairs, History: toWireHistory(d.archived, d.archBranch),
+		Tasks: tasks, Statuses: toWireStatuses(d.statuses), Branches: branches, Plan: plan, Pairs: pairs, History: toWireHistory(d.archived, d.archBranch),
 		Repos: states, WorktreeBasePath: filepath.Join(b.deps.HomeDir, "wt"), AutofetchMinutes: autofetch,
 	}
 }
@@ -517,6 +522,7 @@ func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model
 	out := adewire.Task{
 		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, HostURL: t.HostURL, HostLink: b.hostLink(t.HostURL), WorkflowID: t.WorkflowID,
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
+		StatusID: t.StatusID, StatusBy: t.StatusBy,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
 	}
 	out.BranchIDs = append(out.BranchIDs, branchIDs...)

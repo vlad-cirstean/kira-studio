@@ -47,7 +47,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "In progress",
+          "status": "in-progress",
           "timeout": "1m"
         },
         {
@@ -90,7 +90,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "In review",
+          "status": "in-review",
           "timeout": "1m"
         },
         {
@@ -130,7 +130,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "In progress",
+          "status": "in-progress",
           "timeout": "1m"
         }
       ]
@@ -199,7 +199,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "In progress",
+              "status": "in-progress",
               "timeout": "1m"
             },
             {
@@ -239,7 +239,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "In progress",
+              "status": "in-progress",
               "timeout": "1m"
             },
             {
@@ -282,7 +282,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "In review",
+              "status": "in-review",
               "timeout": "1m"
             },
             {
@@ -322,7 +322,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "In progress",
+              "status": "in-progress",
               "timeout": "1m"
             }
           ]

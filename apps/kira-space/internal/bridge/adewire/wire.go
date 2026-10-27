@@ -20,7 +20,7 @@ const (
 	KindManual StepKind = "manual"
 )
 
-// TaskStatus is 'To do' | 'In progress' | 'In review' | 'Done'.
+// TaskStatus is a task status id from the user's status set, such as 'in-progress'.
 type TaskStatus = string
 
 // RunsOn is 'once' | 'each repo' | `only ${string}`.
@@ -448,6 +448,18 @@ type Task struct {
 	BranchIDs        []string  `json:"branchIds"`
 	Runs             []Run     `json:"runs"`
 	CreatedAt        int64     `json:"createdAt"`
+	// StatusID is the task's status; StatusBy says who set it last: 'auto' (a step change) or 'user'.
+	StatusID string `json:"statusId"`
+	StatusBy string `json:"statusBy"`
+}
+
+// TaskStatusDef is one status of the user's set. Category is 'todo' | 'active' | 'review' | 'done'
+// and decides which status automation picks; Tone is an ADE tone name.
+type TaskStatusDef struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Tone     string `json:"tone"`
+	Category string `json:"category"`
 }
 
 type Plan struct {
@@ -473,14 +485,15 @@ type RepoState struct {
 }
 
 type Board struct {
-	Tasks            []Task         `json:"tasks"`
-	Branches         []Branch       `json:"branches"`
-	Plan             Plan           `json:"plan"`
-	Pairs            []Pair         `json:"pairs"`
-	History          []HistoryEntry `json:"history"`
-	Repos            []RepoState    `json:"repos"`
-	WorktreeBasePath string         `json:"worktreeBasePath"`
-	AutofetchMinutes int            `json:"autofetchMinutes"`
+	Tasks            []Task          `json:"tasks"`
+	Statuses         []TaskStatusDef `json:"statuses"`
+	Branches         []Branch        `json:"branches"`
+	Plan             Plan            `json:"plan"`
+	Pairs            []Pair          `json:"pairs"`
+	History          []HistoryEntry  `json:"history"`
+	Repos            []RepoState     `json:"repos"`
+	WorktreeBasePath string          `json:"worktreeBasePath"`
+	AutofetchMinutes int             `json:"autofetchMinutes"`
 }
 
 type RepoHost struct {
@@ -652,6 +665,20 @@ type TaskPatch struct {
 	Notes     *string `json:"notes"`
 	Color     *int    `json:"color"`
 	Kind      *string `json:"kind"` // 'task' | 'parked'
+	// StatusID moves the task to that status by hand.
+	StatusID *string `json:"statusId"`
+}
+
+// SaveStatusesArgs rewrites the status set in order. A status with an empty ID is new. Reassign maps a
+// removed status id to the id its tasks move to; a removed id without an entry goes to the first kept
+// status of its category.
+type SaveStatusesArgs struct {
+	Statuses []TaskStatusDef   `json:"statuses"`
+	Reassign map[string]string `json:"reassign"`
+}
+
+type SaveStatusesResult struct {
+	Statuses []TaskStatusDef `json:"statuses"`
 }
 
 type UpdateTaskArgs struct {

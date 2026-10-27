@@ -207,6 +207,7 @@ export const IPC = {
   adeTaskResumeRun: 'kira:adetask:resumeRun',
   adeTaskStepDone: 'kira:adetask:stepDone',
   adeTaskSetTaskStep: 'kira:adetask:setTaskStep',
+  adeTaskSaveStatuses: 'kira:adetask:saveStatuses',
   adeTaskRetrySetup: 'kira:adetask:retrySetup',
   adeTaskReadLog: 'kira:adetask:readLog',
   adeTaskRunSandbox: 'kira:adetask:runSandbox',

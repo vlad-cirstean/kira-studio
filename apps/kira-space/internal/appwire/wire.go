@@ -194,7 +194,7 @@ func wireAdeTask(
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
 		Agent:   agents,
 		Prompts: runs.LlmPrompts,
-		Tasks:   repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
+		Tasks:   repositories.AdeTasks, Statuses: repositories.AdeStatuses, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
 		Registry:        git.registry,
 		GitStatus:       func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
@@ -251,6 +251,7 @@ func wireAdeTask(
 		Now:              time.Now,
 	})
 	tracker.SetStoppedHandler(board.OnTUIStopped)
+	tracker.SetStartedHandler(board.OnTUIStarted)
 	if err := board.Recover(); err != nil {
 		slog.Warn("ade: recover task board", "scope", "ade", "err", err)
 	}

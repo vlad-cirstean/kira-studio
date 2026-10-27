@@ -168,7 +168,7 @@ func (b *TaskBoard) UpdateTask(ctx context.Context, args adewire.UpdateTaskArgs)
 	if p.Jira != nil && p.ClearJira {
 		return adewire.Task{}, invalid("jira and clearJira are mutually exclusive")
 	}
-	patch := model.AdeTaskPatch{Title: p.Title, HostURL: p.HostURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind}
+	patch := model.AdeTaskPatch{Title: p.Title, HostURL: p.HostURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind, StatusID: p.StatusID}
 	if p.Title != nil {
 		trimmed := strings.TrimSpace(*p.Title)
 		patch.Title = &trimmed

@@ -1,12 +1,10 @@
 import { t } from '@theme/i18n';
-import type { StepKind, TaskStatus, Workflow, WorkflowStep } from '../wire';
+import type { StepKind, Workflow, WorkflowStep } from '../wire';
 import { DEFAULT_MAX_RETURNS, defaultResults, reviewDefaultResults } from './stepResults';
 import { defaultSandbox } from './stepSandbox';
 
 // Pure helpers behind the Workflows form editor (SPEC2 section 5.1.1). Step ids are run keys: they
 // are minted once, here, and never follow a rename.
-
-export const STATUS_OPTIONS: readonly TaskStatus[] = ['To do', 'In progress', 'In review', 'Done'];
 
 export const STEP_KINDS: readonly StepKind[] = ['agent', 'script', 'review', 'manual'];
 
@@ -41,7 +39,7 @@ function nextId(taken: readonly string[]): string {
 function kindDefaults(kind: StepKind): Omit<WorkflowStep, 'id' | 'name'> {
   const base: Omit<WorkflowStep, 'id' | 'name'> = {
     kind,
-    status: kind === 'review' ? 'In review' : 'In progress',
+    status: kind === 'review' ? 'in-review' : 'in-progress',
     skip: false,
     session: false,
     command: '',
@@ -93,7 +91,7 @@ export function withKind(step: WorkflowStep, kind: StepKind): WorkflowStep {
     name: step.name,
     skip: step.skip,
     status:
-      step.status === (step.kind === 'review' ? 'In review' : 'In progress')
+      step.status === (step.kind === 'review' ? 'in-review' : 'in-progress')
         ? fresh.status
         : step.status,
     runsOn: fresh.runsOn === '' ? '' : step.runsOn || fresh.runsOn,

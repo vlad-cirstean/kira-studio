@@ -120,7 +120,7 @@ func adeTaskError(err error) error {
 			return ipcerr.T(c.code, c.key, nil)
 		}
 	}
-	if errors.Is(err, repos.ErrTaskUnnamed) {
+	if errors.Is(err, repos.ErrTaskUnnamed) || errors.Is(err, repos.ErrStatusSet) || errors.Is(err, repos.ErrStatusUnknown) {
 		return ipcerr.BadRequest(err.Error())
 	}
 	if errors.Is(err, ade.ErrInvalidInput) {
@@ -268,6 +268,29 @@ func validateUpdateTask(a adewire.UpdateTaskArgs) error {
 	if p.Kind != nil && *p.Kind != "task" && *p.Kind != "parked" {
 		return adeTaskInvalid("kind must be task or parked")
 	}
+	if p.StatusID != nil && !model.ValidAdeStatusID(*p.StatusID) {
+		return adeTaskInvalid("statusId is not a status id")
+	}
+	return nil
+}
+
+func validateSaveStatuses(a adewire.SaveStatusesArgs) error {
+	if len(a.Statuses) < model.AdeStatusMin || len(a.Statuses) > model.AdeStatusMax {
+		return adeTaskInvalid("statuses must hold 1 to 20 entries")
+	}
+	for _, st := range a.Statuses {
+		if err := (model.AdeTaskStatus{ID: st.ID, Name: strings.TrimSpace(st.Name), Tone: st.Tone, Category: st.Category}).Validate(); err != nil {
+			return adeTaskInvalid(err.Error())
+		}
+	}
+	if len(a.Reassign) > model.AdeStatusMax {
+		return adeTaskInvalid("reassign is too long")
+	}
+	for from, to := range a.Reassign {
+		if !model.ValidAdeStatusID(from) || !model.ValidAdeStatusID(to) {
+			return adeTaskInvalid("reassign must map status ids to status ids")
+		}
+	}
 	return nil
 }
 
@@ -402,6 +425,15 @@ func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTask
 	}
 	t, err := s.Engine.UpdateTask(ctx, args)
 	return t, adeTaskError(err)
+}
+
+// SaveStatuses rewrites the task status set; tasks on a removed status move to its reassign target.
+func (s *AdeTaskService) SaveStatuses(ctx context.Context, args adewire.SaveStatusesArgs) (adewire.SaveStatusesResult, error) {
+	if err := validateSaveStatuses(args); err != nil {
+		return adewire.SaveStatusesResult{}, err
+	}
+	res, err := s.Engine.SaveStatuses(ctx, args)
+	return res, adeTaskError(err)
 }
 
 func (s *AdeTaskService) AddTaskRepo(ctx context.Context, args adewire.AddTaskRepoArgs) (adewire.Branch, error) {

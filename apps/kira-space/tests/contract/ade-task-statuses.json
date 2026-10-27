@@ -1,0 +1,97 @@
+{
+  "AdeTaskService.SaveStatuses#saved": {
+    "statuses": [
+      {
+        "category": "todo",
+        "id": "todo",
+        "name": "To do",
+        "tone": "grey"
+      },
+      {
+        "category": "active",
+        "id": "qa",
+        "name": "QA",
+        "tone": "purple"
+      },
+      {
+        "category": "review",
+        "id": "in-review",
+        "name": "Code review",
+        "tone": "blue"
+      },
+      {
+        "category": "done",
+        "id": "done",
+        "name": "Done",
+        "tone": "green"
+      }
+    ]
+  },
+  "AdeTaskService.UpdateTask#moved": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "implement",
+    "est": "",
+    "hostLink": null,
+    "hostUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [],
+    "since": {},
+    "statusBy": "user",
+    "statusId": "in-review",
+    "title": "Fix login",
+    "workflow": null,
+    "workflowId": "flow",
+    "workflowOutdated": false
+  },
+  "args:AdeTaskService.SaveStatuses": {
+    "reassign": {
+      "in-progress": "qa"
+    },
+    "statuses": [
+      {
+        "category": "todo",
+        "id": "todo",
+        "name": "To do",
+        "tone": "grey"
+      },
+      {
+        "category": "active",
+        "id": "",
+        "name": "QA",
+        "tone": "purple"
+      },
+      {
+        "category": "review",
+        "id": "in-review",
+        "name": "Code review",
+        "tone": "blue"
+      },
+      {
+        "category": "done",
+        "id": "done",
+        "name": "Done",
+        "tone": "green"
+      }
+    ]
+  },
+  "args:AdeTaskService.UpdateTask": {
+    "patch": {
+      "clearJira": false,
+      "color": null,
+      "est": null,
+      "hostUrl": null,
+      "jira": null,
+      "kind": null,
+      "notes": null,
+      "statusId": "in-review",
+      "title": null
+    },
+    "taskId": "<id:1>"
+  }
+}

@@ -401,6 +401,8 @@ const spaceControl = {
     unwrap(AdeTaskService.StepDone(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSetTaskStep: (args: V2.SetTaskStepArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.SetTaskStep(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskSaveStatuses: (args: V2.SaveStatusesArgs): Promise<V2.SaveStatusesResult> =>
+    unwrap(AdeTaskService.SaveStatuses(args)).then((r) => trust<V2.SaveStatusesResult>(r)),
   adeTaskRetrySetup: (args: V2.BranchArgs): Promise<void> =>
     unwrap(AdeTaskService.RetrySetup(args)),
   adeTaskReadLog: (args: V2.ReadLogArgs): Promise<V2.LogPage> =>

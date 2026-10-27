@@ -89,7 +89,7 @@ func stepIndex(wf adewire.Workflow, id string) int {
 
 func agentStep(id string) adewire.WorkflowStep {
 	return adewire.WorkflowStep{
-		ID: id, Name: "S", Kind: adewire.KindAgent, Status: "In progress", RunsOn: "once", Before: "auto",
+		ID: id, Name: "S", Kind: adewire.KindAgent, Status: "in-progress", RunsOn: "once", Before: "auto",
 		Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "10m", Prompt: "go",
 		AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 	}
@@ -200,7 +200,7 @@ func TestSave_edits(t *testing.T) {
 	t.Run("review step round trip", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		rv := agentStep("code-review")
-		rv.Kind, rv.Status, rv.Prompt, rv.MaxReturns, rv.AllowedTools = adewire.KindReview, "In review", "", 0, []string{}
+		rv.Kind, rv.Status, rv.Prompt, rv.MaxReturns, rv.AllowedTools = adewire.KindReview, "in-review", "", 0, []string{}
 		rv.Review = &adewire.ReviewStepConfig{SendTo: "new", Implementer: "impl"}
 		wf.Steps = append(wf.Steps, rv)
 		out := saveOK(t, r, "standard.yaml", wf)
@@ -217,7 +217,7 @@ func TestSave_edits(t *testing.T) {
 	t.Run("kind change drops foreign keys", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		i := stepIndex(wf, "spec")
-		wf.Steps[i] = adewire.WorkflowStep{ID: "spec", Name: "Spec", Kind: adewire.KindScript, Status: "To do", Command: "make spec",
+		wf.Steps[i] = adewire.WorkflowStep{ID: "spec", Name: "Spec", Kind: adewire.KindScript, Status: "todo", Command: "make spec",
 			RunsOn: "once", Before: "auto", Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "5m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
 		out := saveOK(t, r, "standard.yaml", wf)
 		_, seg, _ := strings.Cut(out, "id: spec")
@@ -233,7 +233,7 @@ func TestSave_refusals(t *testing.T) {
 	if _, err := r.SaveYaml("w.yaml", "", "id: w\nname: [\n"); err != nil {
 		t.Fatal(err)
 	}
-	wf := adewire.Workflow{ID: "w", Name: "W", Steps: []adewire.WorkflowStep{{ID: "u", Name: "U", Kind: adewire.KindManual, Status: "To do", Results: []adewire.StepResult{}}}}
+	wf := adewire.Workflow{ID: "w", Name: "W", Steps: []adewire.WorkflowStep{{ID: "u", Name: "U", Kind: adewire.KindManual, Status: "todo", Results: []adewire.StepResult{}}}}
 	before := read(t, r, "w.yaml")
 	if _, err := r.Save("w.yaml", "", wf); err == nil || !strings.Contains(err.Error(), "fix the YAML error on line") {
 		t.Fatalf("syntax error: %v", err)
@@ -247,7 +247,7 @@ func TestSave_refusals(t *testing.T) {
 		t.Fatal("id/stem mismatch accepted")
 	}
 	bad = wf
-	bad.Steps = []adewire.WorkflowStep{{ID: "s", Name: "S", Kind: adewire.KindScript, Status: "To do"}}
+	bad.Steps = []adewire.WorkflowStep{{ID: "s", Name: "S", Kind: adewire.KindScript, Status: "todo"}}
 	if _, err := r.Save("fresh.yaml", "", bad); err == nil {
 		t.Fatal("invalid workflow accepted")
 	}

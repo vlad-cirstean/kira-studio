@@ -17,6 +17,8 @@
     "owner": "",
     "runs": [],
     "since": {},
+    "statusBy": "auto",
+    "statusId": "todo",
     "title": "",
     "workflow": null,
     "workflowId": "",
@@ -31,6 +33,7 @@
       "jira": null,
       "kind": "task",
       "notes": null,
+      "statusId": null,
       "title": null
     },
     "taskId": "<id:1>"

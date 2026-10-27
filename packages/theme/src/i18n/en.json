@@ -7683,6 +7683,9 @@
           "finished": {
             "hint": "The workflow is finished."
           },
+          "manual": {
+            "hint": "Set by you. The next step change sets it again."
+          },
           "notStarted": {
             "hint": "Not started."
           },
@@ -8725,15 +8728,6 @@
       "status": {
         "blocked": {
           "status": "Blocked"
-        },
-        "inProgress": {
-          "status": "In progress"
-        },
-        "inReview": {
-          "status": "In review"
-        },
-        "todo": {
-          "status": "To do"
         }
       },
       "step": {

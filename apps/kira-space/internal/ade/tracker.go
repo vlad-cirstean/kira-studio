@@ -58,6 +58,9 @@ type TrackerDeps struct {
 	// OnStopped is called with a record id after Reconcile marked it stopped (its terminal is gone);
 	// the v2 engine releases per-session state here. Never called with the lock held.
 	OnStopped func(recordID string)
+	// OnStarted is called with the task id after a new task-level session record is inserted. Never
+	// called with the lock held.
+	OnStarted func(taskID string)
 	// Grace/PendingTTL default to defaultGrace/defaultPendingTTL when zero — a test shortens Grace
 	// to make Reconcile's own grace-window behaviour observable in milliseconds, not 30 real
 	// seconds.
@@ -180,6 +183,13 @@ func NewTracker(deps TrackerDeps) *Tracker {
 		fresh:          map[string]bool{},
 		graceTimers:    map[string]*time.Timer{},
 	}
+}
+
+// SetStartedHandler installs TrackerDeps.OnStarted after construction, like SetStoppedHandler.
+func (t *Tracker) SetStartedHandler(fn func(taskID string)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.deps.OnStarted = fn
 }
 
 // SetStoppedHandler installs TrackerDeps.OnStopped after construction: the handler's owner (the v2
@@ -455,6 +465,14 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 
 	if t.deps.OnChange != nil {
 		t.deps.OnChange()
+	}
+	if !intent.Resume && intent.TaskID != "" {
+		t.mu.Lock()
+		onStarted := t.deps.OnStarted
+		t.mu.Unlock()
+		if onStarted != nil {
+			onStarted(intent.TaskID)
+		}
 	}
 
 	return composed, env, nil

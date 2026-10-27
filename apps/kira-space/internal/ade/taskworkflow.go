@@ -41,6 +41,7 @@ func (b *TaskBoard) SetTaskWorkflow(_ context.Context, args adewire.SetTaskWorkf
 	if err := b.deps.Tasks.ResetWorkflow(args.TaskID, args.WorkflowID, entry); err != nil {
 		return adewire.Task{}, err
 	}
+	b.syncStatus(args.TaskID)
 	b.clearStepMessages(args.TaskID)
 	b.notifyBoard()
 	task, err = b.deps.Tasks.GetTask(args.TaskID)

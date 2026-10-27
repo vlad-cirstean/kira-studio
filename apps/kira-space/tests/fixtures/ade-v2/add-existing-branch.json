@@ -17,7 +17,9 @@
     "color": 13,
     "branchIds": ["p_rate"],
     "runs": [],
-    "createdAt": 1790067540000
+    "createdAt": 1790067540000,
+    "statusId": "todo",
+    "statusBy": "auto"
   },
   "branch": {
     "id": "p_rate",

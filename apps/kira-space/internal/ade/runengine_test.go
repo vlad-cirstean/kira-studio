@@ -229,7 +229,7 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 			e.mu.Unlock()
 			return nil
 		},
-		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Tasks: r.AdeTasks, Statuses: r.AdeStatuses, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		GitRepoSettings: r.GitRepoSettings.Get, Runner: gitclient.NewExecRunner(), Registry: registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },
 		Workflows: &adeflow.Reader{Dir: wfDir, Store: r.AdeTasks},

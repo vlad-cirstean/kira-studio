@@ -43,10 +43,16 @@ func DefaultResults() []StepResult {
 	}
 }
 
+// Status ids of the seed set (migration 0051): the defaults of a step that sets none.
+const (
+	StatusInProgress TaskStatus = "in-progress"
+	StatusInReview   TaskStatus = "in-review"
+)
+
 // DefaultStatus is the task status of a step that sets none.
 func DefaultStatus(kind StepKind) TaskStatus {
 	if kind == KindReview {
-		return "In review"
+		return StatusInReview
 	}
-	return "In progress"
+	return StatusInProgress
 }

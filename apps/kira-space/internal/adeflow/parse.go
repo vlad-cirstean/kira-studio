@@ -22,6 +22,9 @@ import (
 
 const maxSmartScriptName = 200
 
+// maxStatusID is the longest status id.
+const maxStatusID = 40
+
 const syntaxMessage = "unexpected content here (check the indentation)"
 
 var (
@@ -31,7 +34,6 @@ var (
 	mcpToolPattern   = regexp.MustCompile(`^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$`)
 	yamlErrLine      = regexp.MustCompile(`line (\d+)`)
 	maxStepTimeout   = 24 * time.Hour
-	taskStatuses     = []string{"To do", "In progress", "In review", "Done"}
 )
 
 // stepKeys are the keys beyond id, name, kind, status and skip that each step kind allows.
@@ -302,14 +304,21 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 	return step, rn
 }
 
-// status reads a step's task status; absent, it is In review on a review step, else In progress.
+// legacyStatuses maps the names files used before statuses became ids to the seed set's ids.
+var legacyStatuses = map[string]string{"To do": "todo", "In progress": "in-progress", "In review": "in-review", "Done": "done"}
+
+// status reads a step's task status id; absent, it is in-review on a review step, else in-progress.
+// Membership in the user's set is checked at run time, so a file loads without the DB.
 func (v *validator) status(sm map[string]*yaml.Node, sp, kind string) string {
 	if _, has := sm["status"]; !has {
 		return adewire.DefaultStatus(kind)
 	}
 	val := v.str(sm, sp, "status", true)
-	if v.err == nil && !contains(taskStatuses, val) {
-		v.fail(sm["status"], sp, "status must be To do, In progress, In review or Done")
+	if id, legacy := legacyStatuses[val]; legacy {
+		return id
+	}
+	if v.err == nil && (!idPattern.MatchString(val) || len(val) > maxStatusID) {
+		v.fail(sm["status"], sp, "status must be a status id such as in-progress")
 	}
 	return val
 }
@@ -619,15 +628,6 @@ func (v *validator) allowedTools(m map[string]*yaml.Node, prefix string) []strin
 		out = append(out, e.Value)
 	}
 	return out
-}
-
-func contains(list []string, s string) bool {
-	for _, e := range list {
-		if e == s {
-			return true
-		}
-	}
-	return false
 }
 
 const (

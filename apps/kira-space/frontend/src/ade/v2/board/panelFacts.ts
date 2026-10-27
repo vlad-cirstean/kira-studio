@@ -6,17 +6,23 @@ import type {
   RepoRefresh,
   Task,
   TaskPatch,
+  TaskStatusDef,
 } from '../wire';
 import type { TaskProgress } from './progress';
-import type { DerivedStatus } from './status';
 
-/** Why the status chip reads as it does (D10: status follows the workflow). */
-export function statusWhy(task: Task, status: DerivedStatus, progress: TaskProgress): string {
+/** Why the status chip reads as it does: the user set it, or the workflow position did. */
+export function statusWhy(
+  task: Task,
+  status: TaskStatusDef,
+  blocked: boolean,
+  progress: TaskProgress,
+): string {
   if (task.kind === 'review') return t('space.ade.board.branchTag.review.tooltip');
   if (task.kind === 'parked') return t('space.ade.board.branchTag.parked.tooltip');
+  if (task.statusBy === 'user') return t('space.ade.panelFacts.why.manual.hint');
   if (progress.finished) return t('space.ade.panelFacts.why.finished.hint');
-  if (status === 'Blocked') return t('space.ade.panelFacts.why.stuck.hint');
-  if (status === 'To do') return t('space.ade.panelFacts.why.notStarted.hint');
+  if (blocked) return t('space.ade.panelFacts.why.stuck.hint');
+  if (status.category === 'todo') return t('space.ade.panelFacts.why.notStarted.hint');
   return progress.step ? t('space.ade.panelFacts.why.step.hint', { step: progress.step.name }) : '';
 }
 
@@ -73,6 +79,7 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
     notes: null,
     color: null,
     kind: null,
+    statusId: null,
     ...over,
   };
 }
