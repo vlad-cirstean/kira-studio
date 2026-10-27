@@ -101,8 +101,8 @@ export const IPC = {
   collectionsCreateCollection: 'kira:collections:createCollection',
   collectionsCreateItem: 'kira:collections:createItem',
   collectionsRename: 'kira:collections:rename',
-  collectionsDelete: 'kira:collections:delete',
-  collectionsMoveItem: 'kira:collections:moveItem',
+  collectionsDeleteMany: 'kira:collections:deleteMany',
+  collectionsMoveItems: 'kira:collections:moveItems',
   collectionsImport: 'kira:collections:import',
   collectionsExport: 'kira:collections:export',
 

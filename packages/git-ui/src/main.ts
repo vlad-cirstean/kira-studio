@@ -7,7 +7,7 @@ import type { RepoHead } from './components/GitViewHead.vue';
 import ReviewView from './components/review/ReviewView.vue';
 import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
 import MountRoot from './MountRoot.vue';
-import type { ReviewTarget } from './state/review.ts';
+import type { ReviewApi, ReviewTarget } from './state/review.ts';
 import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 
 export interface MountHandle {
@@ -39,9 +39,9 @@ export interface MountOptions {
    *  swap or base pick, no `review.target` push, no session resume or save. */
   readonly lockTarget?: boolean;
   /** Only meaningful when `view === "review"`: called with the path after each file-list mark. */
-  readonly onReviewMarked?: (path: string) => void;
+  readonly onReviewMarked?: (paths: readonly string[]) => void;
   /** Only meaningful when `view === "review"`: receives a handle that opens a file's diff, as a click in the Files pane does. */
-  readonly onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
+  readonly onReviewApi?: (api: ReviewApi) => void;
   /** Only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
    *  palette command that fired while the graph webview was cold (`panelView.ts`'s own
    *  `#pendingUiAction`/bootstrap-island arm). `undefined`/`null` means no action is pending.

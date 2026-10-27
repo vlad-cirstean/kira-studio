@@ -33,8 +33,10 @@ import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
+import { adjacentInOrder, orderedFilePaths } from '../../lib/fileTreeModel.ts';
 import { createReviewFilesActions } from '../../lib/reviewFilesActions.ts';
 import { useReviewAnnouncements } from '../../lib/useReviewAnnouncements.ts';
+import type { MountOptions } from '../../main.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
@@ -55,8 +57,8 @@ const props = defineProps<{
   viewState: ViewStateStore;
   target?: ReviewTarget | null;
   lockTarget?: boolean;
-  onReviewMarked?: (path: string) => void;
-  onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
+  onReviewMarked?: (paths: readonly string[]) => void;
+  onReviewApi?: MountOptions['onReviewApi'];
   repoHead?: RepoHead;
 }>();
 
@@ -156,7 +158,7 @@ async function bootstrap(): Promise<void> {
   await bridge.init();
   review.value = new ReviewSessionState(bridge);
   reviewFiles.value = new ReviewFilesState(bridge);
-  reviewFiles.value.onMarked = (path) => props.onReviewMarked?.(path);
+  reviewFiles.value.onMarked = (paths) => props.onReviewMarked?.(paths);
   reviewComments.value = new ReviewCommentsState(bridge);
 
   if (!props.lockTarget) {
@@ -375,7 +377,10 @@ const rowActions = computed<DetailActions | undefined>(() => review.value?.rowAc
 const filesActions = createReviewFilesActions(bridge, () => repoId.value, announce);
 
 onMounted(() => {
-  props.onReviewApi?.({ selectFile: (path) => reviewFiles.value?.selectFile(path) });
+  props.onReviewApi?.({
+    selectFile: (path) => reviewFiles.value?.selectFile(path),
+    adjacentFile: (path, dir) => adjacentInOrder(orderedPaths.value, path, dir),
+  });
   // Mirrors `App.vue`'s own first-paint mark (the review-view perf metric measures from this, not
   // merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
   // worker to wait a frame for, so this can mark right after mount rather than waiting on a
@@ -409,6 +414,14 @@ onBeforeUnmount(() => {
 // (show-toolbar="false") and receive these as plain props.
 const listMode = ref<FileListMode>('tree');
 const filter = ref('');
+// Reactive so a host computed reading the navigator refreshes when the list order changes.
+const orderedPaths = computed(() =>
+  orderedFilePaths(
+    (reviewFiles.value?.files.value ?? []).map((entry) => entry.change),
+    filter.value,
+    listMode.value,
+  ),
+);
 
 // The write half of durable persistence — one watch() over the same fields the
 // snapshot lists (listMode/filter live here; branch/resolution/pane/diffMode are read fresh

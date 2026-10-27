@@ -93,6 +93,8 @@ type Registry struct {
 	OpLog *oplog.Log
 
 	pruneOnce sync.Once
+	// crShare is built on first use, under mu (Acquire holds it while constructing an entry).
+	crShare *crShared
 
 	mu      sync.Mutex
 	entries map[string]*slot
@@ -177,10 +179,18 @@ func (reg *Registry) acquire(
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
 		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Hosts, reg.IsOpen,
-		skipInitialAutoFetch, reg.OpLog, reg.CRStore, reg.CRSync,
+		skipInitialAutoFetch, reg.OpLog, reg.CRStore, reg.CRSync, reg.crShared(),
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
+}
+
+// crShared is the syncers' shared coordination; the caller holds reg.mu.
+func (reg *Registry) crShared() *crShared {
+	if reg.crShare == nil {
+		reg.crShare = newCRShared()
+	}
+	return reg.crShare
 }
 
 // pruneChangeRequests drops repositories idle past the retention, once per process and before any

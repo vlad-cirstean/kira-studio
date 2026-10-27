@@ -61,7 +61,7 @@ function cssVar(name: string): string {
 // deliberate, not an oversight (§6.4's own stated reasoning).
 function terminalTheme(): import('@xterm/xterm').ITheme {
   return {
-    background: cssVar('--kira-bg'),
+    background: cssVar('--kira-bg-chrome'),
     foreground: cssVar('--kira-fg'),
     cursor: cssVar('--kira-fg'),
     selectionBackground: cssVar('--kira-select'),
@@ -89,6 +89,8 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
     scrollback: 5000,
     cursorBlink: true,
     allowProposedApi: false,
+    // VS Code parity: keeps screens cleared with ED2 in scrollback.
+    scrollOnEraseInDisplay: true,
     fontFamily: appearance.fontFamily,
     fontSize: appearance.fontSize,
     theme: terminalTheme(),
@@ -96,6 +98,15 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.loadAddon(new WebLinksAddon());
+  // Cmd+Enter is meta-Enter (ESC CR), xterm's own Alt+Enter bytes: a newline in Claude Code and zsh.
+  term.attachCustomKeyEventHandler((ev) => {
+    if (ev.key !== 'Enter' || !ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return true;
+    if (ev.type === 'keydown' && !ev.isComposing) {
+      ev.preventDefault();
+      term.input('\x1b\r', true);
+    }
+    return false;
+  });
   term.open(host);
 
   const off = deps.onTerminalOutput(tabId, (bytes) => term.write(bytes));

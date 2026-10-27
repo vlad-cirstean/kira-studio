@@ -10,9 +10,11 @@ import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
 import { splitMatches } from '@workbench/behaviour/match';
+import { SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
+import type { DropZone } from './collectionDrop';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
 // The same rowIndent indent, roving tabindex and twisty as project/TreeRow.vue,
@@ -27,19 +29,25 @@ const props = withDefaults(
   defineProps<{
     row: CollectionRowVm;
     selected: boolean;
-    /** The tree's one tab stop when nothing is selected. */
+    /** The roving stop: the one row with tabindex 0, whether or not more rows are selected. */
+    focused?: boolean;
+    /** The tree's one tab stop when no row is focused. */
     tabbable?: boolean;
     sticky?: boolean;
+    /** Part of the set being dragged. */
+    dragging?: boolean;
+    /** Where the drag would land relative to this row. */
+    dropZone?: DropZone | null;
     class?: HTMLAttributes['class'];
   }>(),
-  { sticky: false, tabbable: false },
+  { sticky: false, tabbable: false, focused: false, dragging: false, dropZone: null },
 );
 
 // A pinned band row needs an opaque background; selected still wins (rowVariants selected).
 const stickyClass = computed(() => (props.sticky && !props.selected ? 'bg-bg' : undefined));
 
 const emit = defineEmits<{
-  select: [row: CollectionRowVm];
+  select: [row: CollectionRowVm, event?: MouseEvent];
   toggle: [row: CollectionRowVm];
   open: [row: CollectionRowVm];
   contextmenu: [row: CollectionRowVm, event: MouseEvent];
@@ -67,9 +75,23 @@ function onTwistyClick(): void {
   emit('toggle', props.row);
 }
 
-// A focused row is the roving stop, so Shift+F10 and arrows act on it.
+// A focused row is the roving stop, so Shift+F10 and arrows act on it. Focus from a mouse press is
+// the click's to handle: selecting here would undo a Ctrl or Shift click before it lands.
+let pressed = false;
+function onMouseDown(): void {
+  pressed = true;
+}
+function onMouseUp(): void {
+  pressed = false;
+}
+function onClick(event: MouseEvent): void {
+  pressed = false;
+  emit('select', props.row, event);
+}
 function onFocus(): void {
-  if (!props.sticky && !props.selected) emit('select', props.row);
+  const byMouse = pressed;
+  pressed = false;
+  if (!byMouse && !props.sticky && !props.selected) emit('select', props.row);
 }
 
 // The container's useListNavigation claims Enter and the arrows; Space mirrors a single click.
@@ -84,7 +106,14 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     :class="
-      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, props.class)
+      cn(
+        rowVariants({ layout: 'tree', selected }),
+        'h-row',
+        stickyClass,
+        dragging && SORTABLE_GHOST_CLASS,
+        dropZone === 'into' && 'ring-1 ring-inset ring-focus bg-focus/10',
+        props.class,
+      )
     "
     :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'collection-sticky-row' : 'collection-row'"
@@ -95,13 +124,25 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-level="row.depth + 1"
     :aria-expanded="row.hasChildren ? row.expanded : undefined"
     :aria-selected="selected"
-    :tabindex="sticky ? -1 : selected || tabbable ? 0 : -1"
-    @click="emit('select', row)"
+    :data-key="row.key"
+    :data-drop-zone="dropZone ?? undefined"
+    :tabindex="sticky ? -1 : focused || tabbable ? 0 : -1"
+    @mousedown="onMouseDown"
+    @mouseup="onMouseUp"
+    @click="onClick"
     @dblclick="emit('open', row)"
     @focus="onFocus"
     @keydown="onKeydown"
     @contextmenu.prevent.stop="emit('contextmenu', row, $event)"
   >
+    <div
+      v-if="dropZone === 'before' || dropZone === 'after'"
+      aria-hidden="true"
+      data-testid="tree-drop-indicator"
+      :data-zone="dropZone"
+      :class="cn('pointer-events-none absolute inset-x-0 h-0.5 bg-focus', dropZone === 'before' ? 'top-0' : 'bottom-0')"
+    />
+
     <!-- Same reasoning as project/TreeRow.vue's twisty: its entire meaning is drawn by the
          chevron direction, so no tooltip, but :aria-label stays so it isn't nameless. -->
     <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick" />

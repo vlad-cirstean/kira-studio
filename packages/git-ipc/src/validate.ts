@@ -195,7 +195,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P352: 50 -> 51, additive. New requests 'branch.changeRequestIndex' and 'branch.syncChangeRequests';
 // 'repo.changed' gains kind 'changeRequestsChanged'; 'ChangeRequestRecord' gains 'draft',
 // 'reviewDecision' and 'checksState'.
-export const CONTRACT_VERSION = 51;
+// P358: 51 -> 52, additive. New request 'review.markMany' (batch whole-file mark).
+export const CONTRACT_VERSION = 52;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -275,6 +276,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.files': true,
   'review.fileDiff': true,
   'review.mark': true,
+  'review.markMany': true,
   'review.snapshot': true,
   'review.comment.add': true,
   'review.comment.list': true,

@@ -8,7 +8,7 @@ import {
   openPlan,
 } from './support/adeV2';
 import { contract } from './support/contract';
-import { gitStreamRequests } from './support/gitStreamMock';
+import { gitStreamParams, gitStreamRequests } from './support/gitStreamMock';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -159,6 +159,248 @@ reviewTest('a review diff opens side by side', async ({ relaunch }) => {
     .locator('.monaco-diff-editor .editor.original')
     .evaluate((el) => el.getBoundingClientRect().width);
   expect(width).toBeGreaterThan(100);
+});
+
+reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
+  const read = (side: 'left' | 'right') => contract('git-review-hunks', `git:file.read#${side}`);
+  const comment = {
+    id: 1,
+    path: 'src/pending.ts',
+    range: { start: 12, end: 12 },
+    body: 'Why this?',
+    anchor: 'exact',
+    anchorSha: 'a'.repeat(40),
+    createdAt: 1_790_036_500_000,
+    kind: 'change',
+    state: 'open',
+    reply: '',
+    repliedAt: null,
+    sentAt: null,
+  };
+  const { window: page } = await relaunch({
+    control: reviewControl([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'file.read': { __sequence: [read('left'), read('right')] },
+        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
+        'review.fileDiff': {
+          ...contract<object>('git-review-hunks', 'git:review.fileDiff#range'),
+          path: 'src/pending.ts',
+        },
+        'review.comment.list': { at: 'a'.repeat(40), comments: [comment] },
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await page
+    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
+    .click();
+  const modified = page.locator(t('repo-diff-editor')).locator('.editor.modified');
+  const lines = modified.locator('.view-lines .view-line');
+  const rendered = (text: string) =>
+    lines.filter({ hasText: new RegExp(`^\\s*${text.replace(' ', '\\s')}$`) });
+
+  await expect(rendered('CHANGED 100')).toHaveCount(1);
+  for (const n of [97, 98, 99, 101, 102, 103, 12]) {
+    await expect(rendered(`line ${n}`)).toHaveCount(1);
+  }
+  await expect(modified.locator('.kira-review-glyph-comment')).toHaveCount(1);
+  for (const n of [50, 150]) await expect(rendered(`line ${n}`)).toHaveCount(0);
+  expect(await lines.count()).toBeLessThan(40);
+  const placeholders = modified.locator('.diff-hidden-lines');
+  await expect(placeholders).toHaveCount(2);
+
+  await page.screenshot({ path: 'test-results/review-hunks-only.png' });
+
+  const before = await lines.count();
+  await placeholders.last().locator('a').first().click();
+  await expect.poll(() => lines.count()).toBeGreaterThan(before);
+});
+
+async function openDiffWindow(
+  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
+  files: readonly string[],
+  extraResults: Record<string, unknown>,
+): Promise<Page> {
+  const { window: page } = await relaunch({
+    control: reviewControl([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'review.files': {
+          ...REVIEW_FILES,
+          files: files.map((path) => ({ change: change(path), review: status('none', false) })),
+        },
+        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
+        'review.fileDiff': {
+          path: files[0],
+          deltaSource: 'noSnapshot',
+          body: { kind: 'text', hunks: [] },
+          reviewedRanges: [],
+          lineCount: 200,
+          reviewedAtSha: null,
+        },
+        ...extraResults,
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  return page;
+}
+
+reviewTest('a folder checkbox marks every file under it', async ({ relaunch }) => {
+  const marked = contract<{ results: { path: string; review: object }[] }>(
+    'git-review-folder',
+    'git:review.markMany#mark',
+  );
+  const fullReview = marked.results[0]?.review ?? {};
+  const noneReview = { kind: 'none', changedSinceReview: false };
+  const result = (reviewed: boolean, paths: string[]) => ({
+    results: paths.map((path) => ({ path, review: reviewed ? fullReview : noneReview })),
+  });
+  const all = ['src/pending.ts', 'src/done.ts', 'src/moved.ts'];
+  const { window: mixed } = await relaunch({
+    control: reviewControl(),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'review.markMany': {
+          __sequence: [result(true, ['src/pending.ts']), result(false, all)],
+        },
+      },
+    },
+  });
+  await mixed.locator(t('ade-review-window')).waitFor();
+  const tree = mixed.locator(t('review-files-tree'));
+  const folder = tree.locator(t('review-folder-check'));
+  const files = tree.locator(`${t('file-tree-row')} button[role="checkbox"]`);
+  await expect(folder).toHaveAttribute('aria-checked', 'mixed');
+
+  await folder.click();
+  await expect(folder).toHaveAttribute('aria-checked', 'true');
+  await expect(files).toHaveCount(4);
+  for (const i of [0, 1, 2, 3]) await expect(files.nth(i)).toHaveAttribute('aria-checked', 'true');
+  await mixed.screenshot({ path: 'test-results/review-folder-marked.png' });
+
+  await folder.click();
+  await expect(folder).toHaveAttribute('aria-checked', 'false');
+  const params = (await gitStreamParams(mixed, 'review.markMany')) as {
+    paths: string[];
+    reviewed: boolean;
+  }[];
+  expect(params.map((p) => [p.paths, p.reviewed])).toEqual([
+    [['src/pending.ts'], true],
+    [['src/done.ts', 'src/moved.ts', 'src/pending.ts'], false],
+  ]);
+});
+
+reviewTest('next and previous change walk hunks and cross files', async ({ relaunch }) => {
+  const read = (file: 'a' | 'b', side: 'left' | 'right') =>
+    contract('git-review-nav', `git:file.read#${file}-${side}`);
+  const page = await openDiffWindow(relaunch, ['src/a.txt', 'src/b.txt'], {
+    'file.read': {
+      __sequence: [
+        read('a', 'left'),
+        read('a', 'right'),
+        read('b', 'left'),
+        read('b', 'right'),
+        read('a', 'left'),
+        read('a', 'right'),
+      ],
+    },
+  });
+  await page
+    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'a.txt' })
+    .click();
+  const modified = page.locator(t('repo-diff-editor')).locator('.editor.modified');
+  const active = modified.locator('.line-numbers.active-line-number');
+  const next = page.locator(t('repo-diff-next-change'));
+  const previous = page.locator(t('repo-diff-prev-change'));
+  await expect(modified.locator('.view-lines')).toContainText('CHANGED 20');
+  await expect(previous).toBeDisabled();
+
+  await next.click();
+  await expect(active).toHaveText('20');
+  await next.click();
+  await expect(active).toHaveText('150');
+  await next.click();
+  await expect(modified.locator('.view-lines')).toContainText('CHANGED 60');
+  await expect(active).toHaveText('60');
+  await expect(next).toBeDisabled();
+  await page.screenshot({ path: 'test-results/review-change-nav.png' });
+
+  await previous.click();
+  await expect(modified.locator('.view-lines')).toContainText('CHANGED 150');
+  await expect(active).toHaveText('150');
+  await previous.click();
+  await expect(active).toHaveText('20');
+  await expect(previous).toBeDisabled();
+});
+
+reviewTest('the diff layout toggle switches to inline and persists', async ({ relaunch }) => {
+  const page = await openDiffWindow(relaunch, ['src/a.txt'], {
+    'file.read': {
+      __sequence: [
+        contract('git-review-nav', 'git:file.read#a-left'),
+        contract('git-review-nav', 'git:file.read#a-right'),
+      ],
+    },
+  });
+  const open = () =>
+    page.locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'a.txt' }).click();
+  const diff = page.locator(t('repo-diff-editor')).locator('.monaco-diff-editor');
+  await open();
+  await expect(diff).toHaveClass(/side-by-side/);
+
+  await page.locator(t('repo-diff-layout-inline')).click();
+  await expect(diff).not.toHaveClass(/side-by-side/);
+  await expect(page.locator(t('repo-diff-layout-inline'))).toHaveAttribute('data-state', 'on');
+  expect(await page.evaluate(() => localStorage.getItem('kira.repo.diffLayout'))).toBe('inline');
+  await page.screenshot({ path: 'test-results/review-diff-inline.png' });
+
+  await page.reload();
+  await page.locator(t('ade-review-window')).waitFor();
+  await open();
+  await expect(diff).not.toHaveClass(/side-by-side/);
+
+  await page.locator(t('repo-diff-layout-side-by-side')).click();
+  await expect(diff).toHaveClass(/side-by-side/);
 });
 
 reviewTest('with no review agent the panel offers to start one', async ({ relaunch }) => {

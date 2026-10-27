@@ -8,6 +8,7 @@ const TREE_IDS = [
   'tree.copyName',
   'tree.copyUri',
   'tree.rename',
+  'tree.selectAll',
   'tree.duplicate',
   'tree.delete',
   'list.moveUp',

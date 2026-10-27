@@ -136,6 +136,8 @@ export interface ListNavigationOptions<T> {
   onOpen?: (item: T) => void;
   /** ContextMenu key and Shift+F10, with the row's rect. */
   onMenu?: (item: T, rect: DOMRect) => void | Promise<void>;
+  /** Shift+Up/Down/Home/End: moves the roving stop and extends a selection to the new row. */
+  onExtend?: (item: T) => void;
   /** Up from the first row (a filter field above the list). */
   onExitTop?: () => void;
   tree?: {
@@ -156,6 +158,7 @@ export interface ListNavigationOptions<T> {
 }
 
 const MOVE_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
+const EXTEND_KEYS = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End']);
 const TEXT_FIELD = 'input, textarea, select, [contenteditable="true"]';
 
 export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
@@ -258,6 +261,19 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
     return true;
   }
 
+  function onExtendKey(e: KeyboardEvent, cx: KeyContext): boolean {
+    if (!opts.onExtend || !e.shiftKey || !EXTEND_KEYS.has(e.key)) return false;
+    e.preventDefault();
+    const action = navigate(cx.view, cx.activeIndex, e.key, opts.tree !== undefined);
+    if (action.kind === 'move') {
+      const item = cx.list[action.index];
+      // Extend first: focusKey then sets the stop the extension already moved to.
+      opts.onExtend(item);
+      void focusKey(opts.key(item));
+    }
+    return true;
+  }
+
   function onTypeaheadKey(e: KeyboardEvent, cx: KeyContext): void {
     if (!opts.typeahead || e.key.length !== 1 || e.key === ' ') return;
     const texts = cx.list.map((it) =>
@@ -292,6 +308,7 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
     if (onMenuKey(e, cx)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (onActivationKey(e, cx)) return;
+    if (onExtendKey(e, cx)) return;
     if (e.shiftKey) return;
     if (!onMoveKey(e, cx)) onTypeaheadKey(e, cx);
   }

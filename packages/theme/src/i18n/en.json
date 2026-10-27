@@ -1632,6 +1632,9 @@
           "disabledVariables": {
             "body": "{count} disabled variables were skipped."
           },
+          "emptyValues": {
+            "body": "{count} variables arrived without a value. Postman exports only shared values; share them in Postman, then export again."
+          },
           "graphqlBody": {
             "body": "{count} {format} bodies were imported as JSON bodies carrying the same query."
           },
@@ -1659,6 +1662,9 @@
         },
         "importRollbackFailed": {
           "error": "{detail} (also couldn’t remove the partially imported collection “{name}”: {rollbackDetail}). It remains visible. Delete it manually."
+        },
+        "invalidMove": {
+          "body": "That item can’t move there."
         },
         "writeFailed": {
           "error": "Couldn’t write {path}: {detail}"
@@ -2326,6 +2332,12 @@
     },
     "mainWorktree": {
       "tooltip": "Main worktree"
+    },
+    "markFolderReviewed": {
+      "tooltip": "Mark folder reviewed"
+    },
+    "markFolderUnreviewed": {
+      "tooltip": "Mark folder unreviewed"
     },
     "markReviewed": {
       "tooltip": "Mark reviewed"
@@ -9008,8 +9020,20 @@
         "comment": {
           "placeholder": "Leave a review comment"
         },
+        "diffLayout": {
+          "aria": "Diff layout"
+        },
+        "diffLayoutInline": {
+          "label": "Inline"
+        },
+        "diffLayoutSideBySide": {
+          "label": "Side by side"
+        },
         "missing": {
           "empty": "This file no longer exists"
+        },
+        "nextChange": {
+          "label": "Next change"
         },
         "noChanges": {
           "empty": "No changed files"
@@ -9022,6 +9046,9 @@
         },
         "openFileFailed": {
           "error": "Couldn’t open this file."
+        },
+        "previousChange": {
+          "label": "Previous change"
         },
         "reading": {
           "label": "Reading"
@@ -9351,12 +9378,31 @@
         "deleteFolderConfirm": {
           "title": "Delete folder?"
         },
+        "deleteMany": {
+          "label": "Delete {count} item | Delete {count} items"
+        },
+        "deleteManyConfirm": {
+          "body": "Deletes {list}.",
+          "collections": {
+            "label": "{count} collection | {count} collections"
+          },
+          "nested": {
+            "body": "Everything inside folders and collections goes too."
+          },
+          "openTabs": {
+            "body": "Open tabs for deleted requests stay open as unsaved."
+          },
+          "title": "Delete {count} items?"
+        },
         "deleteRequestConfirm": {
           "body": "“{name}” will be deleted.",
           "title": "Delete request?"
         },
         "deleteTreeConfirm": {
           "body": "“{name}” and everything inside it will be deleted."
+        },
+        "dragCount": {
+          "aria": "Moving {count} items"
         },
         "empty": "No collections yet",
         "emptyHint": "Create one from the + button above, or import a Postman collection.",

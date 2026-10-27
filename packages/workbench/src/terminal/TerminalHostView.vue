@@ -35,7 +35,7 @@ const { session, footerText } = useTerminalMount({
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-bg p-1">
+  <div class="flex flex-col h-full bg-chrome p-1">
     <slot />
     <div ref="container" class="flex-1 min-h-0" data-testid="repo-terminal-host" />
     <slot name="outcome" />

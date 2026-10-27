@@ -728,7 +728,37 @@ func (e *RepoEntry) MarkFile(ctx context.Context, branch, path string, reviewed 
 	if err != nil {
 		return gitreview.FileRecord{}, err
 	}
+	return e.markFileAt(ctx, tip, branch, path, reviewed, ranges)
+}
 
+// MarkFiles is whole-file MarkFile over several paths: the branch tip resolves once, so every file
+// shares one reviewedAtSha. Returns records in path order; the first error stops the batch.
+func (e *RepoEntry) MarkFiles(ctx context.Context, branch string, paths []string, reviewed bool) ([]gitreview.FileRecord, error) {
+	tip, err := e.branchTip(ctx, branch)
+	if err != nil {
+		return nil, err
+	}
+	recs := make([]gitreview.FileRecord, 0, len(paths))
+	for _, path := range paths {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		rec, err := e.markFileLocked(ctx, tip, branch, path, reviewed)
+		if err != nil {
+			return nil, err
+		}
+		recs = append(recs, rec)
+	}
+	return recs, nil
+}
+
+func (e *RepoEntry) markFileLocked(ctx context.Context, tip, branch, path string, reviewed bool) (gitreview.FileRecord, error) {
+	unlock := e.review.Lock(e.Summary.RepoID, branch, path)
+	defer unlock()
+	return e.markFileAt(ctx, tip, branch, path, reviewed, nil)
+}
+
+func (e *RepoEntry) markFileAt(ctx context.Context, tip, branch, path string, reviewed bool, ranges []gitreview.LineRange) (gitreview.FileRecord, error) {
 	// currentOID comes straight off readSnapshotSource's own return now, instead of a second,
 	// separately-spawned blobOID call for the identical tip:path — readCurrentContent's own doc
 	// comment explains why the OID was already sitting there for free.

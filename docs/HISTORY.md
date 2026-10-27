@@ -7022,3 +7022,44 @@ New visual spec `ade-plan-branches.spec.ts`; 4 new baselines, existing baselines
 ### v0.2.17 P356 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.17/` removed.
 <!-- /chapter v0.2.17 -->
+
+<!-- chapter v0.2.18 -->
+## v0.2.18
+Source: docs/v0.2.18/ at dcb5d945bb9e. 8 phases.
+
+### v0.2.18 P357 (Done)
+Cause: `useDiffEditor.ts` set `hideUnchangedRegions: { enabled: !review }`, so review diffs rendered whole files. Now enabled for review too, 3 context lines. `revealCommentLines` selects each comment line so Monaco 0.56.0 unhides it; a comment mid-region shows more than 3 context lines (no public per-line API). Reruns on `onDidUpdateDiff`.
+Tests: `TestReviewDiffLargeFileHunks`, `ade-v2-review.spec.ts` hunk spec. `test:ui:space` 690 pass. Wails desktop build not runnable in Linux sandbox; Playwright webkit is closest real window.
+
+### v0.2.18 P358 (Done)
+Folder mark: request `review.markMany`, contract 51 to 52 additive. `gitsession` `MarkFiles` resolves branch tip once, marks each path under its own lock. Tri-state in `lib/folderReview.ts`: all true, none false, else mixed. Click on true unmarks every touched file.
+Next/previous change: `diffNavigation.ts` keeps own index over `getLineChanges()`. Past last or first change it opens the review list's adjacent file via Pinia `reviewNavigation`. Layout toggle `kira.repo.diffLayout`, per device, all repo diff editors follow.
+Tests: `TestReviewMarkFolder`, `TestReviewNavigationFiles`, 3 `ade-v2-review.spec.ts` specs. `test:ui:space` 692 pass after fixing a diff-compute race in the nav test (72/72 on 3x8 repeats). Linux webkit tier only; desktop WKWebView build not run.
+
+### v0.2.18 P359 (Done)
+`KindFinished` notes skip while any app window, review windows included, is the macOS key window. `WindowRegistry.AnyFocused` probes native `IsFocused` outside `r.mu`; `agentnotify.notifyTerminal` calls `Deps.AppFocused` before `n.mu`; skipped note burns no cooldown. Dead `Deps.Focus` removed. Other kinds keep per-window tab rule.
+Tests: `TestFocusedAppSkipsFinished`, `TestFocusedTabSuppresses`. Unverified on macOS: `isKeyWindow` reads only on macOS Wails. Known edge: screen locked with Kira Space frontmost keeps window key, so finished notes skip while user is away.
+
+### v0.2.18 P360 (Done)
+All terminals build through `terminalRenderer.ts`. Cmd+Enter: custom key handler sends `ESC CR` via `term.input`, swallows the chord, `preventDefault`. U41 exemption for `terminalRenderer.ts`.
+Scroll: xterm sends one wheel report per event, same as VS Code; gap is Claude Code, which scrolls 1 row per report without XTVERSION or `TERM_PROGRAM=vscode`. `sessionEnv` sets `CLAUDE_CODE_SCROLL_SPEED=3` unless set; `scrollOnEraseInDisplay: true`. Declined: `TERM_PROGRAM=vscode`, XTVERSION answer, wheel repeat, xterm 6.1 beta.
+Background: theme and `TerminalHostView` frame use `--kira-bg-chrome` (`#181818`). Test: `repo-workspace.spec.ts` Cmd+Enter spec.
+Unverified on macOS: Cmd+Enter newline in Claude Code (repo terminal, ADE pane, review flow) without submit; Studio "Run statement" menu item not firing (WKWebView forwarding); zsh continuation; scroll feel with trackpad and wheel versus VS Code; background shade on real display.
+
+### v0.2.18 P361 (Done)
+Leading cause outside app: Postman exports `"value": ""` for unshared variables; app cannot import absent values. New warning `empty_values` counts imported entries with empty value. In-app gaps fixed: object and array `value` now compact JSON; Postman API envelopes `{"collection":...}` and `{"environment":...}` unwrapped; collection `variable[]` skips `disabled: true` (counted `disabled_variables`); legacy promotion in `repos/variables.go` uses `postman.VariableValue`. Parsers share `decodeVariableEntry`.
+Tests: `TestDecodeVariableEntry`, `TestParseFile`, `apiflow.TestPostmanImportCollectionAndEnvironment`, `collections.spec.ts` import spec. Out of scope: globals, Collection v2.0, folder-level variables.
+
+### v0.2.18 P362 (Done)
+Backend: `MoveItems` and `DeleteMany` replace `MoveItem` and `Delete`, one transaction each. Invalid move (into self or descendant, under non-folder, before foreign sibling) refused as `invalidMove`, no change. One `kira:api:dataChanged` emit per call.
+Frontend: `treePointerDrag.ts` extracted from `connectionReorder.ts`; `useListNavigation` gains `onExtend`; shortcut `tree.selectAll`; new `useCollectionSelectionStore`. Click, Ctrl/Cmd toggle, Shift range, Shift+arrows, Ctrl/Cmd+A, Escape. `collectionDrop.ts` holds drop zones and placement. Bulk delete asks one confirmation with per-kind counts. Deleted requests' open tabs stay open as unsaved.
+Collection reorder (dragging collection rows) deferred: collection rows never drag.
+Tests: `TestBatchMoveDelete`, unit `api-collection-drop.spec.ts`, UI specs. Unit 871 pass, `ui` project 610 pass. Unverified on macOS: Cmd+A versus Edit-menu select-all role.
+
+### v0.2.18 P363 (Done)
+Round 1 review, base `b407b4e`: 8 findings, all fixed. R1-1 `revealCommentLines` restores saved selections. R1-2 `postman.DecodeVariables` drives legacy promotion. R1-3 `ReviewView` caches ordered path list in `computed`; navigator map `shallowReactive`. R1-4 `menuForSelection` takes topmost count, pluralised label. R1-5 `CollectionsRepo.Delete` narrowed to `DeleteCollection`. R1-6 partly fixed, not a refcounted syncer: new `crShared` on `Registry` with per-key gate from sync state read to write, shared pending-checks spacing, index changes notify every entry on key. Remaining: each entry still probes host once per interval (ETag), per-entry timers remain. R1-7 `MarkSent` failure after successful send logs and returns count. R1-8 `verify-packaging.sh` A6 fails under `CI=true` below SDK 26.
+Also fixed pre-existing failing unit test: `graphChunkFrame.bin` patched to contract version 52. Unit 1957 pass.
+
+### v0.2.18 P364 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.18/` removed. PR opened to `main`.
+<!-- /chapter v0.2.18 -->

@@ -1,3 +1,4 @@
+import type { Locator, Page } from '@playwright/test';
 import { CHANNEL } from '@shared/protocol/events';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
@@ -6,6 +7,7 @@ import { collectionRow } from './support/apiRows';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import { settleFrames } from './support/tree';
 
 // P4 §6.3: four tests, one snapshot per channel (mockRuntime.ts: a channel with exactly one
 // snapshot answers args-blind, which is what lets a test assert on a call's args afterwards
@@ -149,14 +151,17 @@ test('contract: collections — a request moves to another collection from its c
   const { window: page, control } = await relaunch({
     control: [
       { channel: IPC.collectionsList, response: tree },
-      { channel: IPC.collectionsMoveItem, response: null },
+      { channel: IPC.collectionsMoveItems, response: null },
       {
         channel: IPC.collectionsCreateCollection,
         response: tree.collections[2],
       },
     ],
   });
-  const moveArgs = contract<Record<string, string>>('api-move', 'args:CollectionsService.MoveItem');
+  const moveArgs = contract<Record<string, unknown>>(
+    'api-move-many',
+    'args:CollectionsService.MoveItems',
+  );
   await openHttpMode(page);
   await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
 
@@ -168,8 +173,14 @@ test('contract: collections — a request moves to another collection from its c
   );
   await page.locator('[data-testid="menu-item-move-to-col-2"]').click();
   await expect
-    .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItem)?.args)
-    .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-2' });
+    .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItems)?.args)
+    .toEqual({
+      ...moveArgs,
+      itemIds: ['item-health'],
+      collectionId: 'col-2',
+      parentId: null,
+      beforeId: null,
+    });
 
   await collectionRow(page, 'item-health').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
@@ -179,10 +190,16 @@ test('contract: collections — a request moves to another collection from its c
       () =>
         control
           .log()
-          .filter((e) => e.channel === IPC.collectionsMoveItem)
+          .filter((e) => e.channel === IPC.collectionsMoveItems)
           .at(-1)?.args,
     )
-    .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-new' });
+    .toEqual({
+      ...moveArgs,
+      itemIds: ['item-health'],
+      collectionId: 'col-new',
+      parentId: null,
+      beforeId: null,
+    });
   await expect(page.locator('[data-testid="collection-rename-input"]')).toBeFocused();
 });
 
@@ -572,17 +589,28 @@ test('collections — Postman import of a collection, an environment and a bad f
   await emitWailsEvent(page, CHANNEL.importPostman, undefined);
 
   const files = page.locator('[data-testid="import-report-file"]');
-  await expect(files).toHaveCount(3);
+  await expect(files).toHaveCount(4);
   await expect(files.nth(0)).toHaveAttribute('data-kind', 'collection');
   await expect(files.nth(0)).toContainText('Imported “Multi”: 1 request, 0 folders.');
+  await expect(files.nth(0).locator('li[data-kind="empty_values"]')).toContainText(
+    '1 variables arrived without a value. Postman exports only shared values; share them in Postman, then export again.',
+  );
   await expect(files.nth(1)).toHaveAttribute('data-kind', 'environment');
-  await expect(files.nth(1)).toContainText('Imported environment “Staging”: 4 variables.');
+  await expect(files.nth(1)).toContainText('Imported environment “Staging”: 6 variables.');
   await expect(files.nth(1).locator('li[data-kind="disabled_variables"]')).toContainText(
     '1 disabled variables were skipped.',
+  );
+  await expect(files.nth(1).locator('li[data-kind="empty_values"]')).toContainText(
+    '1 variables arrived without a value.',
   );
   await expect(files.nth(2)).toHaveAttribute('data-kind', 'failed');
   await expect(files.nth(2)).toContainText(
     'Couldn’t import bad.json: postman: not a Postman collection or environment',
+  );
+  await expect(files.nth(3)).toHaveAttribute('data-kind', 'environment');
+  await expect(files.nth(3)).toContainText('Imported environment “Wrapped”: 2 variables.');
+  await expect(files.nth(3).locator('li[data-kind="empty_values"]')).toContainText(
+    '1 variables arrived without a value.',
   );
   const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
   expect(importCalls[0].args).toEqual(
@@ -615,4 +643,214 @@ test('collections — after a restart the tree and the active environment come b
   expect(active).toBeDefined();
   const activeRow = page.locator(`[data-testid="environment-row"][data-id="${active?.id}"]`);
   await expect(activeRow.locator('[role="radio"]')).toBeChecked();
+});
+
+// ---- multiselect, drag and bulk delete (P362) ----
+
+const item = (
+  id: string,
+  kind: 'folder' | 'request',
+  name: string,
+  sortOrder: number,
+  parentId: string | null = null,
+) => ({
+  id,
+  collectionId: 'col-1',
+  parentId,
+  kind,
+  name,
+  sortOrder,
+  method: kind === 'request' ? 'GET' : '',
+  url: kind === 'request' ? `https://api.example.com/${id}` : '',
+  createdAt: NOW,
+  updatedAt: NOW,
+});
+
+// Visible once col-1 is open: folder, health, status, archive (an empty folder). Create order sits
+// inside the folder.
+const MULTI_TREE = {
+  collections: TREE.collections,
+  items: [
+    item('item-folder', 'folder', 'Orders', 0),
+    item('item-create', 'request', 'Create order', 0, 'item-folder'),
+    item('item-health', 'request', 'Health check', 1),
+    item('item-status', 'request', 'Status check', 2),
+    item('item-archive', 'folder', 'Archive', 3),
+  ],
+};
+
+const MULTI_CONTROL: ControlSnapshot[] = [
+  { channel: IPC.collectionsList, response: MULTI_TREE },
+  { channel: IPC.collectionsMoveItems, response: null },
+  { channel: IPC.collectionsDeleteMany, response: null },
+];
+
+const selectedRows = (page: Page) =>
+  page.locator('[data-testid="collection-row"][aria-selected="true"]');
+const dropIndicator = (page: Page) => page.locator('[data-testid="tree-drop-indicator"]');
+const moveCalls = (control: { log(): { channel: string; args?: unknown }[] }) =>
+  control.log().filter((e) => e.channel === IPC.collectionsMoveItems);
+
+// The app reads the platform chord from the page's user agent (WebKit reports a Mac).
+const primary = (page: Page) =>
+  page.evaluate(() =>
+    navigator.userAgent.includes('Mac') ? ('Meta' as const) : ('Control' as const),
+  );
+
+/** Press on `from`'s centre, cross the drag tolerance, then park at `fraction` of `to`'s height. */
+async function dragRow(page: Page, from: Locator, to: Locator, fraction: number): Promise<void> {
+  const src = await from.boundingBox();
+  const dst = await to.boundingBox();
+  if (!src || !dst) throw new Error('row has no box');
+  const x = src.x + src.width * 0.6;
+  await page.mouse.move(x, src.y + src.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(x, src.y + src.height / 2 + 10, { steps: 4 });
+  await page.mouse.move(x, dst.y + dst.height * fraction, { steps: 10 });
+  await settleFrames(page);
+}
+
+test('contract: collections — a multi-selection drags into a folder and deletes as one', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: MULTI_CONTROL });
+  const moveArgs = contract<Record<string, unknown>>(
+    'api-move-many',
+    'args:CollectionsService.MoveItems',
+  );
+  const deleteArgs = contract<Record<string, unknown>>(
+    'api-delete-many',
+    'args:CollectionsService.DeleteMany',
+  );
+  await openHttpMode(page);
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+
+  // Shift extends a range from the anchor.
+  await collectionRow(page, 'item-folder').click();
+  await collectionRow(page, 'item-status').click({ modifiers: ['Shift'] });
+  await expect(selectedRows(page)).toHaveCount(3);
+
+  // Ctrl/Cmd toggles one row.
+  await collectionRow(page, 'item-health').click();
+  await collectionRow(page, 'item-status').click({ modifiers: [await primary(page)] });
+  await expect(selectedRows(page)).toHaveCount(2);
+
+  await dragRow(page, collectionRow(page, 'item-health'), collectionRow(page, 'item-archive'), 0.5);
+  await expect(collectionRow(page, 'item-archive')).toHaveAttribute('data-drop-zone', 'into');
+  await expect(page.locator('[data-testid="collection-drag-count"]')).toHaveText('2');
+  await page.screenshot({ path: test.info().outputPath('drag-into-folder.png') });
+  await page.mouse.up();
+  await expect
+    .poll(() => moveCalls(control).at(0)?.args)
+    .toEqual({
+      ...moveArgs,
+      itemIds: ['item-health', 'item-status'],
+      collectionId: 'col-1',
+      parentId: 'item-archive',
+      beforeId: null,
+    });
+  await expect(page.locator('[data-testid="collection-drag-count"]')).toHaveCount(0);
+
+  // A folder dropped on its own child refuses: no indicator, no call.
+  await collectionRow(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
+  await expect(collectionRow(page, 'item-create')).toBeVisible();
+  await dragRow(page, collectionRow(page, 'item-folder'), collectionRow(page, 'item-create'), 0.4);
+  await expect(dropIndicator(page)).toHaveCount(0);
+  await expect(page.locator('[data-drop-zone]')).toHaveCount(0);
+  await page.mouse.up();
+  await settleFrames(page);
+  expect(moveCalls(control)).toHaveLength(1);
+
+  // Delete the folder and a request together: one confirm, one call.
+  await collectionRow(page, 'item-folder').click();
+  await collectionRow(page, 'item-health').click({ modifiers: [await primary(page)] });
+  const mod = await primary(page);
+  await page.keyboard.press(mod === 'Meta' ? 'Meta+Backspace' : 'Delete');
+  const dialog = page.locator('[data-testid="confirm-dialog"]');
+  await expect(dialog).toContainText('Delete 2 items?');
+  await expect(dialog).toContainText('Deletes 1 request, 1 folder.');
+  await expect(dialog).toContainText('Everything inside folders and collections goes too.');
+  await page.locator('[data-testid="confirm-dialog-confirm"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.collectionsDeleteMany)?.args)
+    .toEqual({ ...deleteArgs, collectionIds: [], itemIds: ['item-folder', 'item-health'] });
+});
+
+test('collections — right-click inside a selection opens the set menu and keeps the selection', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: MULTI_CONTROL });
+  await openHttpMode(page);
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+
+  await collectionRow(page, 'item-health').click();
+  await collectionRow(page, 'item-status').click({ modifiers: [await primary(page)] });
+  await collectionRow(page, 'item-health').click({ button: 'right' });
+  await expect(page.locator('[data-testid="menu-item-delete"]')).toContainText('Delete 2 items');
+  await expect(page.locator('[data-testid="menu-item-move-to-collection"]')).toBeVisible();
+  await expect(selectedRows(page)).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(selectedRows(page)).toHaveCount(2);
+
+  // A right-click outside the selection replaces it.
+  await collectionRow(page, 'item-archive').click({ button: 'right' });
+  await expect(selectedRows(page)).toHaveCount(1);
+});
+
+test('collections — Shift+arrows extend, Ctrl/Cmd+A selects all, Escape collapses to the focused row', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: MULTI_CONTROL });
+  await openHttpMode(page);
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+
+  await collectionRow(page, 'item-health').click();
+  await page.keyboard.press('Shift+ArrowDown');
+  await expect(selectedRows(page)).toHaveCount(2);
+  await page.keyboard.press('Shift+ArrowDown');
+  await expect(selectedRows(page)).toHaveCount(3);
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect(selectedRows(page)).toHaveCount(2);
+
+  await page.keyboard.press(`${await primary(page)}+a`);
+  await expect(selectedRows(page)).toHaveCount(5);
+
+  await page.keyboard.press('Escape');
+  await expect(selectedRows(page)).toHaveCount(1);
+  await page.screenshot({ path: test.info().outputPath('selection.png') });
+});
+
+test('collections — reorder is refused while a search filters the tree; dropping into a folder still works', async ({
+  relaunch,
+}) => {
+  const tree = {
+    collections: TREE.collections,
+    items: [
+      item('item-health', 'request', 'Check health', 0),
+      item('item-status', 'request', 'Check status', 1),
+      item('item-checks', 'folder', 'Checks', 2),
+    ],
+  };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.collectionsList, response: tree },
+      { channel: IPC.collectionsMoveItems, response: null },
+    ],
+  });
+  await openHttpMode(page);
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await page.click('[data-testid="toggle-search"]');
+  await page.fill('[data-testid="tree-search"]', 'check');
+  await expect(collectionRow(page, 'item-checks')).toBeVisible();
+
+  await dragRow(page, collectionRow(page, 'item-health'), collectionRow(page, 'item-status'), 0.75);
+  await expect(dropIndicator(page)).toHaveCount(0);
+  await page.mouse.up();
+  await settleFrames(page);
+  expect(moveCalls(control)).toHaveLength(0);
+
+  await dragRow(page, collectionRow(page, 'item-health'), collectionRow(page, 'item-checks'), 0.5);
+  await expect(collectionRow(page, 'item-checks')).toHaveAttribute('data-drop-zone', 'into');
+  await page.mouse.up();
+  await expect.poll(() => moveCalls(control).length).toBe(1);
 });

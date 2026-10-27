@@ -57,10 +57,17 @@ func passwdShell(username string) string {
 // already inherited from os.Environ(), and inventing one would risk a wrong locale breaking UTF-8
 // output.
 func sessionEnv() []string {
-	return []string{
+	env := []string{
 		"TERM=xterm-256color",
 		"COLORTERM=truecolor",
 		"TERM_PROGRAM=" + TermProgram,
 		"TERM_PROGRAM_VERSION=" + TermProgramVersion,
 	}
+	// Claude Code picks 3 for VS Code's xterm.js but cannot tell this xterm.js from a native
+	// terminal (xterm 6.0.0 answers no XTVERSION), so it falls back to 1 row per wheel report. An
+	// explicit user value wins.
+	if _, ok := os.LookupEnv("CLAUDE_CODE_SCROLL_SPEED"); !ok {
+		env = append(env, "CLAUDE_CODE_SCROLL_SPEED=3")
+	}
+	return env
 }

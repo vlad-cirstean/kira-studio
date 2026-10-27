@@ -796,6 +796,31 @@ test("the tab strip's + opens a terminal tab at the active repository's root", a
   await expect(page.locator('.xterm-rows')).toContainText('hello');
 });
 
+test('Cmd+Enter in a terminal sends meta-Enter (ESC CR); plain Enter stays CR', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: [...CONTROL, TERMINAL_OPEN_OK, { channel: IPC.terminalWrite, response: null }],
+  });
+
+  await repoRowById(page, REPO.id).click();
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  await expect(page.locator('.xterm-rows')).toBeVisible();
+  await page.locator('.xterm-helper-textarea').focus();
+
+  const writes = () =>
+    control
+      .log()
+      .filter((e) => e.channel === IPC.terminalWrite)
+      .map((e) => (e.args as { data?: string } | undefined)?.data);
+
+  await page.keyboard.press('Meta+Enter');
+  await expect.poll(writes).toContain('Gw0=');
+
+  await page.keyboard.press('Enter');
+  await expect.poll(writes).toContain('DQ==');
+});
+
 // A worktree row's own context menu (nothing needed one until a terminal could be opened at a
 // worktree that isn't the active workspace) plus the indicator's own row-specificity: it must key
 // off the terminal's cwd, not merely "a terminal is open somewhere in this repository".

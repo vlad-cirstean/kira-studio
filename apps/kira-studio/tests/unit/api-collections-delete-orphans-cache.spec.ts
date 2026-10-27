@@ -1,6 +1,6 @@
 // Go's own delete genuinely cascades (repos/collections.go's
 // own comment: "the cascade is genuine") — deleting a folder or a collection removes every
-// descendant api_items row, not just the row clicked. deleteRow used to purge exactly one cache
+// descendant api_items row, not just the row clicked. deleteRows used to purge exactly one cache
 // entry (collectionsStore.requests[row.id] / grpcRequests[row.id]), leaving every *descendant*
 // request's cached HttpSavedRequest/GrpcSavedRequest behind. The orphan rule
 // (HttpRequestView.vue: canSave depends on the apiSavedRequestKey query reading non-null) then
@@ -11,7 +11,7 @@
 // descendant requests' cache entries survive) and passes once the whole subtree is purged.
 //
 // Asserts against the apiSavedRequestKey query cache directly (queryClient.getQueryData), which is
-// what deleteRow itself now writes `null` into for the whole orphaned subtree.
+// what deleteRows itself now writes `null` into for the whole orphaned subtree.
 import '@workbench/testing/unit/window';
 
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -120,7 +120,7 @@ function savedRequest(name: string): Awaited<ReturnType<typeof control.collectio
   >;
 }
 
-describe('deleteRow purges the whole deleted subtree from the request caches (finding 4)', () => {
+describe('deleteRows purges the whole deleted subtree from the request caches (finding 4)', () => {
   test('deleting a folder also drops its nested requests, not just the folder itself', async () => {
     // col-1
     //   folder-1 ("Auth")
@@ -151,9 +151,9 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
 
     const captured: { deletedId: string | null } = { deletedId: null };
     (
-      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
-    ).collectionsDelete = async (id: string) => {
-      captured.deletedId = id;
+      control as unknown as { collectionsDeleteMany: typeof control.collectionsDeleteMany }
+    ).collectionsDeleteMany = async (args) => {
+      captured.deletedId = args.itemIds[0] ?? args.collectionIds[0] ?? null;
     };
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({
@@ -162,21 +162,23 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
         items: collectionsStore.items.filter((item) => item.id === 'req-3'),
       });
 
-    await collectionsStore.deleteRow({
-      key: 'i:folder-1',
-      depth: 1,
-      hasChildren: true,
-      expanded: true,
-      kind: 'folder',
-      id: 'folder-1',
-      collectionId: 'col-1',
-      parentId: null,
-      name: 'Auth',
-      method: '',
-      url: '',
-      protocol: 'http',
-      matched: false,
-    });
+    await collectionsStore.deleteRows([
+      {
+        key: 'i:folder-1',
+        depth: 1,
+        hasChildren: true,
+        expanded: true,
+        kind: 'folder',
+        id: 'folder-1',
+        collectionId: 'col-1',
+        parentId: null,
+        name: 'Auth',
+        method: '',
+        url: '',
+        protocol: 'http',
+        matched: false,
+      },
+    ]);
 
     expect(captured.deletedId).toBe('folder-1');
     // The direct child, the nested folder's own child, and the folder itself must all be purged —
@@ -204,29 +206,31 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     expect(savedRequestCache('req-4')).not.toBeNull();
 
     (
-      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
-    ).collectionsDelete = async () => {};
+      control as unknown as { collectionsDeleteMany: typeof control.collectionsDeleteMany }
+    ).collectionsDeleteMany = async () => {};
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({
         collections: [],
         items: [],
       });
 
-    await collectionsStore.deleteRow({
-      key: 'c:col-2',
-      depth: 0,
-      hasChildren: true,
-      expanded: true,
-      kind: 'collection',
-      id: 'col-2',
-      collectionId: 'col-2',
-      parentId: null,
-      name: 'Widgets API',
-      method: '',
-      url: '',
-      protocol: 'http',
-      matched: false,
-    });
+    await collectionsStore.deleteRows([
+      {
+        key: 'c:col-2',
+        depth: 0,
+        hasChildren: true,
+        expanded: true,
+        kind: 'collection',
+        id: 'col-2',
+        collectionId: 'col-2',
+        parentId: null,
+        name: 'Widgets API',
+        method: '',
+        url: '',
+        protocol: 'http',
+        matched: false,
+      },
+    ]);
 
     expect(savedRequestCache('req-4')).toBeNull();
   });

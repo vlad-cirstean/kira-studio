@@ -15,12 +15,13 @@ import type { DiffSide } from '@shared/domain/repo';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { logWarn } from '@workbench/bridge/log';
-import { type Ref, ref, shallowRef } from 'vue';
+import { type Ref, ref, shallowRef, type WatchStopHandle, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { openRepoFileTab } from '../../state/repoTabs';
 import { useSettingsStore } from '../../state/settings';
+import { useDiffLayout } from './diffLayout';
 import { registerDiffEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import {
@@ -154,7 +155,7 @@ export interface DiffEditorParams {
    *  supplies both (a root commit's left is git's well-known empty-tree sha, never null). */
   left: string | null;
   right: string | null;
-  /** Only toggles hideUnchangedRegions/glyphMargin (§7.3 gotchas 1/2) — the review object itself,
+  /** Only toggles glyphMargin (§7.3 gotcha 1) — the review object itself,
    *  and attaching its comment-thread layer, stay the caller's own concern. */
   review: boolean;
   /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
@@ -192,6 +193,7 @@ export function useDiffEditor(
   const errorMessage = ref('');
   const editor = shallowRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null);
   let goToFileImpl: (() => void) | null = null;
+  let stopLayoutWatch: WatchStopHandle | null = null;
 
   async function mount(): Promise<void> {
     const settingsStore = useSettingsStore();
@@ -217,6 +219,7 @@ export function useDiffEditor(
       return;
     }
 
+    const layout = useDiffLayout();
     const mod = await loadMonaco();
     // Unmounted (tab closed/switched away, or the section collapsed) while the read/import above
     // was in flight.
@@ -248,14 +251,16 @@ export function useDiffEditor(
       renderMarginRevertIcon: false,
       renderGutterMenu: false,
       automaticLayout: true,
-      renderSideBySide: true,
+      renderSideBySide: layout.value === 'sideBySide',
       // A narrow pane (the review window centre) must not flip to inline.
       useInlineViewWhenSpaceIsLimited: false,
       ignoreTrimWhitespace: false,
-      // C11 §7.3 gotcha 2: 0.56.0 has no public API to expand one specific collapsed unchanged
-      // region, so a comment anchored inside one would be invisible — only the review variant
-      // disables this; C6/C10's plain diff keeps it enabled, byte-identical.
-      hideUnchangedRegions: { enabled: !review },
+      hideUnchangedRegions: {
+        enabled: true,
+        contextLineCount: 3,
+        minimumLineCount: 3,
+        revealLineCount: 20,
+      },
       // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
       // for the review variant rather than depend on either being right in a future Monaco bump.
       // The plain diff passes nothing, unchanged from before this phase.
@@ -268,6 +273,10 @@ export function useDiffEditor(
       // RepoFileView.vue's own plain editor.
       fixedOverflowWidgets: true,
       overflowWidgetsDomNode: overflowWidgetsContainer(),
+    });
+    // Outside any component scope (mount() is async), so the stop handle is kept for dispose().
+    stopLayoutWatch = watch(layout, (value) => {
+      created.updateOptions({ renderSideBySide: value === 'sideBySide' });
     });
     created.setModel({ original, modified });
     registerDiffEditor(editorKey, [headUri.toString(), worktreeUri.toString()], created);
@@ -284,6 +293,8 @@ export function useDiffEditor(
 
   function dispose(): void {
     goToFileImpl = null;
+    stopLayoutWatch?.();
+    stopLayoutWatch = null;
     editor.value = null;
     unmountEditor(params.editorKey);
   }

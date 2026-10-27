@@ -89,7 +89,7 @@ export type ReviewRepaintEvent =
       readonly kind: 'mark';
       readonly repoId: string;
       readonly branch: string;
-      readonly path: string;
+      readonly paths: readonly string[];
     };
 
 const reviewRepaintListeners = new Set<(event: ReviewRepaintEvent) => void>();
@@ -166,14 +166,16 @@ function createNativeGitTransport(codeRepoId: string): Transport {
       // §7.6: repaint every open review surface once a mutation actually succeeds, regardless of
       // which half of the UI made the call (the panel's own Comments pane and this Monaco layer
       // share this one Transport per repo workspace) — never on a rejected request.
-      if (method === 'review.mark') {
-        const { repoId, branch, path } = params as unknown as {
+      if (method === 'review.mark' || method === 'review.markMany') {
+        const p = params as unknown as {
           repoId: string;
           branch: string;
-          path: string;
+          path?: string;
+          paths?: readonly string[];
         };
+        const paths = p.paths ?? (p.path === undefined ? [] : [p.path]);
         return result.then((value) => {
-          fireReviewRepaint({ kind: 'mark', repoId, branch, path });
+          fireReviewRepaint({ kind: 'mark', repoId: p.repoId, branch: p.branch, paths });
           return value;
         });
       }

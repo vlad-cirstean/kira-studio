@@ -349,7 +349,7 @@ func TestResponseHistoryCascadeAndSweepOrphans(t *testing.T) {
 	}
 
 	// F5: deleting the item cascades its history away.
-	if err := cr.Delete(item.ID, "item"); err != nil {
+	if err := cr.DeleteMany(nil, []string{item.ID}); err != nil {
 		t.Fatalf("Delete item: %v", err)
 	}
 	if entries, err := r.List(item.ID); err != nil || len(entries) != 0 {

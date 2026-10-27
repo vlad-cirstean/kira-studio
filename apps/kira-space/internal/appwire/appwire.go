@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
@@ -109,6 +110,8 @@ type ShellHooks struct {
 	CloseWindow        func(key string) bool
 	FocusWindow        func(key string) bool
 	SetWindowTitle     func(key, title string)
+	// AppFocused reports whether any app window is key; nil defaults to the window registry.
+	AppFocused func() bool
 }
 
 // Wired is the built object graph.
@@ -170,6 +173,7 @@ type Wired struct {
 	AgentSvc *bridge.AgentService
 
 	reopen          func()
+	appFocused      atomic.Pointer[func() bool]
 	detachMetrics   func()
 	detachOpLog     func()
 	detachGitCred   func()
@@ -193,6 +197,7 @@ func Build(opts Options) *Wired {
 
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()
+	w.SetAppFocused(w.Windows.AnyFocused)
 	git := wireGit(repositories, opts.Locator, opts.GitHosts, opts.ChangeRequestSync)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
@@ -254,6 +259,7 @@ func Build(opts Options) *Wired {
 		Prefs: notifyPrefs(repositories), Describe: w.describeAgent, TaskTitle: w.taskTitle, Reveal: w.revealNote,
 		AgentLabel: func() string { return w.Agents.Active().Label() },
 		Alive:      func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
+		AppFocused: func() bool { return (*w.appFocused.Load())() },
 	})
 	w.AgentNotifySvc = &bridge.AgentNotifyService{N: w.AgentNotify}
 	w.AgentUsage = agentusage.New(agentusage.Deps{
@@ -395,6 +401,9 @@ func (w *Wired) BindShell(h ShellHooks) {
 	if setTitle == nil {
 		setTitle = func(key, title string) { w.Windows.SetTitle(key, title) }
 	}
+	if h.AppFocused != nil {
+		w.SetAppFocused(h.AppFocused)
+	}
 	w.AdeTask.OpenWindow = h.OpenWindow
 	w.AdeTask.CloseWindow = closeWindow
 	w.AdeTask.FocusWindow = focusWindow
@@ -402,6 +411,9 @@ func (w *Wired) BindShell(h ShellHooks) {
 	w.WindowsSvc.OpenNewWindow = h.OpenNewWindow
 	w.OpenedFiles.OpenWindow = h.OpenNewWindowKeyed
 }
+
+// SetAppFocused swaps the any-window-focused probe; atomic because hook events read it concurrently.
+func (w *Wired) SetAppFocused(fn func() bool) { w.appFocused.Store(&fn) }
 
 // SetReopen sets what a notification click runs when no window is open (main owns the opener deps).
 func (w *Wired) SetReopen(fn func()) { w.reopen = fn }

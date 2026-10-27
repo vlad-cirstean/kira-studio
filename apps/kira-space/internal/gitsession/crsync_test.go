@@ -71,7 +71,7 @@ func TestWalkDeltaPageCap(t *testing.T) {
 
 // A continuation armed before MinGap elapses is refused by trigger and slips to the full interval.
 func TestContinueWaitHonoursMinGap(t *testing.T) {
-	s := newCRSyncer(nil, nil, CRSyncConfig{ContinueDelay: 5 * time.Second, MinGap: 30 * time.Second})
+	s := newCRSyncer(nil, nil, CRSyncConfig{ContinueDelay: 5 * time.Second, MinGap: 30 * time.Second}, newCRShared())
 	now := time.Now()
 	s.lastStart = now.Add(-12 * time.Second)
 	if got := s.continueWaitLocked(now); got < 18*time.Second {

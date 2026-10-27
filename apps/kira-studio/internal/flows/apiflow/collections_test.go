@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
@@ -69,7 +70,7 @@ func TestSavedRequestHistory(t *testing.T) {
 	}
 
 	mark = app.Events.Mark()
-	if err := app.W.Collections.Delete(bridge.CollectionsTargetArgs{ID: col.ID, Target: "collection"}); err != nil {
+	if err := app.W.Collections.DeleteMany(bridge.CollectionsDeleteManyArgs{CollectionIDs: []string{col.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	ch = apiChanges(t, app, mark)
@@ -445,11 +446,11 @@ func TestMoveRenameGrpcItem(t *testing.T) {
 	if err := cs.Rename(bridge.CollectionsTargetArgs{ID: item.ID, Target: "item", Name: "renamed"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.MoveItem(bridge.CollectionsMoveItemArgs{ItemID: folder.ID, CollectionID: to.ID}); err != nil {
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{folder.ID}, CollectionID: to.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.MoveItem(bridge.CollectionsMoveItemArgs{ItemID: folder.ID, CollectionID: "missing"}); err == nil {
-		t.Fatal("MoveItem into an unknown collection succeeded")
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{folder.ID}, CollectionID: "missing"}); err == nil {
+		t.Fatal("MoveItems into an unknown collection succeeded")
 	}
 
 	check := func(label string) {
@@ -493,11 +494,9 @@ func TestMoveRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := bridge.CollectionsMoveItemArgs{ItemID: item.ID, CollectionID: to.ID}
-	if err := cs.MoveItem(args); err != nil {
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{item.ID}, CollectionID: to.ID}); err != nil {
 		t.Fatal(err)
 	}
-	app.Contract(t, "api-move", "args:CollectionsService.MoveItem", args)
 	all, err := cs.List()
 	if err != nil {
 		t.Fatal(err)
@@ -519,21 +518,22 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 		}
 		return p
 	}
-	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
+	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"variable":[{"key":"base","value":"https://example.test"},{"key":"blank","value":""},{"key":"cfg","value":{"k":[1]}},{"key":"off","value":"x","disabled":true}],"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
 	env, err := os.ReadFile(filepath.Join("testdata", "environment.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	environment := write("environment.json", string(env))
 	bad := write("bad.json", `{"hello":"world"}`)
+	wrapped := write("wrapped.json", `{"environment":{"name":"Wrapped","values":[{"key":"a","value":"1"},{"key":"b","value":""}]}}`)
 
 	// Contract api-postman-multi, read by tests/ui/collections.spec.ts "Postman import of a
 	// collection, an environment and a bad file".
 	const sc = "api-postman-multi"
 	pathOpts := []flowharness.ContractOption{flowharness.Replace(dir, "<tmp>")}
-	app.Dialogs.QueueOpenFiles(collection, environment, bad)
+	app.Dialogs.QueueOpenFiles(collection, environment, bad, wrapped)
 	chosen, err := app.W.Files.ChooseOpenMany(bridge.FilesChooseOpenArgs{})
-	if err != nil || len(chosen.Files) != 3 {
+	if err != nil || len(chosen.Files) != 4 {
 		t.Fatalf("ChooseOpenMany = %+v (%v)", chosen, err)
 	}
 	app.Contract(t, sc, "FilesService.ChooseOpenMany", chosen, append(pathOpts, flowharness.Mask("size"))...)
@@ -550,29 +550,66 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	}
 	app.Contract(t, sc, "CollectionsService.Import", res, pathOpts...)
 
-	if len(res.Files) != 3 {
+	if len(res.Files) != 4 {
 		t.Fatalf("files = %+v, want one entry per path", res.Files)
 	}
-	if res.Files[0].Kind != "collection" || res.Files[0].Collection == nil || res.Files[0].Collection.Requests != 1 {
-		t.Errorf("collection entry = %+v", res.Files[0])
+	warningCounts := func(ws []bridge.ImportWarning) map[string]int {
+		m := map[string]int{}
+		for _, w := range ws {
+			m[w.Kind] = w.Count
+		}
+		return m
+	}
+	colEntry := res.Files[0]
+	if colEntry.Kind != "collection" || colEntry.Collection == nil || colEntry.Collection.Requests != 1 {
+		t.Fatalf("collection entry = %+v", colEntry)
+	}
+	if diff := cmp.Diff(map[string]int{
+		postman.WarnVariablesImported: 3, postman.WarnEmptyValues: 1, postman.WarnDisabledVariables: 1,
+	}, warningCounts(colEntry.Collection.Warnings)); diff != "" {
+		t.Errorf("collection warnings (-want +got):\n%s", diff)
 	}
 	envEntry := res.Files[1]
-	if envEntry.Kind != "environment" || envEntry.Environment == nil || envEntry.Environment.Variables != 4 ||
-		len(envEntry.Environment.Warnings) != 1 || envEntry.Environment.Warnings[0].Kind != postman.WarnDisabledVariables {
-		t.Errorf("environment entry = %+v, want 4 variables and a disabled-variables warning", envEntry)
+	if envEntry.Kind != "environment" || envEntry.Environment == nil || envEntry.Environment.Variables != 6 {
+		t.Fatalf("environment entry = %+v, want 6 variables", envEntry)
+	}
+	if diff := cmp.Diff(map[string]int{postman.WarnDisabledVariables: 1, postman.WarnEmptyValues: 1},
+		warningCounts(envEntry.Environment.Warnings)); diff != "" {
+		t.Errorf("environment warnings (-want +got):\n%s", diff)
 	}
 	if res.Files[2].Kind != "" || res.Files[2].Error == nil {
 		t.Errorf("bad file entry = %+v, want a failure", res.Files[2])
 	}
+	wrapEntry := res.Files[3]
+	if wrapEntry.Kind != "environment" || wrapEntry.Environment == nil || wrapEntry.Environment.Name != "Wrapped" ||
+		wrapEntry.Environment.Variables != 2 ||
+		!cmp.Equal(map[string]int{postman.WarnEmptyValues: 1}, warningCounts(wrapEntry.Environment.Warnings)) {
+		t.Errorf("wrapped entry = %+v, want Wrapped with 2 variables and one empty value", wrapEntry)
+	}
 
-	if got := tree(t, app, res.Files[0].Collection.CollectionID); len(got) != 1 {
+	if got := tree(t, app, colEntry.Collection.CollectionID); len(got) != 1 {
 		t.Errorf("collection tree = %q, want the one request", got)
 	}
-	envs, err := app.W.Variables.ListEnvironments()
-	if err != nil || len(envs) != 1 || envs[0].Name != "Staging" {
-		t.Fatalf("environments = %+v (%v), want Staging", envs, err)
+	colVars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeCollection, OwnerID: colEntry.Collection.CollectionID})
+	if err != nil {
+		t.Fatal(err)
 	}
-	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: envs[0].ID})
+	gotCol := map[string]string{}
+	for _, v := range colVars {
+		gotCol[v.Name] = v.Value
+	}
+	if diff := cmp.Diff(map[string]string{"base": "https://example.test", "blank": "", "cfg": `{"k":[1]}`}, gotCol); diff != "" {
+		t.Errorf("collection variables (-want +got):\n%s", diff)
+	}
+	envs, err := app.W.Variables.ListEnvironments()
+	if err != nil || len(envs) != 2 {
+		t.Fatalf("environments = %+v (%v), want Staging and Wrapped", envs, err)
+	}
+	envIDs := map[string]string{}
+	for _, e := range envs {
+		envIDs[e.Name] = e.ID
+	}
+	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: envIDs["Staging"]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,8 +618,9 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	for _, v := range vars {
 		got[v.Name] = v
 	}
-	if len(got) != 4 || got["token"].Value != "" || !got["token"].IsSecret || got["host"].Value != "https://staging.example.test" || got["legacy"].Name != "" {
-		t.Errorf("variables = %+v, want 4 with a blank-listed secret and the disabled one skipped", got)
+	if len(got) != 6 || got["token"].Value != "" || !got["token"].IsSecret || got["host"].Value != "https://staging.example.test" ||
+		got["config"].Value != `{"retry":[1,2]}` || got["blank"].Value != "" || got["legacy"].Name != "" {
+		t.Errorf("variables = %+v, want 6 with a blank-listed secret, a compact object value and the disabled one skipped", got)
 	}
 	var kinds []string
 	for _, c := range apiChanges(t, app, mark) {
@@ -593,5 +631,127 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	sort.Strings(kinds)
 	if strings.Join(kinds, ",") != "environments,tree" {
 		t.Errorf("change events = %v, want one tree and one environments change", kinds)
+	}
+}
+
+// childOrder lists a parent's children names in sort_order, asserting the order is dense.
+func childOrder(t *testing.T, app *flowharness.App, collectionID string, parentID *string) []string {
+	t.Helper()
+	all, err := app.W.Collections.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, it := range all.Items {
+		if it.CollectionID != collectionID || (it.ParentID == nil) != (parentID == nil) ||
+			(parentID != nil && *it.ParentID != *parentID) {
+			continue
+		}
+		if it.SortOrder >= len(all.Items) {
+			t.Fatalf("sort order %d out of range", it.SortOrder)
+		}
+		for len(names) <= it.SortOrder {
+			names = append(names, "")
+		}
+		if names[it.SortOrder] != "" {
+			t.Fatalf("sort order %d used twice under %v", it.SortOrder, parentID)
+		}
+		names[it.SortOrder] = it.Name
+	}
+	for _, n := range names {
+		if n == "" {
+			t.Fatalf("sort order has a gap under %v: %v", parentID, names)
+		}
+	}
+	return names
+}
+
+func TestBatchMoveDelete(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.Collections
+	orders, billing := newCollection(t, app, "orders"), newCollection(t, app, "billing")
+	mk := func(col model.Collection, parent *model.CollectionItem, kind, name string) model.CollectionItem {
+		t.Helper()
+		args := bridge.CollectionsCreateItemArgs{CollectionID: col.ID, Kind: kind, Name: name}
+		if parent != nil {
+			args.ParentID = &parent.ID
+		}
+		it, err := cs.CreateItem(args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return it
+	}
+	f := mk(orders, nil, model.CollectionItemFolder, "F")
+	a := mk(orders, &f, model.CollectionItemRequest, "a")
+	b := mk(orders, nil, model.CollectionItemRequest, "b")
+	mk(orders, nil, model.CollectionItemRequest, "c")
+	g := mk(billing, nil, model.CollectionItemFolder, "G")
+	d := mk(billing, &g, model.CollectionItemRequest, "d")
+
+	mark := app.Events.Mark()
+	move := bridge.CollectionsMoveItemsArgs{ItemIDs: []string{b.ID, f.ID}, CollectionID: billing.ID, ParentID: &g.ID, BeforeID: &d.ID}
+	if err := cs.MoveItems(move); err != nil {
+		t.Fatal(err)
+	}
+	if ch := apiChanges(t, app, mark); len(ch) != 1 || len(ch[0]) != 1 || ch[0][0].Kind != bridge.ApiDataTree {
+		t.Errorf("MoveItems events = %+v, want one tree change", ch)
+	}
+	app.Contract(t, "api-move-many", "args:CollectionsService.MoveItems", move)
+	var paths []string
+	for _, line := range tree(t, app, billing.ID) {
+		paths = append(paths, strings.SplitN(line, "|", 2)[0])
+	}
+	sort.Strings(paths)
+	if diff := cmp.Diff([]string{"G", "G/F", "G/F/a", "G/b", "G/d"}, paths); diff != "" {
+		t.Errorf("billing paths (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"b", "F", "d"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("G children order (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"c"}, childOrder(t, app, orders.ID, nil)); diff != "" {
+		t.Errorf("orders root after the move (-want +got):\n%s", diff)
+	}
+
+	mark = app.Events.Mark()
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{g.ID}, CollectionID: billing.ID, ParentID: &f.ID}); ipcErr(t, err).Code != "E_BAD_REQUEST" {
+		t.Fatalf("move a folder into its own descendant = %v, want E_BAD_REQUEST", err)
+	}
+	if ch := apiChanges(t, app, mark); len(ch) != 0 {
+		t.Errorf("a refused move emitted %+v", ch)
+	}
+
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{d.ID}, CollectionID: billing.ID, ParentID: &g.ID, BeforeID: &b.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"d", "b", "F"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("G children after reorder (-want +got):\n%s", diff)
+	}
+
+	// a is inside F, so the deleted collection covers it and the delete skips it.
+	mark = app.Events.Mark()
+	del := bridge.CollectionsDeleteManyArgs{CollectionIDs: []string{orders.ID}, ItemIDs: []string{f.ID, a.ID}}
+	if err := cs.DeleteMany(del); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "api-delete-many", "args:CollectionsService.DeleteMany", del)
+	ch := apiChanges(t, app, mark)
+	if len(ch) != 1 || !hasChange(ch[0], bridge.ApiDataChange{Kind: bridge.ApiDataTree}) ||
+		!hasChange(ch[0], bridge.ApiDataChange{Kind: bridge.ApiDataVariables, Scope: model.VariableScopeCollection, OwnerID: orders.ID}) {
+		t.Errorf("DeleteMany events = %+v, want tree and the collection's variables", ch)
+	}
+	all, err := cs.List()
+	if err != nil || len(all.Collections) != 1 || all.Collections[0].ID != billing.ID {
+		t.Fatalf("collections after delete = %+v (%v), want only billing", all.Collections, err)
+	}
+	if diff := cmp.Diff([]string{"d", "b"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("G children after delete (-want +got):\n%s", diff)
+	}
+
+	if err := cs.DeleteMany(bridge.CollectionsDeleteManyArgs{ItemIDs: []string{b.ID, "missing"}}); ipcErr(t, err).Code != "E_NOT_FOUND" {
+		t.Fatalf("DeleteMany with a missing id = %v, want E_NOT_FOUND", err)
+	}
+	if diff := cmp.Diff([]string{"d", "b"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("a failed batch must delete nothing (-want +got):\n%s", diff)
 	}
 }

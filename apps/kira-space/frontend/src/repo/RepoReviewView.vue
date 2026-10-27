@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { t } from '@theme/i18n';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
+import { useReviewNavigationStore } from '../state/reviewNavigation';
 import { loadGitUi } from './git/gitUiModule';
 import { takePendingReviewTarget } from './git/hostHandlers';
 import { repoHeadOf } from './git/repoHead';
@@ -20,6 +21,8 @@ const props = defineProps<{ repoId: string }>();
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
+let unregisterNavigator: (() => void) | null = null;
+const navigation = useReviewNavigationStore();
 
 async function mountReview(): Promise<void> {
   if (!props.repoId) {
@@ -42,6 +45,10 @@ async function mountReview(): Promise<void> {
     view: 'review',
     repoHead: repoHeadOf(useCodeReposStore().codeRepoRecord(props.repoId)),
     target,
+    onReviewApi: (api) => {
+      unregisterNavigator?.();
+      unregisterNavigator = navigation.register(props.repoId, api);
+    },
   });
 }
 
@@ -53,6 +60,8 @@ onMounted(() => void mountReview());
 // view's own transport is a lease: its dispose() on unmount releases only this
 // mount's subscriptions, so it can no longer take the graph tab's transport down with it.
 onUnmounted(() => {
+  unregisterNavigator?.();
+  unregisterNavigator = null;
   handle?.unmount();
   handle = null;
 });

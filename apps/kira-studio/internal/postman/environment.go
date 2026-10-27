@@ -13,6 +13,8 @@ type Environment struct {
 	Variables []Variable
 	// Disabled counts values skipped because Postman marks them `enabled: false`.
 	Disabled int
+	// Empty counts imported values that are "": Postman exports only shared values.
+	Empty int
 }
 
 // File is what ParseFile found: exactly one of Collection and Environment is set.
@@ -28,6 +30,7 @@ func ParseFile(r io.Reader) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	doc = unwrapAPIDocument(doc)
 	if _, ok := doc["info"]; ok {
 		tree, err := parseCollection(doc)
 		if err != nil {
@@ -45,6 +48,28 @@ func ParseFile(r io.Reader) (*File, error) {
 	return nil, errors.New("postman: not a Postman collection or environment")
 }
 
+// unwrapAPIDocument unwraps one level of the Postman API envelope: `GET /collections/{id}` answers
+// `{"collection":{info,...}}` and `GET /environments/{id}` `{"environment":{values,...}}`. Only a
+// document with neither `info` nor `values` unwraps, and only when the member's own shape
+// classifies; `collection` wins when both are present.
+func unwrapAPIDocument(doc map[string]json.RawMessage) map[string]json.RawMessage {
+	if _, ok := doc["info"]; ok {
+		return doc
+	}
+	if _, ok := doc["values"]; ok {
+		return doc
+	}
+	if inner := decodeObject(doc["collection"]); inner != nil && decodeObject(inner["info"]) != nil {
+		return inner
+	}
+	if inner := decodeObject(doc["environment"]); inner != nil {
+		if raw := inner["values"]; len(raw) > 0 && raw[0] == '[' {
+			return inner
+		}
+	}
+	return doc
+}
+
 func parseEnvironment(doc map[string]json.RawMessage) *Environment {
 	name, _ := decodeString(doc["name"])
 	if strings.TrimSpace(name) == "" {
@@ -56,17 +81,17 @@ func parseEnvironment(doc map[string]json.RawMessage) *Environment {
 		if obj == nil {
 			continue
 		}
-		key, ok := decodeScalarString(obj["key"])
-		if !ok || key == "" {
-			continue
-		}
-		if enabled, ok := decodeBool(obj["enabled"]); ok && !enabled {
+		v, ok, off := decodeVariableEntry(obj)
+		switch {
+		case !ok:
+		case off:
 			env.Disabled++
-			continue
+		default:
+			if v.Value == "" {
+				env.Empty++
+			}
+			env.Variables = append(env.Variables, v)
 		}
-		value, _ := decodeScalarString(obj["value"])
-		typ, _ := decodeString(obj["type"])
-		env.Variables = append(env.Variables, Variable{Name: key, Value: value, Secret: typ == "secret", Type: typ})
 	}
 	return env
 }

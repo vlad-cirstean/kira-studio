@@ -271,7 +271,7 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: minos 26.0 always; SDK >= 26 once the runner is macos-26 (P346). Until then (SDK 15.5) only a note.
+  # A6: minos 26.0 and SDK >= 26. A smaller SDK is a failure on CI (macos-26); only a note locally.
   if command -v vtool >/dev/null 2>&1; then
     LINKED_SDK="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="sdk"{print $2}')"
     LINKED_MINOS="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="minos"{print $2}')"
@@ -279,6 +279,8 @@ else
       if [ "$LINKED_MINOS" != "26.0" ]; then
         fail "linked minos wrong" "linked minos is '$LINKED_MINOS' in $APP, expected 26.0"
       fi
+    elif [ "${CI:-}" = "true" ]; then
+      fail "linked SDK too old" "$APP links SDK '$LINKED_SDK' (< 26), minos '$LINKED_MINOS'; CI runs macos-26"
     else
       note "A6 warning — $APP links SDK '$LINKED_SDK' (< 26): minos '$LINKED_MINOS', smaller traffic lights; build with Xcode 26+ (CI runs macos-26)"
     fi
@@ -373,7 +375,7 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: minos 26.0 always; SDK >= 26 once the runner is macos-26 (P346). Until then (SDK 15.5) only a note.
+  # A6: minos 26.0 and SDK >= 26. A smaller SDK is a failure on CI (macos-26); only a note locally.
   if command -v vtool >/dev/null 2>&1; then
     SPACE_LINKED_SDK="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="sdk"{print $2}')"
     SPACE_LINKED_MINOS="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="minos"{print $2}')"
@@ -381,6 +383,8 @@ else
       if [ "$SPACE_LINKED_MINOS" != "26.0" ]; then
         fail "linked minos wrong" "linked minos is '$SPACE_LINKED_MINOS' in $SPACE_APP, expected 26.0"
       fi
+    elif [ "${CI:-}" = "true" ]; then
+      fail "linked SDK too old" "$SPACE_APP links SDK '$SPACE_LINKED_SDK' (< 26), minos '$SPACE_LINKED_MINOS'; CI runs macos-26"
     else
       note "A6 warning — $SPACE_APP links SDK '$SPACE_LINKED_SDK' (< 26): minos '$SPACE_LINKED_MINOS', smaller traffic lights; build with Xcode 26+ (CI runs macos-26)"
     fi

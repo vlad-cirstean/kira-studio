@@ -12,6 +12,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
+import { useCollectionSelectionStore } from './state/collectionSelection';
 import { useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
@@ -20,6 +21,7 @@ import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
+const selection = useCollectionSelectionStore();
 const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
 
@@ -73,7 +75,7 @@ function onImport(): void {
 // folder/request's own collection). A no-op with nothing selected, the same "view-scoped, no-op
 // elsewhere" shape view.run/api.save already have.
 function onVariablesCommand(): void {
-  const selected = collectionsStore.selected;
+  const selected = selection.focusKey;
   if (!selected) return;
   if (selected.startsWith('c:')) {
     const id = selected.slice(2);

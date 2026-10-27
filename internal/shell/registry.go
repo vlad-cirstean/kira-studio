@@ -204,6 +204,25 @@ func (r *WindowRegistry) Focused(key string) bool {
 	return ok && e.win != nil && e.win.IsFocused()
 }
 
+// AnyFocused reports whether any registered window is the key window. IsFocused hops to the main
+// thread, so never call this on it, and handles are probed outside r.mu.
+func (r *WindowRegistry) AnyFocused() bool {
+	r.mu.Lock()
+	wins := make([]*application.WebviewWindow, 0, len(r.entries))
+	for _, e := range r.entries {
+		if e.win != nil {
+			wins = append(wins, e.win)
+		}
+	}
+	r.mu.Unlock()
+	for _, w := range wins {
+		if w.IsFocused() {
+			return true
+		}
+	}
+	return false
+}
+
 // Keys returns every currently registered window's key — Quitter's LiveWindowKeys seam (P8 C8):
 // which windows the quit handshake must wait for is decided at the moment quitting actually
 // starts, not fixed at construction time.

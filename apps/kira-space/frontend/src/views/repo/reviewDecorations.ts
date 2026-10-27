@@ -69,6 +69,8 @@ export interface ReviewDecorationsDeps {
 }
 
 export interface ReviewDecorationsHandle {
+  /** Settles once the first diff and comment load finished (or failed). */
+  readonly ready: Promise<void>;
   dispose(): void;
 }
 
@@ -408,6 +410,28 @@ export function attachReviewDecorations(
   // True while the shown banner is a failed comment load, so a later success clears only that.
   let commentsLoadFailed = false;
 
+  // Monaco's hideUnchangedRegions feature unhides every line a selection touches
+  // (hideUnchangedRegionsFeature.js, onDidChangeCursorPosition); no public API reveals one line.
+  // It unhides contiguously from the nearer region edge to the line, so context around a comment
+  // in the middle of a long unchanged stretch is wider than three lines.
+  // The event fires only when the primary cursor moves, so alternate the column per call.
+  let revealColumn = 1;
+  function revealCommentLines(): void {
+    const max = modifiedEditor.getModel()?.getLineCount() ?? 0;
+    const lines = [...new Set(comments.map((c) => c.range.start))]
+      .filter((l) => l >= 1 && l <= max)
+      .sort((a, b) => a - b);
+    const [first] = lines;
+    if (first === undefined) return;
+    revealColumn = revealColumn === 1 ? 2 : 1;
+    const col = revealColumn;
+    // Restore after: a repaint must not collapse the user's selection or move their cursor.
+    const saved = modifiedEditor.getSelections();
+    modifiedEditor.setSelections(lines.map((l) => new mod.Selection(l, col, l, col)));
+    modifiedEditor.setSelection(new mod.Selection(first, col, first, col));
+    if (saved?.length) modifiedEditor.setSelections(saved);
+  }
+
   async function loadComments(): Promise<void> {
     const seq = ++commentsSeq;
     let commentsResult: Awaited<ReturnType<typeof deps.transport.request<'review.comment.list'>>>;
@@ -436,6 +460,7 @@ export function attachReviewDecorations(
       closeErrorZone();
     }
     paint();
+    revealCommentLines();
   }
 
   /** The mount-time (and Retry-button) load only — reloads reachable from onReviewRepaint's own
@@ -626,18 +651,25 @@ export function attachReviewDecorations(
   const unsubscribeRepaint = onReviewRepaint((event) => {
     if (event.repoId !== deps.gitRepoId || event.branch !== deps.review.branch) return;
     if (event.kind === 'mark') {
-      if (event.path !== deps.path) return;
+      if (!event.paths.includes(deps.path)) return;
       void loadDiff();
     } else {
       void loadComments();
     }
   });
 
-  void load();
+  // Regions rebuild on every diff compute, which can re-collapse lines revealed earlier.
+  const diffUpdateDisposable = diffEditor.onDidUpdateDiff(revealCommentLines);
+
+  const ready = load().catch((err: unknown) =>
+    logError('reviewDecorations', 'initial load failed', err),
+  );
 
   return {
+    ready,
     dispose(): void {
       disposed = true;
+      diffUpdateDisposable.dispose();
       unsubscribeRepaint();
       closeZone();
       closeErrorZone();

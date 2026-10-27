@@ -6,7 +6,9 @@
     { "key": "token", "value": "s3cret", "type": "secret", "enabled": true },
     { "key": "retries", "value": 3, "enabled": true },
     { "key": "legacy", "value": "old", "type": "default", "enabled": false },
-    { "key": "implicit", "value": "on" }
+    { "key": "implicit", "value": "on" },
+    { "key": "config", "value": { "retry": [1, 2] }, "type": "any" },
+    { "key": "blank", "value": "", "type": "default" }
   ],
   "_postman_variable_scope": "environment"
 }

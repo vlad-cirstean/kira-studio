@@ -1612,6 +1612,16 @@ export type Contract = {
       result: { readonly review: ReviewFileStatus };
     };
     /**
+     * Marks (or unmarks) whole files in one call: one branch-tip resolution, one result per distinct
+     * path in first-seen order. Backs a folder checkbox.
+     */
+    'review.markMany': {
+      params: { repoId: string; branch: string; paths: readonly string[]; reviewed: boolean };
+      result: {
+        readonly results: readonly { readonly path: string; readonly review: ReviewFileStatus }[];
+      };
+    };
+    /**
      * The stored text of `path` as it was when last reviewed, read from review.db's own
      * compressed snapshot (no git object read, so it survives a rewritten or unreachable tip).
      * `absent` = no record or no stored snapshot; `reviewedAtSha` is the tip at that review.

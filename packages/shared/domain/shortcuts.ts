@@ -75,6 +75,7 @@ export const SHORTCUTS = {
     mac: { key: 'C', alt: true, cmdOrCtrl: true },
   },
   'tree.rename': { scope: 'tree', chord: { key: 'F2' } },
+  'tree.selectAll': { scope: 'tree', chord: { key: 'A', cmdOrCtrl: true } },
   'tree.duplicate': { scope: 'tree', chord: { key: 'D', cmdOrCtrl: true } },
   'tree.delete': {
     scope: 'tree',

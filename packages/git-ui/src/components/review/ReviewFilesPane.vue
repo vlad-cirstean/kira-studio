@@ -104,6 +104,10 @@ function onToggleReviewed(path: string): void {
   const isReviewed = entry ? entry.review.kind !== 'none' : false;
   void props.reviewFiles.mark(path, !isReviewed);
 }
+
+function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
+  void props.reviewFiles.markMany(paths, reviewed);
+}
 </script>
 
 <template>
@@ -157,6 +161,7 @@ function onToggleReviewed(path: string): void {
         :review-states="reviewStatesMap"
         @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
+        @toggle-reviewed-folder="onToggleReviewedFolder"
       />
       <InlineState v-if="reviewFiles.loading.value && files.length === 0" kind="loading">
         {{ t('common.state.loading.loading') }}

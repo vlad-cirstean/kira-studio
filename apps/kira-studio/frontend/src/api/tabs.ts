@@ -176,6 +176,15 @@ export function patchGrpcRequestTabState(id: string, patch: Partial<GrpcRequestT
   useTabsStore().patchTabState(id, 'grpc-request', patch, { skipUnchanged: false });
 }
 
+/** True when any open request tab (HTTP or gRPC) is bound to one of `itemIds`. */
+export function hasOpenRequestTab(itemIds: ReadonlySet<string>): boolean {
+  return useTabsStore().tabs.some((tab) => {
+    if (tab.kind !== 'http-request' && tab.kind !== 'grpc-request') return false;
+    const { itemId } = (tab as HttpRequestTabRecord | GrpcRequestTabRecord).state;
+    return itemId !== null && itemIds.has(itemId);
+  });
+}
+
 export function findHttpRequestTab(id: string): HttpRequestTabRecord | null {
   return asHttpRequestTab(useTabsStore().tabs.find((t) => t.id === id));
 }

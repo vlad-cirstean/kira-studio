@@ -7,7 +7,7 @@
 // `listCache` is gone — eviction is `reconcileEnvironments`/`reconcileTree` (apiQueries.ts),
 // run from `afterEnvironmentsListChange`/`afterTreeListChange` after every list mutation. The
 // collection-delete case below is `reconcileTree`'s own half, re-added now that
-// `collections.ts`'s own migration wires `deleteRow` through `afterTreeListChange`.
+// `collections.ts`'s own migration wires `deleteRows` through `afterTreeListChange`.
 import '@workbench/testing/unit/window';
 
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -171,7 +171,7 @@ describe('deleteEnvironment evicts the incognito override and the cached variabl
   });
 });
 
-describe('deleteRow (collections.ts) evicts the collection-scope variables query on a collection delete (reconcileTree, P112)', () => {
+describe('deleteRows (collections.ts) evicts the collection-scope variables query on a collection delete (reconcileTree, P112)', () => {
   test('deleting a collection evicts its cached variables query, not just the tree', async () => {
     const collectionId = 'col-to-delete-1';
     queryClient.setQueryData(apiCollectionsTreeKey, {
@@ -185,26 +185,28 @@ describe('deleteRow (collections.ts) evicts the collection-scope variables query
     expect(queryClient.getQueryData(apiVariablesKey('collection', collectionId))).toHaveLength(1);
 
     (
-      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
-    ).collectionsDelete = async () => {};
+      control as unknown as { collectionsDeleteMany: typeof control.collectionsDeleteMany }
+    ).collectionsDeleteMany = async () => {};
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({ collections: [], items: [] });
 
-    await collectionsStore.deleteRow({
-      key: `c:${collectionId}`,
-      depth: 0,
-      hasChildren: true,
-      expanded: true,
-      kind: 'collection',
-      id: collectionId,
-      collectionId,
-      parentId: null,
-      name: 'Orders API',
-      method: '',
-      url: '',
-      protocol: 'http',
-      matched: false,
-    });
+    await collectionsStore.deleteRows([
+      {
+        key: `c:${collectionId}`,
+        depth: 0,
+        hasChildren: true,
+        expanded: true,
+        kind: 'collection',
+        id: collectionId,
+        collectionId,
+        parentId: null,
+        name: 'Orders API',
+        method: '',
+        url: '',
+        protocol: 'http',
+        matched: false,
+      },
+    ]);
 
     // reconcileTree reads the query cache directly (an imperative reader, §3.5) — no reactivity
     // lag to wait out here.
