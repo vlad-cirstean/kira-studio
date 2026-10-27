@@ -11,7 +11,7 @@ First phase `P365` (highest in `HISTORY.md` is `P364`). Branch `chapter/v0.2.19`
 | P369 | Review window header: merge title bar and second bar into one title bar. Remove the sync-to-GitHub button and its functionality entirely (frontend, bridge, backend, docs). | Done |
 | P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Done |
 | P371 | Review comment dialog resizes and fits the available space. Hunk checkmark must not move when the add-comment mark appears on hover. | Done |
-| P372 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
+| P372 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Done |
 | P373 | Close chapter, open PR. | Pending |
 
 ## P365 Result
@@ -113,3 +113,17 @@ Assumptions to check:
 - A3: Resize is by the right and bottom edges, mouse and keyboard, growing from the centre. No corner grip and no left or top edge.
 - A4: Size is not remembered between opens.
 - A5: The review diff's glyph margin is now always two lanes wide (about one line height wider than a hunk-only file today). That is the cost of marks that never move, and it also gives comment and hunk marks their own columns.
+
+## P372 Result
+
+Rounds: 1. Base `d1975b05b`. Findings: 11 (0 high, 3 medium, 8 low; the review header miscounted 7). All fixed; findings file removed.
+
+- F1, F2 (CI): `ci-apt-install.sh` bounds only `apt-get install --download-only` and repairs dpkg (`dpkg --configure -a`) before each round; the unpack runs unbounded under the step timeout. New `scripts/playwright-install.sh` repairs dpkg, then runs `playwright install --with-deps`. `go mod download` in `.github/actions/setup/action.yml` is 3 x 120 s so setup fits its 10-minute step.
+- F3: dropped the stale pending-patch pointer in `PACKAGING.md`; the unobserved live GitHub POSTs are a `Known open items` entry in `ARCHITECTURE.md`.
+- F4, F5 (tests): escalation test counts only SIGKILLs sent after `Wait` returned (atomic flag). Board-reads test uses `testing/synctest` (`synctest.Wait` instead of a 100 ms sleep). Both pass `-count=50 -race`, also under 8 busy loops with `-cpu=1,2(,4)`.
+- F6: a review item is done once all its `review` branches merged into main; merged pinned reviews no longer show overdue. Unit row added.
+- F7, F8: submit dialog waits for the on-open refetch, re-applies `reviewGate`, blocks on a failed refresh with an Alert. Title bar shows a disabled Review button with the failure in its tooltip. i18n `space.ade.review.actions.stateFailed.hint`.
+- F9: `SubmitReview` and `CommentOnPull` use a 30 s write timeout; a write timeout reason says the request may have been recorded.
+- F10, F11: resize handles moved to `DialogResizeHandles.vue`, mounted only for `resizable`; `ResizeHandle` gains `scale`, so ARIA reports full sizes; an aborted drag restores the last committed size. UI spec extended.
+
+Pending user action: apply `docs/pending-changes/.github__workflows__pr.yml.patch` (`git apply`, then delete the patch file in the same commit). It points both Playwright install steps in `pr.yml` at `scripts/playwright-install.sh`. F2's optional `pr.yml` timeout change was not needed: the fix is in the action.
