@@ -26,7 +26,7 @@ import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
 import { useRerun, useRunScript } from './runScript';
 import RunsSection from './runs/RunsSection.vue';
-import { useScriptRuns } from './runs/runsQueries';
+import { useLiveRunByScript } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
 import ScriptGroupHeader from './ScriptGroupHeader.vue';
 import ScriptRow from './ScriptRow.vue';
@@ -248,8 +248,12 @@ function openItem(item: NavItem): void {
   if (item.kind === 'group') toggleGroup(item.id);
   else {
     const script = scriptById(item.id);
-    if (script) void runScript(script);
+    if (script) editScript(script);
   }
+}
+
+function editScript(script: CustomScript): void {
+  editor.value = { script, kind: script.kind, collectionId: null };
 }
 
 const nav = useListNavigation<NavItem>({
@@ -314,13 +318,7 @@ async function rerun(run: ScriptRun): Promise<void> {
   actionError.value = await rerunRun(run);
 }
 
-const { data: runs } = useScriptRuns();
-const liveRunByScript = computed(() => {
-  const m = new Map<string, ScriptRun>();
-  for (const r of runs.value ?? [])
-    if (r.state === 'running' && !m.has(r.scriptId)) m.set(r.scriptId, r);
-  return m;
-});
+const liveRunByScript = useLiveRunByScript();
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
@@ -389,9 +387,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       id: 'edit',
       label: t('common.action.edit.label'),
       icon: 'edit',
-      run: () => {
-        editor.value = { script, kind: script.kind, collectionId: null };
-      },
+      run: () => editScript(script),
     },
     moveToCollectionMenu({
       collections: scripts.collections(),
@@ -508,7 +504,10 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                 :depth="0"
                 :live-run="liveRunByScript.get(script.id)"
                 v-bind="nav.rowProps(`script:${script.id}`)"
+                :selected="activeKey === `script:${script.id}`"
+                :live="scriptTabs.isLive({ scriptId: script.id, taskId: '', branchId: '' })"
                 @run="runScript(script)"
+                @open="editScript(script)"
                 @menu="onContextMenu($event, script)"
               />
             </SortableList>
@@ -561,7 +560,10 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                     :depth="1"
                     :live-run="liveRunByScript.get(script.id)"
                     v-bind="nav.rowProps(`script:${script.id}`)"
+                    :selected="activeKey === `script:${script.id}`"
+                    :live="scriptTabs.isLive({ scriptId: script.id, taskId: '', branchId: '' })"
                     @run="runScript(script)"
+                    @open="editScript(script)"
                     @menu="onContextMenu($event, script)"
                   />
                 </SortableList>

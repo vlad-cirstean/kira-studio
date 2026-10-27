@@ -385,7 +385,7 @@ test('run script dialog uses catalog text', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: AUTOMATIONS });
   await openAutomations(page);
 
-  await tid(page, `script-${SCRIPT.id}`).click();
+  await tid(page, `script-${SCRIPT.id}`).locator('[data-testid="script-play"]').click();
   const dialog = tid(page, 'run-dialog');
   await expect(dialog).toBeVisible();
   await expectCatalogText(dialog, { allow: AUTOMATIONS_DATA });

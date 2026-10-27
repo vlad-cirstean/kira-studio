@@ -228,7 +228,7 @@ test('run script dialog primary action is Run', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: AUTOMATIONS });
   await openAutomations(page);
 
-  await tid(page, `script-${SCRIPT.id}`).click();
+  await tid(page, `script-${SCRIPT.id}`).locator('[data-testid="script-play"]').click();
   await expect(tid(page, 'run-dialog')).toBeVisible();
   await expect(tid(page, 'run-start')).toHaveText('Run');
   await expect(tid(page, 'run-cancel')).toHaveText('Cancel');

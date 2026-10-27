@@ -186,7 +186,7 @@ test('the run dialog shows the backend text when a task is refused in Studio', a
     ],
   });
   await modeTab(page, 'automations').click();
-  await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
+  await page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-play"]`).click();
 
   await expect(page.locator('[data-testid="run-preview-error"]')).toHaveText(
     'Tasks exist only in Kira Space.',

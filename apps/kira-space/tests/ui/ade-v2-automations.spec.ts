@@ -252,7 +252,7 @@ test('the Automations entry asks for the task and the run dialog lists tasks', a
   );
   await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
   await page.locator(t('automations-panel')).waitFor();
-  await page.locator(t('script-smart-1')).click();
+  await page.locator(`${t('script-smart-1')} [data-testid="script-play"]`).click();
   const dialog = page.locator(t('run-dialog'));
   await dialog.locator(t('run-task')).click();
   await expect(page.locator(t('run-task-option-T_bill'))).toBeVisible();

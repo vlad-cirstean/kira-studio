@@ -427,6 +427,9 @@
       "shellHint": {
         "hint": "Runs in your login shell; lines run in order. Press {chord} to save."
       },
+      "showRun": {
+        "tooltip": "Show run"
+      },
       "unknownParam": {
         "tooltip": "Unknown parameter"
       },

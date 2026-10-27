@@ -99,7 +99,7 @@ test('clicking a script opens a terminal tab titled with its name', async ({ rel
 
   const row = page.locator(`[data-testid="script-${SCRIPT.id}"]`);
   await expect(row).toContainText('echo one…');
-  await row.click();
+  await row.locator('[data-testid="script-play"]').click();
 
   await expect(page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]')).toContainText(
     SCRIPT.name,

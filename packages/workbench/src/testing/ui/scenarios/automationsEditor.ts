@@ -179,7 +179,7 @@ export function registerEditorScenarios(env: Env, extra?: (ctx: Ctx) => void): v
       ],
     });
     await openPanel(page);
-    await page.locator(`[data-testid="script-${script.id}"]`).click();
+    await page.locator(`[data-testid="script-${script.id}"] [data-testid="script-play"]`).click();
     await expect(
       page.locator(
         '[data-testid="run-dialog"] [data-testid="run-prompt-text"] [data-testid="var-chip"][data-var="topic"]',

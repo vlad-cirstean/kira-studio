@@ -296,7 +296,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await openPanel(page);
     const row = page.locator(`[data-testid="script-${SMART.id}"]`);
     await expect(row.locator('[data-testid="script-ai-badge"]')).toBeVisible();
-    await row.click();
+    await row.locator('[data-testid="script-play"]').click();
 
     const dialog = page.locator('[data-testid="run-dialog"]');
     await expect(dialog).toBeVisible();
@@ -334,7 +334,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
   test('a one-off prompt edit reaches Start and is never saved', async ({ relaunch }) => {
     const { window: page, control } = await relaunch({ control: BASE });
     await openPanel(page);
-    await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+    await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
     const dialog = page.locator('[data-testid="run-dialog"]');
     await dialog.locator('[data-testid="run-prompt-edit"]').click();
     await expect(dialog).toContainText('Not saved to the script');
@@ -358,7 +358,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await page.clock.pauseAt(Date.now() + 10_000);
     const now = await page.evaluate(() => Date.now());
 
-    await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+    await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
     await page.locator('[data-testid="run-start"]').click();
     await emitWailsEvent(
       page,
@@ -413,7 +413,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       ],
     });
     await openPanel(page);
-    await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+    await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
     await page.locator('[data-testid="run-start"]').click();
     await emitWailsEvent(
       page,
@@ -500,7 +500,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
         ],
       });
       await openPanel(page);
-      await page.locator(`[data-testid="script-${script.id}"]`).click();
+      await page.locator(`[data-testid="script-${script.id}"] [data-testid="script-play"]`).click();
       await expect(page.locator('[data-testid="run-start"]')).toBeEnabled();
       await page.locator('[data-testid="run-start"]').click();
       await expect

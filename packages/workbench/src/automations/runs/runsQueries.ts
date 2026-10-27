@@ -56,6 +56,17 @@ export function useScriptRuns() {
   );
 }
 
+/** The newest running run of each script. */
+export function useLiveRunByScript() {
+  const { data } = useScriptRuns();
+  return computed(() => {
+    const m = new Map<string, ScriptRun>();
+    for (const r of data.value ?? [])
+      if (r.state === 'running' && !m.has(r.scriptId)) m.set(r.scriptId, r);
+    return m;
+  });
+}
+
 /** The runs of one ADE task, kept live by the same push channel. */
 export function useTaskScriptRuns(taskId: MaybeRefOrGetter<string>) {
   const { runs } = useAutomationsModule();
