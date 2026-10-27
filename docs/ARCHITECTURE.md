@@ -1945,7 +1945,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Failure: cenkalti/backoff/v4 ExponentialBackOff (30 s to 15 min), a hard gate until the host's reset time, the existing per-repo breaker, and a stop under 200 remaining GraphQL budget. A transient remote-read failure never drops rows.
 - Invalidation: a different signed-in account or a bumped GitHostSchemaVersion drops the repo's rows. Turning the host setting off drops them. Rows of a repo with no sync-state write (updated_at, migration 0048) in 30 days are pruned once per process, at the first Registry.Acquire before any syncer reads state, so no run can resurrect a pruned repo as complete.
 - Delivery: repo.changed kind changeRequestsChanged goes through the coalescing subscriber after a run that changed rows. branch.changeRequestIndex serves one record per head branch from SQLite (newest row per branch picked in SQL, so cost tracks branch count), reports `complete` false when refs cannot be read, only branches present in refs plus open requests; git-ui fills byBranch in one assignment, skips per-branch lookups when `complete`, and reloads on the event (one in flight, one queued). Repo-scoped git reloads ignore the kind.
-- ADE storage: ade_tasks.host_url, ade_backlog.host_url. Migration 0044 renames github_url, ade_gh_synced and pr_number. Migration 0050 (P369) drops ade_viewed_sync.
+- ADE storage: ade_tasks.host_url, ade_backlog.host_url. Migration 0044 renames github_url, ade_gh_synced and pr_number. Migration 0050 (P369) drops ade_viewed_sync. Migration 0051 (P379) adds ade_task_statuses with 4 seeds and ade_tasks.status_id, status_by, status_step, backfilled from the entry step.
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
 
@@ -2011,7 +2011,10 @@ and `docs/HISTORY.md (v2.0)`.
 - A review task converts one way to a work item (task menu, UpdateTask kind task): task owner cleared, its review branches become mine and get a worktree plus prepare script. Clicking a review card opens the task panel; its branch panel opens from the task's branch list (P377).
 - A task follows a workflow, a flat list of steps of kind agent (claude -p), script (a shell command), review or manual (your own work, optionally an interactive session).
 - A workflow step runs once (on the first mine branch in task order), each repo, or only <repo>, with one run per step and branch.
-- Task status is derived from the workflow and runs, never typed (decision D10), so the Status field is read-only.
+- Task status is stored (P379): table ade_task_statuses (id slug, name, tone, category todo|active|review|done, position), 1-20 rows, every category present, names unique ignoring case. Tasks hold status_id, status_by (auto|user), status_step; no SQL FK, so a removed id is reassigned in the same transaction as the set write.
+- Status sync is last event wins. The engine re-applies a step's status only when the workflow position key (current step id, `done`, or empty when not started) differs from status_step. A manual move (UpdateTask statusId) sets status_by user and leaves status_step, so it holds until the next step change. A step status id missing from the set resolves to the first status of the kind default (review step: review, else active).
+- Blocked is not a status: a derived overlay (stuck or failed run, failed setup) shown as a red chip beside the status.
+- Workflow step `status:` holds a status id. The parser checks id syntax only and maps legacy names (To do, In progress, In review, Done) to the seed ids.
 - Backlog items are not on the plan until promoted.
 - The Plan uses flat token surfaces only: no textures, shadows, dashed borders or tint washes. State shows as rail, border, outline or chip colour. Each branch row has one `surface` tooltip (`AdeBranchTip`) in the plan colour coding.
 - CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
@@ -2024,7 +2027,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the agentmcp finish_step server, the Tracker, log sink and session store.
 - wireAdeTask calls Recover() then Start() on the task board, and installs board.OnTUIStopped as the tracker's stopped handler.
-- bridge.AdeTaskService binds 64 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
+- bridge.AdeTaskService binds 65 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
 - AdeTaskService push channels are defined in bridge/adewire/channels.go with prefix kira:adetask: and suffixes board, backlog, workflows, repos, runs, log, sessions and open-session; open-session is emitted to one window via EmitTo.
 - bridge/adewire is the frozen wire contract; tests/fixtures/ade-v2/ holds 27 fixtures decoded by adewire/wire_test.go and the mock runtime.
 - layeringtest.RunAllowing admits the adewire package.
