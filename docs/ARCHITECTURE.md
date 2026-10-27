@@ -2387,7 +2387,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Keep Monaco objects in shallowRef (useDiffEditor), because a deep ref hangs the page.
 - Review entry rule (P240): board/reviewCode.ts reviewChoice hides (parked), disables with a reason (uncreated branch, ahead === 0) or enables each branch; useReviewCode is the one caller of OpenReviewWindow.
 - The ade.reviewCode command uses Cmd/Ctrl+Shift+R as a local binding with no accel.go row; a task with several branches shows a picker.
-- Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[]. A part with `kind: 'branch'` renders as `BranchChip` (git-branch Badge, the git graph ref-badge recipe); ADE builds branch-name parts with `branchParts`.
+- Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[]. A part with `kind: 'branch'` renders as `BranchChip` (git-branch Badge, the git graph ref-badge recipe); ADE builds branch-name parts with `branchParts`. `kind: 'path'` renders `PathChip` (folder icon, same Badge). Both share `ValueChip` (Badge + icon + truncating value).
 
 ### Tests
 
