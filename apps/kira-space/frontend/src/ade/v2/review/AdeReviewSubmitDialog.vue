@@ -95,7 +95,12 @@ const onSubmitKey = shortcutKeydown(['form.submit'], () => void submit());
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && emit('close')">
-    <DialogContent size="md" :dirty="body.trim() !== ''" data-testid="ade-review-submit-dialog">
+    <DialogContent
+      size="md"
+      resizable
+      :dirty="body.trim() !== ''"
+      data-testid="ade-review-submit-dialog"
+    >
       <DialogHeader>
         <DialogTitle>{{ t(TITLE[mode], { short, number: live.number }) }}</DialogTitle>
       </DialogHeader>
@@ -115,6 +120,7 @@ const onSubmitKey = shortcutKeydown(['form.submit'], () => void submit());
         <Textarea
           v-model="body"
           rows="6"
+          class="min-h-24 flex-auto resize-none field-sizing-fixed"
           data-dialog-initial
           :aria-label="t('common.message.label')"
           :placeholder="t('space.ade.review.actions.dialogBody.placeholder')"

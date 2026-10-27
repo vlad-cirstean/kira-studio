@@ -697,3 +697,79 @@ reviewTest('contract: a refused review shows the host reason', async ({ relaunch
   );
   await expect(page.getByRole('dialog')).toBeVisible();
 });
+
+const openCommentDialog = async (
+  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
+  viewport?: { width: number; height: number },
+): Promise<Page> => {
+  const page = await openReview(relaunch, [], actionsGit());
+  if (viewport) await page.setViewportSize(viewport);
+  await page.locator(t('ade-review-cr-comment')).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  return page;
+};
+
+const boxOf = async (l: Locator) => {
+  const b = await l.boundingBox();
+  if (!b) throw new Error('no box');
+  return b;
+};
+
+reviewTest('the review dialog fits a small window', async ({ relaunch }) => {
+  const viewport = { width: 560, height: 420 };
+  const page = await openCommentDialog(relaunch, viewport);
+  const d = await boxOf(page.getByRole('dialog'));
+  expect(d.x).toBeGreaterThanOrEqual(0);
+  expect(d.y).toBeGreaterThanOrEqual(0);
+  expect(d.x + d.width).toBeLessThanOrEqual(viewport.width);
+  expect(d.y + d.height).toBeLessThanOrEqual(viewport.height);
+  await expect(page.locator(t('ade-review-submit'))).toBeInViewport();
+  await expect(page.locator(t('ade-review-submit-body'))).toBeInViewport();
+  expect((await boxOf(page.locator(t('ade-review-submit-body')))).height).toBeGreaterThanOrEqual(
+    96,
+  );
+});
+
+reviewTest('the review dialog resizes from its edges', async ({ relaunch }) => {
+  const page = await openCommentDialog(relaunch);
+  const dialog = page.getByRole('dialog');
+  const body = page.locator(t('ade-review-submit-body'));
+  const drag = async (id: string, dx: number, dy: number) => {
+    const h = await boxOf(page.locator(t(id)));
+    const x = h.x + h.width / 2;
+    const y = h.y + h.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+  const d0 = await boxOf(dialog);
+  const t0 = await boxOf(body);
+
+  await drag('dialog-resize-x', 100, 0);
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeGreaterThan(d0.width + 196);
+  const d1 = await boxOf(dialog);
+  expect(Math.abs(d1.x + d1.width - (d0.x + d0.width) - 100)).toBeLessThanOrEqual(2);
+  expect(Math.abs(d1.width - d0.width - 200)).toBeLessThanOrEqual(4);
+
+  await drag('dialog-resize-y', 0, 80);
+  await expect.poll(async () => (await boxOf(body)).height).toBeGreaterThanOrEqual(t0.height + 150);
+
+  const viewportWidth = page.viewportSize()?.width ?? 0;
+  await drag('dialog-resize-x', 2000, 0);
+  await expect
+    .poll(async () => (await boxOf(dialog)).width)
+    .toBeGreaterThan(viewportWidth * 0.9 - 2);
+  const wide = (await boxOf(dialog)).width;
+  expect(wide).toBeLessThanOrEqual(viewportWidth * 0.9 + 1);
+
+  await page.locator(t('dialog-resize-x')).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeLessThan(wide);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await page.locator(t('ade-review-cr-comment')).click();
+  await expect(dialog).toBeVisible();
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeCloseTo(d0.width, -1);
+});
