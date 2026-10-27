@@ -10,7 +10,7 @@ Source: user request. Phases run top to bottom.
 | P375 | Studio keeps filter value and results across tab changes | Done |
 | P376 | Terminal: Shift+Enter inserts newline | Done |
 | P377 | Foreign-branch review tasks: convert to work item, open normal task view | Done |
-| P378 | Finished/stopped agents behind a dropdown | Todo |
+| P378 | Finished/stopped agents behind a dropdown | Done |
 | P379 | ADE tasks: customizable statuses, manual moves both ways | Todo |
 | P380 | Automation scripts reuse one tab per script | Todo |
 | P381 | Reorder collections and other folders | Todo |
@@ -52,6 +52,8 @@ Result: plan `plans/P377.md`. `UpdateTask` kind `task` now converts a review tas
 ### P378 Finished/stopped agents behind a dropdown
 
 Finished and stopped agents take too much screen space. Move them into a dropdown.
+
+Result: plan `plans/P378.md`. New `AdeStoppedMenu` popover (`ade-stopped-trigger`, `ade-stopped-count`, `ade-stopped-popover`) beside the running strip in `ade-session-bar-row`; hidden when none stopped. Take over closes it. Archived panel keeps the list inline. New store field `revealSessionId`: explicit open of a stopped session opens the popover, marks and focuses its row. Deviations from plan: count is a `rowMeta` span, not `Badge variant="count"` (lint U101); popover `w-96` (U15); row selection via `rowVariants`, reveal via `revealElement` and `useFocus` in `AdeStoppedRow` (U18, U57, U62). Archive spec supplies a stopped `H_5` session, since fixtures have none. Docs: `agents.mdx`. Checks: lint, typecheck, lint:dead, build:space, UI specs `ade-v2-sessions`, `-archive`, `-panel`, `-needs` pass; full Space UI suite not run.
 
 ### P379 ADE task statuses
 
