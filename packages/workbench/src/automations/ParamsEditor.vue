@@ -21,7 +21,7 @@ const PARAM_VAR = '$KIRA_PARAM_<NAME>';
 function add(): void {
   params.value = [
     ...params.value,
-    { name: '', label: '', type: 'text', options: [], default: [], required: false, secret: false },
+    { name: '', type: 'text', options: [], default: [], required: false, secret: false },
   ];
 }
 
@@ -112,16 +112,9 @@ function toggleDefault(i: number, option: string, on: boolean): void {
         <Input
           :model-value="p.name"
           :placeholder="t('common.field.name.label')"
-          class="w-32 font-data"
+          class="min-w-0 flex-1 font-data"
           :data-testid="`param-name-${i}`"
           @update:model-value="(v) => patch(i, { name: String(v) })"
-        />
-        <Input
-          :model-value="p.label"
-          :placeholder="t('git.dialog.stash.saveLabel.label')"
-          class="min-w-0 flex-1"
-          :data-testid="`param-label-${i}`"
-          @update:model-value="(v) => patch(i, { label: String(v) })"
         />
         <NativeSelect
           :model-value="p.type"

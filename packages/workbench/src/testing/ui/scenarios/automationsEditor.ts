@@ -130,7 +130,6 @@ export function registerEditorScenarios(env: Env, extra?: (ctx: Ctx) => void): v
     await d.locator('[data-testid="script-dialog-tab-params"]').click();
     await d.locator('[data-testid="param-add"]').click();
     await d.locator('[data-testid="param-name-0"]').fill('topic');
-    await d.locator('[data-testid="param-label-0"]').fill('Topic');
     await d.locator('[data-testid="param-default-0"]').fill('auth');
 
     await d.locator('[data-testid="script-dialog-tab-script"]').click();

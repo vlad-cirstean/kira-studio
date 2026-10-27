@@ -19,7 +19,7 @@ func TestScriptEditorSave(t *testing.T) {
 	}
 	args := bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 		Name: "triage", Kind: scripts.KindSmart, Command: "Look at {topic}", Color: "blue", CollectionID: &coll.ID,
-		Params: []scripts.Param{{Name: "topic", Label: "Topic", Type: scripts.ParamText, Options: []string{}, Default: []string{"auth"}}},
+		Params: []scripts.Param{{Name: "topic", Type: scripts.ParamText, Options: []string{}, Default: []string{"auth"}}},
 		Smart:  &scripts.Smart{},
 		Schedule: &scripts.Schedule{
 			Cron: "0 9 * * 1-5", Timezone: "UTC", Enabled: true, Confirm: true,

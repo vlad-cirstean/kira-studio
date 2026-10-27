@@ -35,7 +35,6 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     params: [
       {
         name: 'topic',
-        label: 'Topic',
         type: 'text',
         options: [],
         default: ['build'],
@@ -44,7 +43,6 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       },
       {
         name: 'env',
-        label: 'Environment',
         type: 'select',
         options: ['dev', 'prod'],
         default: ['dev'],
@@ -53,7 +51,6 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       },
       {
         name: 'areas',
-        label: 'Areas',
         type: 'multiselect',
         options: ['api', 'ui', 'db'],
         default: ['api'],

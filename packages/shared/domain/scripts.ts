@@ -33,7 +33,6 @@ export type ScriptParamType = z.infer<typeof scriptParamTypeSchema>;
 // Mirrors scripts.Param.
 export const scriptParamSchema = /*#__PURE__*/ z.object({
   name: z.string(),
-  label: z.string(),
   type: scriptParamTypeSchema,
   options: z.array(z.string()),
   default: z.array(z.string()),

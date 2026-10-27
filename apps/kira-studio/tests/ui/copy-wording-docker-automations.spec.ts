@@ -146,7 +146,6 @@ const SCRIPT = {
   params: [
     {
       name: 'topic',
-      label: 'Topic',
       type: 'text',
       options: [],
       default: [],

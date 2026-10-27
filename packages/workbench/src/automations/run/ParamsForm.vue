@@ -28,8 +28,8 @@ function summary(p: ScriptParam): string {
   <div class="flex flex-col gap-3" data-testid="run-params">
     <Field v-for="p in params" :key="p.name" :data-testid="`run-param-${p.name}`">
       <FieldLabel :for="`${idBase}-${p.name}`">
-        {{ p.label || p.name
-        }}<span v-if="p.required" class="text-error">
+        <span class="font-data">{{ p.name }}</span
+        ><span v-if="p.required" class="text-error">
           *<span class="sr-only"> {{ t('common.required.label') }}</span></span
         >
       </FieldLabel>

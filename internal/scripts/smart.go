@@ -36,7 +36,6 @@ const (
 	MaxParams       = 20
 	MaxOptions      = 50
 	MaxOptionRunes  = 200
-	MaxLabelRunes   = 80
 	MaxTextValue    = 2000
 	MaxPatterns     = 30
 	MaxPatternRunes = 200
@@ -68,8 +67,7 @@ var (
 
 // Param is one input of a script.
 type Param struct {
-	Name  string `json:"name"`
-	Label string `json:"label"`
+	Name string `json:"name"`
 	// Type is text, select or multiselect.
 	Type    string   `json:"type"`
 	Options []string `json:"options"`
@@ -130,7 +128,6 @@ func validParams(params []Param, kind, prompt string) ([]Param, error) {
 	seen := map[string]bool{}
 	for _, p := range params {
 		p.Name = strings.TrimSpace(p.Name)
-		p.Label = strings.TrimSpace(p.Label)
 		switch {
 		case !paramNameRE.MatchString(p.Name):
 			return nil, invalid("scripts: param name %q must be lowercase letters, digits and _, starting with a letter, up to 32 characters", p.Name)
@@ -138,8 +135,6 @@ func validParams(params []Param, kind, prompt string) ([]Param, error) {
 			return nil, invalid("scripts: param name %q is reserved", p.Name)
 		case seen[p.Name]:
 			return nil, invalid("scripts: param %q is listed twice", p.Name)
-		case utf8.RuneCountInString(p.Label) > MaxLabelRunes:
-			return nil, invalid("scripts: param %s: label is too long", p.Name)
 		}
 		seen[p.Name] = true
 		var err error
