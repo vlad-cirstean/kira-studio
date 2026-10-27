@@ -106,6 +106,20 @@ describe('merge order', () => {
     expect(v.entries.get('rev')?.day).toBe(1);
   });
 
+  test('a review item with a plan day sits on that day and places nothing', () => {
+    const b = board([
+      { id: 'a', day: 0, est: '1h' },
+      { id: 'b', day: 1, est: '1h' },
+      { id: 'rev', kind: 'review', day: 2 },
+    ]);
+    const stacked = b.branches.find((x) => x.id === 'b_b');
+    if (stacked) stacked.baseBranchId = 'b_rev';
+    const v = view(b);
+    expect(v.seq.map((e) => e.taskId)).toEqual(['a', 'b', 'rev']);
+    expect(v.entries.get('rev')?.day).toBe(2);
+    expect(v.entries.get('rev')?.auto).toBe(false);
+  });
+
   test('an unplaced review item goes to Later', () => {
     const v = view(
       board([

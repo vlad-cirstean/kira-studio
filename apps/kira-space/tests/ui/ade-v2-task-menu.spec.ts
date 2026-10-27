@@ -77,7 +77,7 @@ test('a review item gets the reduced set', async ({ relaunch }) => {
   expect(ids).toContain('ade-task-archive');
   expect(ids).not.toContain('ade-task-step');
   expect(ids).not.toContain('ade-task-park');
-  expect(ids).not.toContain('ade-task-plan');
+  expect(ids).toContain('ade-task-plan');
 });
 
 test('Shift+F10 on the card head and the panel More button open it', async ({ relaunch }) => {

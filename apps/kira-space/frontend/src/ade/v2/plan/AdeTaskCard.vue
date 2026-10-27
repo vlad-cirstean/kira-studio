@@ -98,7 +98,8 @@ const boxClass = computed(() => {
   const c = props.card;
   return [
     c.parked ? 'bg-bg' : '',
-    c.review ? 'cursor-default border-l-tone-blue-solid' : 'cursor-grab',
+    'cursor-grab',
+    c.review ? 'border-l-tone-blue-solid' : '',
     c.allMerged ? 'border-y-tone-purple-solid/60 border-r-tone-purple-solid/60' : '',
     c.ripple && !c.selected ? 'outline outline-1 outline-tone-amber-solid' : '',
   ];
@@ -108,7 +109,7 @@ const boxClass = computed(() => {
 <template>
   <div
     class="flex items-start gap-2"
-    :data-ade-task="card.review ? undefined : ''"
+    data-ade-task=""
     data-testid="ade-task"
     :data-task-id="card.task.id"
     :data-selected="card.selected || undefined"

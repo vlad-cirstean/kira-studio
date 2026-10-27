@@ -156,6 +156,56 @@ test('dragging a card to another day writes the plan once, with no dialog', asyn
   await expect(page.locator('[data-testid="ade-confirm-dialog"]')).toHaveCount(0);
 });
 
+test('dragging a review card to another day pins it', async ({ relaunch }) => {
+  const board = adeFixture<BoardFx>('board');
+  const { window: page, control } = await openPlan(relaunch);
+  await page.setViewportSize({ width: 1440, height: 3200 });
+  await page.locator('[data-testid="ade-load-all"]').click();
+  await card(page, 'R_sara').scrollIntoViewIfNeeded();
+  const drop = bandOf(page, 6).locator('[data-testid="ade-band-drop"]');
+  const geometry = async () =>
+    JSON.stringify([await card(page, 'R_sara').boundingBox(), await drop.boundingBox()]);
+  let last = '';
+  await expect
+    .poll(async () => {
+      const now = await geometry();
+      const settled = now === last;
+      last = now;
+      return settled;
+    })
+    .toBe(true);
+  const [from, to] = JSON.parse(last) as [DOMRect | null, DOMRect | null];
+  if (!from || !to) throw new Error('drag geometry missing');
+  await page.mouse.move(from.x + 40, from.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 60, from.y + 50, { steps: 4 });
+  await page.mouse.move(to.x + 200, to.y + to.height / 2, { steps: 12 });
+  // The drop target is hit-tested per animation frame: let it catch up with the pointer.
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  await page.mouse.up();
+
+  const calls = () => control.log().filter((e) => e.channel === IPC.adeTaskSetPlan);
+  await expect.poll(() => calls().length).toBe(1);
+  expect(calls()[0]?.args).toEqual({
+    order: [...board.plan.order.filter((id) => id !== 'R_sara'), 'R_sara'],
+    days: { R_sara: '2026-09-28' },
+  });
+});
+
+test('a review with a plan day sits on that day', async ({ relaunch }) => {
+  const board = adeFixture<BoardFx>('board');
+  board.plan.day.R_sara = '2026-09-28';
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
+  await page.locator('[data-testid="ade-load-all"]').click();
+  await expect(
+    bandOf(page, 6).locator('[data-testid="ade-card"][data-task-id="R_sara"]'),
+  ).toBeVisible();
+});
+
 test('the day-off confirm says what moves, offers Cancel and Escape leaves the plan alone', async ({
   relaunch,
 }) => {

@@ -44,7 +44,7 @@ export interface TimelineInput {
 export interface TimelineEntry {
   taskId: string;
   kind: Task['kind'];
-  /** Start day offset from today, `LATER` when unplanned. A review item takes its placer's day. */
+  /** Start day offset from today, `LATER` when unplanned. A review item with no plan day takes its placer's day. */
   day: number;
   /** Merge day (last working day of the span). */
   end: number;
@@ -55,6 +55,8 @@ export interface TimelineEntry {
   est: { hours: number; days: number } | null;
   /** Every `mine` branch merged. */
   done: boolean;
+  /** A review item placed by the merge-order rule: it has no plan day. */
+  auto: boolean;
 }
 
 interface TimelineSpan {
@@ -133,10 +135,11 @@ function reviewEntry(taskId: string, day: number, end: number): TimelineEntry {
     pos: 999,
     est: null,
     done: false,
+    auto: true,
   };
 }
 
-/** Planned (non-review) tasks sorted by (merge day, start day, plan position). */
+/** Planned tasks and pinned review items (a review with a plan day) sorted by (merge day, start day, plan position). */
 function buildMineEntries(
   input: TimelineInput,
   graph: BranchGraph,
@@ -145,11 +148,12 @@ function buildMineEntries(
   const { board, settings, today } = input;
   const out: TimelineEntry[] = [];
   for (const t of board.tasks) {
-    if (t.kind === 'review') continue;
     const iso = board.plan.day[t.id];
+    const review = t.kind === 'review';
+    if (review && iso === undefined) continue;
     const day = iso === undefined ? LATER : isoToOffset(today, iso);
     const p = board.plan.order.indexOf(t.id);
-    const est = parseEst(t.est, settings.workdayHours, settings.spanDayShare);
+    const est = review ? null : parseEst(t.est, settings.workdayHours, settings.spanDayShare);
     const span = day === LATER ? 1 : (est?.days ?? 1);
     const days = day === LATER ? [LATER] : spanDays(cal, day, span);
     out.push({
@@ -161,7 +165,8 @@ function buildMineEntries(
       span,
       pos: p < 0 ? 999 : p,
       est,
-      done: isDoneTask(t, graph),
+      done: !review && isDoneTask(t, graph),
+      auto: false,
     });
   }
   return out.sort((a, b) => a.end - b.end || a.day - b.day || a.pos - b.pos);
@@ -184,6 +189,10 @@ function placeReviews(
   const seq: TimelineEntry[] = [];
   const placed = new Set<string>();
   for (const me of mine) {
+    if (me.kind === 'review') {
+      seq.push(me);
+      continue;
+    }
     const t = graph.byTask.get(me.taskId) as Task;
     for (const r of reviews) {
       const rb = r.branchIds[0];
@@ -330,9 +339,7 @@ function buildBand(ctx: BandCtx, dk: number, label: string): TimelineBand {
   const weekend = !isLater && isWeekend(cal, dk) && !cal.workWeekend.has(dk);
   const dayOff = !isLater && isDayOff(cal, dk);
   const overdue = isPast
-    ? ctx.seq
-        .filter((e) => e.day === dk && e.kind !== 'review' && e.end < 0 && !e.done)
-        .map((e) => e.taskId)
+    ? ctx.seq.filter((e) => e.day === dk && !e.auto && e.end < 0 && !e.done).map((e) => e.taskId)
     : [];
   const overflow = isPast || weekend || dayOff ? [] : ctx.hours.overflowOf(dk);
   return {
@@ -403,7 +410,9 @@ export function buildTimeline(input: TimelineInput): TimelineView {
   const cal = buildCalendar(today, settings);
 
   const mine = buildMineEntries(input, graph, cal);
-  const reviews = board.tasks.filter((t) => t.kind === 'review');
+  const reviews = board.tasks.filter(
+    (t) => t.kind === 'review' && board.plan.day[t.id] === undefined,
+  );
   const seq = placeReviews(mine, reviews, graph);
   const entries = new Map<string, TimelineEntry>();
   for (const e of seq) entries.set(e.taskId, e);

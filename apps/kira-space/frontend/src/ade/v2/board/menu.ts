@@ -212,7 +212,7 @@ function changeBaseEntry(choices: readonly ChangeBaseChoice[]): TaskMenuEntry[] 
 }
 
 function planEntry(i: TaskMenuInput): TaskMenuEntry {
-  const day = i.card.entry.day;
+  const day = i.card.entry.auto ? LATER : i.card.entry.day;
   const at = (id: string, label: string, to: number): TaskMenuItem => ({
     id,
     label,
@@ -290,8 +290,8 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
     items: [...i.automations],
   });
 
+  out.push(planEntry(i));
   if (!review) {
-    out.push(planEntry(i));
     out.push({
       type: 'item',
       id: 'ade-task-park',
