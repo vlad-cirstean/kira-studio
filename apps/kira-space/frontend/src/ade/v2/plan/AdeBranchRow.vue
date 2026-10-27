@@ -24,8 +24,8 @@ import AdeAttention from './AdeAttention.vue';
 import AdeBranchTip from './AdeBranchTip.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
-const props = defineProps<{ row: BranchRowModel; color: string | null }>();
-const emit = defineEmits<{ forcePush: [] }>();
+const props = defineProps<{ row: BranchRowModel; color: string | null; taskRow?: boolean }>();
+const emit = defineEmits<{ forcePush: []; taskMenu: [ev: MouseEvent] }>();
 const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
 const contextMenu = useContextMenuStore();
@@ -43,13 +43,23 @@ watch(focused, (f) => {
 const hasChips = computed(
   () => props.row.chips.merged.length + props.row.chips.deployed.length > 0,
 );
-const selected = computed(() => ui.selectedBranchId === props.row.id);
+const selected = computed(() =>
+  props.taskRow
+    ? ui.selectedTaskId === props.row.branch.taskId && ui.selectedBranchId === null
+    : ui.selectedBranchId === props.row.id,
+);
 
+// A review card has no head, so its row stands for the task.
 function pick(): void {
-  ui.selectBranch(props.row.branch.taskId, props.row.id);
+  if (props.taskRow) ui.select(props.row.branch.taskId);
+  else ui.selectBranch(props.row.branch.taskId, props.row.id);
 }
 
 function onMenu(ev: MouseEvent): void {
+  if (props.taskRow) {
+    emit('taskMenu', ev);
+    return;
+  }
   const m = model.value;
   const items = m
     ? fixItems({

@@ -2008,6 +2008,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - In Kira Space, a task owns branches across repos.
 - A branch in Kira Space is one of three kinds: mine (created here, has a name), review (another author's), or parked (kept out of the merge order; shown as Not merging).
+- A review task converts one way to a work item (task menu, UpdateTask kind task): task owner cleared, its review branches become mine and get a worktree plus prepare script. Clicking a review card opens the task panel; its branch panel opens from the task's branch list (P377).
 - A task follows a workflow, a flat list of steps of kind agent (claude -p), script (a shell command), review or manual (your own work, optionally an interactive session).
 - A workflow step runs once (on the first mine branch in task order), each repo, or only <repo>, with one run per step and branch.
 - Task status is derived from the workflow and runs, never typed (decision D10), so the Status field is read-only.

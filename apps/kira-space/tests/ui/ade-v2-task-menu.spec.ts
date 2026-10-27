@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { openPlan } from './support/adeV2';
+import { adeBoard, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
@@ -78,6 +79,58 @@ test('a review item gets the reduced set', async ({ relaunch }) => {
   expect(ids).not.toContain('ade-task-step');
   expect(ids).not.toContain('ade-task-park');
   expect(ids).toContain('ade-task-plan');
+  expect(ids).toContain('ade-task-make-task');
+});
+
+interface Converted {
+  kind: string;
+  owner: string;
+}
+
+// Contract ade-review-convert, backend half: adeflow TestReviewConvert.
+test('contract: Convert to work item sends the backend patch', async ({ relaunch }) => {
+  const args = contract<{ patch: unknown }>('ade-review-convert', 'args:AdeTaskService.UpdateTask');
+  const { window: page, control } = await openPlan(relaunch);
+  await page.locator(t('ade-load-all')).click();
+  await page.locator(card('R_sara')).scrollIntoViewIfNeeded();
+  await page
+    .locator(`${card('R_sara')} [data-testid="ade-branch-row"][data-branch-id="b_sara"]`)
+    .click({ button: 'right' });
+  await expect(page.locator(item('ade-task-review'))).toBeVisible();
+  await page.locator(item('ade-task-make-task')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskUpdateTask)).toHaveLength(1);
+  const sent = calls(control, IPC.adeTaskUpdateTask)[0]?.args;
+  expect(sent).toMatchObject({ taskId: 'R_sara' });
+  expect((sent as { patch: unknown }).patch).toEqual(args.patch);
+});
+
+test('contract: a converted review renders as a normal task', async ({ relaunch }) => {
+  const task = contract<Converted>('ade-review-convert', 'AdeTaskService.UpdateTask#converted');
+  const branch = contract<{ kind: string }>(
+    'ade-review-convert',
+    'AdeTaskService.Branch#converted',
+  );
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskBoard,
+      response: adeBoard((b) => {
+        const tk = b.tasks.find((x) => x.id === 'R_sara');
+        const br = b.branches.find((x) => x.id === 'b_sara');
+        if (!tk || !br) throw new Error('fixture review missing');
+        Object.assign(tk, { kind: task.kind, owner: task.owner });
+        Object.assign(br, { kind: branch.kind });
+      }),
+    },
+  ]);
+  await page.locator(t('ade-load-all')).click();
+  await page.locator(card('R_sara')).scrollIntoViewIfNeeded();
+  const head = page.locator(`${card('R_sara')} ${t('ade-card-head')}`);
+  await expect(head).toBeVisible();
+  await head.click({ button: 'right' });
+  await expect(page.locator(item('ade-task-park'))).toBeVisible();
+  await expect(page.locator(item('ade-task-make-task'))).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator(t('ade-panel-review-note'))).toHaveCount(0);
 });
 
 test('Shift+F10 on the card head and the panel More button open it', async ({ relaunch }) => {
