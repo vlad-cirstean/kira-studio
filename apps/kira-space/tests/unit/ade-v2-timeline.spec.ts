@@ -191,12 +191,14 @@ describe('capacity and overdue', () => {
       board([
         { id: 'a', day: -2, est: '1h' },
         { id: 'b', day: -2, est: '1h', merged: true },
+        { id: 'r1', kind: 'review', day: -2 },
+        { id: 'r2', kind: 'review', day: -2, merged: true },
       ]),
       { showHistory: true },
     );
     const band = v.bands.find((x) => x.key === -2);
     expect(band?.isPast).toBe(true);
-    expect(band?.overdueTaskIds).toEqual(['a']);
+    expect(band?.overdueTaskIds).toEqual(['a', 'r1']);
   });
 
   test('unplanned tasks land in the Later band, which is always last', () => {

@@ -119,9 +119,10 @@ export interface TimelineView {
   graph: BranchGraph;
 }
 
-function isDoneTask(t: Task, graph: BranchGraph): boolean {
-  const mine = t.branchIds.filter((id) => graph.byBranch.get(id)?.kind === 'mine');
-  return mine.length > 0 && mine.every((id) => graph.byBranch.get(id)?.mergedIntoMain === true);
+/** Done when every branch of the task's own kind (`mine`, or `review` for a review item) merged into main. */
+function isDoneTask(t: Task, graph: BranchGraph, kind: 'mine' | 'review' = 'mine'): boolean {
+  const own = t.branchIds.filter((id) => graph.byBranch.get(id)?.kind === kind);
+  return own.length > 0 && own.every((id) => graph.byBranch.get(id)?.mergedIntoMain === true);
 }
 
 function reviewEntry(taskId: string, day: number, end: number): TimelineEntry {
@@ -165,7 +166,7 @@ function buildMineEntries(
       span,
       pos: p < 0 ? 999 : p,
       est,
-      done: !review && isDoneTask(t, graph),
+      done: isDoneTask(t, graph, review ? 'review' : 'mine'),
       auto: false,
     });
   }
