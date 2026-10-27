@@ -17,6 +17,7 @@ import {
 import { hostWords, type MessageKey, t } from '@theme/i18n';
 import { useTimeoutFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
+import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import type { ReviewWindowTarget } from '../wire';
 import AdeReviewSubmitDialog from './AdeReviewSubmitDialog.vue';
@@ -28,6 +29,9 @@ const { state, openChangeRequest } = useChangeRequestReview(() => props.target);
 const data = computed(() => state.data.value);
 const ok = computed(() => (data.value?.kind === 'ok' ? data.value : null));
 const unavailable = computed(() => (data.value?.kind === 'unavailable' ? data.value : null));
+const failed = computed(() =>
+  state.isError.value && !data.value ? errorText(state.error.value) : null,
+);
 const short = computed(() => hostWords(ok.value?.host).changeRequestShort);
 
 const EVENTS: readonly { event: ChangeRequestReviewEvent; label: MessageKey }[] = [
@@ -53,11 +57,11 @@ function done(kind: 'review' | 'comment'): void {
 
 <template>
   <div
-    v-if="ok || unavailable"
+    v-if="ok || unavailable || failed"
     class="wails-no-drag ml-auto flex shrink-0 items-center gap-1"
     data-testid="ade-review-actions"
   >
-    <Tooltip v-if="unavailable">
+    <Tooltip v-if="unavailable || failed">
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger>
           <Button
@@ -70,7 +74,11 @@ function done(kind: 'review' | 'comment'): void {
           </Button>
         </TooltipDisabledTrigger>
       </TooltipTrigger>
-      <TooltipContent>{{ unavailable.status.reason }}</TooltipContent>
+      <TooltipContent>{{
+        unavailable
+          ? unavailable.status.reason
+          : t('space.ade.review.actions.stateFailed.hint', { reason: failed ?? '' })
+      }}</TooltipContent>
     </Tooltip>
     <template v-else-if="ok">
       <span

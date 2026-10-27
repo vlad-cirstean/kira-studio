@@ -21,7 +21,7 @@ import Identifier from '@workbench/components/Identifier.vue';
 import { shortcutKeydown } from '@workbench/shortcuts/useShortcut';
 import { computed, onMounted, ref } from 'vue';
 import type { ReviewWindowTarget } from '../wire';
-import { useChangeRequestReview } from './useChangeRequestReview';
+import { reviewGate, useChangeRequestReview } from './useChangeRequestReview';
 
 type Mode = ChangeRequestReviewEvent | 'conversation';
 type OkState = Extract<ChangeRequestReviewState, { kind: 'ok' }>;
@@ -32,9 +32,21 @@ const emit = defineEmits<{ done: [kind: 'review' | 'comment']; close: [] }>();
 const { state, submitReview, comment, openChangeRequest } = useChangeRequestReview(
   () => props.target,
 );
-// The refetch on open gives the head the review applies to.
+// The refetch on open gives the head the review applies to. Submit waits for it, so a stale
+// head or a PR merged meanwhile is never posted against.
 const live = computed<OkState>(() =>
   state.data.value?.kind === 'ok' ? state.data.value : props.review,
+);
+const refreshError = computed(() => {
+  if (state.isFetching.value) return '';
+  if (state.isError.value) return errorText(state.error.value);
+  const d = state.data.value;
+  return d?.kind === 'unavailable' ? (d.status.reason ?? '') : '';
+});
+const gate = computed(() =>
+  props.mode === 'conversation'
+    ? { enabled: true, reason: '' }
+    : reviewGate(live.value, props.mode),
 );
 onMounted(() => void state.refetch());
 
@@ -55,8 +67,16 @@ const short = computed(() => hostWords(live.value.host).changeRequestShort);
 const body = ref('');
 const error = ref('');
 const required = computed(() => props.mode !== 'approve');
-const pending = computed(() => submitReview.isPending.value || comment.isPending.value);
-const canSubmit = computed(() => !pending.value && (!required.value || body.value.trim() !== ''));
+const posting = computed(() => submitReview.isPending.value || comment.isPending.value);
+const refreshing = computed(() => state.isFetching.value);
+const pending = computed(() => posting.value || refreshing.value);
+const canSubmit = computed(
+  () =>
+    !pending.value &&
+    !refreshError.value &&
+    gate.value.enabled &&
+    (!required.value || body.value.trim() !== ''),
+);
 const headDiffers = computed(
   () =>
     props.mode !== 'conversation' &&
@@ -127,11 +147,19 @@ const onSubmitKey = shortcutKeydown(['form.submit'], () => void submit());
           data-testid="ade-review-submit-body"
           @keydown="onSubmitKey"
         />
-        <FieldDescription>{{
+        <FieldDescription v-if="!gate.enabled" data-testid="ade-review-submit-gate">{{
+          gate.reason
+        }}</FieldDescription>
+        <FieldDescription v-else>{{
           required
             ? t('space.ade.review.actions.required.hint')
             : t('space.ade.review.actions.optional.hint')
         }}</FieldDescription>
+        <Alert v-if="refreshError" variant="error" data-testid="ade-review-submit-refresh-error">
+          <AlertDescription>{{
+            t('space.ade.review.actions.stateFailed.hint', { reason: refreshError })
+          }}</AlertDescription>
+        </Alert>
         <Alert v-if="error" variant="error" data-testid="ade-review-submit-error">
           <AlertDescription>
             <div class="flex items-start gap-3">

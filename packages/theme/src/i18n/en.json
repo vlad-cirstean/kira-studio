@@ -7950,6 +7950,9 @@
           "required": {
             "hint": "A message is required."
           },
+          "stateFailed": {
+            "hint": "Couldn’t load the review state: {reason}."
+          },
           "submitReview": {
             "label": "Submit review"
           }
