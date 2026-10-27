@@ -9,7 +9,7 @@ Source: user request. Phases run top to bottom.
 | P374 | Script params redesign + shared branch-style components | Done |
 | P375 | Studio keeps filter value and results across tab changes | Done |
 | P376 | Terminal: Shift+Enter inserts newline | Done |
-| P377 | Foreign-branch review tasks: convert to work item, open normal task view | Todo |
+| P377 | Foreign-branch review tasks: convert to work item, open normal task view | Done |
 | P378 | Finished/stopped agents behind a dropdown | Todo |
 | P379 | ADE tasks: customizable statuses, manual moves both ways | Todo |
 | P380 | Automation scripts reuse one tab per script | Todo |
@@ -46,6 +46,8 @@ Result: plan `plans/P376.md`. Custom key handler in `terminalRenderer.ts` (sole 
 ### P377 Foreign-branch review tasks
 
 Other people's branches default to review. Add a menu action to convert one into a normal work item. Clicking a review task opens the branch view; it must open the normal task view like any other task.
+
+Result: plan `plans/P377.md`. `UpdateTask` kind `task` now converts a review task: owner cleared, review branches become mine, engine gives each a worktree plus prepare script (`prepareAttached`). review -> parked and task -> review stay refused. Task menu item `Convert to work item` (`ade-task-make-task`). Review card row click/Enter selects the task; right-click opens the task menu (`AdeBranchRow` `taskRow`). Flow test `TestReviewConvert` with contract `ade-review-convert`; UI specs in `ade-v2-task-menu`, `ade-v2-panel`. Docs: `ARCHITECTURE.md`, `agents.mdx`. Checks: lint, typecheck, lint:go, lint:dead, Go flows, build:space, full Space UI suite (700) pass. Tooltip drops the plan's final period (catalog C7). Not verified: remote-only foreign branch conversion.
 
 ### P378 Finished/stopped agents behind a dropdown
 
