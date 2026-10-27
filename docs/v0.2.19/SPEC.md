@@ -9,7 +9,7 @@ First phase `P365` (highest in `HISTORY.md` is `P364`). Branch `chapter/v0.2.19`
 | P367 | SQL diff broken: output almost entirely truncated. Root-cause and fix. | Done |
 | P368 | Move reviews between columns on the planning board. | Done |
 | P369 | Review window header: merge title bar and second bar into one title bar. Remove the sync-to-GitHub button and its functionality entirely (frontend, bridge, backend, docs). | Done |
-| P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Pending |
+| P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Done |
 | P371 | Review comment dialog resizes and fits the available space. Hunk checkmark must not move when the add-comment mark appears on hover. | Pending |
 | P372 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
 | P373 | Close chapter, open PR. | Pending |
@@ -72,3 +72,25 @@ Sync removal: `AdeReviewSync`, `syncParts`, queries, wire types, bridge methods,
 Checked: typecheck, biome, lint:rules, lint:go, knip, `go build ./...`, `go test ./apps/kira-space/...` (gitclient and mobileweb timing tests failed only under concurrent UI load, pass alone), flow tests, `bun test packages/git-ipc`, full `test:ui:space` (690 pass), full `test:visual:space` (20 pass). Leftover-name grep clean except migrations 0012/0044/0050, ARCHITECTURE migration note, contract comments, `HISTORY.md` and memory-eval testdata.
 
 Not verifiable on Linux: merged bar clearing the macOS traffic lights on a real WKWebView window. It reuses the main window's 78px inset and drag strip.
+
+## P370 Result
+
+Plan: `plans/P370.md`. Commits: host role, git socket requests with contract 54, review window UI, docs.
+
+Host: optional `githost.ChangeRequestReviews` (ReviewTarget, SubmitReview, Comment). GitHub drives `gh api` REST (GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments); every field goes through `-f`, never `-F` (argv test guards it). `classify` gains a 422 arm that reports GitHub's first `errors[]` entry. fakehost records reviews and comments and refuses approving its own merge request.
+
+Wire: `changeRequest.reviewState`, `changeRequest.submitReview`, `changeRequest.comment`; contract 53 to 54 (additive); `graphChunkFrame` golden regenerated. Flow test `TestChangeRequestReviewActions` writes `tests/contract/ade-review-actions.json`; four `contract:` UI specs read it.
+
+UI: `AdeReviewActions` (title bar right group: Review dropdown with Comment, Approve, Request changes; Comment on {short}) and `AdeReviewSubmitDialog`. Reuses `common.action.approve.label`, `common.comment.label`, `common.message.label` and the board `Review` label.
+
+Checked: typecheck, biome and lint:rules, lint:go, knip, `go build ./...`, `go test ./apps/kira-space/...`, flow tests, `bun test packages/git-ipc`, full `test:ui:space` (694 pass), `test:visual:space` (20 pass, no baseline moved). Neither flaky Go test (gitclient escalation timer, mobileweb concurrent board reads) failed this run.
+
+Not verified: real GitHub calls. The sandbox cannot reach the GitHub API, so `gh api` POSTs are covered by argv test only.
+
+Assumptions to check:
+- A1: Local inline review comments stay agent-only. A submitted review carries only the dialog's message, not the window's comments. Sending them as GitHub review threads would need each comment mapped onto the PR diff; GitHub refuses the whole review when one line is outside it.
+- A2: The "Comment" review event and "Comment on PR" are two separate actions, as on GitHub: the first records a review, the second a plain conversation comment.
+- A3: On a merged or closed PR, all three review events are disabled and the conversation comment stays available.
+- A4: Errors show inline in the dialog (the repo has no toast primitive), and success shows a short status line in the title bar with an "Open PR" link.
+- A5: The review is recorded against the PR's current head on GitHub, not the local branch tip. A differing local tip only warns.
+- A6: A pending review the user started on github.com makes GitHub refuse a new one (422). That refusal is shown as is; the app does not submit or discard the pending review.
