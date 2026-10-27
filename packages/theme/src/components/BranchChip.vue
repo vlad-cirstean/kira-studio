@@ -16,7 +16,13 @@ const props = withDefaults(
 
 <template>
   <!-- Branch name as a value; same recipe as git graph ref badges (refBadges.ts). -->
-  <Badge :variant="variant" data :class="cn('min-w-0', props.class)" data-testid="branch-chip">
+  <Badge
+    :variant="variant"
+    data
+    :class="cn('min-w-0', props.class)"
+    data-chip="branch"
+    data-testid="branch-chip"
+  >
     <CodiconIcon name="git-branch" :size="12" class="shrink-0" />
     <span v-if="name" class="min-w-0 truncate">{{ name }}</span>
   </Badge>

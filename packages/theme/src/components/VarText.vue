@@ -14,6 +14,7 @@ defineProps<{ parts: readonly TextPart[] }>();
       <BranchChip
         v-else-if="p.kind === 'branch'"
         :name="p.value"
+        :variant="p.variant"
         class="h-auto py-px align-middle"
         :data-var="p.name"
         :aria-label="t('theme.varText.aria', { name: p.name, value: p.value })"
