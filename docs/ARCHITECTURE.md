@@ -1073,6 +1073,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P104 (§3) deleted ViewChrome and ViewHeader because there is no components/ui/reka counterpart for a bespoke layout container, and inlined their markup at each call site over components/ui parts and Tailwind utilities.
 - The shared view chrome look is now a convention each view's own template repeats, not a component it mounts; the logic beneath stays shared.
 - The per-tab runtime store (createRuntimeStore) owns setActionError, toggleSearchOpen and setSearchOpen, so views do not re-implement them.
+- Studio tab views unmount on every tab switch (no keepMounted). Per-tab view UI state (filter inputs, open flags, find query and matches, unapplied filter-row drafts) lives in the view's runtime store, session-only and cleared on tab close, never in a component ref. An open find bar keeps its scan across a switch and rescans only when its page changed; closing the bar clears query and filter-rows toggle (P375).
 - views/shared/viewOp.ts's beginOp/applyLoadFailure are the one load-op preamble and load-failure tail behind every view's load() except Browse, which supersedes by loadSeq, not opId, and has no E_CANCELLED branch.
 - views/shared/page/store.ts is the one two-level page-cache implementation behind all five page modules (grid, documents, keyvalue, stream, console).
 - Visible-window pruning of the page cache is wired into the view side of all five page modules (P5 C3); documents also prunes the parsed-tree cache in views/shared/document/rows.ts to the same window.
