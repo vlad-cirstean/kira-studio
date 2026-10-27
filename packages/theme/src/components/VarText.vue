@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import BranchChip from '@theme/components/BranchChip.vue';
+import PathChip from '@theme/components/PathChip.vue';
 import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 
@@ -14,6 +15,14 @@ defineProps<{ parts: readonly TextPart[] }>();
       <BranchChip
         v-else-if="p.kind === 'branch'"
         :name="p.value"
+        :variant="p.variant"
+        class="h-auto py-px align-middle"
+        :data-var="p.name"
+        :aria-label="t('theme.varText.aria', { name: p.name, value: p.value })"
+      />
+      <PathChip
+        v-else-if="p.kind === 'path'"
+        :path="p.value"
         :variant="p.variant"
         class="h-auto py-px align-middle"
         :data-var="p.name"
