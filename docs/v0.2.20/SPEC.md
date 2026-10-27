@@ -8,7 +8,7 @@ Source: user request. Phases run top to bottom.
 |---|---|---|
 | P374 | Script params redesign + shared branch-style components | Done |
 | P375 | Studio keeps filter value and results across tab changes | Done |
-| P376 | Terminal: Shift+Enter inserts newline | Todo |
+| P376 | Terminal: Shift+Enter inserts newline | Done |
 | P377 | Foreign-branch review tasks: convert to work item, open normal task view | Todo |
 | P378 | Finished/stopped agents behind a dropdown | Todo |
 | P379 | ADE tasks: customizable statuses, manual moves both ways | Todo |
@@ -40,6 +40,8 @@ Result: plan `plans/P375.md`. Root cause: Studio tab views unmount on switch; fi
 ### P376 Terminal: Shift+Enter inserts newline
 
 Earlier request said Cmd+Enter; correct key is Shift+Enter. Fix in every terminal.
+
+Result: plan `plans/P376.md`. Custom key handler in `terminalRenderer.ts` (sole xterm host, all Studio/Space/phone terminals) now maps Shift+Enter to `ESC CR`; Cmd+Enter binding removed (sends `CR`). Updated U41 reason, `ARCHITECTURE.md` fact, Space spec (Meta+Enter `CR`, Shift+Enter `ESC CR`, Enter `CR`). Checks: lint, typecheck, lint:rules, lint:dead, build:space, build:studio, Shift+Enter UI spec pass. Not verified: macOS WKWebView with real Claude Code and zsh.
 
 ### P377 Foreign-branch review tasks
 
