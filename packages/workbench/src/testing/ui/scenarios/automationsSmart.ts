@@ -349,6 +349,28 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await expect(page.locator('[data-testid="script-run-view"]')).toBeVisible();
   });
 
+  test('play on a script with a running run reopens its tab and starts nothing', async ({
+    relaunch,
+  }) => {
+    const { window: page, control } = await relaunch({ control: BASE });
+    await openPanel(page);
+    const play = page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`);
+    await play.click();
+    await page.locator('[data-testid="run-start"]').click();
+    await emitWailsEvent(page, IPC.scriptRunsChanged, smartRun('running'));
+    const view = page.locator('[data-testid="script-run-view"]');
+    await expect(view).toBeVisible();
+
+    await page
+      .locator('[data-testid="tab"][data-tab-kind="script-run"] [data-testid="tab-close"]')
+      .click();
+    await expect(view).toHaveCount(0);
+    await play.click();
+    await expect(view).toBeVisible();
+    await expect(page.locator('[data-testid="run-dialog"]')).toHaveCount(0);
+    expect(control.log().filter((e) => e.channel === IPC.scriptRunsStart)).toHaveLength(1);
+  });
+
   test('the run tab follows a run: Running, a pushed log line, then its result', async ({
     relaunch,
   }) => {

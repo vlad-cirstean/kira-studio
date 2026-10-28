@@ -680,6 +680,9 @@
         }
       },
       "scriptRun": {
+        "alreadyRunning": {
+          "body": "{name} is already running here. Focus its tab or stop it first."
+        },
         "answered": {
           "body": "This run was already answered."
         },

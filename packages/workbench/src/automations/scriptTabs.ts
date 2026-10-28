@@ -20,7 +20,7 @@ export function keyOf(run: Pick<ScriptRun, 'scriptId' | 'taskId' | 'branchId'>):
   return { scriptId: run.scriptId, taskId: run.taskId, branchId: run.branchId };
 }
 
-function sameKey(a: ScriptTabKey, b: ScriptTabKey): boolean {
+export function sameKey(a: ScriptTabKey, b: ScriptTabKey): boolean {
   return a.scriptId === b.scriptId && a.taskId === b.taskId && a.branchId === b.branchId;
 }
 

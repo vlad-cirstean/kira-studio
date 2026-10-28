@@ -51,6 +51,8 @@ type Service struct {
 	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
 	ScheduleTimeout time.Duration
 
+	// startMu serializes Start so the running-run check and the insert of a smart run are one step.
+	startMu   sync.Mutex
 	mu        sync.Mutex
 	closed    bool
 	smart     map[string]*bgRun
