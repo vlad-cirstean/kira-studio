@@ -1,4 +1,9 @@
 {
+  "args:CustomScriptsService.Move#before": {
+    "beforeId": "<id:6>",
+    "collectionId": "<id:4>",
+    "id": "<id:3>"
+  },
   "args:CustomScriptsService.Reorder#collection": {
     "collectionId": "<id:4>",
     "ids": [

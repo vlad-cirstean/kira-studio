@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -288,6 +289,8 @@ func TestScriptFolders(t *testing.T) {
 	}
 }
 
+// TestScriptOrder is the backend half of the shared automationsOrder UI scenario (contract
+// script-order).
 func TestScriptOrder(t *testing.T) {
 	app := flowharness.New(t)
 	cs := app.W.CustomScripts
@@ -299,22 +302,89 @@ func TestScriptOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := newScript(t, app, scripts.CustomScriptFields{Name: "a", Command: "echo a"})
-	b := newScript(t, app, scripts.CustomScriptFields{Name: "b", Command: "echo b"})
-	if err := cs.Reorder(bridge.CustomScriptsReorderArgs{IDs: []string{b.ID, a.ID}}); err != nil {
+	s1 := newScript(t, app, scripts.CustomScriptFields{Name: "s1", Command: "echo s1"})
+	s2 := newScript(t, app, scripts.CustomScriptFields{Name: "s2", Command: "echo s2"})
+	s3 := newScript(t, app, scripts.CustomScriptFields{Name: "s3", Command: "echo s3"})
+	t1 := newScript(t, app, scripts.CustomScriptFields{Name: "t1", Command: "echo t1", CollectionID: &x.ID})
+	t2 := newScript(t, app, scripts.CustomScriptFields{Name: "t2", Command: "echo t2", CollectionID: &x.ID})
+
+	ungrouped := bridge.CustomScriptsReorderArgs{IDs: []string{s3.ID, s1.ID, s2.ID}}
+	inX := bridge.CustomScriptsReorderArgs{CollectionID: &x.ID, IDs: []string{t2.ID, t1.ID}}
+	colls := bridge.CustomScriptsReorderCollectionsArgs{IDs: []string{y.ID, x.ID}}
+	if err := cs.Reorder(ungrouped); err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.ReorderCollections(bridge.CustomScriptsReorderCollectionsArgs{IDs: []string{y.ID, x.ID}}); err != nil {
+	if err := cs.Reorder(inX); err != nil {
 		t.Fatal(err)
 	}
-	app.Restart()
-	snap, err := app.W.CustomScripts.List()
+	if err := cs.ReorderCollections(colls); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "script-order", "args:CustomScriptsService.Reorder#ungrouped", ungrouped)
+	app.Contract(t, "script-order", "args:CustomScriptsService.Reorder#collection", inX)
+	app.Contract(t, "script-order", "args:CustomScriptsService.ReorderCollections", colls)
+
+	names := func(snap scripts.Snapshot) (ung, inx, cols string) {
+		var u, in, c []string
+		for _, s := range snap.Scripts {
+			switch {
+			case s.CollectionID == nil:
+				u = append(u, s.Name)
+			case *s.CollectionID == x.ID:
+				in = append(in, s.Name)
+			}
+		}
+		for _, col := range snap.Collections {
+			c = append(c, col.Name)
+		}
+		return strings.Join(u, ","), strings.Join(in, ","), strings.Join(c, ",")
+	}
+	check := func(label string, snap scripts.Snapshot, wantUng, wantX string) {
+		t.Helper()
+		if ung, inx, cols := names(snap); ung != wantUng || inx != wantX || cols != "Y,X" {
+			t.Fatalf("%s = ungrouped %s, X %s, collections %s; want %s, %s, Y,X", label, ung, inx, cols, wantUng, wantX)
+		}
+	}
+	snap, err := cs.List()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snap.Scripts) != 2 || snap.Scripts[0].ID != b.ID || len(snap.Collections) != 2 || snap.Collections[0].ID != y.ID {
-		t.Fatalf("after Restart = %+v, want b before a and Y before X", snap)
+	check("List", snap, "s3,s1,s2", "t2,t1")
+
+	before := bridge.CustomScriptsMoveArgs{ID: s2.ID, CollectionID: &x.ID, BeforeID: &t1.ID}
+	if err := cs.Move(before); err != nil {
+		t.Fatal(err)
 	}
+	app.Contract(t, "script-order", "args:CustomScriptsService.Move#before", before)
+	snap, err = cs.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("after Move before", snap, "s3,s1", "t2,s2,t1")
+
+	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: t1.ID, BeforeID: &s1.ID}); err != nil {
+		t.Fatal(err)
+	}
+	snap, err = cs.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("after Move out before s1", snap, "s3,t1,s1", "t2,s2")
+	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: t1.ID, CollectionID: &x.ID, BeforeID: &s1.ID}); err == nil {
+		t.Fatal("Move before a script of another set succeeded")
+	}
+	if again, err := cs.List(); err != nil {
+		t.Fatal(err)
+	} else if !reflect.DeepEqual(again, snap) {
+		t.Fatalf("a refused Move changed the order: %+v, want %+v", again, snap)
+	}
+
+	app.Restart()
+	again, err := app.W.CustomScripts.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("after Restart", again, "s3,t1,s1", "t2,s2")
 }
 
 func TestScriptLaunchIgnoresForgedCommand(t *testing.T) {

@@ -249,23 +249,65 @@ func (r *Repo) requireCollection(id *string) error {
 	return nil
 }
 
-// Move sets (nil clears) one command's collection and appends it at the end of the target set
-// (sort_order is dense per set once reordered). Returns a wrapped sql.ErrNoRows for an unknown
-// command id.
-func (r *Repo) Move(id string, collectionID *string) error {
+// Move sets (nil clears) one command's collection and places it in the target set before
+// beforeID, or last when nil, in one transaction. beforeID must be another script of the target
+// set. The target set is rewritten dense; the source set keeps its gap, which is still in order.
+// Returns a wrapped sql.ErrNoRows for an unknown command id.
+func (r *Repo) Move(id string, collectionID, beforeID *string) error {
 	if err := r.requireCollection(collectionID); err != nil {
 		return err
 	}
-	res, err := r.DB.Exec(
-		`UPDATE custom_scripts SET collection_id = ?, updated_at = ?,
-		 sort_order = (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM custom_scripts WHERE collection_id IS ? AND id <> ?)
-		 WHERE id = ?`,
-		collectionID, kiratime.NowISO(), collectionID, id, id,
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("scripts: move %s: begin: %w", id, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.Exec(
+		`UPDATE custom_scripts SET collection_id = ?, updated_at = ? WHERE id = ?`,
+		collectionID, kiratime.NowISO(), id,
 	)
 	if err != nil {
 		return fmt.Errorf("scripts: move %s: %w", id, err)
 	}
-	return requireRow(res, "move", id)
+	if err := requireRow(res, "move", id); err != nil {
+		return err
+	}
+	rows, err := tx.Query(
+		`SELECT id FROM custom_scripts WHERE collection_id IS ? AND id <> ? ORDER BY sort_order ASC, name ASC`,
+		collectionID, id,
+	)
+	set, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (string, bool, error) {
+		var sid string
+		err := rows.Scan(&sid)
+		return sid, true, err
+	})
+	if err != nil {
+		return fmt.Errorf("scripts: move %s: read target set: %w", id, err)
+	}
+	at := len(set)
+	if beforeID != nil {
+		at = -1
+		for i, sid := range set {
+			if sid == *beforeID {
+				at = i
+			}
+		}
+		if at < 0 {
+			return invalid("scripts: before is not in the target set")
+		}
+	}
+	ordered := append(set[:at:at], append([]string{id}, set[at:]...)...)
+	if err := sqlitex.ReorderSortOrder(tx,
+		`SELECT id FROM custom_scripts WHERE collection_id IS ? ORDER BY sort_order ASC, name ASC`,
+		`UPDATE custom_scripts SET sort_order = ? WHERE id = ?`,
+		ordered, collectionID,
+	); err != nil {
+		return fmt.Errorf("scripts: move %s: reorder: %w", id, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("scripts: move %s: commit: %w", id, err)
+	}
+	return nil
 }
 
 // Reorder applies a user's drag order to one set: the ungrouped scripts (nil) or one collection's.

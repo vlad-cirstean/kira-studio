@@ -35,7 +35,8 @@ export interface ScriptsSeam {
   renameCollection(id: string, name: string): Promise<void>;
   removeCollection(id: string): Promise<void>;
   /** collectionId null ungroups. */
-  move(id: string, collectionId: string | null): Promise<void>;
+  /** `beforeId` places the script before that sibling of the target set; null appends. */
+  move(id: string, collectionId: string | null, beforeId?: string | null): Promise<void>;
   /** Persists one set's order: the ungrouped scripts (null) or one collection's. */
   reorder(collectionId: string | null, ids: string[]): Promise<void>;
   reorderCollections(ids: string[]): Promise<void>;
