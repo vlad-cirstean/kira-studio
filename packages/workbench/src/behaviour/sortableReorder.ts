@@ -23,6 +23,10 @@ export function moveId(ids: readonly string[], fromId: string, toId: string): st
   return next;
 }
 
+// One drag at a time. Shared, not per list: the list a cross-list drop lands in never saw the
+// drag start, yet must honour an Esc pressed during it.
+let dragCancelled = false;
+
 const VERTICAL_IDS = ['list.moveUp', 'list.moveDown'] as const;
 const HORIZONTAL_IDS = ['list.moveLeft', 'list.moveRight'] as const;
 
@@ -66,7 +70,6 @@ export function useSortableReorder(
     { immediate: true },
   );
   const dragging = shallowRef(false);
-  let cancelled = false;
 
   const sortable = useDraggable(
     container,
@@ -89,7 +92,7 @@ export function useSortableReorder(
       ghostClass: SORTABLE_GHOST_CLASS,
       onStart: () => {
         dragging.value = true;
-        cancelled = false;
+        dragCancelled = false;
       },
       onEnd: () => {
         dragging.value = false;
@@ -100,14 +103,14 @@ export function useSortableReorder(
         const id = options.itemId?.(evt.item);
         const beforeId = ids()[evt.newDraggableIndex ?? -1] ?? null;
         rowIds.value = [...ids()];
-        if (!cancelled && id) options.onAdd?.(id, beforeId);
+        if (!dragCancelled && id) options.onAdd?.(id, beforeId);
       },
       onRemove: () => {
         rowIds.value = [...ids()];
       },
       onUpdate: (evt) => {
         const current = ids();
-        if (cancelled) {
+        if (dragCancelled) {
           rowIds.value = [...current];
           return;
         }
@@ -120,7 +123,7 @@ export function useSortableReorder(
 
   // Esc during a drag drops the item back where it started.
   useEventListener(document, 'keydown', (e: KeyboardEvent) => {
-    if (dragging.value && e.key === 'Escape') cancelled = true;
+    if (dragging.value && e.key === 'Escape') dragCancelled = true;
   });
 
   if (options.keyboard) {
