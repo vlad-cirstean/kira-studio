@@ -11,7 +11,9 @@ import { createLatestRequest, runLatest } from '@workbench/behaviour/latest';
 import { errorText } from '@workbench/bridge/codedError';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createCancellableTimer } from './cancellableTimer.ts';
 import { isCancelledTransport } from './isCancelled.ts';
+import { AUTO_REFRESH_COALESCE_MS } from './refreshTiming.ts';
 
 export type ReviewFileDiffBody = ResultOf<'review.fileDiff'>['body'];
 
@@ -87,14 +89,25 @@ export class ReviewFilesState {
   readonly #filesRequest = createLatestRequest<ResultOf<'review.files'>>(isCancelledTransport);
   readonly #diffRequest = createLatestRequest<ResultOf<'review.fileDiff'>>(isCancelledTransport);
 
+  readonly #unsubscribeChanged: () => void;
+  readonly #reloadTimer = createCancellableTimer(() => this.reload(), AUTO_REFRESH_COALESCE_MS);
+
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
+    // A new commit on the branch keeps the (repo, branch, base) triple, so `setTarget` never
+    // re-runs; the ref write is the only signal the list and shas went stale.
+    this.#unsubscribeChanged = bridge.on('repo.changed', (event) => {
+      if (event.kind !== 'refsChanged') return;
+      if (this.#target?.repoId !== event.repoId) return;
+      this.#reloadTimer.start();
+    });
   }
 
   /** Called whenever the review session's own target/base changes — resets everything and, when a
    *  target is given, loads the file list. */
   setTarget(target: ReviewFilesTarget | undefined): void {
     this.#abortAll();
+    this.#reloadTimer.stop();
     this.#target = target;
     this.files.value = [];
     this.#branchTip = undefined;
@@ -133,6 +146,14 @@ export class ReviewFilesState {
         this.files.value = result.files;
         this.#branchTip = result.branchTip;
         this.#mergeBase = result.mergeBase;
+        this.loadError.value = undefined;
+        const selected = this.selectedPath.value;
+        if (selected === null) return;
+        if (result.files.some((e) => e.change.path === selected)) void this.#loadDiff();
+        else {
+          this.selectedPath.value = null;
+          this.#clearDiff();
+        }
       },
       onError: (message) => {
         this.loadError.value = message;
@@ -366,6 +387,8 @@ export class ReviewFilesState {
   }
 
   dispose(): void {
+    this.#reloadTimer.stop();
+    this.#unsubscribeChanged();
     this.#abortAll();
   }
 
