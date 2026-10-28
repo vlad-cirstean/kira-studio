@@ -14,6 +14,7 @@ import AdeReviewFiles from './AdeReviewFiles.vue';
 import AdeReviewHeader from './AdeReviewHeader.vue';
 import AdeWorkflowReviewPanel from './AdeWorkflowReviewPanel.vue';
 import { useReviewContext } from './useReviewContext';
+import { useReviewWorkingSync } from './useReviewWorking';
 
 // Three panes for one branch: files to review (left), this window's diff tabs (centre), and the
 // questions panel (right).
@@ -21,6 +22,7 @@ const store = useAdeReviewWindowStore();
 const target = computed(() => store.target);
 const { repoLabel } = useReviewContext(() => store.target as NonNullable<typeof store.target>);
 
+useReviewWorkingSync(() => store.target);
 const files = useTemplateRef('files');
 
 // The Workflow review tab shows while the branch has a review step run; it opens first while that

@@ -10,14 +10,16 @@ import { taskColor } from '../palette';
 import type { ReviewWindowTarget } from '../wire';
 import AdeReviewActions from './AdeReviewActions.vue';
 import { useReviewContext } from './useReviewContext';
+import { useReviewWorking } from './useReviewWorking';
 
 const props = defineProps<{ target: ReviewWindowTarget }>();
 
 const { task, branch, repoLabel } = useReviewContext(() => props.target);
+const working = useReviewWorking(() => props.target.branchId);
 const title = computed(() =>
   task.value ? taskTitle(task.value, branch.value, '') : props.target.branch,
 );
-const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
+const dirtyCount = computed(() => working.data.value?.files.length ?? 0);
 const hint = computed(() =>
   t('space.ade.review.header.uncommitted.hint', { count: dirtyCount.value }),
 );

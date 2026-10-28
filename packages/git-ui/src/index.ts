@@ -15,7 +15,13 @@ export { GraphViewState } from './state/graphView.ts';
 export type { AppliedChunkRange, ApplyChunkHooks, ChunkSource } from './state/packedStream.ts';
 export { PackedStreamState } from './state/packedStream.ts';
 export { RepoState } from './state/repo.ts';
-export type { ReviewApi, ReviewExpansion, ReviewPhase, ReviewTarget } from './state/review.ts';
+export type {
+  ReviewApi,
+  ReviewExpansion,
+  ReviewPhase,
+  ReviewTarget,
+  ReviewWorkingSection,
+} from './state/review.ts';
 export { ReviewSessionState } from './state/review.ts';
 export { SelectionState } from './state/selection.ts';
 export type {

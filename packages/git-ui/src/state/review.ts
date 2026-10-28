@@ -1,4 +1,4 @@
-import type { BaseResolution, CommitRange } from '@kira/git-ipc';
+import type { BaseResolution, CommitRange, FileChange } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
@@ -518,4 +518,11 @@ export interface ReviewApi {
   adjacentFile(path: string, dir: 'next' | 'previous'): string | null;
   /** Re-reads the file list and re-checks the base: for a host that may have missed a ref event. */
   refresh(): void;
+}
+
+/** Uncommitted changes a host shows under the committed list (review window): no review marks,
+ *  `onOpen` opens the host's own diff for the path. */
+export interface ReviewWorkingSection {
+  readonly files: readonly FileChange[];
+  onOpen(path: string, pinned: boolean): void;
 }

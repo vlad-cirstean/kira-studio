@@ -21,6 +21,8 @@ export const TIMING = {
   reannounce: 100,
   /** How long the status line stays after a review or comment is posted. */
   postedStatus: 6000,
+  /** Wait after agent activity before re-reading the files it may have written. */
+  fileSettle: 300,
   /** Hover info popup delay. */
   hoverInfo: 400,
   pollFast: 5000,

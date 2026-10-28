@@ -6,7 +6,8 @@ import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { useReviewWorkingDiff } from '../../ade/v2/review/useReviewWorking';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 // The diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
@@ -60,6 +61,7 @@ const diffNavigation = shallowRef<DiffNavigation | null>(null);
 // Bumped when the editor's change cursor moves; the navigator itself is reactive.
 const navTick = ref(0);
 const isReview = props.tab.state.review !== null;
+const workingBranchId = props.tab.state.working?.branchId;
 const repoIdForNav = repoIdOfTab(props.tab);
 
 function hasAdjacentFile(dir: 'next' | 'previous'): boolean {
@@ -127,6 +129,7 @@ async function mount(): Promise<void> {
     right,
     review: review !== null,
     reviewBranch: review?.branch,
+    workingBranchId,
   });
   diffEditor = handle;
   const arrival = repoId ? navigation.takeArrival(repoId, props.tab.path) : null;
@@ -181,6 +184,23 @@ async function mount(): Promise<void> {
   }
 }
 
+// An uncommitted file follows the disk: a refreshed read rewrites both models in place.
+const workingDiff = useReviewWorkingDiff(
+  () => workingBranchId ?? '',
+  () => props.tab.path,
+);
+watch(
+  () => workingDiff.data.value,
+  (diff) => {
+    const models = diffEditor?.editor.value?.getModel();
+    if (!diff || !models || diff.head.kind === 'binary' || diff.worktree.kind === 'binary') return;
+    if (models.original.getValue() !== diff.head.text) models.original.setValue(diff.head.text);
+    if (models.modified.getValue() !== diff.worktree.text) {
+      models.modified.setValue(diff.worktree.text);
+    }
+  },
+);
+
 onMounted(() => void mount());
 
 // A mere tab switch away — the widget disposes, the models survive in editors.ts until an actual
@@ -227,7 +247,7 @@ onUnmounted(() => {
         <CodiconIcon name="arrow-down" :size="13" />
       </Button>
       <Button
-        v-if="state === 'found'"
+        v-if="state === 'found' && !workingBranchId"
         variant="toolbar"
         size="kira"
         data-testid="repo-diff-go-to-file"

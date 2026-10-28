@@ -27,7 +27,12 @@ import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
-import { type ReviewPane, ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
+import {
+  type ReviewPane,
+  ReviewSessionState,
+  type ReviewTarget,
+  type ReviewWorkingSection,
+} from '../../state/review.ts';
 import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
@@ -45,6 +50,7 @@ const props = defineProps<{
   lockTarget?: boolean;
   onReviewApi?: MountOptions['onReviewApi'];
   repoHead?: RepoHead;
+  workingChanges?: ReviewWorkingSection | null;
 }>();
 
 const bridge = new BridgeClient(props.transport);
@@ -565,6 +571,7 @@ useReviewAnnouncements(review, announce);
           :actions="filesActions"
           :list-mode="listMode"
           :filter="filter"
+          :working="workingChanges ?? null"
         />
 
         <ReviewCommentsPane

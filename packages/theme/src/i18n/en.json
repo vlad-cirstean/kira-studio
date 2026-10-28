@@ -5019,6 +5019,9 @@
       },
       "unrelated": {
         "body": "“{branch}” and “{base}” share no common history."
+      },
+      "working": {
+        "hint": "Not committed yet. Not part of the review marks."
       }
     },
     "search": {
@@ -8035,6 +8038,11 @@
           },
           "files": {
             "aria": "Files to review"
+          }
+        },
+        "working": {
+          "right": {
+            "label": "Working tree"
           }
         }
       },

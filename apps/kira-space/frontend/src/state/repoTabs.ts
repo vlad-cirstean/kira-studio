@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { requestReveal } from '../views/repo/reveal';
 import {
   asRepoDiffTab,
@@ -250,6 +251,46 @@ export function openRepoReviewDiffTab(
     pinned,
     previewCohort,
   });
+}
+
+// An uncommitted file of a task branch's worktree, for the review window. Keyed by (path, branch):
+// the same path in another branch's worktree is another tab. `left`/`right` are model keys only.
+export function openRepoWorkingReviewTab(
+  repoId: string,
+  path: string,
+  branchId: string,
+  pinned: boolean,
+): OpenTabResult {
+  const tabsStore = useTabsStore();
+  const workspaceId = repoWorkspaceKey(repoId);
+  const existing = tabsStore.tabs.find(
+    (t) =>
+      (t.workspaceId ?? null) === workspaceId &&
+      t.path === path &&
+      asRepoDiffTab(t)?.state.working?.branchId === branchId,
+  );
+  if (existing) {
+    if (pinned) tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
+    tabsStore.activateTab(existing.id);
+    return { id: existing.id, reused: true };
+  }
+  return tabsStore.openTab(
+    'repo-diff',
+    null,
+    path,
+    () =>
+      defaultRepoDiffTabState(
+        {
+          left: `working-head:${branchId}`,
+          right: `working:${branchId}`,
+          leftLabel: 'HEAD',
+          rightLabel: t('space.ade.review.working.right.label'),
+        },
+        undefined,
+        { branchId },
+      ),
+    { reuse: false, workspaceId, preview: !pinned },
+  );
 }
 
 // Opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
