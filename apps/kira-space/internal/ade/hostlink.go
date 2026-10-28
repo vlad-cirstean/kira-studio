@@ -126,106 +126,137 @@ func (b *TaskBoard) resolveHostLink(ctx context.Context, raw string) (linkPlan, 
 	if link.Issue {
 		return linkPlan{}, invalid("An issue link names no branch. Paste its pull request or branch link.")
 	}
-	var plan linkPlan
 	repoID, remote, err := b.matchHostRepo(ctx, p, link.Repo)
 	if err != nil {
-		return plan, err
+		return linkPlan{}, err
 	}
 	if repoID == "" {
-		return plan, invalid("No repo in your workspace has a remote for %s/%s/%s. Add the repo first.", link.Repo.Host, link.Repo.Owner, link.Repo.Name)
+		return linkPlan{}, invalid("No repo in your workspace has a remote for %s/%s/%s. Add the repo first.", link.Repo.Host, link.Repo.Owner, link.Repo.Name)
 	}
 	var head githost.ChangeRequestHead
 	if link.Number > 0 {
-		var st githost.Status
-		if head, st = bl.ChangeRequestHead(ctx, link.Repo, link.Number); !st.OK() {
-			if st.Gone {
-				return plan, invalid("%s #%d not found on %s/%s/%s, or your %s account cannot see it",
-					p.Terms().ChangeRequest, link.Number, link.Repo.Host, link.Repo.Owner, link.Repo.Name, p.Terms().Label)
-			}
-			return plan, invalid("%s", st.Reason)
-		}
-		if head.State == "merged" {
-			return plan, invalid("%s #%d is already merged", p.Terms().ChangeRequestShort, link.Number)
+		if head, err = changeRequestHead(ctx, p, bl, link); err != nil {
+			return linkPlan{}, err
 		}
 	}
 	entry, err := b.openRepo(ctx, repoID)
 	if err != nil {
-		return plan, err
+		return linkPlan{}, err
 	}
 	inv, err := entry.BranchInventory(ctx)
 	if err != nil {
-		return plan, err
+		return linkPlan{}, err
 	}
 	defaultRemote, _ := entry.DefaultRemote(ctx)
-	hasLocal := func(name string) bool {
-		for _, r := range inv {
-			if r.Remote == "" && r.Short == name {
-				return true
-			}
-		}
-		return false
-	}
-	t := adewire.HostLinkTarget{CodeRepoID: repoID, Remote: remote}
-	plan.exists = true
-
+	f := linkFacts{inv: inv, remote: remote, defaultRemote: defaultRemote}
+	plan := linkPlan{exists: true, target: adewire.HostLinkTarget{CodeRepoID: repoID, Remote: remote}}
 	if link.Number > 0 {
-		t.Author = head.Author
-		t.ChangeRequest = &adewire.ChangeRequest{Number: head.Number, Title: head.Title, State: head.State, URL: head.URL}
-		sameRepo := head.HeadOwner != "" && strings.EqualFold(head.HeadOwner, link.Repo.Owner)
-		t.Fork = !sameRepo
-		switch {
-		case sameRepo:
-			t.Branch = head.HeadRef
-		case head.HeadOwner != "":
-			t.HeadOwner, t.Branch = head.HeadOwner, head.HeadOwner+"/"+head.HeadRef
-		default:
-			t.Branch = fmt.Sprintf("pr-%d", head.Number)
-		}
-		open := head.State == "open" || head.State == "draft"
-		if !hasLocal(t.Branch) {
-			if sameRepo && open && remote == defaultRemote {
-				plan.refspec = "+refs/heads/" + t.Branch + ":refs/remotes/" + remote + "/" + t.Branch
-			} else {
-				plan.refspec = bl.ChangeRequestRef(head.Number) + ":refs/heads/" + t.Branch
-			}
-		}
-		plan.title = head.Title
-		if _, ok := reg.ParseLink(head.URL); ok {
-			plan.hostURL = head.URL
-		}
+		b.planChangeRequest(&plan, f, bl, link, head)
 	} else {
-		plan.treeLink = true
-		t.Branch, plan.exists = pickTreeBranch(inv, remote, link.TreePath)
-		if plan.exists && !hasLocal(t.Branch) && remote != defaultRemote {
-			plan.refspec = "refs/heads/" + t.Branch + ":refs/heads/" + t.Branch
+		planTree(&plan, f, link.TreePath)
+	}
+	if err := b.checkLinkBranch(ctx, entry, &plan); err != nil {
+		return plan, err
+	}
+	return plan, nil
+}
+
+// linkFacts is the repo state a plan reads.
+type linkFacts struct {
+	inv                   []porcelain.InventoryRef
+	remote, defaultRemote string
+}
+
+func (f linkFacts) hasLocal(name string) bool {
+	for _, r := range f.inv {
+		if r.Remote == "" && r.Short == name {
+			return true
 		}
 	}
+	return false
+}
 
+func changeRequestHead(ctx context.Context, p githost.Provider, bl githost.BranchLinks, link githost.BranchLink) (githost.ChangeRequestHead, error) {
+	head, st := bl.ChangeRequestHead(ctx, link.Repo, link.Number)
+	t := p.Terms()
+	switch {
+	case st.Gone:
+		return head, invalid("%s #%d not found on %s/%s/%s, or your %s account cannot see it",
+			t.ChangeRequest, link.Number, link.Repo.Host, link.Repo.Owner, link.Repo.Name, t.Label)
+	case !st.OK():
+		return head, invalid("%s", st.Reason)
+	case head.State == "merged":
+		return head, invalid("%s #%d is already merged", t.ChangeRequestShort, link.Number)
+	}
+	return head, nil
+}
+
+// planChangeRequest names the local branch and fetch for a change request link: a fork lands as
+// <owner>/<head> (pr-<n> when its repo is gone), fetched from the change-request ref.
+func (b *TaskBoard) planChangeRequest(plan *linkPlan, f linkFacts, bl githost.BranchLinks, link githost.BranchLink, head githost.ChangeRequestHead) {
+	t := &plan.target
+	t.Author = head.Author
+	t.ChangeRequest = &adewire.ChangeRequest{Number: head.Number, Title: head.Title, State: head.State, URL: head.URL}
+	sameRepo := head.HeadOwner != "" && strings.EqualFold(head.HeadOwner, link.Repo.Owner)
+	t.Fork = !sameRepo
+	switch {
+	case sameRepo:
+		t.Branch = head.HeadRef
+	case head.HeadOwner != "":
+		t.HeadOwner, t.Branch = head.HeadOwner, head.HeadOwner+"/"+head.HeadRef
+	default:
+		t.Branch = fmt.Sprintf("pr-%d", head.Number)
+	}
+	if !f.hasLocal(t.Branch) {
+		open := head.State == "open" || head.State == "draft"
+		if sameRepo && open && f.remote == f.defaultRemote {
+			plan.refspec = "+refs/heads/" + t.Branch + ":refs/remotes/" + f.remote + "/" + t.Branch
+		} else {
+			plan.refspec = bl.ChangeRequestRef(head.Number) + ":refs/heads/" + t.Branch
+		}
+	}
+	plan.title = head.Title
+	if _, ok := b.deps.Registry.Hosts.Registry.ParseLink(head.URL); ok {
+		plan.hostURL = head.URL
+	}
+}
+
+// planTree names the branch of a branch link. A branch on a non-default remote needs a local copy.
+func planTree(plan *linkPlan, f linkFacts, path string) {
+	plan.treeLink = true
+	plan.target.Branch, plan.exists = pickTreeBranch(f.inv, f.remote, path)
+	if name := plan.target.Branch; plan.exists && !f.hasLocal(name) && f.remote != f.defaultRemote {
+		plan.refspec = "refs/heads/" + name + ":refs/heads/" + name
+	}
+}
+
+// checkLinkBranch refuses the main branch and unusable names, and reports a live holder.
+func (b *TaskBoard) checkLinkBranch(ctx context.Context, entry *gitsession.RepoEntry, plan *linkPlan) error {
+	t := &plan.target
 	if !t.Fork {
 		if ref, _, ok, err := entry.MainRef(ctx); err == nil && ok {
 			if mainName, _ := mainDisplay(ref); mainName == t.Branch {
-				return plan, invalid("%s is the repo's main branch", t.Branch)
+				return invalid("%s is the repo's main branch", t.Branch)
 			}
 		}
 	}
 	valid, err := entry.CheckBranchName(ctx, t.Branch)
 	if err != nil {
-		return plan, err
+		return err
 	}
 	if !valid || strings.ContainsAny(t.Branch, ": ") {
-		return plan, invalid("%q is not a usable branch name", t.Branch)
+		return invalid("%q is not a usable branch name", t.Branch)
 	}
 	live, err := b.deps.Tasks.BranchesLive()
 	if err != nil {
-		return plan, err
+		return err
 	}
 	for _, br := range live {
-		if br.CodeRepoID == repoID && br.Name == t.Branch {
+		if br.CodeRepoID == t.CodeRepoID && br.Name == t.Branch {
 			t.OnTaskID = br.TaskID
 		}
 	}
-	plan.target = t
-	return plan, nil
+	return nil
 }
 
 // pickTreeBranch takes the longest segment prefix of path that names a local branch or a branch of

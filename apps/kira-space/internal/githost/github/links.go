@@ -49,10 +49,8 @@ func (p *Provider) ParseBranchLink(ctx context.Context, raw string) (githost.Bra
 				return githost.BranchLink{}, false
 			}
 			link.Issue = true
-		} else {
-			if len(rest) > 2 || (len(rest) == 2 && !pullTabs[rest[1]]) {
-				return githost.BranchLink{}, false
-			}
+		} else if len(rest) > 2 || (len(rest) == 2 && !pullTabs[rest[1]]) {
+			return githost.BranchLink{}, false
 		}
 		link.Number = n
 	case "tree":
