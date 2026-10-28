@@ -5,6 +5,11 @@ import { type Binding, type Chord, SHORTCUTS, type ShortcutId } from '@shared/do
 // process's lifetime.
 const isMac = navigator.userAgent.includes('Mac');
 
+/** 'Cmd' on mac, 'Ctrl' elsewhere: copy like "Cmd-click". */
+export function primaryModifierName(): 'Cmd' | 'Ctrl' {
+  return isMac ? 'Cmd' : 'Ctrl';
+}
+
 /** The platform's primary modifier: Cmd on mac, Ctrl elsewhere. */
 export function isPrimaryModifier(e: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
   return isMac ? e.metaKey : e.ctrlKey;

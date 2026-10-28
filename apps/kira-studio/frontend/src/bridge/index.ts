@@ -9,6 +9,7 @@ import * as FiltersService from '@bindings/filtersservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
+import * as LinkService from '@bindings/linkservice.js';
 import * as LlmPromptsService from '@bindings/llmpromptsservice.js';
 import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
@@ -74,6 +75,7 @@ import type { TreeVisibility } from '@shared/domain/treeFilter';
 import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
 import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
+import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
@@ -487,6 +489,7 @@ export const control = {
     llmPrompts: LlmPromptsService,
     agent: AgentService,
   }),
+  openExternal: createOpenExternal((url) => unwrap(LinkService.OpenExternal({ url }))),
   ...apiControl,
   ...studioControl,
 };

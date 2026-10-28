@@ -1,4 +1,5 @@
 import type { AutomationsModuleContext } from '@workbench/automations/module';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { control } from '../bridge/control';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useModeStore } from '../state/mode';
@@ -43,6 +44,8 @@ export function createAutomationsModule(): AutomationsModuleContext {
         appearance: () => settingsStore.appearance,
         onTerminalOutput: terminalsStore.onTerminalOutput,
         writeTerminal: terminalsStore.writeTerminal,
+        openLink: (url) => fireAndForget(control.openExternal(url), 'terminalLink'),
+        linkActivation: 'modifier',
       },
       terminalSession: terminalsStore.terminalSession,
       openTerminalSession: terminalsStore.openTerminalSession,

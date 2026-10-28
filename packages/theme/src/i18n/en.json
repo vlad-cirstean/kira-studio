@@ -13636,6 +13636,9 @@
       "exited": {
         "status": "Process exited with code {code}"
       },
+      "link": {
+        "tooltip": "{modifier}-click to open"
+      },
       "startFailed": {
         "error": "Couldn’t start the terminal."
       }

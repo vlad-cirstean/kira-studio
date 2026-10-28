@@ -7,6 +7,9 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
+import { tooltipContentVariants } from '@theme/components/ui/tooltip';
+import { t } from '@theme/i18n';
+import { isPrimaryModifier, primaryModifierName } from '../shortcuts/keys';
 import { registerTabRuntimeCleanup } from '../state/tabRuntime';
 
 interface Attached {
@@ -29,6 +32,45 @@ export interface TerminalRendererDeps {
   appearance(): { fontFamily: string; fontSize: number };
   onTerminalOutput(tabId: string, cb: (bytes: Uint8Array) => void): () => void;
   writeTerminal(tabId: string, bytes: Uint8Array): void;
+  /** Opens an http(s) link from terminal output; never throws. */
+  openLink(url: string): void;
+  /** 'modifier': Cmd-click (mac) or Ctrl-click, with a hover hint. 'tap': plain click/tap (phone). */
+  linkActivation: 'modifier' | 'tap';
+}
+
+// Mirrors the Go OpenExternalURL rule; Go stays the authority.
+function isWebUrl(uri: string): boolean {
+  if (!URL.canParse(uri)) return false;
+  const u = new URL(uri);
+  return (u.protocol === 'http:' || u.protocol === 'https:') && u.host !== '';
+}
+
+interface LinkHint {
+  show(event: MouseEvent, uri: string): void;
+  hide(): void;
+}
+
+function createLinkHint(term: Terminal): LinkHint | null {
+  const root = term.element;
+  if (!root) return null;
+  const el = document.createElement('div');
+  // xterm-hover keeps the hint's own mouse events from activating links under it.
+  el.className = `xterm-hover absolute hidden ${tooltipContentVariants()}`;
+  el.dataset.testid = 'terminal-link-hint';
+  root.append(el);
+  return {
+    show(event, uri) {
+      const box = root.getBoundingClientRect();
+      el.textContent = `${uri}\n${t('workbench.terminal.link.tooltip', { modifier: primaryModifierName() })}`;
+      el.classList.remove('hidden');
+      const left = Math.min(event.clientX - box.left, Math.max(0, box.width - el.offsetWidth));
+      el.style.left = `${Math.max(0, left)}px`;
+      el.style.top = `${event.clientY - box.top + 16}px`;
+    },
+    hide() {
+      el.classList.add('hidden');
+    },
+  };
 }
 
 // Module-level, not held by the Vue component: a tab switch unmounts
@@ -85,7 +127,19 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
   host.classList.add('h-full', 'w-full');
 
   const appearance = deps.appearance();
+  let hint: LinkHint | null = null;
+  const activate = (event: MouseEvent, uri: string): void => {
+    if (deps.linkActivation === 'modifier' && !isPrimaryModifier(event)) return;
+    if (!isWebUrl(uri)) return;
+    hint?.hide();
+    deps.openLink(uri);
+  };
+  const linkHover = {
+    hover: (e: MouseEvent, uri: string) => hint?.show(e, uri),
+    leave: () => hint?.hide(),
+  };
   const term = new Terminal({
+    linkHandler: { activate, ...linkHover, allowNonHttpProtocols: false },
     scrollback: 5000,
     cursorBlink: true,
     allowProposedApi: false,
@@ -97,7 +151,7 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
-  term.loadAddon(new WebLinksAddon());
+  term.loadAddon(new WebLinksAddon(activate, linkHover));
   // Shift+Enter sends ESC CR, xterm's own Alt+Enter bytes: a newline in Claude Code and zsh.
   term.attachCustomKeyEventHandler((ev) => {
     if (ev.key !== 'Enter' || !ev.shiftKey || ev.metaKey || ev.ctrlKey || ev.altKey) return true;
@@ -108,6 +162,7 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
     return false;
   });
   term.open(host);
+  if (deps.linkActivation === 'modifier') hint = createLinkHint(term);
 
   const off = deps.onTerminalOutput(tabId, (bytes) => term.write(bytes));
   // onData is real text (typed characters, paste, escape sequences) — UTF-8 encoded before it

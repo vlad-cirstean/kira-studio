@@ -14,4 +14,5 @@ import { useSettingsStore } from './settings';
 
 export const useTerminalsStore = createTerminalsStore(control, {
   appearance: () => useSettingsStore().appearance,
+  openExternal: control.openExternal,
 });

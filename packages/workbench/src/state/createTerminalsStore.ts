@@ -71,6 +71,8 @@ export interface TerminalsControl {
 export interface TerminalsStoreOptions {
   /** The live "Data font" setting, read when a headless session's xterm is created. */
   appearance(): { fontFamily: string; fontSize: number };
+  /** Opens a terminal link in the OS browser, read when a headless session's xterm is created. */
+  openExternal(url: string): Promise<void>;
   /** Pinia store id; a second terminals store (Docker exec) needs its own. Default `terminals`. */
   storeId?: string;
 }
@@ -161,6 +163,8 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
           appearance: options.appearance,
           onTerminalOutput,
           writeTerminal,
+          openLink: (url) => void options.openExternal(url),
+          linkActivation: 'modifier',
         });
       } catch (err) {
         logError('terminals', `${tabId}: renderer load failed`, err);
