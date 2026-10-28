@@ -12,8 +12,8 @@ Source: user request. Phases run top to bottom.
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Done |
 | P392 | Review others' PRs: approve and comment; agent panel button to far right | Done |
 | P393 | Terminals: Cmd+click opens link | Done |
-| P394 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
-| P395 | Close chapter, open PR | Todo |
+| P394 | Code review, 1 round (Opus review, Sonnet fix) | Done |
+| P395 | Close chapter, open PR | Done |
 
 ## Rows
 
@@ -67,6 +67,10 @@ Result: plan `plans/P393.md`. Cause: web-links addon default handler calls `wind
 
 One round per `CLAUDE.md` "Code review". Base: last commit of v0.2.20 close (`6bd97b9a2`'s chapter content) to chapter HEAD; planner states exact base in the findings file.
 
+Result: round 1, base `6bd97b9a2`, findings `plans/P394-review-r1.md`: 4 findings (1 medium, 3 low), F1-F4, all fixed in `28e11a9af`, `7a530b5d5`, `f6796796f`, `f8d58443e`. F1: `RestartSession` holds the task lock across stop, close and resume, so a concurrent Take over cannot start a second resume. F2: `Tracker.Stop` marks stopped before forgetting. F3: terminal link hint flips above the pointer near the bottom edge. F4: contract version test renamed `Is55`. CodeGraph MCP unavailable.
+
 ### P395 Close chapter, open PR
 
 Per `CLAUDE.md` "Closing a chapter". Tag `v0.2.21`.
+
+Result: chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.21/` removed. PR opened to `main`; `docs/v0.2.22/` kept.
