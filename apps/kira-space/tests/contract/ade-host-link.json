@@ -1,0 +1,101 @@
+{
+  "AdeTaskService.AddHostLink#pr": {
+    "branch": {
+      "addedAt": 0,
+      "ahead": 1,
+      "base": "<masked>",
+      "baseBranchId": "<masked>",
+      "baseMissing": false,
+      "baseOwner": "",
+      "basePendingFrom": "",
+      "behind": 0,
+      "codeRepoId": "<masked>",
+      "conflictCheck": "<masked>",
+      "conflictCheckReason": "",
+      "conflictsIfRebased": [],
+      "deployments": [],
+      "dirty": [],
+      "id": "<masked>",
+      "integration": [],
+      "kind": "mine",
+      "lastCommitAt": 1700000000000,
+      "mergedAt": null,
+      "mergedIntoMain": false,
+      "name": "feat/login",
+      "origin": "",
+      "owner": "",
+      "rebaseInProgress": false,
+      "setup": null,
+      "taskId": "<masked>",
+      "tip": "<masked>",
+      "upstream": "refs/remotes/origin/feat/login",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "worktree": "<masked>"
+    },
+    "task": {
+      "branchIds": [],
+      "color": 0,
+      "createdAt": 0,
+      "entryStepId": "",
+      "est": "",
+      "hostLink": {
+        "kind": "changeRequest",
+        "provider": "github",
+        "ref": "api#11"
+      },
+      "hostUrl": "https://github.com/acme/api/pull/11",
+      "id": "<masked>",
+      "jira": null,
+      "kind": "task",
+      "notes": "",
+      "owner": "",
+      "runs": [],
+      "since": {},
+      "statusBy": "auto",
+      "statusId": "todo",
+      "title": "Fix login",
+      "workflow": null,
+      "workflowId": "",
+      "workflowOutdated": false
+    }
+  },
+  "AdeTaskService.ResolveHostLink#fork": {
+    "author": "sara",
+    "branch": "forker/main",
+    "changeRequest": {
+      "number": 12,
+      "state": "open",
+      "title": "Fork change",
+      "url": "https://github.com/acme/api/pull/12"
+    },
+    "codeRepoId": "<masked>",
+    "fork": true,
+    "headOwner": "forker",
+    "onTaskId": "",
+    "remote": "origin"
+  },
+  "AdeTaskService.ResolveHostLink#pr": {
+    "author": "me",
+    "branch": "feat/login",
+    "changeRequest": {
+      "number": 11,
+      "state": "open",
+      "title": "Fix login",
+      "url": "https://github.com/acme/api/pull/11"
+    },
+    "codeRepoId": "<masked>",
+    "fork": false,
+    "headOwner": "",
+    "onTaskId": "",
+    "remote": "origin"
+  },
+  "args:AdeTaskService.AddHostLink": {
+    "taskId": "",
+    "url": "https://github.com/acme/api/pull/11"
+  },
+  "args:AdeTaskService.ResolveHostLink": {
+    "taskId": "",
+    "url": "https://github.com/acme/api/pull/11/files"
+  }
+}

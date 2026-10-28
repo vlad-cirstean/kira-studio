@@ -127,6 +127,13 @@ func (b *TaskBoard) resolveHostLink(ctx context.Context, raw string) (linkPlan, 
 		return linkPlan{}, invalid("An issue link names no branch. Paste its pull request or branch link.")
 	}
 	var plan linkPlan
+	repoID, remote, err := b.matchHostRepo(ctx, p, link.Repo)
+	if err != nil {
+		return plan, err
+	}
+	if repoID == "" {
+		return plan, invalid("No repo in your workspace has a remote for %s/%s/%s. Add the repo first.", link.Repo.Host, link.Repo.Owner, link.Repo.Name)
+	}
 	var head githost.ChangeRequestHead
 	if link.Number > 0 {
 		var st githost.Status
@@ -140,13 +147,6 @@ func (b *TaskBoard) resolveHostLink(ctx context.Context, raw string) (linkPlan, 
 		if head.State == "merged" {
 			return plan, invalid("%s #%d is already merged", p.Terms().ChangeRequestShort, link.Number)
 		}
-	}
-	repoID, remote, err := b.matchHostRepo(ctx, p, link.Repo)
-	if err != nil {
-		return plan, err
-	}
-	if repoID == "" {
-		return plan, invalid("No repo in your workspace has a remote for %s/%s/%s. Add the repo first.", link.Repo.Host, link.Repo.Owner, link.Repo.Name)
 	}
 	entry, err := b.openRepo(ctx, repoID)
 	if err != nil {
