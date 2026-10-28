@@ -28,6 +28,7 @@ var (
 	_ githost.ChangeRequestSync = (*Provider)(nil)
 
 	_ githost.ChangeRequestReviews = (*Provider)(nil)
+	_ githost.BranchLinks          = (*Provider)(nil)
 )
 
 // New builds the GitHub provider over the `gh` CLI.

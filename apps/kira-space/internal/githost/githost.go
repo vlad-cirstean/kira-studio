@@ -166,6 +166,31 @@ type ChangeRequestReviews interface {
 	Comment(ctx context.Context, r Repo, number int, body string) Status
 }
 
+// BranchLink is a pasted change-request or branch link. Number > 0 names a change request; else
+// TreePath is the path after the branch marker, which may hold a file path after the branch.
+type BranchLink struct {
+	Repo     Repo
+	Number   int
+	TreePath string
+	Issue    bool // an issue link: recognised, names no branch
+}
+
+// ChangeRequestHead is one change request's head, read fresh.
+type ChangeRequestHead struct {
+	ChangeRequest
+	Author string // host login; "" for a deleted account
+}
+
+// BranchLinks is optional: a provider that resolves a pasted link to a branch. Every call reports
+// failure in Status, never an error.
+type BranchLinks interface {
+	// ParseBranchLink makes no host call beyond Claims.
+	ParseBranchLink(ctx context.Context, raw string) (BranchLink, bool)
+	ChangeRequestHead(ctx context.Context, r Repo, number int) (ChangeRequestHead, Status)
+	// ChangeRequestRef is the ref the base repo serves a change request's head at.
+	ChangeRequestRef(number int) string
+}
+
 // ChangeRequestPage is one page of a ChangeRequestSync.Page walk.
 type ChangeRequestPage struct {
 	Items     []ChangeRequest

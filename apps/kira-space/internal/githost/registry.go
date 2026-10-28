@@ -108,6 +108,34 @@ func (r *Registry) ParseLink(raw string) (Link, bool) {
 	return Link{}, false
 }
 
+// ParseBranchLink asks each provider in order that resolves branch links.
+func (r *Registry) ParseBranchLink(ctx context.Context, raw string) (Provider, BranchLinks, BranchLink, bool) {
+	for _, p := range r.All() {
+		bl, ok := p.(BranchLinks)
+		if !ok {
+			continue
+		}
+		if l, parsed := bl.ParseBranchLink(ctx, raw); parsed {
+			return p, bl, l, true
+		}
+	}
+	return nil, nil, BranchLink{}, false
+}
+
+// BranchLinkLabels joins "<label> <short> or branch link" per branch-link provider with " or ", in
+// registration order: "GitHub PR or branch link".
+func (r *Registry) BranchLinkLabels() string {
+	var labels []string
+	for _, p := range r.All() {
+		if _, ok := p.(BranchLinks); !ok {
+			continue
+		}
+		t := p.Terms()
+		labels = append(labels, t.Label+" "+t.ChangeRequestShort+" or branch link")
+	}
+	return strings.Join(labels, " or ")
+}
+
 // IsChangeRequestURL is true when any provider accepts u.
 func (r *Registry) IsChangeRequestURL(ctx context.Context, u *url.URL) bool {
 	for _, p := range r.All() {
