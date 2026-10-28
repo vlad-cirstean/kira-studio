@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -173,6 +174,67 @@ func (b *TaskBoard) ReviewWindowTarget(ctx context.Context, key string) (*adewir
 		return nil, err
 	}
 	return &tgt, nil
+}
+
+// reviewWorktree loads a reviewable branch and its worktree; worktree is "" when it has none.
+func (b *TaskBoard) reviewWorktree(ctx context.Context, branchID string) (*gitsession.RepoEntry, model.AdeTaskBranch, string, error) {
+	sb, err := b.deps.Tasks.GetBranch(branchID)
+	if err != nil {
+		return nil, sb, "", err
+	}
+	tc, err := b.loadTaskCtx(sb.TaskID)
+	if err != nil {
+		return nil, sb, "", err
+	}
+	if err := b.reviewableBranch(tc, sb); err != nil {
+		return nil, sb, "", err
+	}
+	entry, err := b.openRepo(ctx, sb.CodeRepoID)
+	if err != nil {
+		return nil, sb, "", err
+	}
+	worktree, err := b.worktreeOf(ctx, sb)
+	return entry, sb, worktree, err
+}
+
+// ReviewWorking lists the staged, unstaged and untracked changes of the branch's worktree. The
+// worktree path comes from the branch row, never from the caller.
+func (b *TaskBoard) ReviewWorking(ctx context.Context, branchID string) (adewire.ReviewWorking, error) {
+	entry, _, worktree, err := b.reviewWorktree(ctx, branchID)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	if worktree == "" {
+		return adewire.ReviewWorking{Files: []porcelain.FileChange{}}, nil
+	}
+	head, files, err := entry.WorktreeChanges(ctx, worktree)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	return adewire.ReviewWorking{Worktree: worktree, Head: head, Files: files}, nil
+}
+
+// ReviewWorkingDiff reads one uncommitted file: the worktree HEAD side against the file on disk.
+func (b *TaskBoard) ReviewWorkingDiff(ctx context.Context, branchID, path string) (codeworkspace.DiffContent, error) {
+	entry, _, worktree, err := b.reviewWorktree(ctx, branchID)
+	if err != nil {
+		return codeworkspace.DiffContent{}, err
+	}
+	if worktree == "" {
+		return codeworkspace.DiffContent{}, invalid("the branch has no worktree")
+	}
+	if _, err := codeworkspace.ValidateRelPath(worktree, path); err != nil {
+		return codeworkspace.DiffContent{}, invalid("bad path: %v", err)
+	}
+	_, head, err := entry.WorktreeHead(ctx, worktree)
+	if err != nil {
+		return codeworkspace.DiffContent{}, err
+	}
+	cf := entry.CatFile()
+	if cf == nil {
+		return codeworkspace.DiffContent{}, invalid("the repo is closing")
+	}
+	return codeworkspace.ReadDiffAt(ctx, cf, worktree, head, path)
 }
 
 // teardownReview unpins and purges the task's review sessions, and closes its review

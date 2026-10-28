@@ -450,6 +450,10 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewWindowTarget(args)).then((r) =>
       trust<V2.ReviewWindowTarget | null>(r),
     ),
+  adeTaskReviewWorking: (args: V2.BranchArgs): Promise<V2.ReviewWorking> =>
+    unwrap(AdeTaskService.ReviewWorking(args)).then((r) => trust<V2.ReviewWorking>(r)),
+  adeTaskReviewWorkingDiff: (args: V2.ReviewWorkingDiffArgs): Promise<DiffContent> =>
+    unwrap(AdeTaskService.ReviewWorkingDiff(args)).then((r) => trust<DiffContent>(r)),
   adeTaskReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentState> =>
     unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
   adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>

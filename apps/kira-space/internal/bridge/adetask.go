@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -1079,6 +1080,27 @@ func (s *AdeTaskService) ReviewWindowTarget(ctx context.Context, args adewire.Wi
 	}
 	t, err := s.Engine.ReviewWindowTarget(ctx, args.WindowKey)
 	return t, adeTaskError(err)
+}
+
+// ReviewWorking lists the uncommitted changes of the branch's worktree against its HEAD.
+func (s *AdeTaskService) ReviewWorking(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewWorking, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	r, err := s.Engine.ReviewWorking(ctx, args.BranchID)
+	return r, adeTaskError(err)
+}
+
+// ReviewWorkingDiff reads one uncommitted file of the branch's worktree for a diff tab.
+func (s *AdeTaskService) ReviewWorkingDiff(ctx context.Context, args adewire.ReviewWorkingDiffArgs) (codeworkspace.DiffContent, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return codeworkspace.DiffContent{}, err
+	}
+	if args.Path == "" {
+		return codeworkspace.DiffContent{}, adeTaskInvalid("path is required")
+	}
+	d, err := s.Engine.ReviewWorkingDiff(ctx, args.BranchID, args.Path)
+	return d, adeTaskError(err)
 }
 
 // ReviewAgent returns the task's review agent session and, when it runs, the window hosting its terminal.

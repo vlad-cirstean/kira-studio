@@ -1,7 +1,7 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
 // Changing a key, type or value set is a contract change (docs/HISTORY.md (v2.0 P143) rule 1).
 
-import type { GitHostInfo } from '@kira/git-ipc';
+import type { FileChange, GitHostInfo } from '@kira/git-ipc';
 import type { RunOutcome } from '@shared/domain/runOutcome';
 
 // ---- shared
@@ -566,6 +566,15 @@ export interface ReviewWindowTarget {
   branch: string;
   base: string;
   worktree: string;
+}
+export interface ReviewWorking {
+  worktree: string /* '' = the branch has no worktree */;
+  head: string;
+  files: FileChange[];
+}
+export interface ReviewWorkingDiffArgs {
+  branchId: string;
+  path: string;
 }
 export interface ReviewAgentState {
   session: Session | null;

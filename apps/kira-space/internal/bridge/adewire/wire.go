@@ -5,6 +5,7 @@
 package adewire
 
 import (
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
@@ -858,6 +859,20 @@ type ReviewWindowTarget struct {
 	Branch     string `json:"branch"`
 	Base       string `json:"base"`
 	Worktree   string `json:"worktree"`
+}
+
+// ReviewWorking is the uncommitted work of a branch's worktree against its HEAD (P384). Worktree
+// is "" when the branch has none, with no Files. Head is "" for an unborn HEAD.
+type ReviewWorking struct {
+	Worktree string                 `json:"worktree"`
+	Head     string                 `json:"head"`
+	Files    []porcelain.FileChange `json:"files"`
+}
+
+// ReviewWorkingDiffArgs names one uncommitted file of a branch's worktree.
+type ReviewWorkingDiffArgs struct {
+	BranchID string `json:"branchId"`
+	Path     string `json:"path"`
 }
 
 // ReviewAgentState is the task's review agent row; HostWindowKey is ” unless it runs.
