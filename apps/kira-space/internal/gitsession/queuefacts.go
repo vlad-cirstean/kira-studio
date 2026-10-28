@@ -321,22 +321,51 @@ func (e *RepoEntry) RemoteFor(ctx context.Context, p githost.Provider, r githost
 	if s := e.hostSetting(); s == githost.SettingOff || (s != "" && s != githost.SettingAuto && s != p.ID()) {
 		return "", false
 	}
+	for _, ru := range e.remoteURLList(ctx) {
+		got, ok := p.ParseRemote(ru.url)
+		if ok && strings.EqualFold(got.Host, r.Host) && strings.EqualFold(got.Owner, r.Owner) && strings.EqualFold(got.Name, r.Name) {
+			return ru.name, true
+		}
+	}
+	return "", false
+}
+
+type remoteURL struct{ name, url string }
+
+// remoteURLList is every remote's URL, origin first, cached until the next refsChanged: a link
+// resolve asks every repo, and each ask would otherwise spawn git per remote.
+func (e *RepoEntry) remoteURLList(ctx context.Context) []remoteURL {
+	e.host.mu.Lock()
+	if e.host.remoteURLsValid {
+		list := e.host.remoteURLs
+		e.host.mu.Unlock()
+		return list
+	}
+	gen, staleAt := e.host.gen, e.host.refsStaleAt
+	e.host.mu.Unlock()
+
 	names, err := e.Remotes(ctx)
 	if err != nil {
-		return "", false
+		return nil
 	}
 	sort.SliceStable(names, func(i, j int) bool { return names[i] == "origin" && names[j] != "origin" })
+	list := make([]remoteURL, 0, len(names))
 	for _, name := range names {
 		res, err := e.runAllowingExit(ctx, gitops.RemoteGetURLArgs(name), 0, 128)
 		if err != nil || res.ExitCode != 0 {
 			continue
 		}
-		got, ok := p.ParseRemote(strings.TrimSpace(string(res.Stdout)))
-		if ok && strings.EqualFold(got.Host, r.Host) && strings.EqualFold(got.Owner, r.Owner) && strings.EqualFold(got.Name, r.Name) {
-			return name, true
-		}
+		list = append(list, remoteURL{name, strings.TrimSpace(string(res.Stdout))})
 	}
-	return "", false
+	if ctx.Err() != nil {
+		return list
+	}
+	e.host.mu.Lock()
+	if e.host.gen == gen && e.host.refsStaleAt.Equal(staleAt) {
+		e.host.remoteURLs, e.host.remoteURLsValid = list, true
+	}
+	e.host.mu.Unlock()
+	return list
 }
 
 // CheckBranchName reports whether name is a valid branch name per `git check-ref-format --branch`.
