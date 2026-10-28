@@ -2370,10 +2370,10 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Hiding is bound to CodeWorkspaceService.SetRepoHidden and AdeTaskService.SetFolderHidden.
 - "Remove repository…" lives in the dialog's repo head (ViewToolbar) and always goes through confirmRemoveCodeRepo, which names the scan folder that would re-import the repo.
 - Session tabs (P193) are named "<step> · <repo>" (headless) or "<step> · <repo|spec>" (TUI), from the session's own stepId; review keeps "Review agent".
-- AdeSessionId.vue shows the full Claude session id with a copy button (VueUse useClipboard).
-- The task context menu (P198, board/taskMenu.ts, plan/useTaskMenu.ts) opens by right-click, Shift+F10 or the panel header's More actions button, and is built on existing calls.
+- Session tabs show state and age in a tooltip. Right-click menu (`sessions/useSessionMenu.ts`) has Copy session ID and, for a running TUI, Restart: `AdeTaskService.RestartSession` stops the record (`Tracker.Stop`, no grace wait), closes the terminal, then runs Take over on it.
+- The task context menu (P198, board/taskMenu.ts, plan/useTaskMenu.ts) opens by right-click, Shift+F10 or the panel tab row's More actions button, and is built on existing calls.
 - The menu primitive is the workbench singleton ContextMenu.vue (shadcn-vue DropdownMenu), used by every right-click menu in both apps.
-- Pane convention (P194, P207): one frame per pane (shell passes mainFramed off), PanelHeader on every pane, nav and panel tabs on tabChipVariants, shadcn-vue controls at kira/kira-lg/kira-icon sizes, and tokens instead of arbitrary pixel classes.
+- Pane convention (P194, P207): one frame per pane (shell passes mainFramed off), PanelHeader on every pane except the ADE Plan and its panel (P389: no PanelHeader; the shell tab names them, Refresh all sits in the Plan repo row, panel actions at the tab row's right end), nav and panel tabs on tabChipVariants, shadcn-vue controls at kira/kira-lg/kira-icon sizes, and tokens instead of arbitrary pixel classes.
 - Arbitrary pixel classes are allowed only for timeline geometry, glyph ring weight and a few font-relative values; font-data is used only for SHAs, branches, paths, commands, YAML and code.
 - Raw <button> remains in only three places: the task card title, the AdeAttention glyph badge, and AdeSessionStrip chips.
 - ADE dialogs share dialog/flow.ts (target pick: new session via StartBranch, or Send to a running session), compose.ts (message templates), deliver.ts and turnWatch.ts.
