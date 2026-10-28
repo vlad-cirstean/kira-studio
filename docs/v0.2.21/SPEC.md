@@ -9,7 +9,7 @@ Source: user request. Phases run top to bottom.
 | P388 | ADE task list: calmer look, clear active-task marker, visible separators | Done |
 | P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Done |
 | P390 | ADE git module last in order | Done |
-| P391 | Both apps: scrollbars hidden until pointer is in the panel | Todo |
+| P391 | Both apps: scrollbars hidden until pointer is in the panel | Done |
 | P392 | Review others' PRs: approve and comment; agent panel button to far right | Todo |
 | P393 | Terminals: Cmd+click opens link | Todo |
 | P394 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
@@ -47,6 +47,8 @@ Result: plan `plans/P390.md`. Space `MODE_ORDER` is now `ade, automations, memor
 ### P391 Both apps: scrollbars hidden until pointer is in the panel
 
 Studio and Space. Scrollbars hidden by default; shown only while the pointer is inside that panel. Like a modern app.
+
+Result: plan `plans/P391.md`. `packages/theme/src/base.css` (pointer: fine): thumb colour rides `--kira-scrollbar-thumb`, transparent on every element (`:where(*)`), shown by `:where(:hover)`; `:active` keeps a dragged thumb shown. 12px gutter kept, no layout shift. `scrollbar-color`/`scrollbar-width` unused (they drop `::-webkit-scrollbar` styling in WebKit). Monaco, xterm untouched (own hover-reveal). Shared scenario `scenarios/scrollbars.ts` (3 tests: hover reveal and gutter, nested scroller, drag outside) run by both apps' `scrollbars.spec.ts`; fixed one test by moving the pointer after mouse up. Docs: `docs/ARCHITECTURE.md`. Checks: `typecheck`, `lint`, `lint:dead` clean; `test:ui:studio` 644 pass (incl. ui-timing); `test:ui:space` 749 pass; `test:visual:studio` 13 and `test:visual:space` 20 pass, no diff; screenshots re-run stable, 7 PNGs updated (4 framed, 3 detail), all viewed; `site:check` passed, Studio desktop and phone site baselines re-recorded (diff only the new shots). CodeGraph MCP unavailable.
 
 ### P392 Review others' PRs: approve and comment; agent panel button to far right
 
