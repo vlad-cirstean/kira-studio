@@ -204,7 +204,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	}
 
 	res, out, err, set, executed := s.executeAndRender(ctx, args, rv, plan)
-	if !executed || !s.cfg.PreviewResponses() {
+	if !executed || !s.reviewResults(rv.summary) {
 		return res, out, err
 	}
 	return s.reviewResponse(ctx, args, rv, set, res, out, err)

@@ -247,6 +247,7 @@ function defaultDraft(): ConnectionInput {
     mcpWriteMode: 'prompt',
     mcpDdlMode: 'deny',
     mcpAutoExplain: true,
+    mcpReviewResults: 'inherit',
   };
 }
 

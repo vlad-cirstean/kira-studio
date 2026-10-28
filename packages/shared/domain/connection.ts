@@ -95,6 +95,10 @@ export type ConnectionMode = z.infer<typeof connectionModeSchema>;
 export const mcpPermissionModeSchema = /*#__PURE__*/ z.enum(['deny', 'allow', 'prompt']);
 export type McpPermissionMode = z.infer<typeof mcpPermissionModeSchema>;
 
+// mirrors model.ValidMcpReviewResults
+export const mcpReviewResultsSchema = /*#__PURE__*/ z.enum(['inherit', 'review', 'send']);
+export type McpReviewResults = z.infer<typeof mcpReviewResultsSchema>;
+
 // The plain object shape, with no refinement — kept separate so both connectionInputSchema
 // (which adds the fields/uri superRefine below) and connectionSummarySchema (which cannot
 // .omit() from a refined schema) can each build off it independently.
@@ -151,6 +155,8 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // has no such key. Separate from autoExplain (above), which governs this app's own console — see
   // the migration's own comment for why one switch cannot mean both.
   mcpAutoExplain: z.boolean().default(true),
+  // P382: result review override; inherit follows dbMcp.previewResponses. Default is load-bearing for older rows.
+  mcpReviewResults: mcpReviewResultsSchema.default('inherit'),
   // M2: free-text "what this DB is for", passed to an AI client as connection metadata
   // (list_connections). Never interpreted by this app.
   mcpDescription: z.string().max(1000).default(''),

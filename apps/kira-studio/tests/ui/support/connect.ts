@@ -11,8 +11,8 @@ import { connectionRow, expandRow, openRowMenu } from './tree';
 export interface ConnectionCreateArgsOptions {
   readonly readOnly?: boolean;
   readonly autoExplain?: boolean;
-  /** Adds the six `mcp*` fields (`mcpEnabled`/`mcpDescription`/`mcpReadMode`/`mcpWriteMode`/
-   *  `mcpDdlMode`/`mcpAutoExplain`), all at their own off/default value. */
+  /** Adds the seven `mcp*` fields (`mcpEnabled`/`mcpDescription`/`mcpReadMode`/`mcpWriteMode`/
+   *  `mcpDdlMode`/`mcpAutoExplain`/`mcpReviewResults`), all at their own off/default value. */
   readonly mcp?: boolean;
 }
 
@@ -50,6 +50,7 @@ export function connectionCreateArgs(
           mcpWriteMode: 'prompt',
           mcpDdlMode: 'deny',
           mcpAutoExplain: true,
+          mcpReviewResults: 'inherit',
         }
       : {}),
   };

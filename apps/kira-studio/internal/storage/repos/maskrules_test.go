@@ -197,7 +197,7 @@ func TestInsertDuplicateWithSecretCopiesEveryColumn(t *testing.T) {
 		Preconnect: &pre, PreconnectSidecar: true, PreconnectDelaySec: 7,
 		AutoExplain: true, ThrottlePerSec: 0.5,
 		McpEnabled: false, McpDescription: "desc", McpReadMode: "allow", McpWriteMode: "deny",
-		McpDdlMode: "deny", McpAutoExplain: true,
+		McpDdlMode: "deny", McpAutoExplain: true, McpReviewResults: "send",
 	}
 	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil, nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)

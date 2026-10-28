@@ -35,6 +35,7 @@ const BASE: Omit<ConnectionSummary, 'id' | 'name' | 'kind' | 'mode' | 'sortOrder
   mcpWriteMode: 'prompt',
   mcpDdlMode: 'deny',
   mcpAutoExplain: true,
+  mcpReviewResults: 'inherit',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };

@@ -95,12 +95,15 @@ func (in Input) validateLimits() error {
 	return nil
 }
 
-// validateMcp checks the MCP permission modes and description length.
+// validateMcp checks the MCP permission modes, review setting and description length.
 func (in Input) validateMcp() error {
 	if !model.ValidMcpPermissionMode(in.McpReadMode) ||
 		!model.ValidMcpPermissionMode(in.McpWriteMode) ||
 		!model.ValidMcpPermissionMode(in.McpDdlMode) {
 		return ipcerr.Contract("invalid MCP permission mode")
+	}
+	if !model.ValidMcpReviewResults(in.McpReviewResults) {
+		return ipcerr.Contract("invalid MCP review setting")
 	}
 	if len(in.McpDescription) > 1000 {
 		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.mcpDescriptionLength.body", nil)
@@ -161,12 +164,15 @@ func (in Input) validateURI() error {
 
 // normalized drops what the mode does not own (P181): fields mode never carries a URI, URI mode
 // derives its options from the URI in Go, so a stale draft leftover cannot reach storage or flag
-// destinationUnchanged.
+// destinationUnchanged. An unset McpReviewResults becomes inherit.
 func (in Input) normalized() Input {
 	if in.Mode == "uri" {
 		in.Options = map[string]any{}
 	} else {
 		in.URI = nil
+	}
+	if in.McpReviewResults == "" {
+		in.McpReviewResults = "inherit"
 	}
 	return in
 }
