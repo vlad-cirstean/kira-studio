@@ -19,7 +19,7 @@ Source: user request. Phases run top to bottom.
 | P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Done |
 | P385 | Postman import accepts partial data again | Done |
 | P386 | Code review, 1 round (Opus review, Sonnet fix) | Done |
-| P387 | Close chapter, open PR | Todo |
+| P387 | Close chapter, open PR | Done |
 
 ## Rows
 
@@ -112,3 +112,5 @@ Result: 7 findings (0 high, 2 medium, 5 low), all fixed; findings file deleted. 
 ### P387 Close chapter, open PR
 
 Hand-written fold per `CLAUDE.md`. Open PR per `docs/DEV_ENVIRONMENT.md`.
+
+Result: chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.20/` removed. PR opened to `main`.
