@@ -472,7 +472,9 @@ test('contract: a script moves between collections from its context menu', async
   await expect
     .poll(() => control.log().some((e) => e.channel === IPC.customScriptsCreateCollection))
     .toBe(true);
-  await expect.poll(() => moves().at(-1)).toEqual({ id: script.id, collectionId: 'c-web' });
+  await expect
+    .poll(() => moves().at(-1))
+    .toEqual({ ...toCollection, id: script.id, collectionId: 'c-web' });
   await expect(page.locator('[data-testid="script-collection-rename-input"]')).toBeFocused();
 });
 
