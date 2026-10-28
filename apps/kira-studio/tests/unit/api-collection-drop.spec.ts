@@ -2,7 +2,12 @@
 // ancestor, and where a drop lands. Pure arithmetic over the tree list, so no store is mounted.
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary } from '@shared/domain/collections';
-import { placementFor, topmost, zoneFor } from '../../frontend/src/api/collectionDrop';
+import {
+  collectionOrderFor,
+  placementFor,
+  topmost,
+  zoneFor,
+} from '../../frontend/src/api/collectionDrop';
 import type { CollectionRowVm } from '../../frontend/src/api/state/collections';
 
 function item(
@@ -142,5 +147,29 @@ describe('placementFor', () => {
     expect(placementFor(into('i:F'), new Set(['a', 'G']), ITEMS)).toBeNull();
     // Same parent, different order is a move.
     expect(placementFor({ key: 'i:F', zone: 'before' }, new Set(['c']), ITEMS)).not.toBeNull();
+  });
+});
+
+describe('collectionOrderFor', () => {
+  const order = ['a', 'b', 'c', 'd'];
+
+  test('moves a block before or after the target, keeping its own order', () => {
+    expect(collectionOrderFor(order, new Set(['d']), 'a', 'before')).toEqual(['d', 'a', 'b', 'c']);
+    expect(collectionOrderFor(order, new Set(['a', 'c']), 'd', 'after')).toEqual([
+      'b',
+      'd',
+      'a',
+      'c',
+    ]);
+  });
+
+  test('a moved set spanning the target is refused', () => {
+    expect(collectionOrderFor(order, new Set(['a', 'c']), 'c', 'before')).toBeNull();
+  });
+
+  test('refuses a drop that changes nothing', () => {
+    expect(collectionOrderFor(order, new Set(['b']), 'c', 'before')).toBeNull();
+    expect(collectionOrderFor(order, new Set(['b']), 'a', 'after')).toBeNull();
+    expect(collectionOrderFor(order, new Set(['d']), 'c', 'after')).toBeNull();
   });
 });
