@@ -473,3 +473,92 @@ func TestDbMcpResponsePreview(t *testing.T) {
 		t.Fatalf("preview off still queued %+v", snap.Pending)
 	}
 }
+
+// A connection's mcpReviewResults overrides dbMcp.previewResponses: review always holds, send never
+// does, inherit follows the app setting. Contract dbmcp-review-connection:
+// tests/ui/dbmcp-review-connection.spec.ts renders it.
+func TestDbMcpReviewPerConnection(t *testing.T) {
+	f := newFixture(t)
+	sess, err := f.connect(t, f.token(t))
+	if err != nil {
+		t.Fatalf("connect with the helper token: %v", err)
+	}
+	defer sess.Close()
+
+	const read = "select id, body from notes order by id"
+	current := func() model.ConnectionSummary {
+		list, err := f.app.W.Connections.List()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range list {
+			if c.ID == f.connID {
+				return c
+			}
+		}
+		t.Fatal("fixture connection missing")
+		return model.ConnectionSummary{}
+	}
+	setReview := func(value string) (bridge.ConnectionsUpdateArgs, model.ConnectionSummary, error) {
+		cur := current()
+		fields := cur.ConnectionFields
+		fields.McpReviewResults = value
+		args := bridge.ConnectionsUpdateArgs{ID: f.connID, Input: connections.Input{ConnectionFields: fields}}
+		got, err := f.app.W.Connections.Update(args)
+		return args, got, err
+	}
+	replace := flowharness.Replace(f.dbPath, "/data/mcp.db")
+
+	args, got, err := setReview("review")
+	if err != nil || got.McpReviewResults != "review" {
+		t.Fatalf("Update = %+v (%v), want review", got, err)
+	}
+	f.app.Contract(t, "dbmcp-review-connection", "args:ConnectionsService.Update", args, replace)
+	f.app.Contract(t, "dbmcp-review-connection", "ConnectionsService.Update", got, flowharness.Mask("createdAt", "updatedAt"), replace)
+
+	done := callAsync(sess, f.connID, read)
+	req := f.pending(t)
+	if req.Stage != "response" || req.Response == nil {
+		t.Fatalf("pending = %+v, want a response-stage hold with the app setting off", req)
+	}
+	held, err := f.app.W.DbMcp.PendingResponse(bridge.DbMcpApprovalArgs{RequestID: req.RequestID})
+	if err != nil || held.IsError {
+		t.Fatalf("PendingResponse = %+v (%v)", held, err)
+	}
+	f.app.Contract(t, "dbmcp-review-connection", "DbMcpService.PendingApprovals", bridge.DbMcpApprovalSnapshot{Pending: &req}, flowharness.Mask("expiresAtMs"), replace)
+	f.app.Contract(t, "dbmcp-review-connection", "DbMcpService.PendingResponse", held)
+	f.answer(t, true, req.RequestID)
+	if sent := wait(t, done); sent.IsError || text(sent) != held.Text {
+		t.Fatalf("sent = %q, want the held bytes %q", text(sent), held.Text)
+	}
+
+	f.setPreview(t, true)
+	if _, got, err = setReview("send"); err != nil || got.McpReviewResults != "send" {
+		t.Fatalf("Update = %+v (%v), want send", got, err)
+	}
+	if live := runQuery(t, sess, f.connID, read); live.IsError || !strings.Contains(text(live), "two") {
+		t.Fatalf("read with send = %q, want rows straight away", text(live))
+	}
+	if snap := f.app.W.DbMcp.PendingApprovals(); snap.Pending != nil {
+		t.Fatalf("send still queued %+v", snap.Pending)
+	}
+
+	if _, got, err = setReview("inherit"); err != nil || got.McpReviewResults != "inherit" {
+		t.Fatalf("Update = %+v (%v), want inherit", got, err)
+	}
+	done = callAsync(sess, f.connID, read)
+	if q := f.pending(t); q.Stage != "response" {
+		t.Fatalf("pending = %+v, want inherit to follow the app setting on", q)
+	}
+	f.answer(t, false, f.pending(t).RequestID)
+	if w := wait(t, done); !w.IsError {
+		t.Fatalf("withheld read = %q, want an error", text(w))
+	}
+
+	if _, _, err := setReview("maybe"); err == nil {
+		t.Fatal("Update accepted an invalid review setting")
+	}
+	if cur := current(); cur.McpReviewResults != "inherit" {
+		t.Fatalf("review setting after a refused Update = %q, want inherit", cur.McpReviewResults)
+	}
+}
