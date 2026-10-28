@@ -573,14 +573,22 @@ func (t *Tracker) forgetLocked(recordID string, now time.Time) (lastActive int64
 // closed on purpose (Restart). ErrSessionNotRunning when no live terminal is tracked for it.
 func (t *Tracker) Stop(recordID string) error {
 	t.mu.Lock()
-	lastActive, ok := t.forgetLocked(recordID, t.deps.Now())
+	_, tracked := t.byRecord[recordID]
+	lastActive, kept := t.lastActive[recordID]
 	t.mu.Unlock()
-	if !ok {
+	if !tracked {
 		return ErrSessionNotRunning
 	}
+	if !kept {
+		lastActive = t.deps.Now().UnixMilli()
+	}
+	// Mark before forgetting: a failed write leaves the live terminal tracked, so a retry works.
 	if err := t.deps.Store.MarkStopped(recordID, lastActive); err != nil {
 		return fmt.Errorf("ade: stop: mark stopped: %w", err)
 	}
+	t.mu.Lock()
+	t.forgetLocked(recordID, t.deps.Now())
+	t.mu.Unlock()
 	if t.deps.OnChange != nil {
 		t.deps.OnChange()
 	}

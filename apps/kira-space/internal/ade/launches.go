@@ -141,6 +141,11 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	mu := b.taskMu(rec.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
+	return b.takeOverLocked(ctx, tr, rec)
+}
+
+// takeOverLocked opens the row's conversation in a TUI. The task lock is held.
+func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.AdeSession) (adewire.Launch, error) {
 	// The check in takeOverSession ran before the lock, so a concurrent call may have opened it since.
 	if err := b.ensureNotOpen(tr, rec); err != nil {
 		return adewire.Launch{}, err
@@ -190,6 +195,17 @@ func (b *TaskBoard) RestartSession(ctx context.Context, args adewire.RestartSess
 	if rec == nil || rec.TaskID == "" {
 		return adewire.Launch{}, invalid("session %s is not a task session", args.SessionID)
 	}
+	// Held across Stop, close and resume: a concurrent Take over would otherwise resume the
+	// conversation while the old process still writes it.
+	mu := b.taskMu(rec.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	if rec, err = b.deps.Sessions.Get(args.SessionID); err != nil {
+		return adewire.Launch{}, err
+	}
+	if rec == nil || rec.TaskID == "" {
+		return adewire.Launch{}, invalid("session %s is not a task session", args.SessionID)
+	}
 	if rec.Mode != model.AdeSessionModeTUI {
 		return adewire.Launch{}, invalid("only an interactive session restarts")
 	}
@@ -213,7 +229,10 @@ func (b *TaskBoard) RestartSession(ctx context.Context, args adewire.RestartSess
 	if err := b.deps.CloseTerminal(terminalID); err != nil {
 		return adewire.Launch{}, fmt.Errorf("ade: restart: close terminal: %w", err)
 	}
-	return b.TakeOver(ctx, adewire.TakeOverArgs{SessionID: rec.ID})
+	if rec, err = b.deps.Sessions.Get(rec.ID); err != nil {
+		return adewire.Launch{}, err
+	}
+	return b.takeOverLocked(ctx, tr, rec)
 }
 
 // ensureNotOpen rejects a session whose conversation runs in a TUI or has one prepared and not yet
