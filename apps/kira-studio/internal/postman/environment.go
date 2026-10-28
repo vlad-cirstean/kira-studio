@@ -15,6 +15,8 @@ type Environment struct {
 	Disabled int
 	// Empty counts imported values that are "": Postman exports only shared values.
 	Empty int
+	// Unnamed counts imported values whose key was missing and became unnamed_<n>.
+	Unnamed int
 }
 
 // File is what ParseFile found: exactly one of Collection and Environment is set.
@@ -81,17 +83,15 @@ func parseEnvironment(doc map[string]json.RawMessage) *Environment {
 		if obj == nil {
 			continue
 		}
-		v, ok, off := decodeVariableEntry(obj)
-		switch {
-		case !ok:
-		case off:
+		v, off := decodeVariableEntry(obj, &env.Unnamed)
+		if off {
 			env.Disabled++
-		default:
-			if v.Value == "" {
-				env.Empty++
-			}
-			env.Variables = append(env.Variables, v)
+			continue
 		}
+		if v.Value == "" {
+			env.Empty++
+		}
+		env.Variables = append(env.Variables, v)
 	}
 	return env
 }

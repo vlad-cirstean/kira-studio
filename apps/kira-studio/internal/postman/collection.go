@@ -99,7 +99,7 @@ const (
 	WarnUnsupportedMethod = "unsupported_method"
 	WarnUnresolvedFile    = "unresolved_file"
 	WarnInlineFileContent = "inline_file_content"
-	WarnMalformedItem     = "malformed_item"
+	WarnMalformedItem     = "malformed_item" // item entry is not a JSON object
 	// WarnVariablesImported is D15's promoted-count sibling to WarnVariablesInert: a collection-
 	// level variable[] is no longer inert, so it gets its own message rather than being folded
 	// into the inert count it no longer belongs to.
@@ -111,8 +111,12 @@ const (
 	// app has no per-variable enabled flag, so they are skipped rather than applied.
 	WarnDisabledVariables = "disabled_variables"
 	// WarnEmptyValues counts imported variables with an empty value: Postman exports only shared
-	// values, so unshared ones arrive as keys alone.
+	// values, so unshared ones arrive as keys alone; they import with "".
 	WarnEmptyValues = "empty_values"
+	// WarnUnnamedVariables counts variables with no usable key, imported as unnamed_<n>.
+	WarnUnnamedVariables = "unnamed_variables"
+	// WarnMissingRequest counts items with neither `item` nor `request`, imported as empty GET requests.
+	WarnMissingRequest = "missing_request"
 )
 
 // Report is what Parse counted. The per-kind messages are UI text and live at the bridge, not

@@ -16,6 +16,7 @@ func TestDecodeVariableEntry(t *testing.T) {
 		want         []Variable
 		wantDisabled int
 		wantEmpty    int
+		wantUnnamed  int
 	}{
 		{name: "string default", entry: `{"key":"a","value":"x","type":"default","enabled":true}`,
 			want: []Variable{{Name: "a", Value: "x", Type: "default"}}},
@@ -33,31 +34,41 @@ func TestDecodeVariableEntry(t *testing.T) {
 		{name: "enabled false", entry: `{"key":"a","value":"x","enabled":false}`, wantDisabled: 1},
 		{name: "disabled true", entry: `{"key":"a","value":"x","disabled":true}`, wantDisabled: 1},
 		{name: "enabled absent", entry: `{"key":"a","value":"x"}`, want: []Variable{{Name: "a", Value: "x"}}},
-		{name: "empty key", entry: `{"key":"","value":"x"}`},
-		{name: "non-scalar key", entry: `{"key":{},"value":"x"}`},
+		{name: "empty key", entry: `{"key":"","value":"x"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "x"}}, wantUnnamed: 1},
+		{name: "non-scalar key", entry: `{"key":{},"value":"x"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "x"}}, wantUnnamed: 1},
+		{name: "absent key", entry: `{"value":"x"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "x"}}, wantUnnamed: 1},
+		{name: "null key", entry: `{"key":null,"value":"x"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "x"}}, wantUnnamed: 1},
+		{name: "two unnamed", entry: `{"value":"a"},{"value":"b"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "a"}, {Name: "unnamed_2", Value: "b"}}, wantUnnamed: 2},
+		{name: "disabled unnamed takes no number", entry: `{"value":"a","disabled":true},{"value":"b"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "b"}}, wantDisabled: 1, wantUnnamed: 1},
 		{name: "description object", entry: `{"key":"a","value":"x","description":{"content":"d"}}`,
 			want: []Variable{{Name: "a", Value: "x", Description: "d"}}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			arr := json.RawMessage("[" + tc.entry + "]")
-			gotVars, gotDisabled, gotEmpty := decodeVariables(arr)
+			gotVars, got := decodeVariables(arr)
 			if len(tc.want) == 0 {
 				tc.want = []Variable{}
 			}
 			if diff := cmp.Diff(tc.want, gotVars); diff != "" {
 				t.Fatalf("collection variables (-want +got):\n%s", diff)
 			}
-			if gotDisabled != tc.wantDisabled || gotEmpty != tc.wantEmpty {
-				t.Fatalf("collection counts = %d disabled, %d empty; want %d, %d", gotDisabled, gotEmpty, tc.wantDisabled, tc.wantEmpty)
+			if want := (variableCounts{tc.wantDisabled, tc.wantEmpty, tc.wantUnnamed}); got != want {
+				t.Fatalf("collection counts = %+v; want %+v", got, want)
 			}
 
 			env := parseEnvironment(map[string]json.RawMessage{"values": arr})
 			if diff := cmp.Diff(tc.want, env.Variables); diff != "" {
 				t.Fatalf("environment variables (-want +got):\n%s", diff)
 			}
-			if env.Disabled != tc.wantDisabled || env.Empty != tc.wantEmpty {
-				t.Fatalf("environment counts = %d disabled, %d empty; want %d, %d", env.Disabled, env.Empty, tc.wantDisabled, tc.wantEmpty)
+			if got := (variableCounts{env.Disabled, env.Empty, env.Unnamed}); got != (variableCounts{tc.wantDisabled, tc.wantEmpty, tc.wantUnnamed}) {
+				t.Fatalf("environment counts = %+v; want %d, %d, %d", got, tc.wantDisabled, tc.wantEmpty, tc.wantUnnamed)
 			}
 		})
 	}

@@ -91,17 +91,20 @@ func parseCollection(doc map[string]json.RawMessage) (*Tree, error) {
 	// D15: the collection level is promoted, not inert — scripts and auth still count as inert
 	// here, but `variable` does not go through countInertMembers at this one level.
 	countScriptsAndAuth(doc, &tree.Report)
-	var disabledVars, emptyVars int
-	tree.Variables, disabledVars, emptyVars = decodeVariables(doc["variable"])
+	var counts variableCounts
+	tree.Variables, counts = decodeVariables(doc["variable"])
 	delete(tree.Origin, "variable")
 	if len(tree.Variables) > 0 {
 		tree.Report.warnN(WarnVariablesImported, len(tree.Variables))
 	}
-	if disabledVars > 0 {
-		tree.Report.warnN(WarnDisabledVariables, disabledVars)
+	if counts.Disabled > 0 {
+		tree.Report.warnN(WarnDisabledVariables, counts.Disabled)
 	}
-	if emptyVars > 0 {
-		tree.Report.warnN(WarnEmptyValues, emptyVars)
+	if counts.Empty > 0 {
+		tree.Report.warnN(WarnEmptyValues, counts.Empty)
+	}
+	if counts.Unnamed > 0 {
+		tree.Report.warnN(WarnUnnamedVariables, counts.Unnamed)
 	}
 	if raw := doc["item"]; len(raw) > 0 && raw[0] == '[' {
 		dec := json.NewDecoder(bytes.NewReader(raw))
@@ -136,23 +139,29 @@ func VariableValue(raw json.RawMessage) string {
 
 // decodeVariableEntry is the one rule set for a collection `variable[]` entry and an environment
 // `values[]` entry. `type == "secret"` marks the entry secret; the original `type` string is kept so
-// an unrecognised one survives export. disabled is `enabled: false` or `disabled: true`.
-func decodeVariableEntry(obj map[string]json.RawMessage) (v Variable, ok, disabled bool) {
-	name, isScalar := decodeScalarString(obj["key"])
-	if !isScalar || name == "" {
-		return Variable{}, false, false
-	}
+// an unrecognised one survives export. disabled is `enabled: false` or `disabled: true`; the caller
+// skips it. A key that is not a non-empty scalar becomes `unnamed_<n>` (n from *unnamed, counted
+// per array); a disabled entry never consumes a number.
+func decodeVariableEntry(obj map[string]json.RawMessage, unnamed *int) (v Variable, disabled bool) {
 	if enabled, has := decodeBool(obj["enabled"]); has && !enabled {
 		disabled = true
 	}
 	if off, has := decodeBool(obj["disabled"]); has && off {
 		disabled = true
 	}
+	if disabled {
+		return Variable{}, true
+	}
+	name, isScalar := decodeScalarString(obj["key"])
+	if !isScalar || name == "" {
+		*unnamed++
+		name = fmt.Sprintf("unnamed_%d", *unnamed)
+	}
 	typ, _ := decodeString(obj["type"])
 	return Variable{
 		Name: name, Value: VariableValue(obj["value"]), Secret: typ == "secret", Type: typ,
 		Description: decodeDescription(obj["description"]),
-	}, true, disabled
+	}, false
 }
 
 // DecodeVariables is decodeVariables for storage's legacy promotion, so promoted entries follow
@@ -161,32 +170,38 @@ func DecodeVariables(raw json.RawMessage) (vars []Variable, ok bool) {
 	if t := bytes.TrimSpace(raw); len(t) == 0 || t[0] != '[' {
 		return nil, false
 	}
-	vars, _, _ = decodeVariables(raw)
+	vars, _ = decodeVariables(raw)
 	return vars, true
 }
 
+// variableCounts is what decodeVariables counted besides the imported entries.
+type variableCounts struct {
+	Disabled int // skipped: Postman marks them disabled
+	Empty    int // imported with value ""
+	Unnamed  int // imported under a generated unnamed_<n> key
+}
+
 // decodeVariables decodes a collection-level `variable[]` array. Disabled entries are skipped and
-// counted; empty counts imported entries whose value is "".
-func decodeVariables(raw json.RawMessage) (vars []Variable, disabled, empty int) {
+// counted; every other object entry imports. Non-object entries carry no field to default and are
+// skipped.
+func decodeVariables(raw json.RawMessage) (vars []Variable, counts variableCounts) {
 	vars = []Variable{}
 	for _, entry := range decodeArray(raw) {
 		obj := decodeObject(entry)
 		if obj == nil {
 			continue
 		}
-		v, ok, off := decodeVariableEntry(obj)
-		switch {
-		case !ok:
-		case off:
-			disabled++
-		default:
-			if v.Value == "" {
-				empty++
-			}
-			vars = append(vars, v)
+		v, off := decodeVariableEntry(obj, &counts.Unnamed)
+		if off {
+			counts.Disabled++
+			continue
 		}
+		if v.Value == "" {
+			counts.Empty++
+		}
+		vars = append(vars, v)
 	}
-	return vars, disabled, empty
+	return vars, counts
 }
 
 // checkSchemaVersion: v2.1 parses, an absent or unrecognised `info.schema` parses anyway
