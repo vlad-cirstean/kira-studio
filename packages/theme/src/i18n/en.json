@@ -7963,6 +7963,9 @@
           "merged": {
             "hint": "This {short} is merged."
           },
+          "none": {
+            "hint": "No {short} found for this branch."
+          },
           "open": {
             "label": "View {short}"
           },

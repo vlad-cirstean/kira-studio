@@ -566,6 +566,7 @@ export interface ReviewWindowTarget {
   branch: string;
   base: string;
   worktree: string;
+  changeRequest: number /* the task link's change request; 0 = find it by branch */;
 }
 export interface ReviewWorking {
   worktree: string /* '' = the branch has no worktree */;
