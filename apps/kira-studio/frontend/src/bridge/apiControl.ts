@@ -227,6 +227,8 @@ export const apiControl = {
     parentId: string | null;
     beforeId: string | null;
   }): Promise<void> => unwrap(CollectionsService.MoveItems(args)),
+  collectionsReorderCollections: (ids: string[]): Promise<void> =>
+    unwrap(CollectionsService.ReorderCollections({ ids })),
   collectionsImport: (paths: string[]): Promise<ImportResult> =>
     unwrap(CollectionsService.Import({ paths })).then((r) => trust<ImportResult>(r)),
   // P5 D16: ExportReport.secretCount is what lets the panel say "N secret values were not

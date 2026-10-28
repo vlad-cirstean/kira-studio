@@ -1669,6 +1669,9 @@
         "invalidMove": {
           "body": "That item can’t move there."
         },
+        "invalidOrder": {
+          "body": "That collection order isn’t valid."
+        },
         "writeFailed": {
           "error": "Couldn’t write {path}: {detail}"
         }

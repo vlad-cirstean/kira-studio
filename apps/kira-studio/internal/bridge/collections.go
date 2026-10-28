@@ -265,12 +265,31 @@ func (s *CollectionsService) MoveItems(args CollectionsMoveItemsArgs) error {
 	return nil
 }
 
+type CollectionsReorderCollectionsArgs struct {
+	IDs []string `json:"ids"`
+}
+
+// ReorderCollections applies the user's order to the top-level collections; ids left out keep
+// their relative order after.
+func (s *CollectionsService) ReorderCollections(args CollectionsReorderCollectionsArgs) error {
+	if len(args.IDs) == 0 {
+		return ipcerr.Required("ids")
+	}
+	if err := s.Deps.Repos.Collections.ReorderCollections(args.IDs); err != nil {
+		return collectionsWriteErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return nil
+}
+
 // collectionsWriteErr maps a batch write failure: a refused placement is E_BAD_REQUEST, a missing
 // id E_NOT_FOUND, anything else E_INTERNAL.
 func collectionsWriteErr(err error) error {
 	switch {
 	case errors.Is(err, repos.ErrInvalidMove):
 		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.collection.invalidMove.body", nil)
+	case errors.Is(err, repos.ErrInvalidOrder):
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.collection.invalidOrder.body", nil)
 	case errors.Is(err, repos.ErrItemNotFound), errors.Is(err, repos.ErrCollectionNotFound):
 		return ipcerr.NotFound(err.Error())
 	}

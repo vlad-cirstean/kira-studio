@@ -16,6 +16,7 @@ import (
 var (
 	ErrInvalidMove        = errors.New("repos/collections: invalid move")
 	ErrCollectionNotFound = errors.New("repos/collections: collection not found")
+	ErrInvalidOrder       = errors.New("repos/collections: invalid collection order")
 )
 
 type treeNode struct {
@@ -315,4 +316,57 @@ func (r *CollectionsRepo) DeleteMany(collectionIDs, itemIDs []string) error {
 		return fmt.Errorf("repos/collections: commit: %w", err)
 	}
 	return nil
+}
+
+// ReorderCollections applies a user's drag order to the top-level collections and rewrites
+// sort_order dense. Collections ids leaves out keep their relative order after. An unknown or
+// repeated id is ErrInvalidOrder. updated_at stays: order is not content.
+func (r *CollectionsRepo) ReorderCollections(ids []string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/collections: reorder: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	known, err := collectionIDs(tx)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := known[id]; !ok {
+			return fmt.Errorf("%w: unknown collection %s", ErrInvalidOrder, id)
+		}
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("%w: %s listed twice", ErrInvalidOrder, id)
+		}
+		seen[id] = struct{}{}
+	}
+	if err := sqlitex.ReorderSortOrder(tx,
+		`SELECT id FROM api_collections ORDER BY sort_order, name`,
+		`UPDATE api_collections SET sort_order = ? WHERE id = ?`,
+		ids,
+	); err != nil {
+		return fmt.Errorf("repos/collections: reorder: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/collections: reorder: commit: %w", err)
+	}
+	return nil
+}
+
+func collectionIDs(tx *sql.Tx) (map[string]struct{}, error) {
+	rows, err := tx.Query(`SELECT id FROM api_collections`)
+	if err != nil {
+		return nil, fmt.Errorf("repos/collections: list collection ids: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]struct{}{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("repos/collections: scan collection id: %w", err)
+		}
+		out[id] = struct{}{}
+	}
+	return out, rows.Err()
 }
