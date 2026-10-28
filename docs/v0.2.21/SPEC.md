@@ -10,7 +10,7 @@ Source: user request. Phases run top to bottom.
 | P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Done |
 | P390 | ADE git module last in order | Done |
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Done |
-| P392 | Review others' PRs: approve and comment; agent panel button to far right | Todo |
+| P392 | Review others' PRs: approve and comment; agent panel button to far right | Done |
 | P393 | Terminals: Cmd+click opens link | Todo |
 | P394 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
 | P395 | Close chapter, open PR | Todo |
@@ -54,6 +54,8 @@ Result: plan `plans/P391.md`. `packages/theme/src/base.css` (pointer: fine): thu
 
 - Reviewing another person's work must allow approving the PR and leaving comments, same as for own PRs.
 - Move the agent panel button to the far right.
+
+Result: plan `plans/P392.md`. Cause: review target branch was a ref spelling (`origin/feat/x`, fork `<owner>/<head>`), so the PR lookup missed and no actions showed. `changeRequest.reviewState` looks up the host head name (origin prefix dropped) and takes optional `number`; contract 54 to 55, additive. `ReviewWindowTarget.changeRequest` carries the task link's PR number (covers forks). Kind `none` shows a disabled Review button with reason. `ade-review-toggle-agent` is the last title bar item. Flow `TestReviewForeignChangeRequest` + contract `ade-review-foreign.json`; `ade-host-link.json` unchanged. 4 UI specs in `ade-v2-review.spec.ts` (foreign, remote-only, none reason, far-right position). Docs: `docs/ARCHITECTURE.md`, `agents.mdx`. Checks: `typecheck`, `lint`, `lint:go`, `lint:dead`, `bun test packages/git-ipc`, Go tests (githost, gitsession, gitrpc, ade, adeflow, githostflow, coverage) clean; `test:ui:space` 753 pass; `test:visual:space` 20 pass, no diff; `site:check` 144 pass, no diff. CodeGraph MCP unavailable.
 
 ### P393 Terminals: Cmd+click opens link
 
