@@ -15,7 +15,7 @@ Source: user request. Phases run top to bottom.
 | P380 | Automation scripts reuse one tab per script; start only from the play icon | Done |
 | P381 | Reorder collections and other folders | Done |
 | P382 | MCP show-results customizable per connection | Done |
-| P383 | Add a work item from a GitHub link, branch taken from the link | Todo |
+| P383 | Add a work item from a GitHub link, branch taken from the link | Done |
 | P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Todo |
 | P385 | Postman import accepts partial data again | Todo |
 | P386 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
@@ -85,6 +85,8 @@ Result: plan `plans/P382.md`. New per-connection `mcpReviewResults` (inherit, re
 ### P383 Add a work item from a GitHub link
 
 Add a work item by pasting a GitHub link (PR or branch URL). Derive the branch from the link and attach it.
+
+Result: plan `plans/P383.md`. New optional `githost.BranchLinks` role (GitHub: `ParseBranchLink`, `ChangeRequestHead`, `ChangeRequestRef`). `ResolveHostLink` (read only) and `AddHostLink` (re-resolve, fetch one refspec, attach via `attachExistingBranch`) IPC; `AdeTaskService` 67 methods. Fork PR lands as `<owner>/<head>` (`pr-<n>` when head repo gone) from `refs/pull/<n>/head`; same-repo open PR on default remote fetches its head into the tracking ref; branch link picks the longest existing branch prefix after a full fetch. Merged PR, issue link, main branch, no matching repo refused. New task from a PR takes its title and `hostUrl`. `RemoteOpParams.Refspecs` (in-process), `RepoEntry.RemoteFor`, `CheckBranchName`. UI: link paste in Add > Existing branch (`AdeLinkTarget`, `useResolveHostLink`, `useAddHostLink`). Tests: `TestParseBranchLink`, `TestHostLink`, `TestHostLinkUnauthenticated` (contract `ade-host-link`), `ade-v2-add-link.spec.ts` (6). Checks: lint, typecheck, lint:go, lint:dead, all flows, build:space, full Space UI (730) pass. Deviations from plan: repo match runs before the host call (no gh call for an unknown repo); case 5 attaches the tree link to a repo-less task (a task holds one branch per repo); fixture sets `GIT_SSH_COMMAND` and `GIT_CONFIG_COUNT=0` (sandbox rewrites `git@github.com:`); `resolveHostLink` split in helpers for lint; reuse `common.action.add.label` and `docker.edit.attach.label`; query leaves `retry` at default (U53 forbids `retry: false`); no-gh status text is the provider's own reason.
 
 ### P384 Review window fixes
 
