@@ -2035,7 +2035,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the agentmcp finish_step server, the Tracker, log sink and session store.
 - wireAdeTask calls Recover() then Start() on the task board, and installs board.OnTUIStopped as the tracker's stopped handler.
-- bridge.AdeTaskService binds 67 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
+- bridge.AdeTaskService binds 69 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
 - AdeTaskService push channels are defined in bridge/adewire/channels.go with prefix kira:adetask: and suffixes board, backlog, workflows, repos, runs, log, sessions and open-session; open-session is emitted to one window via EmitTo.
 - bridge/adewire is the frozen wire contract; tests/fixtures/ade-v2/ holds 27 fixtures decoded by adewire/wire_test.go and the mock runtime.
 - layeringtest.RunAllowing admits the adewire package.
@@ -2387,6 +2387,11 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - closeDecision keeps the main window from closing while a review window is open.
 - The review window has three panes: git-ui review files (every changed file, target locked), diff tabs, and the review agent panel. One title bar (AdeReviewHeader inside the shared TitleBar strip, so the drag region and traffic-light inset stay) holds the task colour, title, repo, branch, base and an uncommitted badge.
 - The files pane calls ensureRepoOpen first, because the git socket needs repo.open on its connection.
+- The committed list reloads on repo.changed refsChanged (ReviewFilesState, coalesced), on window focus (AdeReviewFiles) and, with lockTarget, through ReviewSessionState auto-apply (new tip adopted without a manual apply). A selected file re-runs its diff after a reload, or clears if it left the list.
+- Uncommitted changes show in a separate section under the committed list (review-working), never marked reviewed: marks belong to the branch tip. Source is AdeTaskService.ReviewWorking (porcelain status of the worktree against HEAD; branchId resolves the worktree server-side, never a client path). ReviewWorkingDiff returns the HEAD blob and the worktree file. The diff tab is repo-diff with a `working` branchId; it follows live data and has no go-to-file.
+- The uncommitted queries (TanStack, useReviewWorking) refresh on the ade board push, window focus and agent PostToolUse or Stop events whose cwd is inside the worktree (debounced TIMING.fileSettle). No polling: an edit from another tool shows on refocus. FSEvents delivery and WKWebView focus are unverified off macOS.
+- Since-review diff left side: the stored snapshot when the file changed since review (changedSinceReview), otherwise the merge base, so a reviewed file still shows its diff like a PR. Left equal to right is never used.
+- The title bar toggle (ade-review-toggle-agent, useAdeReviewWindowStore.agentPanelVisible) hides the right pane. In a review window Cmd+J toggles it and Cmd+B is a no-op; the main window keeps the layout panels.
 - The title bar's right group (AdeReviewActions) has a Review dropdown (Comment, Approve, Request changes) and Comment on {short}. Both open AdeReviewSubmitDialog, which posts a review or a conversation comment through changeRequest.submitReview or changeRequest.comment. Local review comments stay agent-only and are never part of a submitted review. Own change requests disable approve and request changes; merged or closed ones disable every review event. The review applies to the host's current head (commit_id); a differing local tip shows a warning. Errors render inline; there is no toast.
 - The since-review review_session is pinned (SetPinned, gitreview 0003) so rebases cannot drop the reviewed blobs.
 - The since-review diff's left side is the stored snapshot (review.snapshot), not a git ref; a renamed unchanged file keeps its review.
