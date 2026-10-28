@@ -36,6 +36,7 @@ import type {
   ReviewForwardText,
   RunArgs,
   SaveStatusesArgs,
+  SaveStatusesResult,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
   SendArgs,
@@ -192,12 +193,23 @@ export function useSaveStatuses() {
     mutationFn: (args: SaveStatusesArgs) => control.adeTaskSaveStatuses(args),
     ...optimistic,
     // The result carries the real ids of new statuses; the board push may land after this resolves.
-    onSuccess: (result) => {
-      queryClient.setQueryData<Board>(boardKey, (b) =>
-        b ? { ...b, statuses: result.statuses } : b,
-      );
+    onSuccess: (result, args) => {
+      queryClient.setQueryData<Board>(boardKey, (b) => (b ? withSavedIds(b, args, result) : b));
     },
   });
+}
+
+/** Swaps the placeholder id of each new status for the one the backend assigned. Positions line up
+ *  only while the cache still holds the optimistic set; any other shape is left to the board push. */
+function withSavedIds(board: Board, args: SaveStatusesArgs, result: SaveStatusesResult): Board {
+  const n = args.statuses.length;
+  if (board.statuses.length !== n || result.statuses.length !== n) return board;
+  return {
+    ...board,
+    statuses: board.statuses.map((s, i) =>
+      args.statuses[i]?.id === '' ? { ...s, id: result.statuses[i]?.id ?? s.id } : s,
+    ),
+  };
 }
 
 export function useUpdateBacklogItem() {
