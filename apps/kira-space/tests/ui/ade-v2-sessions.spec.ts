@@ -162,6 +162,7 @@ test('a headless tab shows its status on hover, its log, and Stop sends the run 
   const { window: page, control } = await openPlan(relaunch);
   await openSessions(page, 'T_bill');
   await page.locator(t('ade-session-tab-b1c2')).click();
+  await page.mouse.move(0, 0);
   await page.locator(t('ade-session-tab-b1c2')).hover();
   await expect(page.locator(t('ade-session-tip'))).toContainText('Background run · step');
   await expect(page.locator(t('ade-run-log-line')).first()).toBeVisible();

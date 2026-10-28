@@ -225,7 +225,7 @@ test('a branch opens Details with merged and deployed rows; back to the task', a
 
 test("the panel has no toolbar; actions sit at the tab row's right end", async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await openTask(page, 'T_bill');
+  await openTask(page, 'T_auth');
   const panel = page.locator('[data-testid="ade-panel"]');
   await expect(panel.locator('[data-slot="panel-header"]')).toHaveCount(0);
   const actions = panel.locator('[data-testid="ade-panel-actions"]');
