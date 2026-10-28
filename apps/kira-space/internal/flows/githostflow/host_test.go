@@ -13,8 +13,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakehost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -102,6 +104,11 @@ func newRig(t *testing.T, forge *fakehost.Forge, opts ...flowharness.Opt) *rig {
 	if opened.Kind != "ok" || opened.Repo == nil {
 		t.Fatalf("repo.open = %+v", opened)
 	}
+	// The agent committed in a worktree; the entry's cached refs follow via the async watcher.
+	testx.WaitUntil(t, waitFor, func() bool {
+		refs := call[gitsession.RefsResult](t, gs, "refs.list", gitrpc.RefsListParams{RepoID: opened.Repo.RepoID})
+		return slices.ContainsFunc(refs.Branches, func(b porcelain.RefRow) bool { return b.ShortName == branch && b.ObjectID == tip })
+	})
 	return &rig{t: t, app: app, forge: forge, branch: br, repoID: rec.ID, dir: dir, tip: tip, gs: gs, gitID: opened.Repo.RepoID}
 }
 
