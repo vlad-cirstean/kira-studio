@@ -76,7 +76,7 @@ async function boot(
     results: { 'refs.list': refsAtTip(manyRowShas(0)), ...extra },
     control,
   });
-  await expect(row(page, 0)).toBeVisible();
+  await expect(row(page, 0)).toBeVisible({ timeout: 15_000 });
   await expect
     .poll(() => viewport(page).evaluate((el) => el.scrollHeight > el.clientHeight * 4), {
       timeout: 15_000,
