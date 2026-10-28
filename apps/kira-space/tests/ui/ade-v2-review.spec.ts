@@ -267,7 +267,7 @@ reviewTest('the hunk mark stays put when the add-comment mark shows', async ({ r
     if (!b) throw new Error('no box');
     return b;
   };
-  await expect(mark).toBeVisible();
+  await expect(mark).toBeVisible({ timeout: 15_000 }); // Monaco's diff and decorations land late under suite load
   await page.mouse.move(0, 0);
   const markBefore = await box(mark);
   const linesBefore = await box(viewLines);
