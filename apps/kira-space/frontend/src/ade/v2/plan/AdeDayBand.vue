@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Separator } from '@theme/components/ui/separator';
 import { t } from '@theme/i18n';
 import { SORTABLE_CHOSEN_CLASS, SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import { computed, ref } from 'vue';
@@ -137,7 +138,7 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         v-for="h in history"
         :key="h.key"
         variant="toolbar"
-        class="ml-54.5 h-row w-auto justify-start gap-2 px-2 font-normal"
+        class="ml-54.5 h-row w-auto justify-start gap-2 px-2 font-normal data-[selected]:bg-select"
         :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
@@ -174,23 +175,27 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
           {{ overflowLabel }}
         </Button>
       </div>
-      <AdeTaskCard
-        v-for="card in cards"
-        :key="card.task.id"
-        :card="card"
-        @select="emit('select', card.task.id)"
-        @force-push="(row) => emit('forcePush', row)"
-      />
+      <template v-for="(card, i) in cards" :key="card.task.id">
+        <Separator v-if="i > 0" class="bg-border-strong" data-testid="ade-task-separator" />
+        <AdeTaskCard
+          :card="card"
+          @select="emit('select', card.task.id)"
+          @force-push="(row) => emit('forcePush', row)"
+        />
+      </template>
       <Button
         size="kira"
         v-for="s in spans"
         :key="s.taskId"
         variant="toolbar"
-        class="ml-54.5 h-row w-auto justify-start gap-2 border border-border px-2 font-normal"
+        class="ml-54.5 h-row w-auto justify-start gap-2 border border-border px-2 font-normal data-[selected]:bg-select"
+        :data-task-id="s.taskId"
+        :data-selected="ui.selectedTaskId === s.taskId || undefined"
         data-testid="ade-span-row"
         @click="emit('select', s.taskId)"
       >
         <CodiconIcon name="indent" :size="12" class="shrink-0 text-subtle" />
+        <span class="size-2 shrink-0 rounded-kira-xs" :style="{ background: s.color }" />
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-subtle">{{ s.note }}</span>
         <span class="min-w-0 truncate font-medium text-fg">{{ s.title }}</span>
       </Button>

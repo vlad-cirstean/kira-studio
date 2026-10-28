@@ -147,7 +147,7 @@ const baseVariant = computed(() => (props.row.base?.pending ? 'warn' : 'default'
   <div
     ref="rowEl"
     class="group box-border flex h-board-row w-full items-center gap-1.5 px-2"
-    :class="selected ? 'ring-1 ring-inset ring-focus' : ''"
+    :class="selected ? 'bg-select' : ''"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"

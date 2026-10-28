@@ -77,6 +77,7 @@ function act(row: BranchRowModel, a: BranchAction): void {
   } else if (a.kind === 'start') dialogs.start(row.id);
 }
 
+const headSelected = computed(() => props.card.selected && ui.selectedBranchId === null);
 const p = computed(() => props.card.progress);
 const segClass = (state: string): string => {
   if (state === 'done') return 'bg-muted-foreground';
@@ -89,6 +90,7 @@ const boxClass = computed(() => {
   return [
     c.parked ? 'bg-bg' : '',
     'cursor-grab',
+    c.selected ? 'border-focus ring-1 ring-focus' : '',
     c.ripple && !c.selected ? 'outline-dashed outline-1 outline-border-strong' : '',
   ];
 });
@@ -122,6 +124,7 @@ const boxClass = computed(() => {
       :data-task-id="card.task.id"
       class="box-border flex min-w-0 flex-1 flex-col overflow-hidden"
       :class="boxClass"
+      :aria-current="card.selected || undefined"
       data-testid="ade-card"
       @contextmenu="taskMenu.open"
     >
@@ -130,7 +133,7 @@ const boxClass = computed(() => {
         v-if="!card.review"
         ref="head"
         class="box-border flex h-17 w-full flex-col justify-center gap-1 border-b border-b-border px-2 py-1.5"
-        :class="card.selected ? 'bg-hover' : ''"
+        :class="headSelected ? 'bg-select' : 'hover:bg-hover'"
         role="button"
         tabindex="0"
         data-testid="ade-card-head"
