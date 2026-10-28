@@ -346,13 +346,9 @@ func walkItems(nodes []itemNode, parent int, t *Tree) {
 			continue
 		}
 		isFolder := node.hasItem
-		_, isRequest := obj["request"]
-		if !isFolder && !isRequest {
-			// Ill-formed both ways round: neither a folder nor a request. Dropping-and-reporting
-			// matches repos/saved_queries.go's own posture for a row it cannot classify; refusing
-			// the whole file for one malformed item would be hostile.
-			t.Report.warn(WarnMalformedItem)
-			continue
+		if _, isRequest := obj["request"]; !isFolder && !isRequest {
+			// Neither member: a request with defaults (importRequest handles a nil member).
+			t.Report.warn(WarnMissingRequest)
 		}
 
 		origin := cloneOrigin(obj)
