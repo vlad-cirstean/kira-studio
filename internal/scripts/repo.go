@@ -296,7 +296,10 @@ func (r *Repo) Move(id string, collectionID, beforeID *string) error {
 			return invalid("scripts: before is not in the target set")
 		}
 	}
-	ordered := append(set[:at:at], append([]string{id}, set[at:]...)...)
+	ordered := make([]string, 0, len(set)+1)
+	ordered = append(ordered, set[:at]...)
+	ordered = append(ordered, id)
+	ordered = append(ordered, set[at:]...)
 	if err := sqlitex.ReorderSortOrder(tx,
 		`SELECT id FROM custom_scripts WHERE collection_id IS ? ORDER BY sort_order ASC, name ASC`,
 		`UPDATE custom_scripts SET sort_order = ? WHERE id = ?`,
