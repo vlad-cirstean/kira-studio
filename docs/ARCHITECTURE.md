@@ -2380,6 +2380,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Plan drag and drop (plan/usePlanDrag.ts, board/dropPlan.ts) writes the day and position directly with no dialog.
 - ADE notes use TipTap (notes/), and the fix menu uses the shared context-menu primitive (R20).
 - ade/v2/tones.ts and palette.ts are dark-only; scripts/check-ade-colours.sh (part of bun run lint) fails any other colour literal under ade/.
+- Plan board colour: tone colour only on the task status tag, red failures and amber needs-you/stale; branch tags other than red/amber render grey; task colour only as the head dot. The task open in the panel wears a focus frame (border-focus ring-1) and aria-current; its head, branch row, span and history rows use bg-select.
 
 ### Review code (P150)
 
