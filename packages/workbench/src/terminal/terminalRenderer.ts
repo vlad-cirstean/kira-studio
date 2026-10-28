@@ -55,20 +55,22 @@ function createLinkHint(term: Terminal): LinkHint | null {
   if (!root) return null;
   const el = document.createElement('div');
   // xterm-hover keeps the hint's own mouse events from activating links under it.
-  el.className = `xterm-hover absolute hidden ${tooltipContentVariants()}`;
+  el.className = `xterm-hover absolute ${tooltipContentVariants()}`;
+  // Inline style: the tooltip's inline-flex would beat a `hidden` class.
+  el.style.display = 'none';
   el.dataset.testid = 'terminal-link-hint';
   root.append(el);
   return {
     show(event, uri) {
       const box = root.getBoundingClientRect();
       el.textContent = `${uri}\n${t('workbench.terminal.link.tooltip', { modifier: primaryModifierName() })}`;
-      el.classList.remove('hidden');
+      el.style.display = '';
       const left = Math.min(event.clientX - box.left, Math.max(0, box.width - el.offsetWidth));
       el.style.left = `${Math.max(0, left)}px`;
       el.style.top = `${event.clientY - box.top + 16}px`;
     },
     hide() {
-      el.classList.add('hidden');
+      el.style.display = 'none';
     },
   };
 }
