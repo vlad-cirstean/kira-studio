@@ -41,23 +41,23 @@ const REPO_BRANCHES = {
   ],
 };
 
-function repoRecord(id: string, name: string, order: number) {
+function repoRecord(id: string, name: string, order: number, color: string) {
   return {
     id,
     name,
     root: `/tmp/${name}`,
     repoId: `/tmp/${name}`,
     sortOrder: order,
-    color: 'none',
+    color,
     createdAt: '2026-01-01T00:00:00.000Z',
     hidden: false,
   };
 }
 
 const REPO_RECORDS = [
-  repoRecord('repo-web-app', 'acme-customer-dashboard-web-frontend', 1),
-  repoRecord('repo-api', 'acme-platform-core-api-service', 2),
-  repoRecord('repo-mobile', 'acme-mobile-react-native-app', 3),
+  repoRecord('repo-web-app', 'acme-customer-dashboard-web-frontend', 1, 'blue'),
+  repoRecord('repo-api', 'acme-platform-core-api-service', 2, 'green'),
+  repoRecord('repo-mobile', 'acme-mobile-react-native-app', 3, 'violet'),
 ];
 
 function firstWorkflow(): unknown {

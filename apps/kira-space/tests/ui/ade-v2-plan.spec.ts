@@ -262,14 +262,16 @@ test('the task open in the panel is marked on its card, spans and branch rows', 
 }) => {
   const { window: page } = await openPlan(relaunch);
   const marked = page.locator('[data-testid="ade-card"][aria-current="true"]');
-  const focusColor = await page.evaluate(() => {
-    const span = document.createElement('span');
-    span.style.color = 'var(--kira-focus)';
-    document.body.appendChild(span);
-    const color = getComputedStyle(span).color;
-    span.remove();
-    return color;
-  });
+  const [focusColor, badgeColor] = await page.evaluate(() =>
+    ['--kira-focus', '--kira-badge'].map((v) => {
+      const span = document.createElement('span');
+      span.style.color = `var(${v})`;
+      document.body.appendChild(span);
+      const color = getComputedStyle(span).color;
+      span.remove();
+      return color;
+    }),
+  );
 
   await card(page, 'T_search').locator('[data-testid="ade-card-head"]').click();
   await expect(card(page, 'T_search')).toHaveAttribute('aria-current', 'true');
@@ -280,6 +282,9 @@ test('the task open in the panel is marked on its card, spans and branch rows', 
 
   await card(page, 'T_push').locator('[data-testid="ade-card-head"]').click();
   await expect(card(page, 'T_push')).toHaveAttribute('aria-current', 'true');
+  expect(await card(page, 'T_search').evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(
+    badgeColor,
+  );
   await expect(card(page, 'T_search')).not.toHaveAttribute('aria-current', 'true');
 
   const row = card(page, 'T_push').locator('[data-testid="ade-branch-row"]').first();
@@ -294,14 +299,18 @@ test('the task open in the panel is marked on its card, spans and branch rows', 
   await expect(span).toHaveAttribute('data-selected', 'true');
 });
 
-test('plan cards use colour only for status and problems', async ({ relaunch }) => {
+test('plan cards use colour only for status, problems and the repo badge', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await expect(page.locator('[data-testid="ade-card"][style*="border-left-color"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="ade-action-cell"] [class*="-solid"]')).toHaveCount(0);
   await expect(card(page, 'T_search').locator('[data-testid="ade-step-label"]')).not.toHaveClass(
     /tone-amber|tone-green/,
   );
-  await expect(page.locator('[data-testid="ade-branch-repo"][style]')).toHaveCount(0);
+  const repoBadges = page.locator('[data-testid="ade-branch-repo"]');
+  await expect(repoBadges.first()).toHaveAttribute('style', /--repo: var\(--kira-conn-/);
+  await expect(page.locator('[data-testid="ade-branch-repo"]:not([style*="--repo"])')).toHaveCount(
+    0,
+  );
 });
 
 test('the Plan scrolls inside the window instead of growing it', async ({ relaunch }) => {

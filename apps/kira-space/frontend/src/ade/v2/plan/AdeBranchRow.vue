@@ -11,7 +11,9 @@ import { useFocus } from '@vueuse/core';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
+import { useRepoLinksStore } from '../../../repo/state/repoLinks';
 import { useRepos } from '../../../repo/state/reposQueries';
+import { repoTint } from '../../../state/coderepos';
 import { useRunAutomation } from '../automation/useRunAutomation';
 import { fixItems } from '../board/menu';
 import { useReviewCode } from '../review/useReviewCode';
@@ -28,6 +30,8 @@ const dialogs = useAdeDialogsStore();
 const contextMenu = useContextMenuStore();
 const { model } = usePlanModel();
 const repos = useRepos();
+const repoLinks = useRepoLinksStore();
+const repoTintOf = computed(() => repoTint(repoLinks.repoColorOf(props.row.branch.codeRepoId)));
 const reviewCode = useReviewCode();
 const automation = useRunAutomation();
 const choice = computed(() => reviewCode.choiceOf(props.row));
@@ -167,7 +171,15 @@ const baseVariant = computed(() => (props.row.base?.pending ? 'warn' : 'default'
     </span>
     <AdeBranchTip v-model:open="tipOpen" :row="row" :color="color">
       <div class="flex h-full min-w-0 flex-1 items-center gap-1.5">
-        <Badge data-testid="ade-branch-repo">{{ row.repo }}</Badge>
+        <Badge
+          variant="chip"
+          :class="repoTintOf.class"
+          :style="repoTintOf.style"
+          data-testid="ade-branch-repo"
+          >{{
+            row.repo
+          }}</Badge
+        >
         <BranchChip
           v-if="row.base"
           :name="baseName"

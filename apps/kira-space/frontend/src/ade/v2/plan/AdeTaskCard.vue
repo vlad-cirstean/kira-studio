@@ -90,7 +90,7 @@ const boxClass = computed(() => {
   return [
     c.parked ? 'bg-bg' : '',
     'cursor-grab',
-    c.selected ? 'border-focus ring-1 ring-focus' : '',
+    c.selected ? 'border-focus ring-1 ring-focus' : 'border-badge',
     c.ripple && !c.selected ? 'outline-dashed outline-1 outline-border-strong' : '',
   ];
 });
