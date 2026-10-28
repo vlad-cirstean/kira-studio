@@ -129,6 +129,26 @@ func TestTaskStatuses(t *testing.T) {
 		}
 		return s
 	})
+
+	// A new status named like a removed one gets a fresh id; the removed one's tasks still move.
+	if _, err := app.W.AdeTask.SaveStatuses(ctx, adewire.SaveStatusesArgs{
+		Statuses: []adewire.TaskStatusDef{
+			{ID: "todo", Name: "To do", Tone: "grey", Category: "todo"},
+			{Name: "Doing", Tone: "blue", Category: "active"},
+			{ID: "in-review", Name: "Code review", Tone: "blue", Category: "review"},
+			{Name: "QA", Tone: "purple", Category: "review"},
+			{ID: "done", Name: "Done", Tone: "green", Category: "done"},
+		},
+		Reassign: map[string]string{"qa": "doing"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	expect(other.ID, "doing", "user")
+	for _, st := range board(t, app).Statuses {
+		if st.Name == "QA" && st.ID == "qa" {
+			t.Fatalf("new status reused the removed id: %+v", st)
+		}
+	}
 }
 
 func ptr[T any](v T) *T { return &v }

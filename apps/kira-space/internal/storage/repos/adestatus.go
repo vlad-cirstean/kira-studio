@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -166,9 +167,15 @@ func normalizeSet(set []model.AdeTaskStatus, oldByID map[string]model.AdeTaskSta
 			return nil, nil, setErr("at least one status must count as %s", c)
 		}
 	}
+	// A new status never takes a removed id: reassignRemoved would read it as kept.
+	reserved := maps.Clone(taken)
+	for id := range oldByID {
+		reserved[id] = true
+	}
 	for i := range next {
 		if next[i].ID == "" {
-			next[i].ID = statusSlug(next[i].Name, taken)
+			next[i].ID = statusSlug(next[i].Name, reserved)
+			reserved[next[i].ID] = true
 			taken[next[i].ID] = true
 		}
 		next[i].Position = i
