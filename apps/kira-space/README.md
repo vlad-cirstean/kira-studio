@@ -5,7 +5,7 @@
 A native macOS git client and code workspace: a commit graph, branch review and remote operations
 over a VS Code-adjacent workspace (file tree, Monaco viewer, diffs, search), with coding agents, a
 memory store, a terminal and a phone view on your home network — built on Wails (Go)
-and Vue 3. Its modules are Git, Agents, Automations and Memory.
+and Vue 3. Its modules are Agents, Automations, Memory and Git.
 
 [Presentation page](https://vlad-cirstean.github.io/kira-studio/) and
 [screenshots](../../README.md#screenshots).

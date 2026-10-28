@@ -829,7 +829,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - The worktree claim blocks both ways: a step run on a claimed branch is held with note "waiting for automation <name>" until release (and after a restart); a rebase is refused with "automation X is running in <branch>"; StartBranch is refused; a script start is refused while a step run or rebase works on the branch.
 - A workflow step may name smart_script plus params instead of a prompt (planSmartStep, smartOutcome, supervised by superviseAgent).
 - agentnotify.HandleScriptRun posts for smart runs only: failed under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never.
-- Kira Studio MODE_ORDER is studio, api, automations, docker; Kira Space order is git, ade, automations, memory. ModeDef.tabStrip: false hides the tab strip for modules without tabs (Docker and Space's Memory).
+- Kira Studio MODE_ORDER is studio, api, automations, docker; Kira Space order is ade, automations, memory, git. Space opens new windows in git (WindowModes.Default), now the last tab. ModeDef.tabStrip: false hides the tab strip for modules without tabs (Docker and Space's Memory).
 - WorkbenchShell takes mainFramed (default keeps the main-panel frame); ade passes it off so each pane carries its own single frame.
 - Kira Space repo terminals and the Automations module's terminals both render through the shared TerminalTabView.vue/TerminalHostView.vue, not two parallel implementations.
 - P128 deleted views/repo/RepoTerminalView.vue, which had been a hand-kept-identical second copy of the terminal tab body for repo-scoped terminals.
