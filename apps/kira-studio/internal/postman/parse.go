@@ -140,9 +140,9 @@ func VariableValue(raw json.RawMessage) string {
 // decodeVariableEntry is the one rule set for a collection `variable[]` entry and an environment
 // `values[]` entry. `type == "secret"` marks the entry secret; the original `type` string is kept so
 // an unrecognised one survives export. disabled is `enabled: false` or `disabled: true`; the caller
-// skips it. A key that is not a non-empty scalar becomes `unnamed_<n>` (n from *unnamed, counted
-// per array); a disabled entry never consumes a number.
-func decodeVariableEntry(obj map[string]json.RawMessage, unnamed *int) (v Variable, disabled bool) {
+// skips it. A key that is not a non-empty scalar becomes `unnamed_<n>` (numbered per array, skipping
+// names the array already uses); a disabled entry never consumes a number.
+func decodeVariableEntry(obj map[string]json.RawMessage, unnamed *unnamedKeys) (v Variable, disabled bool) {
 	if enabled, has := decodeBool(obj["enabled"]); has && !enabled {
 		disabled = true
 	}
@@ -154,14 +154,45 @@ func decodeVariableEntry(obj map[string]json.RawMessage, unnamed *int) (v Variab
 	}
 	name, isScalar := decodeScalarString(obj["key"])
 	if !isScalar || name == "" {
-		*unnamed++
-		name = fmt.Sprintf("unnamed_%d", *unnamed)
+		name = unnamed.next()
 	}
 	typ, _ := decodeString(obj["type"])
 	return Variable{
 		Name: name, Value: VariableValue(obj["value"]), Secret: typ == "secret", Type: typ,
 		Description: decodeDescription(obj["description"]),
 	}, false
+}
+
+// unnamedKeys hands out the generated keys of one array. taken holds the array's real keys, so a
+// generated key never collides with one.
+type unnamedKeys struct {
+	taken map[string]bool
+	n     int // last number tried
+	count int // keys handed out
+}
+
+func newUnnamedKeys(entries []json.RawMessage) *unnamedKeys {
+	u := &unnamedKeys{taken: map[string]bool{}}
+	for _, entry := range entries {
+		obj := decodeObject(entry)
+		if obj == nil {
+			continue
+		}
+		if name, ok := decodeScalarString(obj["key"]); ok && name != "" {
+			u.taken[name] = true
+		}
+	}
+	return u
+}
+
+func (u *unnamedKeys) next() string {
+	u.count++
+	for {
+		u.n++
+		if name := fmt.Sprintf("unnamed_%d", u.n); !u.taken[name] {
+			return name
+		}
+	}
 }
 
 // DecodeVariables is decodeVariables for storage's legacy promotion, so promoted entries follow
@@ -186,12 +217,14 @@ type variableCounts struct {
 // skipped.
 func decodeVariables(raw json.RawMessage) (vars []Variable, counts variableCounts) {
 	vars = []Variable{}
-	for _, entry := range decodeArray(raw) {
+	entries := decodeArray(raw)
+	unnamed := newUnnamedKeys(entries)
+	for _, entry := range entries {
 		obj := decodeObject(entry)
 		if obj == nil {
 			continue
 		}
-		v, off := decodeVariableEntry(obj, &counts.Unnamed)
+		v, off := decodeVariableEntry(obj, unnamed)
 		if off {
 			counts.Disabled++
 			continue
@@ -201,6 +234,7 @@ func decodeVariables(raw json.RawMessage) (vars []Variable, counts variableCount
 		}
 		vars = append(vars, v)
 	}
+	counts.Unnamed = unnamed.count
 	return vars, counts
 }
 

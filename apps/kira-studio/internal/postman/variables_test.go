@@ -46,6 +46,8 @@ func TestDecodeVariableEntry(t *testing.T) {
 			want: []Variable{{Name: "unnamed_1", Value: "a"}, {Name: "unnamed_2", Value: "b"}}, wantUnnamed: 2},
 		{name: "disabled unnamed takes no number", entry: `{"value":"a","disabled":true},{"value":"b"}`,
 			want: []Variable{{Name: "unnamed_1", Value: "b"}}, wantDisabled: 1, wantUnnamed: 1},
+		{name: "generated key skips a real one", entry: `{"key":"unnamed_1","value":"a"},{"value":"b"}`,
+			want: []Variable{{Name: "unnamed_1", Value: "a"}, {Name: "unnamed_2", Value: "b"}}, wantUnnamed: 1},
 		{name: "description object", entry: `{"key":"a","value":"x","description":{"content":"d"}}`,
 			want: []Variable{{Name: "a", Value: "x", Description: "d"}}},
 	}

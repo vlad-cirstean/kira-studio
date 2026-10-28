@@ -78,12 +78,14 @@ func parseEnvironment(doc map[string]json.RawMessage) *Environment {
 		name = "Imported environment"
 	}
 	env := &Environment{Name: name, Variables: []Variable{}}
-	for _, entry := range decodeArray(doc["values"]) {
+	entries := decodeArray(doc["values"])
+	unnamed := newUnnamedKeys(entries)
+	for _, entry := range entries {
 		obj := decodeObject(entry)
 		if obj == nil {
 			continue
 		}
-		v, off := decodeVariableEntry(obj, &env.Unnamed)
+		v, off := decodeVariableEntry(obj, unnamed)
 		if off {
 			env.Disabled++
 			continue
@@ -93,5 +95,6 @@ func parseEnvironment(doc map[string]json.RawMessage) *Environment {
 		}
 		env.Variables = append(env.Variables, v)
 	}
+	env.Unnamed = unnamed.count
 	return env
 }
