@@ -13,7 +13,7 @@ Source: user request. Phases run top to bottom.
 | P378 | Finished/stopped agents behind a dropdown | Done |
 | P379 | ADE tasks: customizable statuses, manual moves both ways | Done |
 | P380 | Automation scripts reuse one tab per script; start only from the play icon | Done |
-| P381 | Reorder collections and other folders | Todo |
+| P381 | Reorder collections and other folders | Done |
 | P382 | MCP show-results customizable per connection | Todo |
 | P383 | Add a work item from a GitHub link, branch taken from the link | Todo |
 | P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Todo |
@@ -73,6 +73,8 @@ Result: plan `plans/P380.md`. Tab key `{scriptId, taskId, branchId}` stored in t
 ### P381 Reorder collections and other folders
 
 Drag reorder for collections and other folder trees.
+
+Result: plan `plans/P381.md`. API collections: `CollectionsRepo.ReorderCollections` (dense via `sqlitex.ReorderSortOrder`, `ErrInvalidOrder` -> `E_BAD_REQUEST`, `updated_at` untouched), bridge `CollectionsService.ReorderCollections`; folders and requests reuse `MoveItems`. Tree: collection rows drag (`RowDrop` union, header top half = before, else after last visible row of block); mixed selection and active search refuse it; menu `Move up`/`Move down` on collection, folder, request (`list.moveUp`/`list.moveDown`). Automations: `custom_scripts` `Move` takes `beforeId` (one tx, dense target set, bad id -> bad request); scripts drag between collections via shared Sortable group; `Reorder`/`ReorderCollections` unchanged; menus in new `panelMenus.ts`; Escape cancels cross-list drop (module-level `dragCancelled`). Tests: `TestCollectionOrder` (contract `api-order`), extended `TestScriptOrder` both apps (contract `script-order`), `api-order.spec.ts` (6), shared scenario `automationsOrder.ts` registered in Studio `script-order.spec.ts` and Space `automations-order.spec.ts` (5 each), unit cases for `collectionOrderFor`. Contract diff: `beforeId: null` on script Move args only. Checks: lint, lint:go, lint:dead, typecheck, Go tests, builds, full Space UI (724), full Studio UI (631 pass, 2 failures fixed and rerun green). Fixes outside scope: script move contract expectation, gocritic `appendAssign` in `scripts/repo.go`, stale `script-dialog` visual baseline (predates run-folder chip restyle). Not done: macOS WKWebView drag feel.
 
 ### P382 MCP show-results customizable per connection
 
