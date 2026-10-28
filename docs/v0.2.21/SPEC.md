@@ -7,7 +7,7 @@ Source: user request. Phases run top to bottom.
 | Phase | Title | Status |
 |---|---|---|
 | P388 | ADE task list: calmer look, clear active-task marker, visible separators | Done |
-| P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Todo |
+| P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Done |
 | P390 | ADE git module last in order | Todo |
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Todo |
 | P392 | Bug: three-finger swipe up (Mission Control) moves focus to another space | Todo |
@@ -38,6 +38,8 @@ Result: plan `plans/P388.md`. Plan cards neutral: colour only on task status tag
   - "x time ago" shown in a tooltip on the tab.
   - Tab right-click menu: copy session id.
 - Tab right-click menu also gets restart: closes the session, then reopens it.
+
+Result: plan `plans/P389.md`. Plan top bar gone: `AdePlanHeader` renamed `AdePlanRepos`, Refresh all at right end of repo row. `AdePanelFrame` drops `PanelHeader`; actions (`ade-panel-actions`) at tab row right end. `AdeSessionBar` and `AdeSessionId` deleted: session tab tooltip (`AdeSessionTabTip`, state and age) and right-click menu (`useSessionMenu`: Restart for running TUI, Copy session ID); Take over and Stop move to the tab row (`AdeSessionActions`). Go: `Tracker.Stop` (no grace wait) and `TaskBoard.RestartSession` (stop, close terminal, Take over), `AdeTaskService.RestartSession`, flow test `TestRestartSession`, contract `ade-session-restart.json`. i18n: `common.action.restart.label` replaces `docker.action.restart.label` (catalog rule C3). Checks: `lint`, `typecheck`, `lint:go`, `lint:dead` clean; Go ade/flows/bridge tests pass; `ade-` UI specs pass (2 new-spec fixes committed); visual: `branch-panel-details` re-recorded (Inter confirmed); screenshots re-run stable, 2 PNGs updated. CodeGraph MCP unavailable.
 
 ### P390 ADE git module last in order
 
