@@ -56,7 +56,9 @@ func newHostLinkFixture(t *testing.T, authFail bool) *hostLinkFixture {
 	seed.Git("checkout", "-q", "-b", "fork-main", "main")
 	seed.Git("commit", "-q", "--allow-empty", "--author=Sara <sara@example.com>", "-m", "fork change")
 	forkTip := seed.Git("rev-parse", "HEAD")
-	seed.Git("push", "-q", base.Dir, "main", "feat/login", "feat/x", "fork-main:refs/pull/12/head")
+	seed.Git("checkout", "-q", "-b", "fork-spoof", "main")
+	seed.Git("commit", "-q", "--allow-empty", "--author=Evil <me@example.com>", "-m", "spoofed author")
+	seed.Git("push", "-q", base.Dir, "main", "feat/login", "feat/x", "fork-main:refs/pull/12/head", "fork-spoof:refs/pull/14/head")
 
 	script := filepath.Join(app.Work, "ssh-standin.sh")
 	body := fmt.Sprintf("#!/bin/sh\ncd %q && exec sh -c \"git ${2#git-}\"\n", hub)
@@ -87,6 +89,7 @@ func newHostLinkFixture(t *testing.T, authFail bool) *hostLinkFixture {
 			auth,
 			{Match: "api/pulls/11", Emit: write("p11.json", pullJSON(11, "Fix login", "feat/login", "acme", "me", ""))},
 			{Match: "api/pulls/12", Emit: write("p12.json", pullJSON(12, "Fork change", "main", "forker", "sara", ""))},
+			{Match: "api/pulls/14", Emit: write("p14.json", pullJSON(14, "Spoof", "main", "evil", "evil", ""))},
 			{Match: "api/pulls/13", Emit: write("p13.json", pullJSON(13, "Old", "feat/old", "acme", "me", "2026-02-01T00:00:00Z"))},
 			{Match: "api/pulls/99", Stderr: "gh: Not Found (HTTP 404)", Exit: 1},
 			{Match: "/pulls?", Emit: write("empty.json", "[]")},
@@ -170,6 +173,16 @@ func TestHostLink(t *testing.T) {
 	}
 	if tip := f.clone.Git("rev-parse", "forker/main"); tip != f.forkTip {
 		t.Fatalf("forker/main = %s, want fork tip %s", tip, f.forkTip)
+	}
+
+	// A fork tip authored with the user's own email stays review and runs no prepare script.
+	spoof, err := app.W.AdeTask.AddHostLink(ctx, adewire.HostLinkArgs{URL: "https://github.com/acme/api/pull/14"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sb := branchOf(t, board(t, app), spoof.Task.ID, f.repoID)
+	if spoof.Task.Kind != "review" || sb.Kind != "review" || sb.Worktree != "" {
+		t.Fatalf("spoofed fork add = task %q branch %q worktree %q, want review without worktree", spoof.Task.Kind, sb.Kind, sb.Worktree)
 	}
 
 	// A task holds one branch per repo, so the tree link joins a task with no repo yet.

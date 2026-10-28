@@ -352,7 +352,11 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 }
 
 // newTaskFields are the task fields an attach sets when it creates the task.
-type newTaskFields struct{ Title, HostURL string }
+type newTaskFields struct {
+	Title, HostURL string
+	// ForceReview attaches the branch as review whatever its author email says; fork code is untrusted.
+	ForceReview bool
+}
 
 func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch, nf newTaskFields) (adewire.AddExistingBranchResult, error) {
 	if err := b.requireRepos([]string{args.CodeRepoID}); err != nil {
@@ -390,6 +394,9 @@ func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddEx
 	}
 
 	kind := resolveKind(row, userEmail, "")
+	if nf.ForceReview {
+		kind = model.AdeBranchKindReview
+	}
 	now := b.deps.Now().UnixMilli()
 	var task model.AdeTask
 	var sb model.AdeTaskBranch

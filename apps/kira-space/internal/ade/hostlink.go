@@ -58,11 +58,11 @@ func (b *TaskBoard) AddHostLink(ctx context.Context, args adewire.HostLinkArgs) 
 	t := plan.target
 	var sb model.AdeTaskBranch
 	res, err := b.attachExistingBranch(ctx, adewire.AddExistingBranchArgs{CodeRepoID: t.CodeRepoID, Name: t.Branch, TaskID: args.TaskID}, &sb,
-		newTaskFields{Title: plan.title, HostURL: plan.hostURL})
+		newTaskFields{Title: plan.title, HostURL: plan.hostURL, ForceReview: t.Fork})
 	if err != nil {
 		return res, err
 	}
-	if sb.Kind != model.AdeBranchKindReview {
+	if sb.Kind != model.AdeBranchKindReview && !t.Fork {
 		b.prepareAttached(ctx, sb)
 	}
 	return res, nil
