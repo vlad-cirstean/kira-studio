@@ -199,12 +199,17 @@ export async function emitOpenSession(
 }
 
 /** Pushes one Claude Code hook event for a terminal (`UserPromptSubmit`, `Stop`, `SessionEnd`, ...). */
-export async function emitAgentEvent(page: Page, terminalId: string, event: string): Promise<void> {
+export async function emitAgentEvent(
+  page: Page,
+  terminalId: string,
+  event: string,
+  cwd = '',
+): Promise<void> {
   await emitWailsEvent(page, IPC.agentEvent, {
     terminalId,
     event,
     sessionId: '',
-    cwd: '',
+    cwd,
     toolName: '',
     toolUseId: '',
     notificationType: '',

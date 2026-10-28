@@ -205,6 +205,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskFocusSession: 'AdeTaskService.FocusSession',
   adeTaskOpenReviewWindow: 'AdeTaskService.OpenReviewWindow',
   adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
+  adeTaskReviewWorking: 'AdeTaskService.ReviewWorking',
+  adeTaskReviewWorkingDiff: 'AdeTaskService.ReviewWorkingDiff',
   adeTaskReviewAgent: 'AdeTaskService.ReviewAgent',
   adeTaskForwardReviewComments: 'AdeTaskService.ForwardReviewComments',
   adeTaskReviewForwardText: 'AdeTaskService.ReviewForwardText',
@@ -355,6 +357,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
   // main.ts asks every window whether it is a review window; none of the specs' windows is one.
   [IPC.adeTaskReviewWindowTarget]: 'null',
+  [IPC.adeTaskReviewWorking]: JSON.stringify({ worktree: '', head: '', files: [] }),
   // P286: the review window asks for its branch's review step; none by default.
   [IPC.adeTaskReviewStep]: JSON.stringify({
     run: null,
