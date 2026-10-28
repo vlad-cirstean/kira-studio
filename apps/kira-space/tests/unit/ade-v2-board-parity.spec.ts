@@ -6,7 +6,7 @@ import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
 import { branchLine2 } from '../../frontend/src/ade/v2/board/labels';
 import { buildNeedsYou, NEEDS_RANK } from '../../frontend/src/ade/v2/board/needsYou';
 import { buildTaskProgress, type TaskProgress } from '../../frontend/src/ade/v2/board/progress';
-import { deriveStatus } from '../../frontend/src/ade/v2/board/status';
+import { blocked as isBlocked, statusOf } from '../../frontend/src/ade/v2/board/status';
 import { buildTimeline, type TimelineView } from '../../frontend/src/ade/v2/board/timeline';
 import type {
   Board,
@@ -18,7 +18,15 @@ import type {
   Workflow,
   WorkflowsResult,
 } from '../../frontend/src/ade/v2/wire';
-import { loadFixture, mkBranch, mkPlan, mkRun, mkStep, mkTask } from './support/adeV2Fixtures';
+import {
+  DEFAULT_STATUSES,
+  loadFixture,
+  mkBranch,
+  mkPlan,
+  mkRun,
+  mkStep,
+  mkTask,
+} from './support/adeV2Fixtures';
 import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 
 // Parity: the board logic over the P143 fixtures equals the mockup's own `renderVals()` for status,
@@ -184,18 +192,15 @@ describe('per task', () => {
     if (!t) throw new Error(taskId);
     const branches = t.branchIds.flatMap((id) => board.branches.filter((b) => b.id === id));
     const p = progress.get(t.id) as TaskProgress;
-    const status = deriveStatus({
-      task: t,
-      progress: p,
-      branches,
-      hasSessions: sessions.sessions.some((s) => s.taskId === t.id),
-    });
+    const status = statusOf(t, board.statuses);
+    const blocked = isBlocked(t, p, branches);
     return {
-      status,
+      status: blocked ? 'Blocked' : status.name,
       cell: taskCell({
         task: t,
         progress: p,
         status,
+        blocked,
         branches,
         sessions: sessions.sessions.filter((s) => s.taskId === t.id),
       }),
@@ -457,8 +462,9 @@ describe('script step recovery', () => {
       branch: () => b,
       repoNick: (id) => id,
     });
-    const status = deriveStatus({ task: t, progress: p, branches: [b], hasSessions: false });
-    return taskCell({ task: t, progress: p, status, branches: [b], sessions: [] })?.action;
+    const status = statusOf(t, DEFAULT_STATUSES);
+    const blocked = isBlocked(t, p, [b]);
+    return taskCell({ task: t, progress: p, status, blocked, branches: [b], sessions: [] })?.action;
   };
 
   test('a stuck script run offers Retry like a failed one (R23)', () => {

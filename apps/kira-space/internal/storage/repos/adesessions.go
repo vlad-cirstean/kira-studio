@@ -58,6 +58,15 @@ func (r *AdeSessionsRepo) ListTask() ([]model.AdeSession, error) {
 	})
 }
 
+// HasTask reports whether any session row, running or stopped, belongs to the task.
+func (r *AdeSessionsRepo) HasTask(taskID string) (bool, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_sessions WHERE task_id = ?`, taskID).Scan(&n); err != nil {
+		return false, fmt.Errorf("repos: count ade sessions of task %s: %w", taskID, err)
+	}
+	return n > 0, nil
+}
+
 // CountRunningHeadless counts headless task sessions still running.
 func (r *AdeSessionsRepo) CountRunningHeadless() (int, error) {
 	var n int

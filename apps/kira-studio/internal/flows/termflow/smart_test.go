@@ -357,13 +357,16 @@ func TestSmartScript(t *testing.T) {
 	t.Run("run cap", func(t *testing.T) {
 		app := flowharness.New(t)
 		app.Scenario(scenario(fakeagent.Action{Name: "sleep"}))
-		rec := newSmart(t, app, "go", nil)
-		args := scriptruns.RunArgs{ScriptID: rec.ID}
+		var recs []scripts.CustomScript
+		for i := range 4 {
+			recs = append(recs, newSmart(t, app, "go", func(f *scripts.CustomScriptFields) { f.Name = fmt.Sprintf("ask%d", i) }))
+		}
 		ids := make([]string, 0, 3)
-		for range 3 {
-			id, _ := startSmart(t, app, args)
+		for _, rec := range recs[:3] {
+			id, _ := startSmart(t, app, scriptruns.RunArgs{ScriptID: rec.ID})
 			ids = append(ids, id)
 		}
+		args := scriptruns.RunArgs{ScriptID: recs[3].ID}
 		pv := previewOf(t, app, args)
 		const want = "3 smart scripts are running. Wait for one to finish."
 		if pv.Blocker != want {
@@ -380,6 +383,25 @@ func TestSmartScript(t *testing.T) {
 		}
 		if got := previewOf(t, app, args).Blocker; got != "" {
 			t.Fatalf("blocker after stopping = %q", got)
+		}
+	})
+
+	t.Run("one live run per script", func(t *testing.T) {
+		app := flowharness.New(t)
+		app.Scenario(scenario(fakeagent.Action{Name: "sleep"}))
+		rec := newSmart(t, app, "go", nil)
+		args := scriptruns.RunArgs{ScriptID: rec.ID}
+		id, pv := startSmart(t, app, args)
+		_, err := app.W.ScriptRuns.Start(startArgs(args, pv))
+		if errCode(err) != "E_CONFLICT" || !strings.Contains(err.Error(), "already running") {
+			t.Fatalf("second Start = %v, want conflict", err)
+		}
+		if err := app.W.ScriptRuns.Stop(scriptruns.IDArgs{ID: id}); err != nil {
+			t.Fatal(err)
+		}
+		waitSmart(t, app, id, "cancelled")
+		if _, err := app.W.ScriptRuns.Start(startArgs(args, pv)); err != nil {
+			t.Fatalf("Start after stop = %v", err)
 		}
 	})
 

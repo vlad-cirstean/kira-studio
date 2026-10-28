@@ -22,6 +22,7 @@ import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
+import { useGrpcRequestViewStore } from './state';
 
 // D13's Schema pane: the source selector (Reflection / .proto file + import paths + Reload) above
 // a service→method list — inside the tab, not the left panel (D13's own reasoning: a schema is a
@@ -86,7 +87,11 @@ function removeImportPath(i: number): void {
 // P16 D15: matches service name or method name — a service whose own name matches shows all its
 // methods; otherwise only the methods that themselves match, and a service with no match at all
 // (name or any method) drops out entirely.
-const filterQuery = ref('');
+const grpcRequestViewStore = useGrpcRequestViewStore();
+const filterQuery = computed({
+  get: () => grpcRequestViewStore.runtime[props.tab.id]?.schemaFilter ?? '',
+  set: (v: string) => grpcRequestViewStore.setSchemaFilter(props.tab.id, v),
+});
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredServices = computed(() => {
   const services = props.schema?.services ?? [];

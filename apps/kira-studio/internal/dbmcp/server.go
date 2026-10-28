@@ -108,7 +108,7 @@ type Config struct {
 	// make every heavy-query verdict wrong in a way nothing surfaces.
 	ExplainThreshold func() int
 	// PreviewResponses reports whether run_query results are held for the user's review before the
-	// client gets them (dbMcp.previewResponses) — read fresh on every call. Required for the same
+	// client gets them (dbMcp.previewResponses) — read fresh on every call. It is the default for connections whose McpReviewResults is inherit. Required for the same
 	// reason as ExplainThreshold: a silently-defaulted switch would send unreviewed data.
 	PreviewResponses func() bool
 	// Prompts resolves the editable instruction and tool texts; nil means the registry defaults.

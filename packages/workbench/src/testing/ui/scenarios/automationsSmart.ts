@@ -35,7 +35,6 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     params: [
       {
         name: 'topic',
-        label: 'Topic',
         type: 'text',
         options: [],
         default: ['build'],
@@ -44,7 +43,6 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       },
       {
         name: 'env',
-        label: 'Environment',
         type: 'select',
         options: ['dev', 'prod'],
         default: ['dev'],
@@ -53,7 +51,6 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       },
       {
         name: 'areas',
-        label: 'Areas',
         type: 'multiselect',
         options: ['api', 'ui', 'db'],
         default: ['api'],
@@ -231,7 +228,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await dialog.locator('[data-testid="script-dialog-tab-params"]').click();
     await dialog.locator('[data-testid="param-add"]').click();
     await dialog.locator('[data-testid="param-name-0"]').fill('topic');
-    await dialog.locator('[data-testid="param-type-0"]').selectOption('select');
+    await dialog.locator('[data-testid="param-type-0-select"]').click();
     await dialog.locator('[data-testid="param-option-add-0"]').click();
     await dialog.locator('[data-testid="param-option-0-0"]').fill('dev');
 
@@ -299,13 +296,19 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await openPanel(page);
     const row = page.locator(`[data-testid="script-${SMART.id}"]`);
     await expect(row.locator('[data-testid="script-ai-badge"]')).toBeVisible();
-    await row.click();
+    await row.locator('[data-testid="script-play"]').click();
 
     const dialog = page.locator('[data-testid="run-dialog"]');
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('[data-testid="run-param-input-topic"]')).toHaveValue('build');
-    await expect(dialog.locator('[data-testid="run-param-input-env"]')).toHaveValue('dev');
-    await expect(dialog.locator('[data-testid="run-param-input-areas"]')).toContainText('api');
+    await expect(dialog.locator('[data-testid="run-param-option-env-dev"]')).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
+    await expect(dialog.locator('[data-testid="run-param-option-areas-api"]')).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
     await expect(
       dialog.locator('[data-testid="run-prompt-text"] [data-testid="var-chip"][data-var="env"]'),
     ).toBeVisible();
@@ -316,8 +319,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await expect(dialog).toContainText('Your Claude settings files are not loaded.');
     await expect(dialog.locator('[data-testid="run-start"]')).toBeEnabled();
 
-    await dialog.locator('[data-testid="run-param-input-areas"]').click();
-    await page.locator('[data-testid="run-param-option-areas-ui"]').click();
+    await dialog.locator('[data-testid="run-param-option-areas-ui"]').click();
     await expect
       .poll(
         () =>
@@ -332,7 +334,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
   test('a one-off prompt edit reaches Start and is never saved', async ({ relaunch }) => {
     const { window: page, control } = await relaunch({ control: BASE });
     await openPanel(page);
-    await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+    await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
     const dialog = page.locator('[data-testid="run-dialog"]');
     await dialog.locator('[data-testid="run-prompt-edit"]').click();
     await expect(dialog).toContainText('Not saved to the script');
@@ -347,6 +349,28 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await expect(page.locator('[data-testid="script-run-view"]')).toBeVisible();
   });
 
+  test('play on a script with a running run reopens its tab and starts nothing', async ({
+    relaunch,
+  }) => {
+    const { window: page, control } = await relaunch({ control: BASE });
+    await openPanel(page);
+    const play = page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`);
+    await play.click();
+    await page.locator('[data-testid="run-start"]').click();
+    await emitWailsEvent(page, IPC.scriptRunsChanged, smartRun('running'));
+    const view = page.locator('[data-testid="script-run-view"]');
+    await expect(view).toBeVisible();
+
+    await page
+      .locator('[data-testid="tab"][data-tab-kind="script-run"] [data-testid="tab-close"]')
+      .click();
+    await expect(view).toHaveCount(0);
+    await play.click();
+    await expect(view).toBeVisible();
+    await expect(page.locator('[data-testid="run-dialog"]')).toHaveCount(0);
+    expect(control.log().filter((e) => e.channel === IPC.scriptRunsStart)).toHaveLength(1);
+  });
+
   test('the run tab follows a run: Running, a pushed log line, then its result', async ({
     relaunch,
   }) => {
@@ -356,7 +380,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await page.clock.pauseAt(Date.now() + 10_000);
     const now = await page.evaluate(() => Date.now());
 
-    await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+    await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
     await page.locator('[data-testid="run-start"]').click();
     await emitWailsEvent(
       page,
@@ -411,7 +435,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       ],
     });
     await openPanel(page);
-    await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+    await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
     await page.locator('[data-testid="run-start"]').click();
     await emitWailsEvent(
       page,
@@ -463,7 +487,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       ],
     });
     await openPanel(page);
-    await page.locator('[data-testid="script-plain-1"]').click();
+    await page.locator('[data-testid="script-plain-1"] [data-testid="script-play"]').click();
     await expect(page.locator('[data-testid="run-command"]')).toHaveText('deploy.sh');
     await page.locator('[data-testid="run-start"]').click();
     await expect
@@ -498,7 +522,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
         ],
       });
       await openPanel(page);
-      await page.locator(`[data-testid="script-${script.id}"]`).click();
+      await page.locator(`[data-testid="script-${script.id}"] [data-testid="script-play"]`).click();
       await expect(page.locator('[data-testid="run-start"]')).toBeEnabled();
       await page.locator('[data-testid="run-start"]').click();
       await expect

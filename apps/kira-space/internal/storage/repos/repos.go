@@ -32,6 +32,7 @@ type Repos struct {
 	AdeSessions           *AdeSessionsRepo
 	AdeReview             *AdeReviewWindowsRepo
 	AdeTasks              *AdeTaskRepo
+	AdeStatuses           *AdeStatusRepo
 	AdeBacklog            *AdeBacklogRepo
 	AdeRepoConfig         *AdeRepoConfigRepo
 	AdeFacts              *AdeFactsRepo
@@ -74,6 +75,7 @@ func New(db *sql.DB) (*Repos, error) {
 		AdeSessions:           &AdeSessionsRepo{DB: db},
 		AdeReview:             &AdeReviewWindowsRepo{DB: db},
 		AdeTasks:              &AdeTaskRepo{DB: db},
+		AdeStatuses:           &AdeStatusRepo{DB: db},
 		AdeBacklog:            &AdeBacklogRepo{DB: db},
 		AdeRepoConfig:         &AdeRepoConfigRepo{DB: db},
 		AdeFacts:              &AdeFactsRepo{DB: db},

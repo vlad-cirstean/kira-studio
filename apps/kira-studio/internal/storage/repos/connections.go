@@ -14,7 +14,7 @@ const connectionSelectColumns = `
 	id, name, kind, color, mode, read_only, host, port, database, username,
 	options_json, preconnect, preconnect_sidecar, preconnect_delay_sec, auto_explain, throttle_per_sec,
 	mcp_enabled,
-	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
+	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain, mcp_review_results,
 	sort_order, created_at, updated_at
 `
 
@@ -22,7 +22,7 @@ type ConnectionsRepo struct {
 	DB *sql.DB
 }
 
-// connectionColumns is the connections table's 21 config columns, shared by every write below —
+// connectionColumns is the connections table's 22 config columns, shared by every write below —
 // id/created_at/updated_at/sort_order/password/uri sit outside it since which of those a
 // statement needs (and how) is exactly what differs between Insert/InsertWithSecret/
 // InsertDuplicateWithSecret and Update/UpdateWithSecret; connectionSetColumns is the same list as
@@ -30,20 +30,20 @@ type ConnectionsRepo struct {
 const connectionColumns = `name, kind, color, mode, read_only, host, port, database, username,
 	options_json, preconnect, preconnect_sidecar, preconnect_delay_sec, auto_explain, throttle_per_sec,
 	mcp_enabled,
-	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain`
+	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain, mcp_review_results`
 
 const connectionSetColumns = `name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 	database = ?, username = ?, options_json = ?, preconnect = ?,
 	preconnect_sidecar = ?, preconnect_delay_sec = ?, auto_explain = ?, throttle_per_sec = ?,
 	mcp_enabled = ?,
 	mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
-	mcp_auto_explain = ?`
+	mcp_auto_explain = ?, mcp_review_results = ?`
 
-// connectionArgs is connectionColumns's own 21 values off f, in the same order — every write that
+// connectionArgs is connectionColumns's own 22 values off f, in the same order — every write that
 // binds the full column set (Insert, InsertWithSecret, Update, UpdateWithSecret) uses this. It
 // never binds f.URI: the column is ciphertext the caller seals (SecretWrite / uriEnc).
 // InsertDuplicateWithSecret does not use it: it forces mcp_enabled to a SQL literal 0 regardless
-// of f.McpEnabled (see its own doc comment), so one of these 21 values would never be
+// of f.McpEnabled (see its own doc comment), so one of these 22 values would never be
 // bound there — it builds its own arg list by hand instead of trimming this one.
 func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
 	return []any{
@@ -51,6 +51,7 @@ func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
 		f.Username, optionsJSON, f.Preconnect, boolToInt(f.PreconnectSidecar),
 		f.PreconnectDelaySec, boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
 		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
+		f.McpReviewResults,
 	}
 }
 
@@ -77,7 +78,7 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	if err := row.Scan(
 		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
 		&username, &options, &preconnect, &sidecar, &c.PreconnectDelaySec, &autoExplain, &c.ThrottlePerSec,
-		&mcpEnabled, &c.McpDescription, &c.McpReadMode, &c.McpWriteMode, &c.McpDdlMode, &mcpAutoExplain,
+		&mcpEnabled, &c.McpDescription, &c.McpReadMode, &c.McpWriteMode, &c.McpDdlMode, &mcpAutoExplain, &c.McpReviewResults,
 		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
 	); err != nil {
 		return nil, err
@@ -109,6 +110,11 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	if !model.ValidMcpPermissionMode(c.McpDdlMode) {
 		slog.Warn("coercing connection row: unrecognised MCP DDL mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpDdlMode)
 		c.McpDdlMode = "deny"
+	}
+	// P382: same fail-closed coercion; an unreadable value holds results for review.
+	if !model.ValidMcpReviewResults(c.McpReviewResults) {
+		slog.Warn("coercing connection row: unrecognised MCP review setting", "scope", "storage/connections", "id", c.ID, "value", c.McpReviewResults)
+		c.McpReviewResults = "review"
 	}
 
 	c.ReadOnly = readOnly != 0
@@ -276,7 +282,7 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
 				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 			append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc, uriEnc)...,
 		); err != nil {
@@ -317,7 +323,7 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
 				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 				(SELECT password FROM connections WHERE id = ?),
 				(SELECT uri FROM connections WHERE id = ?))
 		`,
@@ -325,6 +331,7 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 			f.Username, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
 			f.PreconnectDelaySec, boolToInt(f.AutoExplain), f.ThrottlePerSec,
 			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
+			f.McpReviewResults,
 			createdAt, createdAt, sortOrder, fromConnectionID, fromConnectionID,
 		); err != nil {
 			return fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)

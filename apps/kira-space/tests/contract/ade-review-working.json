@@ -1,0 +1,47 @@
+{
+  "AdeTaskService.ReviewWorking": {
+    "files": [
+      {
+        "kind": "deleted",
+        "path": "gone.txt"
+      },
+      {
+        "kind": "modified",
+        "path": "keep.txt"
+      },
+      {
+        "kind": "modified",
+        "path": "staged.txt"
+      },
+      {
+        "kind": "added",
+        "path": "fresh.txt"
+      }
+    ],
+    "head": "<masked>",
+    "worktree": "<worktree>"
+  },
+  "AdeTaskService.ReviewWorkingDiff": {
+    "head": {
+      "bytes": 9,
+      "kind": "found",
+      "limitBytes": 8388608,
+      "text": "keep.txt\n"
+    },
+    "language": "plaintext",
+    "path": "keep.txt",
+    "worktree": {
+      "bytes": 23,
+      "kind": "found",
+      "limitBytes": 8388608,
+      "text": "keep.txt\nunstaged edit\n"
+    }
+  },
+  "args:AdeTaskService.ReviewWorking": {
+    "branchId": "<id:1>"
+  },
+  "args:AdeTaskService.ReviewWorkingDiff": {
+    "branchId": "<id:1>",
+    "path": "keep.txt"
+  }
+}

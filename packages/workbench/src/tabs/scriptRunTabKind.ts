@@ -27,7 +27,8 @@ export function scriptRunTabKind<
     title: (tab) => (tab as RunRecord).state.label || t('common.smartScript.label'),
     icon: () => 'sparkle' as Icon,
     railColor: () => undefined,
-    defaultState: (): RunState => ({ runId: '', label: '' }) as RunState,
+    defaultState: (): RunState =>
+      ({ runId: '', label: '', scriptId: '', taskId: '', branchId: '' }) as RunState,
     duplicateState: (tab) => ({ ...(tab as RunRecord).state }) as RunState,
     dropResources: () => {},
     menuExtras: () => [],

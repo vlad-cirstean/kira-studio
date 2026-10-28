@@ -11,6 +11,7 @@ import type {
   SmartSettings,
 } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
+import PathChip from '@theme/components/PathChip.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
@@ -117,15 +118,14 @@ const blocker = computed(() =>
   dirMode.value === props.script?.dirMode ? (dir.data.value?.blocker ?? '') : '',
 );
 const folderParts = computed<TextPart[]>(() => [
-  { name: t('automations.dialog.script.kiraHome.label'), value: dir.data.value?.base ?? '…' },
-  '/automations/',
   {
-    name: t('automations.dialog.script.scriptId.label'),
-    value: props.script?.id ?? t('automations.dialog.script.setOnSave.status'),
+    name: 'folder',
+    kind: 'path',
+    value: `${dir.data.value?.base ?? '…'}/automations/${props.script?.id ?? t('automations.dialog.script.setOnSave.status')}`,
   },
 ]);
 const homeParts = computed<TextPart[]>(() => [
-  { name: 'HOME', value: dir.data.value?.base ?? '…' },
+  { name: 'HOME', value: dir.data.value?.base ?? '…', kind: 'path' },
 ]);
 // '' is the select's "No collection" sentinel; the payload sends null.
 const collection = ref(props.script?.collectionId ?? props.collectionId ?? '');
@@ -391,11 +391,11 @@ const onSubmitKey = shortcutKeydown(['form.submit'], () => void save());
                 </div>
               </RadioGroup>
               <div v-if="dirMode === 'fixed'" class="flex items-center gap-1.5">
-                <span
-                  class="min-w-0 flex-1 truncate font-data"
-                  data-testid="script-dialog-workingdir"
-                >
-                  {{ workingDir || t('automations.dialog.script.noFolder.status') }}
+                <span class="flex min-w-0 flex-1" data-testid="script-dialog-workingdir">
+                  <PathChip v-if="workingDir" :path="workingDir" />
+                  <span v-else class="truncate font-data">{{
+                    t('automations.dialog.script.noFolder.status')
+                  }}</span>
                 </span>
                 <Button
                   variant="dialog"

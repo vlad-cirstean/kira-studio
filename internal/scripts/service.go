@@ -143,13 +143,15 @@ func (s *Service) DeleteCollection(args DeleteCollectionArgs) error {
 type MoveArgs struct {
 	ID           string  `json:"id"`
 	CollectionID *string `json:"collectionId"`
+	// BeforeID places the script before that sibling of the target set; null appends.
+	BeforeID *string `json:"beforeId"`
 }
 
 func (s *Service) Move(args MoveArgs) error {
 	if args.ID == "" {
 		return ipcerr.Required("id")
 	}
-	if err := s.Repo.Move(args.ID, args.CollectionID); err != nil {
+	if err := s.Repo.Move(args.ID, args.CollectionID, args.BeforeID); err != nil {
 		return fail(err)
 	}
 	s.broadcast()

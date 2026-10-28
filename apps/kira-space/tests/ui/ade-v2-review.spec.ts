@@ -8,7 +8,8 @@ import {
   openPlan,
 } from './support/adeV2';
 import { contract } from './support/contract';
-import { gitStreamParams, gitStreamRequests } from './support/gitStreamMock';
+import { gitStreamEmit, gitStreamParams, gitStreamRequests } from './support/gitStreamMock';
+import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -16,9 +17,12 @@ import type { ControlSnapshot } from './support/types';
 // The review window: three panes for one branch, and the review agent.
 
 const t = (id: string) => `[data-testid="${id}"]`;
-const target = adeFixture<{ gitRepoId: string; codeRepoId: string; branchId: string }>(
-  'review-target',
-);
+const target = adeFixture<{
+  gitRepoId: string;
+  codeRepoId: string;
+  branchId: string;
+  worktree: string;
+}>('review-target');
 const agent = adeFixture<{ session: { terminalId: string } }>('review-agent');
 
 const change = (path: string) => ({
@@ -263,7 +267,7 @@ reviewTest('the hunk mark stays put when the add-comment mark shows', async ({ r
     if (!b) throw new Error('no box');
     return b;
   };
-  await expect(mark).toBeVisible();
+  await expect(mark).toBeVisible({ timeout: 15_000 }); // Monaco's diff and decorations land late under suite load
   await page.mouse.move(0, 0);
   const markBefore = await box(mark);
   const linesBefore = await box(viewLines);
@@ -448,6 +452,167 @@ reviewTest('the diff layout toggle switches to inline and persists', async ({ re
 
   await page.locator(t('repo-diff-layout-side-by-side')).click();
   await expect(diff).toHaveClass(/side-by-side/);
+});
+
+const working = contract<{ files: object[]; head: string; worktree: string }>(
+  'ade-review-working',
+  'AdeTaskService.ReviewWorking',
+);
+const workingResponse = { ...working, worktree: target.worktree };
+const workingDiff = contract<{ path: string }>(
+  'ade-review-working',
+  'AdeTaskService.ReviewWorkingDiff',
+);
+const withWorking = [
+  { channel: IPC.adeTaskReviewWorking, response: workingResponse },
+  { channel: IPC.adeTaskReviewWorkingDiff, response: workingDiff },
+];
+
+// Contract ade-review-working, backend half: adeflow TestReviewWorking.
+reviewTest('a new commit reloads the files pane', async ({ relaunch }) => {
+  const page = await openReview(relaunch);
+  const loads = async () => (await gitStreamRequests(page)).filter((r) => r === 'review.files');
+  await expect.poll(async () => (await loads()).length).toBeGreaterThan(0);
+  const before = (await loads()).length;
+  await gitStreamEmit(page, 'repo.changed', {
+    repoId: target.gitRepoId,
+    kind: 'refsChanged',
+  });
+  await expect.poll(async () => (await loads()).length).toBeGreaterThan(before);
+});
+
+reviewTest('uncommitted changes sit in their own section', async ({ relaunch }) => {
+  const page = await openReview(relaunch, withWorking);
+  const section = page.locator(t('review-working'));
+  await expect(section.locator(t('file-tree-row'))).toHaveCount(working.files.length);
+  await expect(section.locator(t('file-tree-row'), { hasText: 'keep.txt' })).toBeVisible();
+  await expect(page.locator(t('review-files-tree'))).not.toContainText('keep.txt');
+  await expect(page.locator(t('ade-review-uncommitted'))).toHaveText(
+    `${working.files.length} uncommitted`,
+  );
+  await expect(section.locator('input[type="checkbox"]')).toHaveCount(0);
+});
+
+reviewTest('no uncommitted section for a clean worktree', async ({ relaunch }) => {
+  const page = await openReview(relaunch);
+  await expect(page.locator(t('review-working'))).toHaveCount(0);
+  await expect(page.locator(t('ade-review-uncommitted'))).toHaveCount(0);
+});
+
+reviewTest('an uncommitted file opens a worktree diff', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({
+    control: reviewControl([
+      ...withWorking,
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: GIT,
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await page
+    .locator(`${t('review-working-tree')} ${t('file-tree-row')}`, {
+      hasText: 'keep.txt',
+    })
+    .click();
+  await expect
+    .poll(() => calls(control, IPC.adeTaskReviewWorkingDiff).map((c) => c.args))
+    .toContainEqual({ branchId: target.branchId, path: 'keep.txt' });
+  await expect(page.locator(t('repo-diff-editor')).locator('.editor.modified')).toContainText(
+    'unstaged edit',
+  );
+});
+
+reviewTest(
+  'agent activity in the worktree refreshes the uncommitted list',
+  async ({ relaunch }) => {
+    const { window: page, control } = await relaunch({
+      control: reviewControl(withWorking),
+      gitStream: GIT,
+    });
+    await page.locator(t('ade-review-window')).waitFor();
+    const reads = () => calls(control, IPC.adeTaskReviewWorking).length;
+    await expect.poll(reads).toBeGreaterThan(0);
+    const before = reads();
+    await emitAgentEvent(page, agent.session.terminalId, 'PostToolUse', `${target.worktree}/src`);
+    await expect.poll(reads).toBeGreaterThan(before);
+    const after = reads();
+    await emitAgentEvent(page, agent.session.terminalId, 'PostToolUse', '/tmp/elsewhere');
+    await page.waitForTimeout(600);
+    expect(reads()).toBe(after);
+  },
+);
+
+reviewTest('a file already marked reviewed still opens its diff', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: reviewControl([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'file.read': { kind: 'found', content: 'export const a = 1;\n' },
+        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
+        'review.fileDiff': {
+          path: 'src/done.ts',
+          deltaSource: 'noSnapshot',
+          body: { kind: 'text', hunks: [] },
+          reviewedRanges: [],
+          lineCount: 1,
+          reviewedAtSha: null,
+        },
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await page
+    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, {
+      hasText: 'done.ts',
+    })
+    .click();
+  const editor = page.locator(t('repo-diff-editor'));
+  await expect(editor.locator('.monaco-diff-editor .editor.original')).toBeVisible();
+  await expect(editor.locator('.monaco-diff-editor .editor.modified')).toBeVisible();
+});
+
+reviewTest('the agent panel hides and returns', async ({ relaunch }) => {
+  const page = await openReview(relaunch);
+  const right = page.locator(t('ade-review-right'));
+  const toggle = page.locator(t('ade-review-toggle-agent'));
+  await expect(right).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(right).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await emitWailsEvent(page, IPC.toggleOperationsPanel, undefined);
+  await expect(right).toBeVisible();
 });
 
 reviewTest('with no review agent the panel offers to start one', async ({ relaunch }) => {

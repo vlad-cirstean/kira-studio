@@ -1,25 +1,16 @@
 import { type MessageKey, t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import { formatCompactDuration } from '@workbench/behaviour/format';
-import type { Branch, Plan, Run, Session, Task } from '../wire';
+import type { Branch, Plan, Run, Session, Task, TaskStatusDef } from '../wire';
 import { type BranchGraph, shortBranchName } from './branchGraph';
 import { branchParts } from './catalogParts';
 import type { TaskProgress } from './progress';
 import { type RebaseAct, rebaseActs } from './rebaseActions';
-import type { DerivedStatus } from './status';
 
 // Left action column: task step action and branch tag + action, both first-match tables
 // (SPEC2 §4.2, mockup v2 lines 1855-1856 and 1934-1957).
 
 export type Tone = 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
-
-export const STATUS_TONE: Record<DerivedStatus, Tone> = {
-  'To do': 'grey',
-  'In progress': 'amber',
-  'In review': 'blue',
-  Blocked: 'red',
-  Done: 'green',
-};
 
 // ---- task cell
 
@@ -52,7 +43,9 @@ export interface TaskCell {
 export interface TaskCellInput {
   task: Task;
   progress: TaskProgress;
-  status: DerivedStatus;
+  status: TaskStatusDef;
+  /** A stuck or failed run or setup: its tag wins over the status. */
+  blocked: boolean;
   /** The task's branches. */
   branches: readonly Branch[];
   /** The task's sessions. */
@@ -60,16 +53,6 @@ export interface TaskCellInput {
 }
 
 export const archiveTip = (): string => t('space.ade.board.taskAction.archive.hint');
-
-const STATUS_LABEL = {
-  'To do': 'space.common.status.todo.status',
-  'In progress': 'space.common.status.inProgress.status',
-  'In review': 'space.common.status.inReview.status',
-  Blocked: 'space.common.status.blocked.status',
-  Done: 'common.done.status',
-} as const satisfies Record<DerivedStatus, MessageKey>;
-
-export const statusLabel = (s: DerivedStatus): string => t(STATUS_LABEL[s]);
 
 function doneAction(p: TaskProgress): TaskAction {
   const rest = p.segments.slice(p.stepIndex + 1).filter((s) => s.state !== 'skipped');
@@ -210,8 +193,8 @@ export function taskCell(i: TaskCellInput): TaskCell | null {
   }
   return {
     tag: {
-      label: statusLabel(i.status),
-      tone: STATUS_TONE[i.status],
+      label: i.blocked ? t('space.common.status.blocked.status') : i.status.name,
+      tone: i.blocked ? 'red' : i.status.tone,
       tip: t('space.ade.board.taskStatus.tooltip'),
     },
     action: stepAction(i),

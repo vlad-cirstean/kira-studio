@@ -27,6 +27,26 @@ function updates(control: { log(): { channel: string; args?: unknown }[] }) {
   return control.log().filter((e) => e.channel === IPC.adeTaskUpdateTask);
 }
 
+test('clicking a review card opens the task panel', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-load-all"]').click();
+  const row = page.locator(
+    '[data-testid="ade-card"][data-task-id="R_sara"] [data-testid="ade-branch-row"][data-branch-id="b_sara"]',
+  );
+  await row.scrollIntoViewIfNeeded();
+  await row.click();
+  await expect(page.locator('[data-testid="ade-panel-review-note"]')).toBeVisible();
+  await expect(page.locator('[data-testid="ade-panel-back"]')).toHaveCount(0);
+  await page.locator('[data-testid="ade-task-branch"][data-branch-id="b_sara"]').click();
+  await expect(page.locator('[data-testid="ade-panel-back"]')).toBeVisible();
+
+  await page.locator('[data-testid="ade-panel-back"]').click();
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="ade-panel-review-note"]')).toBeVisible();
+  await expect(page.locator('[data-testid="ade-panel-back"]')).toHaveCount(0);
+});
+
 test('Space on a focused card head selects the task', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await card(page, 'T_bill').focus();

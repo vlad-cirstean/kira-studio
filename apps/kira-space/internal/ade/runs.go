@@ -461,6 +461,7 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	if err := b.deps.Tasks.InsertRun(run); err != nil {
 		return model.AdeRun{}, err
 	}
+	b.syncStatus(tc.task.ID)
 	if !open {
 		b.emitRuns(run)
 		return run, nil
@@ -1040,6 +1041,7 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 
 // advanceLocked applies the step machine's next action; the task mutex is held.
 func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
+	defer b.syncStatus(taskID)
 	tc, err := b.loadTaskCtx(taskID)
 	if err != nil || !tc.active() {
 		return
@@ -1282,6 +1284,7 @@ func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, er
 	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil); err != nil {
 		return adewire.Task{}, err
 	}
+	b.syncStatus(taskID)
 	b.notifyBoard()
 	task, err := b.deps.Tasks.GetTask(taskID)
 	if err != nil {
@@ -1348,6 +1351,7 @@ func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID st
 	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since); err != nil {
 		return adewire.Task{}, err
 	}
+	b.syncStatus(taskID)
 	b.clearStepMessages(taskID)
 	b.notifyBoard()
 	task, err := b.deps.Tasks.GetTask(taskID)

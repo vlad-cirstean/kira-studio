@@ -15,10 +15,12 @@ import (
 
 // Sentinels AdeTaskRepo/AdeBacklogRepo return; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
 var (
-	ErrTaskNotFound  = errors.New("repos: task not found")
+	ErrTaskNotFound = errors.New("repos: task not found")
+	// ErrStatusUnknown marks a status id missing from the status set.
+	ErrStatusUnknown = errors.New("repos: unknown task status")
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
 	ErrRepoOnTask    = errors.New("repos: task already has a branch in that repo")
-	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task keeps its kind")
+	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task only becomes a task")
 	ErrTaskUnnamed   = errors.New("a task needs a title or a Jira key")
 	ErrBranchMissing = errors.New("repos: branch not found")
 	ErrBacklogGone   = errors.New("repos: backlog item not found")
@@ -51,7 +53,7 @@ func EstOverCap(est string) bool {
 	return n > MaxEstDays
 }
 
-const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
+const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at, status_id, status_by, status_step`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
 const adeRunColumns = `id, task_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
@@ -82,7 +84,7 @@ func scanAdeTask(row rowScanner) (model.AdeTask, error) {
 	var since, workflow sql.NullString
 	var archived sql.NullInt64
 	if err := row.Scan(&t.ID, &t.Kind, &t.Title, &t.Owner, &t.JiraKey, &t.JiraURL, &t.HostURL, &t.WorkflowID,
-		&t.EntryStepID, &since, &workflow, &t.WorkflowHash, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived); err != nil {
+		&t.EntryStepID, &since, &workflow, &t.WorkflowHash, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived, &t.StatusID, &t.StatusBy, &t.StatusStep); err != nil {
 		return model.AdeTask{}, err
 	}
 	t.SinceJSON = since.String
@@ -128,7 +130,7 @@ func (r *AdeTaskRepo) queryTasks(query string, args ...any) ([]model.AdeTask, er
 // ListLive returns non-archived tasks in plan order (a task with no plan row sorts last).
 func (r *AdeTaskRepo) ListLive() ([]model.AdeTask, error) {
 	return r.queryTasks(`SELECT t.id, t.kind, t.title, t.owner, t.jira_key, t.jira_url, t.host_url, t.workflow_id,
-		t.entry_step_id, t.since_json, t.workflow_json, t.workflow_hash, t.est, t.notes, t.color, t.created_at, t.archived_at
+		t.entry_step_id, t.since_json, t.workflow_json, t.workflow_hash, t.est, t.notes, t.color, t.created_at, t.archived_at, t.status_id, t.status_by, t.status_step
 		FROM ade_tasks t LEFT JOIN ade_task_plan p ON p.task_id = t.id
 		WHERE t.archived_at IS NULL ORDER BY p.position IS NULL, p.position, t.created_at, t.id`)
 }
@@ -185,9 +187,23 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day
 	if t.SinceJSON != "" {
 		since = t.SinceJSON
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, est, notes, color, created_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+	if t.StatusID == "" {
+		category := model.AdeStatusTodo
+		if t.Kind == model.AdeTaskKindReview {
+			category = model.AdeStatusReview
+		}
+		id, err := firstStatusOf(tx, category)
+		if err != nil {
+			return model.AdeTask{}, err
+		}
+		t.StatusID = id
+	}
+	if t.StatusBy == "" {
+		t.StatusBy = model.AdeStatusByAuto
+	}
+	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, est, notes, color, created_at, archived_at, status_id, status_by, status_step) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
 		t.ID, t.Kind, t.Title, t.Owner, t.JiraKey, t.JiraURL, t.HostURL, t.WorkflowID, t.EntryStepID, since, t.Est,
-		t.Notes, t.Color, t.CreatedAt); err != nil {
+		t.Notes, t.Color, t.CreatedAt, t.StatusID, t.StatusBy, t.StatusStep); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task %s: %w", t.ID, err)
 	}
 	for _, b := range branches {
@@ -253,8 +269,8 @@ func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch
 	return out, nil
 }
 
-// UpdateTask writes the patched leaves. Kind moves only between task and parked,
-// and a review task refuses any kind change.
+// UpdateTask writes the patched leaves. Kind moves only between task and parked; a review task
+// only becomes a task, clearing its owner and turning its review branches into mine.
 func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -269,14 +285,65 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 		return model.AdeTask{}, fmt.Errorf("repos: select ade task %s: %w", id, err)
 	}
 	prevKind := cur.Kind
-	if p.Est != nil {
-		cur.Est = *p.Est
+	if err := checkStatusExists(tx, p.StatusID); err != nil {
+		return model.AdeTask{}, err
 	}
 	if p.Kind != nil && *p.Kind != cur.Kind {
-		if cur.Kind == model.AdeTaskKindReview || (*p.Kind != model.AdeTaskKindTask && *p.Kind != model.AdeTaskKindParked) {
-			return model.AdeTask{}, ErrReviewKind
+		if err := moveTaskKind(&cur, *p.Kind); err != nil {
+			return model.AdeTask{}, err
 		}
-		cur.Kind = *p.Kind
+	}
+	if prevKind == model.AdeTaskKindReview && cur.Kind == model.AdeTaskKindTask {
+		id, err := firstStatusOf(tx, model.AdeStatusTodo)
+		if err != nil {
+			return model.AdeTask{}, err
+		}
+		cur.StatusID, cur.StatusBy, cur.StatusStep = id, model.AdeStatusByAuto, ""
+	}
+	if p.StatusID != nil {
+		cur.StatusID, cur.StatusBy = *p.StatusID, model.AdeStatusByUser
+	}
+	if err := patchLeaves(&cur, p); err != nil {
+		return model.AdeTask{}, err
+	}
+	// A branch-derived task may start with neither; a patch must not strip the last of them.
+	if (p.Title != nil || p.JiraKey != nil) && cur.Title == "" && cur.JiraKey == "" {
+		return model.AdeTask{}, ErrTaskUnnamed
+	}
+	if cur.Kind != prevKind {
+		if err := moveBranchKinds(tx, id, prevKind, cur.Kind); err != nil {
+			return model.AdeTask{}, err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, owner = ?, title = ?, jira_key = ?, jira_url = ?, host_url = ?, est = ?, notes = ?, color = ?, status_id = ?, status_by = ?, status_step = ? WHERE id = ?`,
+		cur.Kind, cur.Owner, cur.Title, cur.JiraKey, cur.JiraURL, cur.HostURL, cur.Est, cur.Notes, cur.Color, cur.StatusID, cur.StatusBy, cur.StatusStep, id); err != nil {
+		return model.AdeTask{}, fmt.Errorf("repos: update ade task %s: %w", id, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return model.AdeTask{}, fmt.Errorf("repos: commit update ade task %s: %w", id, err)
+	}
+	return cur, nil
+}
+
+// checkStatusExists refuses a status id outside the set; nil passes.
+func checkStatusExists(tx *sql.Tx, statusID *string) error {
+	if statusID == nil {
+		return nil
+	}
+	var n int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM ade_task_statuses WHERE id = ?`, *statusID).Scan(&n); err != nil {
+		return fmt.Errorf("repos: check ade task status %s: %w", *statusID, err)
+	}
+	if n == 0 {
+		return ErrStatusUnknown
+	}
+	return nil
+}
+
+// patchLeaves applies the plain text leaves of p to cur.
+func patchLeaves(cur *model.AdeTask, p model.AdeTaskPatch) error {
+	if p.Est != nil {
+		cur.Est = *p.Est
 	}
 	if p.Title != nil {
 		cur.Title = *p.Title
@@ -295,31 +362,39 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 	}
 	if p.Color != nil {
 		if *p.Color < 0 || *p.Color >= maxColorSlots {
-			return model.AdeTask{}, fmt.Errorf("repos: color %d out of range", *p.Color)
+			return fmt.Errorf("repos: color %d out of range", *p.Color)
 		}
 		cur.Color = *p.Color
 	}
-	// A branch-derived task may start with neither; a patch must not strip the last of them.
-	if (p.Title != nil || p.JiraKey != nil) && cur.Title == "" && cur.JiraKey == "" {
-		return model.AdeTask{}, ErrTaskUnnamed
+	return nil
+}
+
+// moveTaskKind sets cur's kind: task <-> parked, or review -> task (which clears the owner).
+func moveTaskKind(cur *model.AdeTask, to string) error {
+	toTask := to == model.AdeTaskKindTask
+	if (cur.Kind == model.AdeTaskKindReview && !toTask) || (!toTask && to != model.AdeTaskKindParked) {
+		return ErrReviewKind
 	}
-	if p.Kind != nil && *p.Kind != prevKind {
-		from, to := model.AdeBranchKindMine, model.AdeBranchKindParked
-		if *p.Kind == model.AdeTaskKindTask {
-			from, to = to, from
+	if cur.Kind == model.AdeTaskKindReview {
+		cur.Owner = ""
+	}
+	cur.Kind = to
+	return nil
+}
+
+// moveBranchKinds flips a task's branches to follow its kind move.
+func moveBranchKinds(tx *sql.Tx, id string, prev, to string) error {
+	from, toKind := model.AdeBranchKindMine, model.AdeBranchKindParked
+	if to == model.AdeTaskKindTask {
+		from, toKind = model.AdeBranchKindParked, model.AdeBranchKindMine
+		if prev == model.AdeTaskKindReview {
+			from = model.AdeBranchKindReview
 		}
-		if _, err := tx.Exec(`UPDATE ade_task_branches SET kind = ? WHERE task_id = ? AND kind = ?`, to, id, from); err != nil {
-			return model.AdeTask{}, fmt.Errorf("repos: move ade task branches to %s: %w", to, err)
-		}
 	}
-	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, title = ?, jira_key = ?, jira_url = ?, host_url = ?, est = ?, notes = ?, color = ? WHERE id = ?`,
-		cur.Kind, cur.Title, cur.JiraKey, cur.JiraURL, cur.HostURL, cur.Est, cur.Notes, cur.Color, id); err != nil {
-		return model.AdeTask{}, fmt.Errorf("repos: update ade task %s: %w", id, err)
+	if _, err := tx.Exec(`UPDATE ade_task_branches SET kind = ? WHERE task_id = ? AND kind = ?`, toKind, id, from); err != nil {
+		return fmt.Errorf("repos: move ade task branches to %s: %w", toKind, err)
 	}
-	if err := tx.Commit(); err != nil {
-		return model.AdeTask{}, fmt.Errorf("repos: commit update ade task %s: %w", id, err)
-	}
-	return cur, nil
+	return nil
 }
 
 // AddBranch appends b to its task after the last branch. A task holds at most one live branch per
@@ -725,6 +800,16 @@ func (r *AdeTaskRepo) ResetWorkflow(taskID, workflowID, entryStepID string) erro
 		return fmt.Errorf("repos: commit reset ade task workflow %s: %w", taskID, err)
 	}
 	return nil
+}
+
+// SetAutoStatus stores the status the engine applied for step key `step` (status_by = auto).
+func (r *AdeTaskRepo) SetAutoStatus(taskID, statusID, step string) error {
+	res, err := r.DB.Exec(`UPDATE ade_tasks SET status_id = ?, status_by = ?, status_step = ? WHERE id = ?`,
+		statusID, model.AdeStatusByAuto, step, taskID)
+	if err != nil {
+		return fmt.Errorf("repos: set ade task status %s: %w", taskID, err)
+	}
+	return sqlitex.RequireOneRow(res, "ade task "+taskID)
 }
 
 // HasRunning reports whether any run of the task is running.

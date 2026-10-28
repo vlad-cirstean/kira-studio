@@ -99,7 +99,7 @@ test('clicking a script opens a terminal tab titled with its name', async ({ rel
 
   const row = page.locator(`[data-testid="script-${SCRIPT.id}"]`);
   await expect(row).toContainText('echo one…');
-  await row.click();
+  await row.locator('[data-testid="script-play"]').click();
 
   await expect(page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]')).toContainText(
     SCRIPT.name,
@@ -139,12 +139,9 @@ test('contract: Choose folder… switches the script to a fixed folder', async (
   await page.locator('[data-testid="menu-item-new-script"]').click();
   const dialog = page.locator('[data-testid="script-dialog"]');
   const preview = dialog.locator('[data-testid="script-dialog-dir-preview"]');
-  await expect(preview.locator('[data-testid="var-chip"][data-var="Kira home"]')).toContainText(
-    '/kira',
-  );
-  await expect(preview.locator('[data-testid="var-chip"][data-var="Script ID"]')).toContainText(
-    'Set on save',
-  );
+  const folder = preview.locator('[data-chip="path"][data-var="folder"]');
+  await expect(folder).toContainText('/kira');
+  await expect(folder).toContainText('Set on save');
 
   await dialog.locator('[data-testid="script-dialog-dir-fixed"]').click();
   await dialog.locator('[data-testid="script-dialog-workingdir-choose"]').click();

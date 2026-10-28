@@ -1,0 +1,91 @@
+{
+  "ConnectionsService.Update": {
+    "autoExplain": false,
+    "color": "teal",
+    "createdAt": "<masked>",
+    "database": "/data/mcp.db",
+    "host": null,
+    "id": "<id:1>",
+    "kind": "sqlite",
+    "mcpAutoExplain": false,
+    "mcpDdlMode": "deny",
+    "mcpDescription": "scratch notes",
+    "mcpEnabled": true,
+    "mcpReadMode": "allow",
+    "mcpReviewResults": "review",
+    "mcpWriteMode": "prompt",
+    "mode": "fields",
+    "name": "notes db",
+    "options": {},
+    "port": null,
+    "preconnect": null,
+    "preconnectDelaySec": 0,
+    "preconnectSidecar": false,
+    "readOnly": false,
+    "sortOrder": 0,
+    "throttlePerSec": 0,
+    "updatedAt": "<masked>",
+    "uri": null,
+    "username": null
+  },
+  "DbMcpService.PendingApprovals": {
+    "pending": {
+      "class": "read",
+      "connectionId": "<id:1>",
+      "connectionName": "notes db",
+      "expiresAtMs": 0,
+      "kind": "sqlite",
+      "plan": null,
+      "reason": "permission",
+      "requestId": "<id:2>",
+      "response": {
+        "bytes": 217,
+        "isError": false
+      },
+      "stage": "response",
+      "statement": "select id, body from notes order by id",
+      "target": {
+        "color": "teal",
+        "database": "/data/mcp.db",
+        "host": "",
+        "path": [],
+        "readOnly": false
+      }
+    },
+    "queued": 0
+  },
+  "DbMcpService.PendingResponse": {
+    "isError": false,
+    "requestId": "<id:2>",
+    "text": "{\"kind\":\"tabular\",\"columns\":[{\"name\":\"id\",\"dataType\":\"INTEGER\",\"typeClass\":\"number\"},{\"name\":\"body\",\"dataType\":\"TEXT\",\"typeClass\":\"text\"}],\"rows\":[[\"1\",\"one\"],[\"2\",\"two\"]],\"rowCount\":2,\"returned\":2,\"truncatedCells\":0}"
+  },
+  "args:ConnectionsService.Update": {
+    "id": "<id:1>",
+    "input": {
+      "autoExplain": false,
+      "color": "teal",
+      "database": "/data/mcp.db",
+      "host": null,
+      "kind": "sqlite",
+      "mcpAutoExplain": false,
+      "mcpDdlMode": "deny",
+      "mcpDescription": "scratch notes",
+      "mcpEnabled": true,
+      "mcpReadMode": "allow",
+      "mcpReviewResults": "review",
+      "mcpWriteMode": "prompt",
+      "mode": "fields",
+      "name": "notes db",
+      "options": {},
+      "password": null,
+      "port": null,
+      "preconnect": null,
+      "preconnectDelaySec": 0,
+      "preconnectSidecar": false,
+      "readOnly": false,
+      "throttlePerSec": 0,
+      "uri": null,
+      "username": null
+    }
+  }
+}

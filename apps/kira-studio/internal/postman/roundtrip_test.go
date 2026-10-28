@@ -724,22 +724,29 @@ func TestTheVersionGate(t *testing.T) {
 
 // ---- 8. The malformed cases (D3) ----
 
-func TestMalformedItemsAreSkippedOrClassifiedStructurally(t *testing.T) {
+func TestMalformedItemsImportWithDefaults(t *testing.T) {
 	tree := parseFile(t, "malformed.json")
 
 	names := []string{}
 	for _, item := range tree.Items {
 		names = append(names, item.Name)
 	}
-	want := []string{"both members", "child", "nameless below", "/v1/derived/name", "/root-string", "custom method"}
+	want := []string{"neither a folder nor a request", "both members", "child", "nameless below", "/v1/derived/name", "/root-string", "custom method"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("items: got %v, want %v", names, want)
 	}
 	if got := tree.Report.Warnings[postman.WarnMalformedItem]; got != 1 {
 		t.Errorf("malformed_item = %d, want 1", got)
 	}
+	if got := tree.Report.Warnings[postman.WarnMissingRequest]; got != 1 {
+		t.Errorf("missing_request = %d, want 1", got)
+	}
 	if got := tree.Report.Warnings[postman.WarnUnsupportedMethod]; got != 1 {
 		t.Errorf("unsupported_method = %d, want 1", got)
+	}
+	bare := tree.Items[itemIndex(t, tree, "neither a folder nor a request")]
+	if bare.Kind != postman.KindRequest || bare.Request.Method != "GET" || bare.Request.URL != "" {
+		t.Errorf("request-less item = %v %q %q, want an empty GET request", bare.Kind, bare.Request.Method, bare.Request.URL)
 	}
 
 	// Both members present: `item` wins, and the `request` member survives untouched in origin,
@@ -787,9 +794,8 @@ func TestAnExportReImportsToTheSameTree(t *testing.T) {
 			if second.Name != first.Name {
 				t.Errorf("name: got %q, want %q", second.Name, first.Name)
 			}
-			// malformed.json's neither-folder-nor-request item was already dropped by the first
-			// parse, so it is not in the export either and the counts still match exactly —
-			// skipping is idempotent, not progressively lossy.
+			// malformed.json's request-less item is kept, exported with a request and re-imported
+			// as the same request; its non-object entry is skipped both times.
 			if len(second.Items) != len(first.Items) {
 				t.Fatalf("item count: got %d, want %d", len(second.Items), len(first.Items))
 			}

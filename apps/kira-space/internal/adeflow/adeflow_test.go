@@ -41,11 +41,11 @@ func smartStep(id, extra string) string {
 }
 
 func scriptStep(id, extra string) string {
-	return "  - id: " + id + "\n    name: R\n    kind: script\n    status: In review\n    runs_on: once\n    timeout: 5m\n    command: make\n" + extra
+	return "  - id: " + id + "\n    name: R\n    kind: script\n    status: in-review\n    runs_on: once\n    timeout: 5m\n    command: make\n" + extra
 }
 
 func manual(id, extra string) string {
-	return "  - id: " + id + "\n    name: U\n    kind: manual\n    status: To do\n" + extra
+	return "  - id: " + id + "\n    name: U\n    kind: manual\n    status: todo\n" + extra
 }
 
 // resultsBlock is one result item; the first call of a step opens the results list.
@@ -71,7 +71,7 @@ func TestParse_rules(t *testing.T) {
 		{"kind required", head + "  - id: u\n    name: U\n", 0, "kind is required"},
 		{"bad kind", head + "  - id: u\n    name: U\n    kind: robot\n", 6, "step 1: kind must be agent, script, review or manual"},
 		{"old kind user", head + "  - id: u\n    name: U\n    kind: user\n", 6, "kind must be agent, script, review or manual"},
-		{"bad status", head + "  - id: u\n    name: U\n    kind: manual\n    status: Wip\n", 0, "step 1: status must be"},
+		{"bad status", head + "  - id: u\n    name: U\n    kind: manual\n    status: Bad Id\n", 0, "step 1: status must be"},
 		{"status optional", head + "  - id: u\n    name: U\n    kind: manual\n", 0, ""},
 		{"skip", head + manual("u", "    skip: true\n") + manual("v", ""), 0, ""},
 		{"all skipped", head + manual("u", "    skip: true\n"), 0, "at least one step must not be skipped"},

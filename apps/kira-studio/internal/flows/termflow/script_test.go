@@ -3,6 +3,7 @@ package termflow
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
@@ -227,6 +229,25 @@ func TestScriptOrder(t *testing.T) {
 	app.Contract(t, "script-order", "args:CustomScriptsService.Reorder#collection", inX)
 	app.Contract(t, "script-order", "args:CustomScriptsService.ReorderCollections", colls)
 
+	before := bridge.CustomScriptsMoveArgs{ID: s2.ID, CollectionID: &x.ID, BeforeID: &t1.ID}
+	if err := cs.Move(before); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "script-order", "args:CustomScriptsService.Move#before", before)
+	moved, err = cs.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ung, inx, _ := order(moved); strings.Join(ung, ",") != "s3" || strings.Join(inx, ",") != "t2,s2,t1,s1" {
+		t.Fatalf("after Move before: ungrouped %v, X %v; want [s3], [t2 s2 t1 s1]", ung, inx)
+	}
+	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: t1.ID, BeforeID: &t2.ID}); !ipcerrBadRequest(err) {
+		t.Fatalf("Move before a script of another set = %v, want E_BAD_REQUEST", err)
+	}
+	if again, err := cs.List(); err != nil || !sameJSON(again, moved) {
+		t.Fatalf("a refused Move changed the order: %+v (%v)", again, err)
+	}
+
 	app.Restart(t)
 	again, err := app.W.CustomScripts.List()
 	if err != nil {
@@ -312,4 +333,9 @@ func TestCustomScriptUpdateRemove(t *testing.T) {
 	if err != nil || len(again.Scripts) != 1 || again.Scripts[0].ID != keep.ID {
 		t.Fatalf("after Restart = %+v (%v)", again, err)
 	}
+}
+
+func ipcerrBadRequest(err error) bool {
+	var ie *ipcerr.Error
+	return errors.As(err, &ie) && ie.Code == string(ipcerr.CodeBadRequest)
 }

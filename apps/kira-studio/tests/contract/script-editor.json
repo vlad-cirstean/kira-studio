@@ -13,7 +13,6 @@
         "default": [
           "auth"
         ],
-        "label": "Topic",
         "name": "topic",
         "options": [],
         "required": false,
@@ -62,7 +61,6 @@
         "default": [
           "auth"
         ],
-        "label": "Topic",
         "name": "topic",
         "options": [],
         "required": false,
@@ -167,7 +165,6 @@
           "default": [
             "auth"
           ],
-          "label": "Topic",
           "name": "topic",
           "options": [],
           "required": false,
@@ -210,7 +207,6 @@
           "default": [
             "auth"
           ],
-          "label": "Topic",
           "name": "topic",
           "options": [],
           "required": false,

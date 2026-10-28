@@ -56,7 +56,10 @@ const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 // P22b D14: HTTP's own ResponseHistoryList.vue idiom (P16 D15) — an always-visible filter box
 // above the list, not a toggle (a compact history pane, not a big document). Matches method,
 // status name, and time — case-folded substring, the fields already on screen in each row.
-const filterQuery = ref('');
+const filterQuery = computed({
+  get: () => grpcCallHistoryStore.ui[props.tab.id]?.filterQuery ?? '',
+  set: (v: string) => grpcCallHistoryStore.setFilterQuery(props.tab.id, v),
+});
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredEntries = computed<GrpcCallHistoryEntry[]>(() => {
   const q = filterQuery.value;

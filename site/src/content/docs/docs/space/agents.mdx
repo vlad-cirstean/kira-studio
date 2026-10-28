@@ -28,7 +28,15 @@ A task owns branches across repositories. A branch is one of:
 - `review`: another author's branch.
 - `parked`: kept out of the merge order. The plan shows it as Not merging.
 
-Task status derives from the workflow and its runs. You never type it.
+Another author's branch arrives as a review task. **Convert to work item** in its task menu makes it your own task: its branches become mine and get a worktree. It can't be turned back.
+
+Paste a pull request or branch link into **Add > Existing branch** to add its branch. A fork's pull request arrives as `owner/branch`; another author's branch arrives as a review task. The repository must already be in your workspace with a remote for that repository.
+
+A task has a status. The workflow sets it as the task moves between steps. You can also set it yourself, from the task menu or the status picker in the task panel. A manual move holds until the task changes step. A stuck or failed run shows a separate Blocked chip beside the status.
+
+### Task statuses
+
+Settings > Task statuses edits the set. Add, rename, recolour and reorder statuses, and pick what each one **counts as**: To do, In progress, In review or Done. Every kind needs at least one status. Deleting a status that tasks use asks where those tasks move. A new install has To do, In progress, In review and Done.
 
 A new task lands in Today with no repositories, so it can start as soon as it has one. Add repositories or existing branches from the task panel, or let the agent declare them. Archiving asks for confirmation. Set, change or clear the estimate at any time, and rename the task in the panel title.
 
@@ -46,7 +54,7 @@ A workflow is a YAML file in the `workflows` folder of the Space home, `~/.kira-
 
 The app watches the folder. A broken edit keeps the last valid version and reports the line.
 
-A workflow lists its steps under `steps`, in order. Every step has an `id`, a `name`, a `kind` and a task `status` while the task sits on it. A top-level `stages` key is refused: list every step under `steps`.
+A workflow lists its steps under `steps`, in order. Every step has an `id`, a `name`, a `kind` and a task `status` (a status id, such as `in-review`) while the task sits on it. Old files that name a status (`In review`) still load. A top-level `stages` key is refused: list every step under `steps`.
 
 A step has one of four kinds:
 
@@ -98,7 +106,7 @@ A run that ends with no report takes the step's `failed` result.
 
 The Workflows page edits a workflow as a graph or as YAML. Save with `Cmd+S`. Nothing saves automatically. Leaving with unsaved edits asks first.
 
-Edit on the canvas. `+ Add step` under the graph adds a step of a kind you pick. The `⋯` menu on a step, or a right click, has Add step after, Move up, Move down, Make start, Skip and Remove. Move is off when it would turn a forward route into a return. Select a step to edit it in the inspector. The inspector shows the kind switch and the name, then three sections: what the step does, where and when it runs, and how it ends. **Advanced** holds the timeout, allowed tools, task status, skip and sandbox. Changing the kind clears the prompt, command or session prompt, after a confirmation.
+Edit on the canvas. `+ Add step` under the graph adds a step of a kind you pick. The `⋯` menu on a step, or a right click, has Add step after, Move up, Move down, Make start, Skip and Remove. Move is off when it would turn a forward route into a return. Select a step to edit it in the inspector. The inspector shows the kind switch and the name, then three sections: what the step does, where and when it runs, and how it ends. **Advanced** holds the timeout, allowed tools, task status, skip and sandbox. The status list is the set from Settings, with an **Edit statuses** link. Changing the kind clears the prompt, command or session prompt, after a confirmation.
 
 A task follows the live file until its first run, session or move. After that it keeps a snapshot, and an updated file applies to new work only.
 
@@ -179,6 +187,8 @@ Branches and repositories an agent adds carry an `agent` chip.
 Start Claude Code in a branch worktree from the board. **Take over** turns a headless run into an interactive session. A taken-over run can still call `finish_step`.
 
 A branch holds one session at a time.
+
+Finished and stopped sessions sit behind the **Finished or stopped** dropdown at the right of the session tabs. Each keeps **Take over**; a background run's label opens its log. An archived task lists them inline.
 
 ## Review code
 

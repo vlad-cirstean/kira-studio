@@ -330,6 +330,7 @@ function onCloseSearch(): void {
     <SearchToolbar
       v-if="rt?.searchOpen"
       :tab-id="tab.id"
+      :is-open="() => !!gridViewStore.runtime[tab.id]?.searchOpen"
       testid-prefix=""
       kind="rows"
       :api="pageSearchApi"

@@ -384,6 +384,7 @@ onUnmounted(() => {
     <SearchToolbar
       v-if="rt?.searchOpen"
       :tab-id="tab.id"
+      :is-open="() => !!documentViewStore.runtime[tab.id]?.searchOpen"
       testid-prefix="document-"
       kind="documents"
       :api="pageSearchApi"

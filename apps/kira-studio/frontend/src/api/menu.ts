@@ -29,6 +29,9 @@ export interface CollectionMenuActions {
   moveTo(rows: readonly CollectionRowVm[], collectionId: string): void;
   moveToNewCollection(rows: readonly CollectionRowVm[]): void;
   copyUrl(row: CollectionRowVm): void;
+  /** One place within the row's own sibling set. */
+  moveStep(row: CollectionRowVm, step: -1 | 1): Promise<void>;
+  canMoveStep(row: CollectionRowVm, step: -1 | 1): boolean;
   importPostman(): void;
   /** P7 D12: the background menu's own "Import from curl…" item — opens the paste-a-curl-command
    *  dialog, always into a fresh tab (never row-scoped, unlike importPostman above). */
@@ -60,6 +63,29 @@ function moveMenu(rows: readonly CollectionRowVm[], actions: CollectionMenuActio
     },
     onNew: () => actions.moveToNewCollection(rows),
   });
+}
+
+function moveItems(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'move-up',
+      label: t('common.moveUp.tooltip'),
+      icon: 'arrow-up',
+      shortcut: 'list.moveUp',
+      disabled: !actions.canMoveStep(row, -1),
+      run: () => actions.moveStep(row, -1),
+    },
+    {
+      type: 'item',
+      id: 'move-down',
+      label: t('common.moveDown.tooltip'),
+      icon: 'arrow-down',
+      shortcut: 'list.moveDown',
+      disabled: !actions.canMoveStep(row, 1),
+      run: () => actions.moveStep(row, 1),
+    },
+  ];
 }
 
 /** The menu for two or more selected rows: the actions that apply to a set. `deleteCount` is the
@@ -122,6 +148,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         run: () => actions.copyUrl(row),
       },
       moveMenu([row], actions),
+      ...moveItems(row, actions),
       { type: 'separator' },
       {
         type: 'item',
@@ -186,6 +213,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       icon: 'export',
       run: () => actions.exportCollection(row),
     });
+    items.push(...moveItems(row, actions));
   } else {
     items.push({
       type: 'item',
@@ -195,7 +223,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       shortcut: 'tree.duplicate',
       run: () => actions.duplicate(row),
     });
-    items.push(moveMenu([row], actions));
+    items.push(moveMenu([row], actions), ...moveItems(row, actions));
   }
 
   items.push(

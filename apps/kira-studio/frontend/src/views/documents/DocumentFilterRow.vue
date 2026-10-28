@@ -33,23 +33,25 @@ const SORT_EXAMPLE = '{ createdAt: -1, name: 1 }';
 const documentViewStore = useDocumentViewStore();
 const mongoFieldSampleStore = useMongoFieldSampleStore();
 
-const searchText = ref('');
-const sortText = ref('');
-// patchDocumentTabState mutates tab.state in place: these watchers keep the boxes in sync with
-// writes that did not come from typing (Clear, history apply).
+// Unapplied text lives in the runtime store (P375): tab-next/tab-prev switch tabs without a blur.
+const searchText = computed({
+  get: () => documentViewStore.runtime[props.tab.id]?.searchDraft ?? props.tab.state.search,
+  set: (v: string) => documentViewStore.setFilterDraft(props.tab.id, { search: v }),
+});
+const sortText = computed({
+  get: () =>
+    documentViewStore.runtime[props.tab.id]?.sortDraft ?? sortSpecToText(props.tab.state.sort),
+  set: (v: string) => documentViewStore.setFilterDraft(props.tab.id, { sort: v }),
+});
+// patchDocumentTabState mutates tab.state in place: an external write (Clear, history apply)
+// wins over a draft. Not immediate: a remount must keep the draft.
 watch(
   () => props.tab.state.search,
-  (search) => {
-    searchText.value = search;
-  },
-  { immediate: true },
+  () => documentViewStore.setFilterDraft(props.tab.id, { search: null }),
 );
 watch(
   () => props.tab.state.sort,
-  (sort) => {
-    sortText.value = sortSpecToText(sort);
-  },
-  { immediate: true },
+  () => documentViewStore.setFilterDraft(props.tab.id, { sort: null }),
 );
 
 const filterCandidates = computed(() => {
@@ -85,28 +87,32 @@ function recordFilterHistory(search: string, sort: SortSpec | null): void {
 
 function onSearchInput(): void {
   // Blur fires on every focus loss; re-applying an unchanged filter would reset paging and count.
-  if (searchText.value.trim() === props.tab.state.search.trim()) return;
-  documentViewStore.setSearch(props.tab.id, searchText.value);
-  recordFilterHistory(searchText.value, props.tab.state.sort);
+  const text = searchText.value;
+  documentViewStore.setFilterDraft(props.tab.id, { search: null });
+  if (text.trim() === props.tab.state.search.trim()) return;
+  documentViewStore.setSearch(props.tab.id, text);
+  recordFilterHistory(text, props.tab.state.sort);
 }
 function onSearchEscape(): void {
-  searchText.value = props.tab.state.search;
+  documentViewStore.setFilterDraft(props.tab.id, { search: null });
   (document.activeElement as HTMLElement | null)?.blur();
 }
 
 function onSortInput(): void {
   const sort = parseSortText(sortText.value);
+  documentViewStore.setFilterDraft(props.tab.id, { sort: null });
   // Compare the text form: SortSpec is a structure, so identity never matches.
   if (sortSpecToText(sort) === sortSpecToText(props.tab.state.sort)) return;
   documentViewStore.setSort(props.tab.id, sort);
   recordFilterHistory(props.tab.state.search, sort);
 }
 function onSortEscape(): void {
-  sortText.value = sortSpecToText(props.tab.state.sort);
+  documentViewStore.setFilterDraft(props.tab.id, { sort: null });
   (document.activeElement as HTMLElement | null)?.blur();
 }
 
 function onClearFilter(): void {
+  documentViewStore.setFilterDraft(props.tab.id, { search: null, sort: null });
   documentViewStore.setSearch(props.tab.id, '');
   documentViewStore.setSort(props.tab.id, null);
   recordFilterHistory('', null);

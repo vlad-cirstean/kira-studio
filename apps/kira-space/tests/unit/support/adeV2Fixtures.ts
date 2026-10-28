@@ -2,9 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defaultResults } from '../../../frontend/src/ade/v2/board/stepResults';
 import { defaultSandbox } from '../../../frontend/src/ade/v2/board/stepSandbox';
-import type { Branch, Plan, Run, Task, WorkflowStep } from '../../../frontend/src/ade/v2/wire';
+import type {
+  Branch,
+  Plan,
+  Run,
+  Task,
+  TaskStatusDef,
+  WorkflowStep,
+} from '../../../frontend/src/ade/v2/wire';
 
 // Builders for the pure-logic specs: every field defaulted, a spec overrides only what it asserts on.
+
+export const DEFAULT_STATUSES: TaskStatusDef[] = [
+  { id: 'todo', name: 'To do', tone: 'grey', category: 'todo' },
+  { id: 'in-progress', name: 'In progress', tone: 'amber', category: 'active' },
+  { id: 'in-review', name: 'In review', tone: 'blue', category: 'review' },
+  { id: 'done', name: 'Done', tone: 'green', category: 'done' },
+];
 
 export function mkBranch(over: Partial<Branch> & Pick<Branch, 'id' | 'taskId'>): Branch {
   return {
@@ -60,6 +74,8 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     branchIds: [],
     runs: [],
     createdAt: 0,
+    statusId: 'todo',
+    statusBy: 'auto',
     ...over,
   };
 }
@@ -94,7 +110,7 @@ export function mkStep(over: Partial<WorkflowStep> & Pick<WorkflowStep, 'id'>): 
   return {
     name: over.id,
     kind: 'agent',
-    status: 'In progress',
+    status: 'in-progress',
     skip: false,
     session: false,
     command: '',

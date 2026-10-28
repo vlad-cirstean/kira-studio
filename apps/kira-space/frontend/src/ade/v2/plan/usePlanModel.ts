@@ -21,7 +21,7 @@ import {
   buildTaskProgress,
   type TaskProgress,
 } from '../board/progress';
-import { type DerivedStatus, deriveStatus } from '../board/status';
+import { blocked as isBlocked, statusOf } from '../board/status';
 import { buildStepBlocks, type StepBlock } from '../board/stepBlocks';
 import {
   buildTimeline,
@@ -34,7 +34,7 @@ import { localIso, localIsoOfMs } from '../localDay';
 import { taskColor } from '../palette';
 import { useBoard, useChangeRequests, useSessions, useWorkflows } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import type { Board, Branch, Session, Task, Workflow } from '../wire';
+import type { Board, Branch, Session, Task, TaskStatusDef, Workflow } from '../wire';
 
 /** Needs-you kinds that put a `!` on a card and row: a waiting question, a stuck run. */
 const ASKS: ReadonlySet<NeedsKind> = new Set(['question', 'stuck run']);
@@ -75,7 +75,9 @@ export interface CardModel {
   workflow: Workflow | null;
   /** Panel Workflow block: one per step; empty for a review or parked task. */
   blocks: StepBlock[];
-  status: DerivedStatus;
+  status: TaskStatusDef;
+  /** A stuck or failed run or setup, shown beside the status. */
+  blocked: boolean;
   tag: { label: string; tone: BranchTag['tone']; tip: string; since?: number } | null;
   /** Task step action; which kinds render is `useTaskAction`'s call. */
   action: TaskAction | null;
@@ -174,8 +176,9 @@ function buildCard(c: Ctx, id: string): CardModel | null {
   const progress = c.progress.get(id) as TaskProgress;
   const branches = task.branchIds.flatMap((bid) => graph.byBranch.get(bid) ?? []);
   const sessions = c.sessions.filter((x) => x.taskId === id);
-  const status = deriveStatus({ task, progress, branches, hasSessions: sessions.length > 0 });
-  const cell = taskCell({ task, progress, status, branches, sessions });
+  const status = statusOf(task, c.board.statuses);
+  const blocked = isBlocked(task, progress, branches);
+  const cell = taskCell({ task, progress, status, blocked, branches, sessions });
   const workflow = task.workflow ?? c.workflows.get(task.workflowId) ?? null;
   const hidden = task.kind !== 'task';
   const first = branches[0];
@@ -191,6 +194,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     workflow,
     blocks: hidden ? [] : buildStepBlocks(progress, workflow),
     status,
+    blocked,
     tag: cell?.tag ?? null,
     action: cell?.action ?? null,
     meta: cardMeta(c, entry, task, branches),

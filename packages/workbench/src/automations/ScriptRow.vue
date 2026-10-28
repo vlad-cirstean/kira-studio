@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript } from '@shared/domain/scripts';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { colorMarkClass } from '@theme/connColor';
+import { t } from '@theme/i18n';
 import { rowIndent, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import RunElapsed from './runs/RunElapsed.vue';
@@ -12,8 +13,15 @@ import ScriptScheduleLine from './schedule/ScriptScheduleLine.vue';
 import SmartBadge from './smart/SmartBadge.vue';
 
 defineOptions({ inheritAttrs: false });
-defineProps<{ script: CustomScript; depth: 0 | 1; liveRun?: ScriptRun }>();
-const emit = defineEmits<{ run: []; menu: [event: MouseEvent] }>();
+defineProps<{
+  script: CustomScript;
+  depth: 0 | 1;
+  liveRun?: ScriptRun;
+  selected: boolean;
+  /** The script's own tab is still running: the play button shows it instead of starting. */
+  live: boolean;
+}>();
+const emit = defineEmits<{ run: []; open: []; menu: [event: MouseEvent] }>();
 
 function firstLine(command: string): string {
   const [first = '', ...rest] = command.split('\n');
@@ -24,13 +32,15 @@ function firstLine(command: string): string {
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <button
-        type="button"
+      <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex arrives in $attrs from useListNavigation.rowProps. -->
+      <div
         v-bind="$attrs"
-        :class="cn(rowVariants({ layout: 'double' }), 'w-full items-center text-left')"
+        role="treeitem"
+        :aria-selected="selected"
+        :class="cn(rowVariants({ layout: 'double', selected }), 'w-full items-center text-left')"
         :style="rowIndent(depth)"
         :data-testid="`script-${script.id}`"
-        @click="emit('run')"
+        @dblclick="emit('open')"
         @contextmenu.prevent.stop="emit('menu', $event)"
       >
         <span
@@ -53,11 +63,18 @@ function firstLine(command: string): string {
           :run="liveRun"
           class="shrink-0 text-kira-sm text-muted-foreground"
         />
-        <span class="flex w-5 shrink-0 items-center justify-center" data-testid="script-run-slot">
+        <span class="flex shrink-0 items-center justify-center" data-testid="script-run-slot">
           <Spinner v-if="liveRun" label="" data-testid="script-running" />
-          <CodiconIcon v-else name="play" :size="13" class="text-muted-foreground" />
+          <TooltipIconButton
+            icon="play"
+            :label="live ? t('automations.script.showRun.tooltip') : t('common.action.run.label')"
+            tabindex="-1"
+            data-testid="script-play"
+            @click.stop="emit('run')"
+            @dblclick.stop
+          />
         </span>
-      </button>
+      </div>
     </TooltipTrigger>
     <TooltipContent class="whitespace-pre-wrap">{{ script.command }}</TooltipContent>
   </Tooltip>

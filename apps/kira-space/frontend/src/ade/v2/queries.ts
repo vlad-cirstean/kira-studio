@@ -19,6 +19,7 @@ import type {
   FinishReviewArgs,
   FocusSessionArgs,
   ForwardReviewResult,
+  HostLinkArgs,
   ImportWorkflowArgs,
   LaunchStepArgs,
   MoveBacklogItemArgs,
@@ -34,6 +35,8 @@ import type {
   ReviewAgentLaunch,
   ReviewForwardText,
   RunArgs,
+  SaveStatusesArgs,
+  SaveStatusesResult,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
   SendArgs,
@@ -114,6 +117,23 @@ export function useAddExistingBranch() {
   });
 }
 
+/** The branch a pasted PR or branch link names; read only, so it runs as the user types. */
+export function useResolveHostLink(url: MaybeRefOrGetter<string>) {
+  return useQuery(() => {
+    const u = toValue(url).trim();
+    return {
+      queryKey: ['adetask', 'hostLink', u] as const,
+      queryFn: () => control.adeTaskResolveHostLink({ url: u, taskId: '' }),
+      enabled: u.startsWith('https://'),
+      staleTime: 30_000,
+    };
+  });
+}
+
+export function useAddHostLink() {
+  return useMutation({ mutationFn: (args: HostLinkArgs) => control.adeTaskAddHostLink(args) });
+}
+
 export function useAddBacklogItem() {
   return useMutation({
     mutationFn: (args: AddBacklogItemArgs) => control.adeTaskAddBacklogItem(args),
@@ -138,6 +158,8 @@ function withTaskPatch(board: Board, args: UpdateTaskArgs): Board {
       notes: p.notes ?? t.notes,
       color: p.color ?? t.color,
       kind: p.kind ?? t.kind,
+      statusId: p.statusId ?? t.statusId,
+      statusBy: p.statusId ? 'user' : t.statusBy,
     };
   });
   return { ...board, tasks };
@@ -148,6 +170,46 @@ export function useUpdateTask() {
     mutationFn: (args: UpdateTaskArgs) => control.adeTaskUpdateTask(args),
     ...optimisticUpdate<Board, UpdateTaskArgs>(queryClient, boardKey, withTaskPatch),
   });
+}
+
+/** The saved set replaces `board.statuses`; the backend's board push brings the reassigned tasks. */
+function withSavedStatuses(board: Board, args: SaveStatusesArgs): Board {
+  return {
+    ...board,
+    statuses: args.statuses.map((s) => ({
+      ...s,
+      id: s.id || board.statuses.find((o) => o.name === s.name)?.id || s.name,
+    })),
+  };
+}
+
+export function useSaveStatuses() {
+  const optimistic = optimisticUpdate<Board, SaveStatusesArgs>(
+    queryClient,
+    boardKey,
+    withSavedStatuses,
+  );
+  return useMutation({
+    mutationFn: (args: SaveStatusesArgs) => control.adeTaskSaveStatuses(args),
+    ...optimistic,
+    // The result carries the real ids of new statuses; the board push may land after this resolves.
+    onSuccess: (result, args) => {
+      queryClient.setQueryData<Board>(boardKey, (b) => (b ? withSavedIds(b, args, result) : b));
+    },
+  });
+}
+
+/** Swaps the placeholder id of each new status for the one the backend assigned. Positions line up
+ *  only while the cache still holds the optimistic set; any other shape is left to the board push. */
+function withSavedIds(board: Board, args: SaveStatusesArgs, result: SaveStatusesResult): Board {
+  const n = args.statuses.length;
+  if (board.statuses.length !== n || result.statuses.length !== n) return board;
+  return {
+    ...board,
+    statuses: board.statuses.map((s, i) =>
+      args.statuses[i]?.id === '' ? { ...s, id: result.statuses[i]?.id ?? s.id } : s,
+    ),
+  };
 }
 
 export function useUpdateBacklogItem() {

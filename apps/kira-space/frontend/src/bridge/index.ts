@@ -101,8 +101,11 @@ const spaceControl = {
     unwrap(CustomScriptsService.RenameCollection({ id, name })),
   customScriptsDeleteCollection: (id: string): Promise<void> =>
     unwrap(CustomScriptsService.DeleteCollection({ id })),
-  customScriptsMove: (id: string, collectionId: string | null): Promise<void> =>
-    unwrap(CustomScriptsService.Move({ id, collectionId })),
+  customScriptsMove: (
+    id: string,
+    collectionId: string | null,
+    beforeId: string | null = null,
+  ): Promise<void> => unwrap(CustomScriptsService.Move({ id, collectionId, beforeId })),
   customScriptsReorder: (collectionId: string | null, ids: string[]): Promise<void> =>
     unwrap(CustomScriptsService.Reorder({ collectionId, ids })),
   customScriptsReorderCollections: (ids: string[]): Promise<void> =>
@@ -345,6 +348,10 @@ const spaceControl = {
     unwrap(AdeTaskService.AddExistingBranch(args)).then((r) =>
       trust<V2.AddExistingBranchResult>(r),
     ),
+  adeTaskResolveHostLink: (args: V2.HostLinkArgs): Promise<V2.HostLinkTarget> =>
+    unwrap(AdeTaskService.ResolveHostLink(args)).then((r) => trust<V2.HostLinkTarget>(r)),
+  adeTaskAddHostLink: (args: V2.HostLinkArgs): Promise<V2.AddExistingBranchResult> =>
+    unwrap(AdeTaskService.AddHostLink(args)).then((r) => trust<V2.AddExistingBranchResult>(r)),
   adeTaskSetPlan: (args: V2.SetPlanArgs): Promise<void> => unwrap(AdeTaskService.SetPlan(args)),
   adeTaskSetQueuedAfter: (args: V2.SetQueuedAfterArgs): Promise<void> =>
     unwrap(AdeTaskService.SetQueuedAfter(args)),
@@ -401,6 +408,8 @@ const spaceControl = {
     unwrap(AdeTaskService.StepDone(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSetTaskStep: (args: V2.SetTaskStepArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.SetTaskStep(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskSaveStatuses: (args: V2.SaveStatusesArgs): Promise<V2.SaveStatusesResult> =>
+    unwrap(AdeTaskService.SaveStatuses(args)).then((r) => trust<V2.SaveStatusesResult>(r)),
   adeTaskRetrySetup: (args: V2.BranchArgs): Promise<void> =>
     unwrap(AdeTaskService.RetrySetup(args)),
   adeTaskReadLog: (args: V2.ReadLogArgs): Promise<V2.LogPage> =>
@@ -441,6 +450,10 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewWindowTarget(args)).then((r) =>
       trust<V2.ReviewWindowTarget | null>(r),
     ),
+  adeTaskReviewWorking: (args: V2.BranchArgs): Promise<V2.ReviewWorking> =>
+    unwrap(AdeTaskService.ReviewWorking(args)).then((r) => trust<V2.ReviewWorking>(r)),
+  adeTaskReviewWorkingDiff: (args: V2.ReviewWorkingDiffArgs): Promise<DiffContent> =>
+    unwrap(AdeTaskService.ReviewWorkingDiff(args)).then((r) => trust<DiffContent>(r)),
   adeTaskReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentState> =>
     unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
   adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>

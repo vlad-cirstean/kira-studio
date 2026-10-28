@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { EXPLAIN_SUPPORTED_KINDS, type McpPermissionMode } from '@shared/domain/connection';
+import {
+  EXPLAIN_SUPPORTED_KINDS,
+  type McpPermissionMode,
+  type McpReviewResults,
+} from '@shared/domain/connection';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { TabsContent } from '@theme/components/ui/tabs';
@@ -8,11 +12,13 @@ import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed } from 'vue';
 import { useConnectionDialogStore } from '../../state/connections';
+import { useSettingsStore } from '../../state/settings';
 import CheckboxRow from './CheckboxRow.vue';
 import { injectConnectionForm } from './form';
 
 const connectionDialogStore = useConnectionDialogStore();
 const { errorFor, errorId, invalidAttrs } = injectConnectionForm();
+const settingsStore = useSettingsStore();
 const draft = computed(() => connectionDialogStore.draft);
 
 // Disabled, never hidden, for kinds without a parseable EXPLAIN: the setting stays visible.
@@ -55,6 +61,28 @@ function modeOptions(cls: PermissionClass) {
 
 function setMode(field: (typeof CLASSES)[number]['field'], value: string): void {
   if (draft.value) draft.value[field] = value as McpPermissionMode;
+}
+
+// Same segmented control as the modes; inherit's label shows the current app setting.
+const reviewOptions = computed(() => {
+  const disabled = !draft.value?.mcpEnabled;
+  const items: { value: McpReviewResults; label: string }[] = [
+    {
+      value: 'inherit',
+      label: t(
+        settingsStore.dbMcp.previewResponses
+          ? 'studio.project.connectionDialog.mcp.reviewInheritOn.option'
+          : 'studio.project.connectionDialog.mcp.reviewInheritOff.option',
+      ),
+    },
+    { value: 'review', label: t('studio.project.connectionDialog.mcp.reviewAlways.option') },
+    { value: 'send', label: t('studio.project.connectionDialog.mcp.reviewNever.option') },
+  ];
+  return items.map((i) => ({ ...i, testid: `connection-mcp-review-${i.value}`, disabled }));
+});
+
+function setReview(value: string): void {
+  if (draft.value) draft.value.mcpReviewResults = value as McpReviewResults;
 }
 </script>
 
@@ -116,5 +144,25 @@ function setMode(field: (typeof CLASSES)[number]['field'], value: string): void 
         t('studio.project.connectionDialog.mcp.strictest.description', { tab: t('common.advanced.label') })
       }}
     </FieldDescription>
+
+    <Field class="flex-1">
+      <FieldLabel
+        >{{ t('studio.project.connectionDialog.mcp.review.label') }}
+        <span class="text-subtle"
+          >— {{ t('studio.project.connectionDialog.mcp.reviewNote.label') }}</span
+        ></FieldLabel
+      >
+      <SecondaryTabs
+        variant="segmented"
+        size="kira-lg"
+        :model-value="draft.mcpReviewResults"
+        :items="reviewOptions"
+        data-testid="connection-mcp-review"
+        @update:model-value="(v) => setReview(String(v))"
+      />
+      <FieldDescription class="w-full">{{
+        t('studio.project.connectionDialog.mcp.review.description')
+      }}</FieldDescription>
+    </Field>
   </TabsContent>
 </template>

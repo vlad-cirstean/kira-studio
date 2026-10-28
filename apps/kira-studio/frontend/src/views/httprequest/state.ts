@@ -111,10 +111,25 @@ interface HttpRequestViewRuntime {
   // something to render beside the message this error strip has always shown.
   error: { code: string; message: string; timeline?: HttpTimeline } | null;
   response: HttpResponseWire | null;
+  // P375: filter inputs outlive the view's unmount on tab switch; session-only, never tab state.
+  fieldFilterOpen: boolean;
+  fieldFilterQuery: string;
+  headerFilter: string;
+  cookieFilter: { request: string; response: string };
 }
 
 function defaultRuntime(): HttpRequestViewRuntime {
-  return { status: 'idle', opId: null, preflight: false, error: null, response: null };
+  return {
+    status: 'idle',
+    opId: null,
+    preflight: false,
+    error: null,
+    response: null,
+    fieldFilterOpen: false,
+    fieldFilterQuery: '',
+    headerFilter: '',
+    cookieFilter: { request: '', response: '' },
+  };
 }
 
 // P90 §2.8: drops every null (inherit) leaf, so Go's Options only ever sees what this request
@@ -243,7 +258,33 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
     stopOp(rt);
   }
 
-  return { runtime, send, stop };
+  function setFieldFilter(tabId: string, open: boolean, query: string): void {
+    const rt = ensureRuntime(tabId);
+    rt.fieldFilterOpen = open;
+    rt.fieldFilterQuery = query;
+  }
+
+  function setFieldFilterQuery(tabId: string, query: string): void {
+    ensureRuntime(tabId).fieldFilterQuery = query;
+  }
+
+  function setHeaderFilter(tabId: string, query: string): void {
+    ensureRuntime(tabId).headerFilter = query;
+  }
+
+  function setCookieFilter(tabId: string, mode: 'request' | 'response', query: string): void {
+    ensureRuntime(tabId).cookieFilter[mode] = query;
+  }
+
+  return {
+    runtime,
+    send,
+    stop,
+    setFieldFilter,
+    setFieldFilterQuery,
+    setHeaderFilter,
+    setCookieFilter,
+  };
 });
 
 // The *Copy as curl* dialog's own frozen resolution — computed once on open, the same shape send()

@@ -41,9 +41,6 @@
         "homeNotice": {
           "description": "Runs in your home folder {home}, the old default. New scripts use the Kira automations folder."
         },
-        "kiraHome": {
-          "label": "Kira home"
-        },
         "nameExample": {
           "example": "Build"
         },
@@ -55,9 +52,6 @@
         },
         "runFolder": {
           "label": "Run folder"
-        },
-        "scriptId": {
-          "label": "Script ID"
         },
         "setOnSave": {
           "status": "Set on save"
@@ -433,6 +427,9 @@
       "shellHint": {
         "hint": "Runs in your login shell; lines run in order. Press {chord} to save."
       },
+      "showRun": {
+        "tooltip": "Show run"
+      },
       "unknownParam": {
         "tooltip": "Unknown parameter"
       },
@@ -683,6 +680,9 @@
         }
       },
       "scriptRun": {
+        "alreadyRunning": {
+          "body": "{name} is already running here. Focus its tab or stop it first."
+        },
         "answered": {
           "body": "This run was already answered."
         },
@@ -1639,7 +1639,7 @@
             "body": "{count} disabled variables were skipped."
           },
           "emptyValues": {
-            "body": "{count} variables arrived without a value. Postman exports only shared values; share them in Postman, then export again."
+            "body": "{count} variables were imported without a value. Postman exports only shared values; fill them in here."
           },
           "graphqlBody": {
             "body": "{count} {format} bodies were imported as JSON bodies carrying the same query."
@@ -1648,10 +1648,16 @@
             "body": "{count} binary bodies carry inline content rather than a file. The content is kept, but a file must be chosen before sending."
           },
           "malformedItem": {
-            "body": "{count} items were neither a folder nor a request and were skipped."
+            "body": "{count} items were not JSON objects and were skipped."
+          },
+          "missingRequest": {
+            "body": "{count} items had no request and were imported as empty GET requests."
           },
           "scriptsInert": {
             "body": "{count} pre-request/test scripts were kept but are not run. They survive an export unchanged."
+          },
+          "unnamedVariables": {
+            "body": "{count} variables had no name and were imported as unnamed_1, unnamed_2 and so on."
           },
           "unresolvedFile": {
             "body": "{count} requests reference a file by a name or a path from another machine. The content is not carried over. Choose a file before sending."
@@ -1671,6 +1677,9 @@
         },
         "invalidMove": {
           "body": "That item can’t move there."
+        },
+        "invalidOrder": {
+          "body": "That collection order isn’t valid."
         },
         "writeFailed": {
           "error": "Couldn’t write {path}: {detail}"
@@ -2116,6 +2125,9 @@
       },
       "magenta": {
         "label": "Magenta"
+      },
+      "purple": {
+        "label": "Purple"
       },
       "red": {
         "label": "Red"
@@ -5016,6 +5028,9 @@
       },
       "unrelated": {
         "body": "“{branch}” and “{base}” share no common history."
+      },
+      "working": {
+        "hint": "Not committed yet. Not part of the review marks."
       }
     },
     "search": {
@@ -6772,6 +6787,20 @@
         "jira": {
           "placeholder": "Paste a link or key (optional)"
         },
+        "link": {
+          "author": {
+            "label": "By {author}"
+          },
+          "fork": {
+            "label": "Fork of {owner}"
+          },
+          "onTask": {
+            "label": "Already on a task"
+          },
+          "pending": {
+            "label": "Reading link…"
+          }
+        },
         "noBranchesYet": {
           "hint": "Add repositories from the task panel, or {agent} declares them."
         },
@@ -6779,7 +6808,7 @@
           "placeholder": "Context for {agent} (optional)"
         },
         "searchBranches": {
-          "placeholder": "Search branches in all repositories"
+          "placeholder": "Search branches or paste a PR or branch link"
         },
         "tabBranch": {
           "label": "Existing branch"
@@ -7250,6 +7279,10 @@
           "liveBlocked": {
             "tooltip": "Stop its running agents first"
           },
+          "makeTask": {
+            "label": "Convert to work item",
+            "tooltip": "Work on {owner}’s branch as your own task. Gets a worktree; can’t be undone"
+          },
           "markMerging": {
             "label": "Mark as merging"
           },
@@ -7685,6 +7718,9 @@
           "finished": {
             "hint": "The workflow is finished."
           },
+          "manual": {
+            "hint": "Set by you. The next step change sets it again."
+          },
           "notStarted": {
             "hint": "Not started."
           },
@@ -7978,6 +8014,11 @@
             "label": "Start review agent"
           }
         },
+        "agentPanel": {
+          "toggle": {
+            "label": "Agent panel"
+          }
+        },
         "copy": {
           "none": {
             "tooltip": "No open review comments to copy"
@@ -8011,6 +8052,11 @@
           },
           "files": {
             "aria": "Files to review"
+          }
+        },
+        "working": {
+          "right": {
+            "label": "Working tree"
           }
         }
       },
@@ -8172,6 +8218,49 @@
         },
         "title": {
           "label": "Worktree setup"
+        }
+      },
+      "statuses": {
+        "add": {
+          "label": "Add status"
+        },
+        "category": {
+          "active": {
+            "label": "In progress"
+          },
+          "description": "Each status counts as one of four kinds of progress. Every kind needs at least one status.",
+          "label": "Counts as",
+          "review": {
+            "label": "In review"
+          },
+          "todo": {
+            "label": "To do"
+          }
+        },
+        "delete": {
+          "tooltip": "Delete status"
+        },
+        "deleteDialog": {
+          "body": "{count} tasks are in {status}. Move them to another status first.",
+          "title": "Delete status and move its tasks"
+        },
+        "description": "Statuses a task moves through. Workflow steps set one automatically; you can move a task by hand at any time.",
+        "lastOfCategory": {
+          "tooltip": "Each category needs one status"
+        },
+        "newName": {
+          "label": "New status"
+        },
+        "reassign": {
+          "label": "Move tasks to"
+        }
+      },
+      "statusPicker": {
+        "back": {
+          "tooltip": "Previous status"
+        },
+        "next": {
+          "tooltip": "Next status"
         }
       },
       "step": {
@@ -8547,6 +8636,9 @@
             "example": "./scripts/release.sh",
             "hint": "Runs in each branch’s worktree. A non-zero exit fails the step. {tokens} are shell-quoted when needed."
           },
+          "editStatuses": {
+            "label": "Edit statuses"
+          },
           "end": {
             "title": "How it ends"
           },
@@ -8600,6 +8692,9 @@
           },
           "status": {
             "label": "Task status while in this step"
+          },
+          "statusMissing": {
+            "label": "{id} (missing, uses {fallback})"
           },
           "tools": {
             "example": "Bash(git *), Edit",
@@ -8727,15 +8822,6 @@
       "status": {
         "blocked": {
           "status": "Blocked"
-        },
-        "inProgress": {
-          "status": "In progress"
-        },
-        "inReview": {
-          "status": "In review"
-        },
-        "todo": {
-          "status": "To do"
         }
       },
       "step": {
@@ -9327,6 +9413,9 @@
         },
         "mobileAccess": {
           "label": "Mobile access"
+        },
+        "taskStatuses": {
+          "label": "Task statuses"
         }
       }
     },
@@ -12024,6 +12113,25 @@
           "readNote": {
             "label": "SELECT and its engine equivalents"
           },
+          "review": {
+            "description": "The app setting lives in the database MCP section of settings. A write has already run when its result shows.",
+            "label": "Review results"
+          },
+          "reviewAlways": {
+            "option": "Always"
+          },
+          "reviewInheritOff": {
+            "option": "App setting (off)"
+          },
+          "reviewInheritOn": {
+            "option": "App setting (on)"
+          },
+          "reviewNever": {
+            "option": "Never"
+          },
+          "reviewNote": {
+            "label": "Hold each query result for you to check before the AI gets it"
+          },
           "strictest": {
             "description": "A statement this app can’t classify is treated as whichever of the three is strictest. These settings govern the MCP server only. The read-only flag on the {tab} tab governs this app’s own console."
           },
@@ -12691,11 +12799,17 @@
           "hint": "This server restarted since it was last enabled; its registration command needs a fresh token to show again."
         },
         "preview": {
-          "description": "Holds each query result until you send it on. Masking is already applied to what you see. A write has already run by the time its result shows; withholding hides the result, it does not undo the change.",
+          "description": "Holds each query result until you send it on. Masking is already applied to what you see. A write has already run by the time its result shows; withholding hides the result, it does not undo the change. A connection’s MCP tab can override this.",
           "label": "Review results before the AI gets them"
         },
         "regenerate": {
           "label": "Regenerate token"
+        },
+        "reviewAlways": {
+          "status": "Results always reviewed"
+        },
+        "reviewNever": {
+          "status": "Results sent without review"
         },
         "tokenExpired": {
           "body": "Token expired. Regenerate it above."

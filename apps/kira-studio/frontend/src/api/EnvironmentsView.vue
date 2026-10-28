@@ -22,11 +22,12 @@ import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { EnvironmentsTabRecord } from '../state/tabDomain';
 import { mergeDrafts, reconcileOrder } from './state/draftMerge';
-import { useVariablesStore } from './state/variables';
+import { useVariableSetStore, useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
 const confirmDialogStore = useConfirmDialogStore();
 const variablesStore = useVariablesStore();
+const variableSetStore = useVariableSetStore();
 const connectionsStore = useConnectionsStore();
 
 // The environment list, re-hosted in a tab. Every behaviour below is
@@ -103,7 +104,10 @@ const orderedEnvironments = computed<ApiEnvironment[]>(() => {
 
 // P16 D14/§5: filters by name only — the same rule (and the same reasoning) as the variable
 // table's own filter.
-const filterQuery = ref('');
+const filterQuery = computed({
+  get: () => variableSetStore.filterQueryFor(props.tab.id),
+  set: (v: string) => variableSetStore.setFilterQuery(props.tab.id, v),
+});
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const displayEnvironments = computed<ApiEnvironment[]>(() => {
   return orderedEnvironments.value.filter((env) => matchesQuery(env.name, filterQuery.value));

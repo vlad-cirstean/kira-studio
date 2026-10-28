@@ -162,5 +162,77 @@
       "tools": []
     },
     "trigger": "terminal"
-  }
+  },
+  "ScriptRunsService.List#twice": [
+    {
+      "branchId": "",
+      "branchLabel": "",
+      "color": "blue",
+      "command": "echo started; read x; echo done",
+      "createdAt": 0,
+      "cwd": "<kira>/automations/<id:1>",
+      "finishedAt": null,
+      "id": "<id:2>",
+      "kind": "script",
+      "model": "",
+      "outcome": null,
+      "params": [],
+      "prompt": "",
+      "provider": "",
+      "resumable": false,
+      "resumedFrom": "",
+      "scriptId": "<id:1>",
+      "scriptName": "job",
+      "sessionId": "",
+      "startedAt": 0,
+      "state": "running",
+      "taskId": "",
+      "taskTitle": "",
+      "terminalId": "second",
+      "tools": {
+        "allowedTools": [],
+        "mcpServers": [],
+        "tools": []
+      },
+      "trigger": "terminal"
+    },
+    {
+      "branchId": "",
+      "branchLabel": "",
+      "color": "blue",
+      "command": "echo started; read x; echo done",
+      "createdAt": 0,
+      "cwd": "<kira>/automations/<id:1>",
+      "finishedAt": 0,
+      "id": "<id:3>",
+      "kind": "script",
+      "model": "",
+      "outcome": {
+        "exitCode": 0,
+        "reason": "",
+        "reported": false,
+        "source": "exit",
+        "status": "done"
+      },
+      "params": [],
+      "prompt": "",
+      "provider": "",
+      "resumable": false,
+      "resumedFrom": "",
+      "scriptId": "<id:1>",
+      "scriptName": "job",
+      "sessionId": "",
+      "startedAt": 0,
+      "state": "done",
+      "taskId": "",
+      "taskTitle": "",
+      "terminalId": "first",
+      "tools": {
+        "allowedTools": [],
+        "mcpServers": [],
+        "tools": []
+      },
+      "trigger": "terminal"
+    }
+  ]
 }

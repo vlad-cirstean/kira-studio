@@ -3,13 +3,13 @@ import { type TaskAction, taskCell } from '@ade/board/actions';
 import { taskTitle } from '@ade/board/labels';
 import { buildNeedsYou } from '@ade/board/needsYou';
 import { buildTaskProgress, type TaskProgress } from '@ade/board/progress';
-import { type DerivedStatus, deriveStatus } from '@ade/board/status';
+import { blocked as isBlocked, statusOf } from '@ade/board/status';
 import { buildStepBlocks, type StepBlock } from '@ade/board/stepBlocks';
 import { type StepMoves, stepMoves } from '@ade/board/stepMoves';
 import { localIso } from '@ade/localDay';
 import { taskColor } from '@ade/palette';
 import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
-import type { Branch, Session, Task, Workflow } from '@ade/wire';
+import type { Branch, Session, Task, TaskStatusDef, Workflow } from '@ade/wire';
 import { t } from '@theme/i18n';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { formatWeekdayDate } from '@workbench/behaviour/format';
@@ -23,7 +23,9 @@ export interface PlanCard {
   title: string;
   color: string;
   progress: TaskProgress;
-  status: DerivedStatus;
+  status: TaskStatusDef;
+  /** A stuck or failed run or setup, shown beside the status. */
+  blocked: boolean;
   blocks: StepBlock[];
   /** Needs-you headline for this task, '' when none. */
   attention: string;
@@ -104,12 +106,8 @@ export const useAgentsModel = createSharedComposable(() => {
       const taskProgress = progress.get(task.id) as TaskProgress;
       const branches = task.branchIds.flatMap((id) => branchById.get(id) ?? []);
       const i = input(task);
-      const status = deriveStatus({
-        task,
-        progress: taskProgress,
-        branches,
-        hasSessions: sessions.value.some((s) => s.taskId === task.id),
-      });
+      const status = statusOf(task, b.statuses);
+      const blocked = isBlocked(task, taskProgress, branches);
       const taskSessions = sessions.value.filter((s) => s.taskId === task.id);
       const blocks = buildStepBlocks(taskProgress, i.workflow);
       cards.set(task.id, {
@@ -118,12 +116,19 @@ export const useAgentsModel = createSharedComposable(() => {
         color: taskColor(task.color),
         progress: taskProgress,
         status,
+        blocked,
         blocks,
         attention: needs.items.find((n) => n.taskId === task.id)?.what ?? '',
         repos: [...new Set(branches.map((br) => repoLabel(br.codeRepoId)))],
         action:
-          taskCell({ task, progress: taskProgress, status, branches, sessions: taskSessions })
-            ?.action ?? null,
+          taskCell({
+            task,
+            progress: taskProgress,
+            status,
+            blocked,
+            branches,
+            sessions: taskSessions,
+          })?.action ?? null,
         moves: stepMoves(
           blocks,
           taskProgress.finished ? 'done' : (taskProgress.step?.id ?? task.entryStepId),

@@ -161,13 +161,14 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 	return b.wireTask(stored)
 }
 
-// UpdateTask applies a patch; kind moves only between task and parked.
-func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
+// UpdateTask applies a patch; kind moves only between task and parked. A review task that becomes
+// a task gets a worktree and prepare script on each branch, as an attached own branch does.
+func (b *TaskBoard) UpdateTask(ctx context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
 	p := args.Patch
 	if p.Jira != nil && p.ClearJira {
 		return adewire.Task{}, invalid("jira and clearJira are mutually exclusive")
 	}
-	patch := model.AdeTaskPatch{Title: p.Title, HostURL: p.HostURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind}
+	patch := model.AdeTaskPatch{Title: p.Title, HostURL: p.HostURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind, StatusID: p.StatusID}
 	if p.Title != nil {
 		trimmed := strings.TrimSpace(*p.Title)
 		patch.Title = &trimmed
@@ -179,11 +180,33 @@ func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (
 		empty := ""
 		patch.JiraKey, patch.JiraURL = &empty, &empty
 	}
+	var converted []model.AdeTaskBranch
+	if p.Kind != nil && *p.Kind == model.AdeTaskKindTask {
+		prev, err := b.deps.Tasks.GetTask(args.TaskID)
+		if err != nil {
+			return adewire.Task{}, err
+		}
+		if prev.Kind == model.AdeTaskKindReview {
+			live, err := b.deps.Tasks.BranchesLive()
+			if err != nil {
+				return adewire.Task{}, err
+			}
+			for _, sb := range live {
+				if sb.TaskID == args.TaskID && sb.Kind == model.AdeBranchKindReview && sb.Name != "" {
+					sb.Kind = model.AdeBranchKindMine
+					converted = append(converted, sb)
+				}
+			}
+		}
+	}
 	task, err := b.deps.Tasks.UpdateTask(args.TaskID, patch)
 	if err != nil {
 		return adewire.Task{}, err
 	}
 	b.notifyBoard()
+	for _, sb := range converted {
+		b.prepareAttached(ctx, sb)
+	}
 	return b.wireTask(task)
 }
 
@@ -294,7 +317,7 @@ func (b *TaskBoard) repoCandidates(ctx context.Context, codeRepoID string, taken
 // none until Start or Take over.
 func (b *TaskBoard) AddExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs) (adewire.AddExistingBranchResult, error) {
 	var sb model.AdeTaskBranch
-	res, err := b.attachExistingBranch(ctx, args, &sb)
+	res, err := b.attachExistingBranch(ctx, args, &sb, newTaskFields{})
 	if err != nil {
 		return res, err
 	}
@@ -328,7 +351,14 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 	b.notifyBoard()
 }
 
-func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch) (adewire.AddExistingBranchResult, error) {
+// newTaskFields are the task fields an attach sets when it creates the task.
+type newTaskFields struct {
+	Title, HostURL string
+	// ForceReview attaches the branch as review whatever its author email says; fork code is untrusted.
+	ForceReview bool
+}
+
+func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch, nf newTaskFields) (adewire.AddExistingBranchResult, error) {
 	if err := b.requireRepos([]string{args.CodeRepoID}); err != nil {
 		return adewire.AddExistingBranchResult{}, err
 	}
@@ -364,11 +394,14 @@ func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddEx
 	}
 
 	kind := resolveKind(row, userEmail, "")
+	if nf.ForceReview {
+		kind = model.AdeBranchKindReview
+	}
 	now := b.deps.Now().UnixMilli()
 	var task model.AdeTask
 	var sb model.AdeTaskBranch
 	if args.TaskID == "" {
-		task = model.AdeTask{ID: b.newID(), Kind: model.AdeTaskKindTask, CreatedAt: now}
+		task = model.AdeTask{ID: b.newID(), Kind: model.AdeTaskKindTask, CreatedAt: now, Title: nf.Title, HostURL: nf.HostURL}
 		if kind == model.AdeBranchKindReview {
 			task.Kind, task.Owner = model.AdeTaskKindReview, row.AuthorName
 		}

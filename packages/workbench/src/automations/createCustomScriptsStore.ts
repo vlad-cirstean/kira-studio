@@ -19,7 +19,11 @@ export interface CustomScriptsControl {
   customScriptsCreateCollection(name: string): Promise<ScriptCollection>;
   customScriptsRenameCollection(id: string, name: string): Promise<void>;
   customScriptsDeleteCollection(id: string): Promise<void>;
-  customScriptsMove(id: string, collectionId: string | null): Promise<void>;
+  customScriptsMove(
+    id: string,
+    collectionId: string | null,
+    beforeId?: string | null,
+  ): Promise<void>;
   /** collectionId null is the ungrouped set. */
   customScriptsReorder(collectionId: string | null, ids: string[]): Promise<void>;
   customScriptsReorderCollections(ids: string[]): Promise<void>;
@@ -87,8 +91,12 @@ export function createCustomScriptsStore(control: CustomScriptsControl) {
       await control.customScriptsDeleteCollection(id);
     }
 
-    async function moveScript(id: string, collectionId: string | null): Promise<void> {
-      await control.customScriptsMove(id, collectionId);
+    async function moveScript(
+      id: string,
+      collectionId: string | null,
+      beforeId: string | null = null,
+    ): Promise<void> {
+      await control.customScriptsMove(id, collectionId, beforeId);
     }
 
     async function resync(): Promise<void> {

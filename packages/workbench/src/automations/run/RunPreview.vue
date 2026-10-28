@@ -35,9 +35,11 @@ function envParts(e: ScriptRunPreview['env'][number]): TextPart[] {
     <div data-testid="run-folder">
       <CatalogText :k="folderKey" :params="folderParams">
         <template v-if="dir.mode === 'worktree'" #branch
-          ><VarText :parts="[{ name: 'branch', value: dir.branch }]" /></template
+          ><VarText :parts="[{ name: 'branch', value: dir.branch, kind: 'branch' }]" /></template
         >
-        <template #folder><VarText :parts="[{ name: 'folder', value: dir.path }]" /></template>
+        <template #folder
+          ><VarText :parts="[{ name: 'folder', value: dir.path, kind: 'path' }]" /></template
+        >
       </CatalogText>
     </div>
     <template v-if="preview.kind === 'smart'">

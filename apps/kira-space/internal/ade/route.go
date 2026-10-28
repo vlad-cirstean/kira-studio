@@ -237,6 +237,7 @@ func (l *pendingLoop) queue(b *TaskBoard) {
 			return
 		}
 		l.tc.entry = l.entry
+		b.syncStatus(l.tc.task.ID)
 	}
 	if _, err := b.queueRun(b.ctx, l.tc, l.plan, l.target, l.branch, l.attempt, "", l.opts); err != nil {
 		slog.Warn("ade: loop run", "scope", "ade", "branch", l.branch, "err", err)

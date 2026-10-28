@@ -120,20 +120,28 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
 // then the same object, and `disabled` gating (canEdit, a missing record, …) is honoured for
 // free instead of being restated at the keydown site. Walks one level into submenus (e.g.
 // `copy-rows-tsv` lives inside `rowMenu`'s "Copy row(s)" submenu).
-export function runMenuShortcut(items: MenuItem[], id: ShortcutId): boolean {
+function findShortcutItem(items: MenuItem[], id: ShortcutId): MenuItem | undefined {
   for (const item of items) {
-    if (item.type === 'item' && item.shortcut === id && !item.disabled) {
-      void item.run();
-      return true;
-    }
+    if (item.type === 'item' && item.shortcut === id && !item.disabled) return item;
     if (item.type === 'submenu') {
-      for (const sub of item.items) {
-        if (sub.type === 'item' && sub.shortcut === id && !sub.disabled) {
-          void sub.run();
-          return true;
-        }
-      }
+      const sub = item.items.find((s) => s.type === 'item' && s.shortcut === id && !s.disabled);
+      if (sub) return sub;
     }
   }
-  return false;
+  return undefined;
+}
+
+export function runMenuShortcut(items: MenuItem[], id: ShortcutId): boolean {
+  const item = findShortcutItem(items, id);
+  if (item?.type !== 'item') return false;
+  void item.run();
+  return true;
+}
+
+/** Like `runMenuShortcut`, but resolves once the item's action settles. */
+export async function runMenuShortcutAsync(items: MenuItem[], id: ShortcutId): Promise<boolean> {
+  const item = findShortcutItem(items, id);
+  if (item?.type !== 'item') return false;
+  await item.run();
+  return true;
 }

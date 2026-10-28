@@ -111,7 +111,7 @@ test('contract: Continue in terminal without the claude CLI shows the install me
     ],
   });
   await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
-  await page.locator(`[data-testid="script-${SMART.id}"]`).click();
+  await page.locator(`[data-testid="script-${SMART.id}"] [data-testid="script-play"]`).click();
   await page.locator('[data-testid="run-start"]').click();
   await emitWailsEvent(page, IPC.scriptRunsChanged, FAILED_RUN);
   await page.locator('[data-testid="run-continue"]').click();

@@ -98,9 +98,9 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.loadAddon(new WebLinksAddon());
-  // Cmd+Enter is meta-Enter (ESC CR), xterm's own Alt+Enter bytes: a newline in Claude Code and zsh.
+  // Shift+Enter sends ESC CR, xterm's own Alt+Enter bytes: a newline in Claude Code and zsh.
   term.attachCustomKeyEventHandler((ev) => {
-    if (ev.key !== 'Enter' || !ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return true;
+    if (ev.key !== 'Enter' || !ev.shiftKey || ev.metaKey || ev.ctrlKey || ev.altKey) return true;
     if (ev.type === 'keydown' && !ev.isComposing) {
       ev.preventDefault();
       term.input('\x1b\r', true);

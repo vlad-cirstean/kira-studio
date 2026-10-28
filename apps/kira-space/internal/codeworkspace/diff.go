@@ -33,7 +33,18 @@ type DiffContent struct {
 // relPath against the session's own root itself (§11's boundary), the one path-safety check every
 // other read primitive already performs before ever touching disk.
 func ReadDiff(ctx context.Context, s *Session, relPath string) (DiffContent, error) {
-	absPath, err := ValidateRelPath(s.Root, relPath)
+	cf, err := s.catfileSession()
+	if err != nil {
+		return DiffContent{}, fmt.Errorf("codeworkspace: read diff HEAD side: %w", err)
+	}
+	return ReadDiffAt(ctx, cf, s.Root, "HEAD", relPath)
+}
+
+// ReadDiffAt is ReadDiff over an explicit root and revision: relPath as it stood at headRev (a
+// commit-ish; "" means no original) against the file under root. A linked worktree passes its own
+// tip, since "HEAD" through a shared cat-file session resolves the main checkout's HEAD.
+func ReadDiffAt(ctx context.Context, cf *catfile.Session, root, headRev, relPath string) (DiffContent, error) {
+	absPath, err := ValidateRelPath(root, relPath)
 	if err != nil {
 		return DiffContent{}, fmt.Errorf("codeworkspace: read diff: %w", err)
 	}
@@ -43,9 +54,12 @@ func ReadDiff(ctx context.Context, s *Session, relPath string) (DiffContent, err
 		return DiffContent{}, fmt.Errorf("codeworkspace: read diff worktree side: %w", err)
 	}
 
-	head, err := readHeadSide(ctx, s, relPath)
-	if err != nil {
-		return DiffContent{}, fmt.Errorf("codeworkspace: read diff HEAD side: %w", err)
+	head := DiffSide{Kind: "missing", LimitBytes: MaxReadBytes}
+	if headRev != "" {
+		head, err = readHeadSide(ctx, cf, headRev+":"+relPath)
+		if err != nil {
+			return DiffContent{}, fmt.Errorf("codeworkspace: read diff HEAD side: %w", err)
+		}
 	}
 
 	return DiffContent{
@@ -59,15 +73,10 @@ func ReadDiff(ctx context.Context, s *Session, relPath string) (DiffContent, err
 // readHeadSide reads relPath as it stood at HEAD via the session's own lazily-constructed
 // catfile.Session — the same 8 MiB gate as the worktree side (MaxReadBytes), not catfile's own
 // larger default, so the two sides can never disagree about what is too large.
-func readHeadSide(ctx context.Context, s *Session, relPath string) (DiffSide, error) {
-	cf, err := s.catfileSession()
-	if err != nil {
-		return DiffSide{}, err
-	}
-	rev := "HEAD:" + relPath
-
+func readHeadSide(ctx context.Context, cf *catfile.Session, rev string) (DiffSide, error) {
 	var info catfile.ObjectInfo
 	var data []byte
+	var err error
 	if strings.Contains(rev, "\n") {
 		// gitsession.Blob's own guard, carried here verbatim: a newline anywhere in the request
 		// desynchronises the one-line-in/one-line-out batch protocol for the life of the session,

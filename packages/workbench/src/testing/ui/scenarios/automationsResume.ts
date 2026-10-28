@@ -27,7 +27,7 @@ export function registerResumeScenarios(env: Env): void {
   async function openInterrupted(page: Page, interrupted: ReturnType<typeof run>) {
     await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
     await expect(page.locator('[data-testid="automations-panel"]')).toBeVisible();
-    await page.locator(`[data-testid="script-${script.id}"]`).click();
+    await page.locator(`[data-testid="script-${script.id}"] [data-testid="script-play"]`).click();
     await expect(page.locator('[data-testid="run-start"]')).toBeEnabled();
     await page.locator('[data-testid="run-start"]').click();
     await emitWailsEvent(page, IPC.scriptRunsChanged, { ...interrupted, ...times });

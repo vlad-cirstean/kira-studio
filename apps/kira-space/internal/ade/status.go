@@ -1,0 +1,145 @@
+package ade
+
+import (
+	"context"
+	"log/slog"
+	"slices"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+)
+
+// firstOf is the lowest-position status of the category in set, "" when none.
+func firstOf(set []model.AdeTaskStatus, category string) string {
+	for _, s := range set {
+		if s.Category == category {
+			return s.ID
+		}
+	}
+	return ""
+}
+
+// resolveStepStatus is the status a step applies: its own when the set still holds it, else the first
+// status of the category its kind defaults to.
+func resolveStepStatus(set []model.AdeTaskStatus, step adewire.WorkflowStep) string {
+	if slices.ContainsFunc(set, func(s model.AdeTaskStatus) bool { return s.ID == step.Status }) {
+		return step.Status
+	}
+	if step.Kind == adewire.KindReview {
+		return firstOf(set, model.AdeStatusReview)
+	}
+	return firstOf(set, model.AdeStatusActive)
+}
+
+// notStarted says the task sits at its first non-skipped step with nothing run in the pass.
+func notStarted(tc *taskCtx, plan []stepView) bool {
+	entry := tc.entryIndex(plan)
+	first := slices.IndexFunc(plan, func(v stepView) bool { return !v.Def.Skip })
+	if entry < 0 || first < 0 || entry != first || currentStep(plan, entry) != first {
+		return false
+	}
+	return !slices.ContainsFunc(plan, func(v stepView) bool { return v.started() })
+}
+
+// statusKey names the workflow position whose status the task shows: "done" when finished, "" while
+// not started, else the current step id. ok is false when the position cannot be read.
+func (b *TaskBoard) statusKey(tc *taskCtx) (key string, ok bool) {
+	if tc.entry == entryDone {
+		return entryDone, true
+	}
+	if !tc.active() {
+		return "", true
+	}
+	plan, err := b.plan(tc)
+	if err != nil {
+		return "", false
+	}
+	entry := tc.entryIndex(plan)
+	if entry < 0 {
+		return "", false
+	}
+	cur := currentStep(plan, entry)
+	if cur < 0 {
+		return entryDone, true
+	}
+	if notStarted(tc, plan) {
+		sessions, err := b.deps.Sessions.HasTask(tc.task.ID)
+		if err != nil {
+			return "", false
+		}
+		if !sessions {
+			return "", true
+		}
+	}
+	return plan[cur].Def.ID, true
+}
+
+// syncStatus applies the status of the task's workflow position when that position changed since the
+// last sync; the task mutex is held. A manual move leaves the position alone, so it holds until the
+// task moves on. Only work tasks sync.
+func (b *TaskBoard) syncStatus(taskID string) {
+	tc, err := b.loadTaskCtx(taskID)
+	if err != nil || tc.task.Kind != model.AdeTaskKindTask {
+		return
+	}
+	key, ok := b.statusKey(tc)
+	if !ok || key == tc.task.StatusStep {
+		return
+	}
+	set, err := b.deps.Statuses.List()
+	if err != nil {
+		slog.Warn("ade: read task statuses", "scope", "ade", "task", taskID, "err", err)
+		return
+	}
+	var target string
+	switch key {
+	case "":
+		target = firstOf(set, model.AdeStatusTodo)
+	case entryDone:
+		target = firstOf(set, model.AdeStatusDone)
+	default:
+		i := slices.IndexFunc(tc.wf.Steps, func(st adewire.WorkflowStep) bool { return st.ID == key })
+		if i < 0 {
+			return
+		}
+		target = resolveStepStatus(set, tc.wf.Steps[i])
+	}
+	if target == "" {
+		return
+	}
+	if err := b.deps.Tasks.SetAutoStatus(taskID, target, key); err != nil {
+		slog.Warn("ade: sync task status", "scope", "ade", "task", taskID, "err", err)
+		return
+	}
+	b.notifyBoard()
+}
+
+// OnTUIStarted is Tracker.OnStarted's target: a first session of a task counts as started.
+func (b *TaskBoard) OnTUIStarted(taskID string) {
+	mu := b.taskMu(taskID)
+	mu.Lock()
+	defer mu.Unlock()
+	b.syncStatus(taskID)
+}
+
+// SaveStatuses rewrites the status set; tasks on a removed status move in the same transaction.
+func (b *TaskBoard) SaveStatuses(_ context.Context, args adewire.SaveStatusesArgs) (adewire.SaveStatusesResult, error) {
+	set := make([]model.AdeTaskStatus, len(args.Statuses))
+	for i, s := range args.Statuses {
+		set[i] = model.AdeTaskStatus{ID: s.ID, Name: s.Name, Tone: s.Tone, Category: s.Category}
+	}
+	saved, err := b.deps.Statuses.Save(set, args.Reassign)
+	if err != nil {
+		return adewire.SaveStatusesResult{}, err
+	}
+	b.notifyBoard()
+	return adewire.SaveStatusesResult{Statuses: toWireStatuses(saved)}, nil
+}
+
+func toWireStatuses(set []model.AdeTaskStatus) []adewire.TaskStatusDef {
+	out := make([]adewire.TaskStatusDef, len(set))
+	for i, s := range set {
+		out[i] = adewire.TaskStatusDef{ID: s.ID, Name: s.Name, Tone: s.Tone, Category: s.Category}
+	}
+	return out
+}

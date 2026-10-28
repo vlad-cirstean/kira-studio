@@ -72,6 +72,7 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   await expect(page.locator('[data-testid="connection-mcp-read-allow"]')).toBeDisabled();
   await expect(page.locator('[data-testid="connection-mcp-write-prompt"]')).toBeDisabled();
   await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="connection-mcp-review-inherit"]')).toBeDisabled();
 
   await page.click('[data-testid="connection-mcp-enabled"]');
   await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeEnabled();
@@ -79,6 +80,7 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   await expect(page.locator('[data-testid="connection-mcp-read-allow"]')).toBeEnabled();
   await expect(page.locator('[data-testid="connection-mcp-write-prompt"]')).toBeEnabled();
   await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="connection-mcp-review-inherit"]')).toBeEnabled();
 
   await generalTab.click();
   await expect(generalTab).toHaveAttribute('data-state', 'on');
@@ -123,6 +125,7 @@ test('the pre-connect textarea round-trips a multi-line value, and a valid throt
     mcpWriteMode: 'prompt',
     mcpDdlMode: 'deny',
     mcpAutoExplain: true,
+    mcpReviewResults: 'inherit',
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

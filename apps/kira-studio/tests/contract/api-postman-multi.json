@@ -6,22 +6,32 @@
           "collectionId": "<id:1>",
           "folders": 0,
           "name": "Multi",
-          "requests": 1,
+          "requests": 2,
           "warnings": [
             {
-              "count": 3,
-              "detail": "3 collection variables were imported.",
+              "count": 4,
+              "detail": "4 collection variables were imported.",
               "kind": "variables_imported"
             },
             {
               "count": 1,
-              "detail": "1 variables arrived without a value. Postman exports only shared values; share them in Postman, then export again.",
+              "detail": "1 variables were imported without a value. Postman exports only shared values; fill them in here.",
               "kind": "empty_values"
             },
             {
               "count": 1,
               "detail": "1 disabled variables were skipped.",
               "kind": "disabled_variables"
+            },
+            {
+              "count": 1,
+              "detail": "1 variables had no name and were imported as unnamed_1, unnamed_2 and so on.",
+              "kind": "unnamed_variables"
+            },
+            {
+              "count": 1,
+              "detail": "1 items had no request and were imported as empty GET requests.",
+              "kind": "missing_request"
             }
           ]
         },
@@ -45,7 +55,7 @@
             },
             {
               "count": 1,
-              "detail": "1 variables arrived without a value. Postman exports only shared values; share them in Postman, then export again.",
+              "detail": "1 variables were imported without a value. Postman exports only shared values; fill them in here.",
               "kind": "empty_values"
             }
           ]
@@ -68,12 +78,17 @@
         "environment": {
           "environmentId": "<id:3>",
           "name": "Wrapped",
-          "variables": 2,
+          "variables": 3,
           "warnings": [
             {
               "count": 1,
-              "detail": "1 variables arrived without a value. Postman exports only shared values; share them in Postman, then export again.",
+              "detail": "1 variables were imported without a value. Postman exports only shared values; fill them in here.",
               "kind": "empty_values"
+            },
+            {
+              "count": 1,
+              "detail": "1 variables had no name and were imported as unnamed_1, unnamed_2 and so on.",
+              "kind": "unnamed_variables"
             }
           ]
         },

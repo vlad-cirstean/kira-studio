@@ -3,7 +3,7 @@ import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { Settings, SettingsPatch } from '../../../state/settingsDomain';
 import type { CardModel } from '../plan/usePlanModel';
-import type { Plan, Run, Session } from '../wire';
+import type { Plan, Run, Session, TaskStatusDef } from '../wire';
 import type { BranchGraph } from './branchGraph';
 import { type Calendar, isWeekend, LATER, nextWork, offsetToIso } from './calendar';
 import type { ChangeBaseChoice } from './changeBase';
@@ -18,12 +18,14 @@ import { nextStepId } from './stepBlocks';
 export type TaskMenuCmd =
   | { kind: 'action' }
   | { kind: 'moveStep'; stepId: string }
+  | { kind: 'setStatus'; statusId: string }
   | { kind: 'stopRuns' }
   | { kind: 'openSession'; session: Session }
   | { kind: 'showSessions' }
   | { kind: 'automation'; scriptId: string }
   | { kind: 'plan'; day: number }
   | { kind: 'park'; parked: boolean }
+  | { kind: 'makeTask' }
   | { kind: 'link'; url: string }
   | { kind: 'copy'; text: string }
   | { kind: 'review'; branchId: string }
@@ -55,6 +57,8 @@ export interface TaskMenuInput {
   /** Menu text of a running session. */
   sessionLabel: (s: Session) => string;
   plan: Plan;
+  /** The status set, in order. */
+  statuses: readonly TaskStatusDef[];
   cal: Calendar;
   archivePending: boolean;
   /** The task's Review code targets; none for a parked task. */
@@ -156,6 +160,20 @@ function stepEntries(c: CardModel, live: boolean): TaskMenuEntry[] {
   return out;
 }
 
+function statusEntry(c: CardModel, statuses: readonly TaskStatusDef[]): TaskMenuEntry {
+  return {
+    type: 'submenu',
+    id: 'ade-task-status',
+    label: t('common.field.status.label'),
+    items: statuses.map((s) => ({
+      id: `ade-task-status-${s.id}`,
+      label: s.name,
+      cmd: { kind: 'setStatus', statusId: s.id },
+      checked: s.id === c.status.id,
+    })),
+  };
+}
+
 function reviewEntry(choices: readonly ReviewChoice[]): TaskMenuEntry[] {
   const item = (c: ReviewChoice, id: string, label: string): TaskMenuItem => ({
     id,
@@ -243,6 +261,21 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
   const live = c.task.runs.some((r) => r.state === 'running');
   const running = i.sessions.filter((s) => s.state === 'running' && s.mode === 'tui');
 
+  if (review) {
+    out.push(
+      {
+        type: 'item',
+        id: 'ade-task-make-task',
+        label: t('space.ade.board.taskMenu.makeTask.label'),
+        cmd: { kind: 'makeTask' },
+        hint: t('space.ade.board.taskMenu.makeTask.tooltip', {
+          owner: c.task.owner || t('space.ade.taskPanel.someone.label'),
+        }),
+      },
+      statusEntry(c, i.statuses),
+      { type: 'separator' },
+    );
+  }
   if (!review) {
     if (c.action && c.action.kind !== 'archive') {
       out.push({
@@ -253,7 +286,7 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
         hint: c.action.tip,
       });
     }
-    out.push(...stepEntries(c, live));
+    out.push(statusEntry(c, i.statuses), ...stepEntries(c, live));
     if (c.task.runs.some((r) => r.state === 'running' || r.state === 'pending')) {
       out.push({
         type: 'item',

@@ -19,6 +19,9 @@ export interface TerminalLaunch {
   scriptId?: string;
   /** Single-use token of a parametrised script's launch (ScriptRuns Start). */
   launchToken?: string;
+  /** The ADE task and branch a script runs for; with `scriptId`, the tab's run key. */
+  taskId?: string;
+  branchId?: string;
 }
 
 export interface OpenTerminalTabOpts<K extends string> {
@@ -26,6 +29,8 @@ export interface OpenTerminalTabOpts<K extends string> {
   cwd: string;
   codeRepoId?: string;
   launch?: TerminalLaunch;
+  /** Id of a tab the new one replaces in place. */
+  replace?: string;
 }
 
 export interface OpenTerminalTabResult {
@@ -39,7 +44,7 @@ interface TerminalTabsStore<K extends string> {
     connectionId: null,
     path: string,
     makeState: () => TerminalTabState,
-    opts: { reuse: boolean; workspaceId: K },
+    opts: { reuse: boolean; workspaceId: K; replace?: string },
   ): OpenTerminalTabResult;
 }
 
@@ -60,8 +65,10 @@ export function createOpenTerminalTab<K extends string>(useTabsStore: () => Term
         launchKind: opts.launch?.kind ?? 'shell',
         scriptId: opts.launch?.scriptId ?? '',
         launchToken: opts.launch?.launchToken ?? '',
+        taskId: opts.launch?.taskId ?? '',
+        branchId: opts.launch?.branchId ?? '',
       }),
-      { reuse: false, workspaceId: opts.workspaceId },
+      { reuse: false, workspaceId: opts.workspaceId, replace: opts.replace },
     );
   };
 }

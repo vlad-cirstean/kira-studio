@@ -1,0 +1,41 @@
+{
+  "AdeTaskService.Branch#converted": {
+    "kind": "mine"
+  },
+  "AdeTaskService.UpdateTask#converted": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "",
+    "est": "",
+    "hostLink": null,
+    "hostUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [],
+    "since": {},
+    "statusBy": "auto",
+    "statusId": "todo",
+    "title": "",
+    "workflow": null,
+    "workflowId": "",
+    "workflowOutdated": false
+  },
+  "args:AdeTaskService.UpdateTask": {
+    "patch": {
+      "clearJira": false,
+      "color": null,
+      "est": null,
+      "hostUrl": null,
+      "jira": null,
+      "kind": "task",
+      "notes": null,
+      "statusId": null,
+      "title": null
+    },
+    "taskId": "<id:1>"
+  }
+}

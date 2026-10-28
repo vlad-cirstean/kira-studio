@@ -132,7 +132,7 @@ test('the task menu lists scripts, smart ones marked, and opens the run dialog o
     dialog.locator('[data-testid="run-prompt-text"] [data-testid="var-chip"][data-var="branch"]'),
   ).toContainText('feat/alerts');
   await expect(
-    dialog.locator('[data-testid="run-folder"] [data-testid="var-chip"][data-var="branch"]'),
+    dialog.locator('[data-testid="run-folder"] [data-chip="branch"][data-var="branch"]'),
   ).toContainText('api · feat/alerts');
   await expect(dialog.locator(t('run-folder'))).toContainText('Worktree of');
   await expect(dialog.locator(t('run-ade-context'))).toContainText('Usage alerts by email');
@@ -252,7 +252,7 @@ test('the Automations entry asks for the task and the run dialog lists tasks', a
   );
   await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
   await page.locator(t('automations-panel')).waitFor();
-  await page.locator(t('script-smart-1')).click();
+  await page.locator(`${t('script-smart-1')} [data-testid="script-play"]`).click();
   const dialog = page.locator(t('run-dialog'));
   await dialog.locator(t('run-task')).click();
   await expect(page.locator(t('run-task-option-T_bill'))).toBeVisible();
@@ -406,7 +406,7 @@ test('contract: the run dialog shows the backend preview for the task branch', a
     dialog.locator('[data-testid="run-prompt-text"] [data-testid="var-chip"][data-var="branch"]'),
   ).toContainText(branch);
   await expect(
-    dialog.locator('[data-testid="run-folder"] [data-testid="var-chip"][data-var="branch"]'),
+    dialog.locator('[data-testid="run-folder"] [data-chip="branch"][data-var="branch"]'),
   ).toContainText(pv.dir.branch);
   await expect(dialog.locator(t('run-start'))).toBeEnabled();
 });

@@ -277,7 +277,9 @@ const boxClass = computed(() => {
         :key="row.id"
         :row="row"
         :color="card.color"
+        :task-row="card.review"
         @force-push="emit('forcePush', row)"
+        @task-menu="taskMenu.open"
       />
     </Card>
   </div>

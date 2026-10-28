@@ -142,6 +142,7 @@ function cellClass(row: number, col: 'field' | 'value') {
   <SearchToolbar
     v-if="rt?.searchOpen"
     :tab-id="viewKey"
+    :is-open="() => !!keyValueViewStore.runtime[viewKey]?.searchOpen"
     testid-prefix="keyvalue-"
     kind="rows"
     :api="pageSearchApi"

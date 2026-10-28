@@ -41,7 +41,7 @@ describe('ReviewFilesState — sinceReview mode opens each file against its own 
               change: fileChange('a.ts'),
               review: {
                 kind: 'full',
-                changedSinceReview: false,
+                changedSinceReview: true,
                 reviewedAt: 1000,
                 reviewedAtSha: 'a-reviewed-sha',
               },
@@ -50,7 +50,7 @@ describe('ReviewFilesState — sinceReview mode opens each file against its own 
               change: fileChange('b.ts'),
               review: {
                 kind: 'full',
-                changedSinceReview: false,
+                changedSinceReview: true,
                 reviewedAt: 2000,
                 reviewedAtSha: 'b-reviewed-sha',
               },

@@ -389,8 +389,11 @@ const studioControl = {
     unwrap(CustomScriptsService.RenameCollection({ id, name })),
   customScriptsDeleteCollection: (id: string): Promise<void> =>
     unwrap(CustomScriptsService.DeleteCollection({ id })),
-  customScriptsMove: (id: string, collectionId: string | null): Promise<void> =>
-    unwrap(CustomScriptsService.Move({ id, collectionId })),
+  customScriptsMove: (
+    id: string,
+    collectionId: string | null,
+    beforeId: string | null = null,
+  ): Promise<void> => unwrap(CustomScriptsService.Move({ id, collectionId, beforeId })),
   customScriptsReorder: (collectionId: string | null, ids: string[]): Promise<void> =>
     unwrap(CustomScriptsService.Reorder({ collectionId, ids })),
   customScriptsReorderCollections: (ids: string[]): Promise<void> =>

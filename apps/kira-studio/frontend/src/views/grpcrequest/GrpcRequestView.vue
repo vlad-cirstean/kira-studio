@@ -197,12 +197,15 @@ function setRequestPane(pane: 'message' | 'metadata' | 'schema'): void {
   patchGrpcRequestTabState(props.tab.id, { requestPane: pane });
 }
 
-// Metadata filter: component-local, a lens rather than tab state.
-const fieldFilterOpen = ref(false);
-const fieldFilterQuery = ref('');
+// Metadata filter: per-tab runtime (P375), a lens rather than tab state.
+const fieldFilterOpen = computed(() => rt.value?.fieldFilterOpen ?? false);
+const fieldFilterQuery = computed({
+  get: () => rt.value?.fieldFilterQuery ?? '',
+  set: (v: string) => grpcRequestViewStore.setFieldFilterQuery(props.tab.id, v),
+});
 function toggleFieldFilter(): void {
-  fieldFilterOpen.value = !fieldFilterOpen.value;
-  if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
+  const open = !fieldFilterOpen.value;
+  grpcRequestViewStore.setFieldFilter(props.tab.id, open, open ? fieldFilterQuery.value : '');
 }
 
 function toggleFieldDescriptions(): void {

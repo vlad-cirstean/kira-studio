@@ -796,7 +796,7 @@ test("the tab strip's + opens a terminal tab at the active repository's root", a
   await expect(page.locator('.xterm-rows')).toContainText('hello');
 });
 
-test('Cmd+Enter in a terminal sends meta-Enter (ESC CR); plain Enter stays CR', async ({
+test('Shift+Enter in a terminal sends meta-Enter (ESC CR); Cmd+Enter and plain Enter stay CR', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({
@@ -815,10 +815,13 @@ test('Cmd+Enter in a terminal sends meta-Enter (ESC CR); plain Enter stays CR', 
       .map((e) => (e.args as { data?: string } | undefined)?.data);
 
   await page.keyboard.press('Meta+Enter');
-  await expect.poll(writes).toContain('Gw0=');
+  await expect.poll(writes).toEqual(['DQ==']);
+
+  await page.keyboard.press('Shift+Enter');
+  await expect.poll(writes).toEqual(['DQ==', 'Gw0=']);
 
   await page.keyboard.press('Enter');
-  await expect.poll(writes).toContain('DQ==');
+  await expect.poll(writes).toEqual(['DQ==', 'Gw0=', 'DQ==']);
 });
 
 // A worktree row's own context menu (nothing needed one until a terminal could be opened at a

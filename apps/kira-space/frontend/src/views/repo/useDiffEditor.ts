@@ -15,7 +15,9 @@ import type { DiffSide } from '@shared/domain/repo';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { logWarn } from '@workbench/bridge/log';
+import { queryClient } from '@workbench/state/queryClient';
 import { type Ref, ref, shallowRef, type WatchStopHandle, watch } from 'vue';
+import { reviewWorkingDiffOptions } from '../../ade/v2/review/useReviewWorking';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
@@ -65,7 +67,16 @@ async function loadDiffSides(
   left: string | null,
   right: string | null,
   reviewBranch: string | undefined,
+  workingBranchId: string | undefined,
 ): Promise<DiffSidesLoaded | { error: string }> {
+  if (workingBranchId !== undefined) {
+    try {
+      const diff = await queryClient.fetchQuery(reviewWorkingDiffOptions(workingBranchId, path));
+      return { diff, gitRepoId: undefined };
+    } catch (err) {
+      return { error: errorText(err) };
+    }
+  }
   if (left === null) {
     try {
       const diff = await control.codeWorkspaceReadDiff(repoId, path);
@@ -161,6 +172,9 @@ export interface DiffEditorParams {
   /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
    *  it stored this revision's text. */
   reviewBranch?: string;
+  /** An uncommitted file of this task branch's worktree: both sides come from the backend, and
+   *  `left`/`right` only key the Monaco models. */
+  workingBranchId?: string;
   /** Checked right before the widget is created; a superseded mount (a section collapsed and
    *  re-expanded mid-read) returns false and leaves nothing to dispose. */
   isCurrent?: () => boolean;
@@ -197,8 +211,8 @@ export function useDiffEditor(
 
   async function mount(): Promise<void> {
     const settingsStore = useSettingsStore();
-    const { editorKey, repoId, path, left, right, review, reviewBranch } = params;
-    const loaded = await loadDiffSides(repoId, path, left, right, reviewBranch);
+    const { editorKey, repoId, path, left, right, review, reviewBranch, workingBranchId } = params;
+    const loaded = await loadDiffSides(repoId, path, left, right, reviewBranch, workingBranchId);
     if ('error' in loaded) {
       state.value = 'error';
       errorMessage.value = loaded.error;
@@ -286,7 +300,11 @@ export function useDiffEditor(
     // matches the file on disk (C6 D7's own reasoning for which side is navigable), and
     // IStandaloneDiffEditor itself has no getAction, so this has to reach through to one pane.
     const modifiedEditor = created.getModifiedEditor();
-    goToFileImpl = wireGoToFile(modifiedEditor, repoId, path, gitRepoId, right);
+    // The worktree file is not in the repo's main checkout, which is what the opener would show.
+    goToFileImpl =
+      workingBranchId === undefined
+        ? wireGoToFile(modifiedEditor, repoId, path, gitRepoId, right)
+        : null;
 
     state.value = 'found';
   }

@@ -69,6 +69,10 @@ interface GrpcRequestViewRuntime {
    *  trueMessageCount, and what makes the response pane's own byte total O(1) per message instead
    *  of O(N) per push. */
   messageBytes: number;
+  // P375: filter inputs outlive the view's unmount on tab switch; session-only, never tab state.
+  fieldFilterOpen: boolean;
+  fieldFilterQuery: string;
+  schemaFilter: string;
 }
 
 function defaultRuntime(): GrpcRequestViewRuntime {
@@ -84,6 +88,9 @@ function defaultRuntime(): GrpcRequestViewRuntime {
     messages: [],
     trueMessageCount: 0,
     messageBytes: 0,
+    fieldFilterOpen: false,
+    fieldFilterQuery: '',
+    schemaFilter: '',
   };
 }
 
@@ -282,5 +289,19 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     stopOp(rt);
   }
 
-  return { runtime, call, stop };
+  function setFieldFilter(tabId: string, open: boolean, query: string): void {
+    const rt = ensureRuntime(tabId);
+    rt.fieldFilterOpen = open;
+    rt.fieldFilterQuery = query;
+  }
+
+  function setFieldFilterQuery(tabId: string, query: string): void {
+    ensureRuntime(tabId).fieldFilterQuery = query;
+  }
+
+  function setSchemaFilter(tabId: string, query: string): void {
+    ensureRuntime(tabId).schemaFilter = query;
+  }
+
+  return { runtime, call, stop, setFieldFilter, setFieldFilterQuery, setSchemaFilter };
 });

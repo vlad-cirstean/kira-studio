@@ -20,13 +20,23 @@ export function createAutomationsModule(): AutomationsModuleContext {
   return {
     defaultCwd: () => terminalsStore.terminalDefaults.cwd,
     openTerminalTab: (opts) => {
-      openTerminalTab({ workspaceId: 'automations', cwd: opts.cwd, launch: opts.launch });
+      openTerminalTab({
+        workspaceId: 'automations',
+        cwd: opts.cwd,
+        launch: opts.launch,
+        replace: opts.replace,
+      });
     },
-    openRunTab: (runId, label) => {
-      tabsStore.openTab('script-run', null, runId, () => ({ runId, label }), {
+    openRunTab: (state, replace) => {
+      tabsStore.openTab('script-run', null, state.runId, () => state, {
         reuse: true,
         workspaceId: 'automations',
+        replace,
       });
+    },
+    tabs: {
+      list: () => tabsStore.tabsForWorkspace('automations'),
+      activate: (id) => tabsStore.activateTab(id),
     },
     host: {
       rendererDeps: {
@@ -74,7 +84,8 @@ export function createAutomationsModule(): AutomationsModuleContext {
       createCollection: (name) => customScriptsStore.createCollection(name),
       renameCollection: (id, name) => customScriptsStore.renameCollection(id, name),
       removeCollection: (id) => customScriptsStore.removeCollection(id),
-      move: (id, collectionId) => customScriptsStore.moveScript(id, collectionId),
+      move: (id, collectionId, beforeId) =>
+        customScriptsStore.moveScript(id, collectionId, beforeId),
       reorder: (collectionId, ids) => customScriptsStore.reorderScripts(collectionId, ids),
       reorderCollections: (ids) => customScriptsStore.reorderCollections(ids),
     },

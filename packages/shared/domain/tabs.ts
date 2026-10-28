@@ -71,6 +71,9 @@ export const terminalTabStateSchema = z.object({
   scriptId: z.string().default(''),
   // The single-use token a parametrised script's launch carries; never persisted (terminal tabs are not).
   launchToken: z.string().default(''),
+  // With `scriptId`, the script tab's run key (the ADE task and branch it runs for).
+  taskId: z.string().default(''),
+  branchId: z.string().default(''),
 });
 export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
 
@@ -79,6 +82,10 @@ export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
 export const scriptRunTabStateSchema = /*#__PURE__*/ z.object({
   runId: z.string(),
   label: z.string().default(''),
+  // The run key: one tab per script, task and branch.
+  scriptId: z.string().default(''),
+  taskId: z.string().default(''),
+  branchId: z.string().default(''),
 });
 export type ScriptRunTabState = z.infer<typeof scriptRunTabStateSchema>;
 

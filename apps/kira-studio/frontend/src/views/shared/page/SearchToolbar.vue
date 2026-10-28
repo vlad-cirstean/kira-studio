@@ -7,10 +7,10 @@ import { errorText } from '@workbench/bridge/codedError';
 import FindBar from '@workbench/components/FindBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
-import { usePageSearchFilterStore } from './searchFilter';
+import { type FindInput, usePageSearchFilterStore } from './searchFilter';
 
 // Shared by the grid, document and key-value views (testidPrefix '', 'document-', 'keyvalue-'):
 // a chunked scan over the loaded rows on the workbench `FindBar` shell.
@@ -19,6 +19,9 @@ const props = defineProps<{
   testidPrefix: string;
   kind: 'rows' | 'documents';
   api: PageSearchApi<M>;
+  /** Live read of the owner's open flag: at unmount the parent's `v-if` has flipped but this
+   *  component's props are stale, so a boolean prop would still read true. */
+  isOpen: () => boolean;
   /** The grid's own mask preview state — this component is shared with documents/
    *  keyvalue, neither of which has a masking concept, so this stays `undefined` (falsy) there.
    *  Search itself is unaffected either way (it always scans stored values, the "not a
@@ -57,10 +60,17 @@ function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
-const query = ref('');
-const matchCase = ref(false);
-const wholeWord = ref(false);
-const regex = ref(false);
+// P375: inputs live in the store so a tab switch (which unmounts this bar) restores them.
+function findField<K extends keyof FindInput>(key: K) {
+  return computed<FindInput[K]>({
+    get: () => pageSearchFilterStore.findInput(props.tabId)[key],
+    set: (v) => pageSearchFilterStore.setFindInput(props.tabId, { [key]: v }),
+  });
+}
+const query = findField('query');
+const matchCase = findField('matchCase');
+const wholeWord = findField('wholeWord');
+const regex = findField('regex');
 const errorMessage = ref<string | null>(null);
 const scanning = ref(false);
 const foundSoFar = ref(0);
@@ -159,7 +169,14 @@ function startSearch(autoScroll = true): void {
     const navigatedIndex = props.api.searchState[props.tabId]?.index ?? -1;
     const navigated = navigatedIndex >= 0 && navigatedIndex < matches.length;
     const index = navigated ? navigatedIndex : matches.length > 0 ? 0 : -1;
-    props.api.searchState[props.tabId] = { matches, index, found, matchedRows };
+    const page = props.api.pageOf?.(props.tabId);
+    props.api.searchState[props.tabId] = {
+      matches,
+      index,
+      found,
+      matchedRows,
+      ...(page && typeof page === 'object' ? { page: new WeakRef(page) } : {}),
+    };
     if (autoScroll && !navigated && matches.length > 0) emit('goToMatch', matches[0]);
   });
 }
@@ -214,18 +231,31 @@ function close(): void {
   handle = null;
   props.api.clearSearchState(props.tabId);
   // P24 D7: a closed toolbar must never leave rows hidden with no visible cause.
-  pageSearchFilterStore.setSearchFiltering(props.tabId, false);
+  pageSearchFilterStore.clearFind(props.tabId);
   emit('close');
 }
+
+// Remount after a tab switch: keep matches when the scan finished over the current page.
+onMounted(() => {
+  if (query.value === '') return;
+  const e = entry.value;
+  const current = props.api.pageOf?.(props.tabId);
+  if (!e || e.pending || e.page?.deref() !== current) startSearch(false);
+});
 
 onUnmounted(() => {
   closed = true;
   handle?.cancel();
   handle = null;
+  // Still open: a tab switch, not a close. Keep input, toggle and a finished scan.
+  if (props.isOpen()) {
+    if (props.api.searchState[props.tabId]?.pending) props.api.clearSearchState(props.tabId);
+    return;
+  }
   props.api.clearSearchState(props.tabId);
   // P24 D7: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too.
-  pageSearchFilterStore.setSearchFiltering(props.tabId, false);
+  pageSearchFilterStore.clearFind(props.tabId);
 });
 </script>
 

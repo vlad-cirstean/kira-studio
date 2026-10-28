@@ -1,4 +1,4 @@
-import type { BaseResolution, CommitRange } from '@kira/git-ipc';
+import type { BaseResolution, CommitRange, FileChange } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
@@ -114,8 +114,13 @@ export class ReviewSessionState {
   #base: string | undefined;
   #pendingResolution: BaseResolution | undefined;
 
-  constructor(bridge: BridgeClient) {
+  readonly #autoApply: boolean;
+
+  /** `autoApply`: a changed background resolution is applied at once instead of raising the D39
+   *  banner — for a locked window that has no Commits pane to show the banner in. */
+  constructor(bridge: BridgeClient, opts: { autoApply?: boolean } = {}) {
     this.#bridge = bridge;
+    this.#autoApply = opts.autoApply ?? false;
     this.#packed = new PackedStreamState();
     this.#unsubscribeChanged = bridge.on('repo.changed', (event) => {
       if (event.kind !== 'refsChanged') return;
@@ -271,12 +276,22 @@ export class ReviewSessionState {
     if (!repoId || !branch || !pending) return;
     this.staleReview.value = false;
     this.#pendingResolution = undefined;
+    await this.#applyFresh(repoId, branch, pending);
+  }
+
+  async #applyFresh(repoId: string, branch: string, fresh: BaseResolution): Promise<void> {
     this.#abortAll();
     this.#clearExpansions();
     this.#packed.reset();
-    this.resolution.value = pending;
-    this.#base = pending.base ?? undefined;
-    await this.#applyResolution(repoId, branch, pending);
+    this.resolution.value = fresh;
+    this.#base = fresh.base ?? undefined;
+    await this.#applyResolution(repoId, branch, fresh);
+  }
+
+  /** Re-checks the resolution now (window focus); a change follows `autoApply`. */
+  checkNow(): void {
+    if (this.phase.value === 'idle' || this.phase.value === 'resolving') return;
+    void this.#checkForChange();
   }
 
   /** Expands a row (first expansion fetches `commit.detail`; a later re-expansion reuses the
@@ -446,6 +461,10 @@ export class ReviewSessionState {
       if (this.resolution.value !== current) return;
       if (this.repoId.value !== repoId || this.branch.value !== branch) return;
       if (!resolutionsDiffer(current, fresh)) return;
+      if (this.#autoApply) {
+        await this.#applyFresh(repoId, branch, fresh);
+        return;
+      }
       this.#pendingResolution = fresh;
       this.staleReview.value = true;
     } catch (error) {
@@ -497,4 +516,13 @@ export interface ReviewApi {
   /** The path after/before `path` in the list as shown (tree order or flat, filter applied), or
    *  null at either end or when `path` is not listed. */
   adjacentFile(path: string, dir: 'next' | 'previous'): string | null;
+  /** Re-reads the file list and re-checks the base: for a host that may have missed a ref event. */
+  refresh(): void;
+}
+
+/** Uncommitted changes a host shows under the committed list (review window): no review marks,
+ *  `onOpen` opens the host's own diff for the path. */
+export interface ReviewWorkingSection {
+  readonly files: readonly FileChange[];
+  onOpen(path: string, pinned: boolean): void;
 }

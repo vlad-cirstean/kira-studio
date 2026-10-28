@@ -179,10 +179,13 @@ function onBackToLatest(): void {
 
 // The response headers pane's own filter — matches name OR value (unlike the variables filter,
 // a header's value is the thing being hunted, is server-provided, and it can never be a secret's
-// plaintext). Component-local: a lens over what's on screen, not a setting —
+// plaintext). Per-tab runtime (P375), not tab state: a lens over what's on screen, not a setting —
 // "a closed toolbar must never leave rows hidden with no visible cause" is satisfied trivially
 // since the box is always visible while the pane is.
-const headerFilter = ref('');
+const headerFilter = computed({
+  get: () => rt.value?.headerFilter ?? '',
+  set: (v: string) => httpRequestViewStore.setHeaderFilter(props.tab.id, v),
+});
 const filteredHeaders = computed(() => {
   const q = headerFilter.value;
   return (response.value?.headers ?? []).filter(
@@ -461,6 +464,7 @@ onUnmounted(() => {
     <CookiesPane
       v-else-if="tab.state.responsePane === 'cookies'"
       mode="response"
+      :tab-id="tab.id"
       :response="response"
     />
     <div v-else class="response-body flex flex-1 min-h-0 flex-col">

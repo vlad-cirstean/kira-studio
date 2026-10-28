@@ -38,16 +38,54 @@ func (e *RepoEntry) WorkingDetail(ctx context.Context) ([]porcelain.FileChange, 
 		return nil, err
 	}
 
-	// Untracked files never appear in a plain `git diff` at all (nothing to diff against) — the
-	// same gap gitsession/stash.go's own untracked bucket already has an answer for: a bare
-	// FileChange, mirrored verbatim here rather than inventing a second
-	// convention.
-	for _, entry := range statusResult.Entries {
+	return appendUntracked(changes, statusResult.Entries)
+}
+
+// WorktreeChanges is WorkingDetail for a linked worktree at dir: staged, unstaged and untracked
+// changes against that worktree's own HEAD, which it also returns (the left side of a diff). A
+// detached or unborn HEAD diffs against the empty tree and returns "".
+func (e *RepoEntry) WorktreeChanges(ctx context.Context, dir string) (head string, changes []porcelain.FileChange, err error) {
+	_, head, err = e.WorktreeHead(ctx, dir)
+	if err != nil {
+		return "", nil, err
+	}
+	base := head
+	if base == "" {
+		hashRaw, herr := e.runOne(ctx, porcelain.EmptyTreeHashArgs())
+		if herr != nil {
+			return "", nil, herr
+		}
+		base = porcelain.ParseEmptyTreeHash(hashRaw)
+	}
+	raw, err := e.runOneInDir(ctx, dir, porcelain.WorkingNameStatusArgs(base))
+	if err != nil {
+		return "", nil, err
+	}
+	recs, err := allRecords(raw)
+	if err != nil {
+		return "", nil, err
+	}
+	changes, err = porcelain.ParseNameStatusRecords(recs)
+	if err != nil {
+		return "", nil, err
+	}
+	entries, err := e.WorktreeStatus(ctx, dir)
+	if err != nil {
+		return "", nil, err
+	}
+	changes, err = appendUntracked(changes, entries)
+	return head, changes, err
+}
+
+// appendUntracked adds a bare FileChange per untracked status entry: a plain `git diff` never
+// lists them (nothing to diff against). Same convention as gitsession/stash.go's untracked bucket.
+func appendUntracked(changes []porcelain.FileChange, entries []porcelain.StatusEntry) ([]porcelain.FileChange, error) {
+	for _, entry := range entries {
 		if entry.Kind != "untracked" {
 			continue
 		}
 		if entry.Path == "" {
-			return nil, fmt.Errorf("gitsession: WorkingDetail: untracked status entry with empty path")
+			return nil, fmt.Errorf("gitsession: untracked status entry with empty path")
 		}
 		changes = append(changes, porcelain.FileChange{Kind: porcelain.FileAdded, Path: entry.Path})
 	}

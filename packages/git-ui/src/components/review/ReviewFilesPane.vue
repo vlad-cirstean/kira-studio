@@ -22,13 +22,15 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  */
 import InlineState from '@theme/components/InlineState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
+import type { ReviewWorkingSection } from '../../state/review.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
 import FileTree from '../FileTree.vue';
 
@@ -48,6 +50,8 @@ const props = defineProps<{
   // renders no toolbar of its own (show-toolbar="false") and so never emits an update to forward.
   listMode: FileListMode;
   filter: string;
+  /** Uncommitted changes under the committed list; `null` hides the section. */
+  working: ReviewWorkingSection | null;
 }>();
 
 const diffModeOptions: readonly DiffModeOption[] = [
@@ -69,6 +73,14 @@ const reviewStatesMap = computed<ReadonlyMap<string, ReviewFileStatus>>(() => {
   for (const entry of props.reviewFiles.files.value) map.set(entry.change.path, entry.review);
   return map;
 });
+
+const workingFiles = computed(() => props.working?.files ?? []);
+const workingSelected = ref(-1);
+
+function onOpenWorkingIndex(index: number, pinned: boolean): void {
+  const file = workingFiles.value[index];
+  if (file) props.working?.onOpen(file.path, pinned);
+}
 
 const selectedIndex = computed(() => {
   const path = props.reviewFiles.selectedPath.value;
@@ -148,7 +160,7 @@ function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
 
       <FileTree
         data-testid="review-files-tree"
-        class="flex-auto min-h-0 border-b border-border"
+        class="flex-auto min-h-0"
         :files="files"
         :selected-file="selectedIndex"
         :list-mode="listMode"
@@ -163,6 +175,38 @@ function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
         @toggle-reviewed="onToggleReviewed"
         @toggle-reviewed-folder="onToggleReviewedFolder"
       />
+      <section
+        v-if="workingFiles.length > 0"
+        class="flex flex-col min-h-0 max-h-[40%] shrink-0 border-t border-border"
+        data-testid="review-working"
+      >
+        <div
+          class="flex items-center gap-1.5 px-2 py-1 text-graph-sm font-medium"
+          data-testid="review-working-header"
+        >
+          <CodiconIcon name="edit" :size="13" class="text-warn" />
+          <span>{{ t('git.detail.working.title') }}</span>
+          <Badge variant="warn" class="ml-auto">{{ workingFiles.length }}</Badge>
+        </div>
+        <p class="px-2 pb-1 text-muted-foreground text-graph-sm">{{
+          t('git.review.working.hint')
+        }}</p>
+        <FileTree
+          data-testid="review-working-tree"
+          class="flex-auto min-h-0 overflow-auto"
+          :files="workingFiles"
+          :selected-file="workingSelected"
+          :list-mode="listMode"
+          :filter="filter"
+          :show-toolbar="false"
+          :parents="[]"
+          :parent-index="0"
+          :store="store"
+          :actions="actions"
+          @select-file="(i) => (workingSelected = i)"
+          @open-file="onOpenWorkingIndex"
+        />
+      </section>
       <InlineState v-if="reviewFiles.loading.value && files.length === 0" kind="loading">
         {{ t('common.state.loading.loading') }}
       </InlineState>

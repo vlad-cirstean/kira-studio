@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { MountHandle, ReviewApi } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { useWindowFocus } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { loadGitUi } from '../../../repo/git/gitUiModule';
 import { gitTransportFor } from '../../../repo/git/transport';
 import { ensureRepoOpen } from '../../../state/repoOpenHold';
+import { openRepoWorkingReviewTab } from '../../../state/repoTabs';
 import { useReviewNavigationStore } from '../../../state/reviewNavigation';
 import type { ReviewWindowTarget } from '../wire';
+import { useReviewWorking } from './useReviewWorking';
 
 // The review window's left pane: git-ui's review view locked to this window's branch and base.
 const props = defineProps<{ target: ReviewWindowTarget }>();
@@ -21,6 +24,28 @@ const navigation = useReviewNavigationStore();
 
 // Opens a file's diff in the centre tabs, as a click in the file list does.
 defineExpose({ selectFile: (path: string) => api?.selectFile(path) });
+
+// A missed watcher event (sleep, dropped FS event) heals when the window regains focus.
+const focused = useWindowFocus();
+watch(focused, (now, was) => {
+  if (now && !was) api?.refresh();
+});
+
+// The uncommitted section under the committed list; git-ui renders it, this window feeds it.
+const working = useReviewWorking(() => props.target.branchId);
+function pushWorking(): void {
+  const data = working.data.value;
+  handle?.setWorkingChanges?.(
+    data && data.worktree !== '' && data.files.length > 0
+      ? {
+          files: data.files,
+          onOpen: (path, pinned) =>
+            openRepoWorkingReviewTab(props.target.codeRepoId, path, props.target.branchId, pinned),
+        }
+      : null,
+  );
+}
+watch(() => working.data.value, pushWorking);
 
 onMounted(async () => {
   if (!container.value) return;
@@ -47,6 +72,7 @@ onMounted(async () => {
         unregisterNavigator = navigation.register(props.target.codeRepoId, a);
       },
     });
+    pushWorking();
   } catch (err) {
     errorMessage.value = errorText(err);
   }

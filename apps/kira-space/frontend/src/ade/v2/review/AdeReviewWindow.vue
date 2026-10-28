@@ -14,6 +14,7 @@ import AdeReviewFiles from './AdeReviewFiles.vue';
 import AdeReviewHeader from './AdeReviewHeader.vue';
 import AdeWorkflowReviewPanel from './AdeWorkflowReviewPanel.vue';
 import { useReviewContext } from './useReviewContext';
+import { useReviewWorkingSync } from './useReviewWorking';
 
 // Three panes for one branch: files to review (left), this window's diff tabs (centre), and the
 // questions panel (right).
@@ -21,6 +22,7 @@ const store = useAdeReviewWindowStore();
 const target = computed(() => store.target);
 const { repoLabel } = useReviewContext(() => store.target as NonNullable<typeof store.target>);
 
+useReviewWorkingSync(() => store.target);
 const files = useTemplateRef('files');
 
 // The Workflow review tab shows while the branch has a review step run; it opens first while that
@@ -109,6 +111,7 @@ const right = useLiveSize(
         </div>
       </section>
       <ResizeHandle
+        v-if="store.agentPanelVisible"
         :label="t('space.ade.panel.resize.label')"
         data-testid="ade-panel-resize-handle"
         direction="reverse"
@@ -117,6 +120,7 @@ const right = useLiveSize(
         v-bind="right.bind"
       />
       <section
+        v-if="store.agentPanelVisible"
         class="flex min-h-0 flex-none flex-col overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${right.size.value}px` }"
         :aria-label="t('space.ade.review.agent.label')"

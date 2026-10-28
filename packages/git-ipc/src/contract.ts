@@ -1862,8 +1862,8 @@ export type Contract = {
         /** The branch tip's own commit sha: the right-hand document's revision. */
         branchTip: string;
         /** The left-hand document's revision — the merge base in `range` mode (G13 F7), the
-         *  file's own `reviewedAtSha` in `sinceReview` mode. Always a commit sha, never a ref
-         *  name. */
+         *  file's own `reviewedAtSha` in `sinceReview` mode when changed since review. Always a
+         *  commit sha, never a ref name. */
         leftRev: string;
         /** What to call the left side in the tab title (`main`, `your last review`). Display
          *  only. */

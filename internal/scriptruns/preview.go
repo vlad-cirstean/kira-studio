@@ -312,9 +312,20 @@ func (s *Service) Preview(args RunArgs) (Preview, error) {
 
 // Start runs what Preview showed. A script that changed since the preview is refused.
 func (s *Service) Start(args StartArgs) (Started, error) {
+	s.startMu.Lock()
+	defer s.startMu.Unlock()
 	p, err := s.plan(args.RunArgs, planOpts{})
 	if err != nil {
 		return Started{}, err
+	}
+	var taskID, branchID string
+	if a := p.preview.ADE; a != nil {
+		taskID, branchID = a.TaskID, a.BranchID
+	}
+	if live, err := s.Runs.Running(p.script.ID, taskID, branchID); err != nil {
+		return Started{}, ipcerr.InternalErr(err)
+	} else if live != nil {
+		return Started{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.alreadyRunning.body", map[string]string{"name": p.script.Name})
 	}
 	if p.dir.Mode == scripts.DirModeWorktree && p.preview.Blocker == "" && len(p.preview.Missing) == 0 &&
 		(p.script.Kind == scripts.KindSmart || p.dir.Pending) {

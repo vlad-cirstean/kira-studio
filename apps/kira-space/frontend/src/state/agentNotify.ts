@@ -1,5 +1,6 @@
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import { useDocumentVisibility, useWindowFocus, watchDebounced } from '@vueuse/core';
+import { isLiveTab, keyOf, placeRunTab } from '@workbench/automations/scriptTabs';
 import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { queryClient } from '@workbench/state/queryClient';
@@ -8,6 +9,7 @@ import { useAdeBoardUiStore } from '../ade/v2/state/adeBoardUi';
 import { control } from '../bridge/control';
 import { useModeStore } from './mode';
 import { useTabsStore } from './tabs';
+import { useTerminalsStore } from './terminals';
 import { GENERAL_WORKSPACE, useWorkspaceStore, visibleWorkspace } from './workspace';
 
 // P238: tells Go what this window shows (so a note for the tab you look at is suppressed) and
@@ -16,6 +18,7 @@ import { GENERAL_WORKSPACE, useWorkspaceStore, visibleWorkspace } from './worksp
 export function installAgentNotifyFocus(): void {
   const mode = useModeStore();
   const tabs = useTabsStore();
+  const terminals = useTerminalsStore();
   const board = useAdeBoardUiStore();
   const focused = useWindowFocus();
   const visibility = useDocumentVisibility();
@@ -64,10 +67,22 @@ export function installAgentNotifyFocus(): void {
     mode.setMode('automations');
     const cached = queryClient.getQueryData<ScriptRun[]>(['scriptRuns', 'list']);
     const name = cached?.find((r) => r.id === runId)?.scriptName ?? label;
-    tabs.openTab('script-run', null, runId, () => ({ runId, label: name }), {
-      reuse: true,
-      workspaceId: 'automations',
-    });
+    const run = cached?.find((r) => r.id === runId);
+    const state = {
+      runId,
+      label: name,
+      ...(run ? keyOf(run) : { scriptId: '', taskId: '', branchId: '' }),
+    };
+    const { activate, replace } = placeRunTab(tabs.tabsForWorkspace('automations'), state, (tab) =>
+      isLiveTab(tab, (id) => terminals.terminalSession(id)?.status),
+    );
+    if (activate !== undefined) tabs.activateTab(activate);
+    else
+      tabs.openTab('script-run', null, runId, () => state, {
+        reuse: true,
+        workspaceId: 'automations',
+        replace,
+      });
   });
 
   control.onAgentRevealTask(({ taskId }) => {

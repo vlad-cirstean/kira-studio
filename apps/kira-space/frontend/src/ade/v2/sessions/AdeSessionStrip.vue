@@ -16,7 +16,7 @@ const phones = useMobileTerminalsStore();
 
 <template>
   <div
-    class="flex shrink-0 items-center gap-0.5 overflow-x-auto scrollbar-none border-b border-border bg-chrome px-1.5 py-1"
+    class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none px-1.5 py-1"
     data-testid="ade-session-strip"
   >
     <Button

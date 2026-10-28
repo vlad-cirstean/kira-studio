@@ -7,6 +7,7 @@ import { usePersistedState } from '@workbench/behaviour/persisted';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { useAutomationsModule } from '../module';
+import { keyOf, useScriptTabs } from '../scriptTabs';
 import { mirrorRuns } from './runStates';
 
 // P242: server state for Automations runs. Keys are flat [domain, ...ids] tuples.
@@ -53,6 +54,17 @@ export function useScriptRuns() {
     },
     queryClient,
   );
+}
+
+/** The newest running run of each script. */
+export function useLiveRunByScript() {
+  const { data } = useScriptRuns();
+  return computed(() => {
+    const m = new Map<string, ScriptRun>();
+    for (const r of data.value ?? [])
+      if (r.state === 'running' && !m.has(r.scriptId)) m.set(r.scriptId, r);
+    return m;
+  });
 }
 
 /** The runs of one ADE task, kept live by the same push channel. */
@@ -107,13 +119,15 @@ export function useStopScriptRun() {
 
 /** Resumes an interrupted smart run and opens the new run's tab. */
 export function useResumeScriptRun() {
-  const { runs, openRunTab } = useAutomationsModule();
+  const { runs } = useAutomationsModule();
+  const tabs = useScriptTabs();
   return useMutation(
     {
       mutationKey: ['scriptRuns', 'resume'],
       mutationFn: async (run: ScriptRun) => ({ run, started: await runs.resume(run.id) }),
       onSuccess: ({ run, started }) => {
-        if (started.runId) openRunTab(started.runId, run.scriptName);
+        if (started.runId)
+          tabs.openRun({ ...keyOf(run), runId: started.runId, label: run.scriptName });
       },
     },
     queryClient,

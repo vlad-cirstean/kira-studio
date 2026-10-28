@@ -5,7 +5,7 @@ import {
   type ProgressInput,
   walkPath,
 } from '../../frontend/src/ade/v2/board/progress';
-import { deriveStatus } from '../../frontend/src/ade/v2/board/status';
+import { blocked as isBlocked } from '../../frontend/src/ade/v2/board/status';
 import type { Branch, Run, Task, Workflow } from '../../frontend/src/ade/v2/wire';
 import { mkBranch, mkManual, mkRun, mkStep, mkTask } from './support/adeV2Fixtures';
 
@@ -14,11 +14,11 @@ const workflow: Workflow = {
   name: 'Feature',
   kiraSpaceMcp: false,
   steps: [
-    mkManual({ id: 'spec', name: 'Spec', status: 'In progress' }),
+    mkManual({ id: 'spec', name: 'Spec', status: 'in-progress' }),
     mkStep({ id: 'plan', runsOn: 'once' }),
     mkStep({ id: 'code' }),
     mkStep({ id: 'pr', before: 'approval' }),
-    mkStep({ id: 'release', kind: 'script', command: './r.sh', status: 'In review' }),
+    mkStep({ id: 'release', kind: 'script', command: './r.sh', status: 'in-review' }),
   ],
 };
 
@@ -215,32 +215,20 @@ describe('branch progress line', () => {
   });
 });
 
-describe('derived status', () => {
-  const status = (runs: Run[], over: Partial<Task> = {}, hasSessions = false, bs = branches) => {
+describe('blocked', () => {
+  const blocked = (runs: Run[], over: Partial<Task> = {}) => {
     const i = input(runs, over);
-    return deriveStatus({
-      task: i.task,
-      progress: buildTaskProgress(i),
-      branches: bs,
-      hasSessions,
-    });
+    return isBlocked(i.task, buildTaskProgress(i), branches);
   };
 
-  test('workflow states', () => {
-    expect(status([], { entryStepId: 'done' })).toBe('Done');
-    expect(status([...doneOn('plan'), run('code', 'b_api', { state: 'failed' })])).toBe('Blocked');
-    expect(status([run('code', 'b_api', { state: 'running' })])).toBe('In progress');
+  test('a stuck or failed run blocks a task in a workflow', () => {
+    expect(blocked([], { entryStepId: 'done' })).toBe(false);
+    expect(blocked([...doneOn('plan'), run('code', 'b_api', { state: 'failed' })])).toBe(true);
+    expect(blocked([run('code', 'b_api', { state: 'running' })])).toBe(false);
   });
 
-  test('a first step with nothing started is To do; a session or a started step is not', () => {
-    const first = { entryStepId: 'spec' };
-    expect(status([], first)).toBe('To do');
-    expect(status([], first, true)).toBe('In progress');
-  });
-
-  test('review and parked tasks ignore the workflow', () => {
-    expect(status([], { kind: 'review' })).toBe('In review');
-    expect(status([run('code', 'b_api', { state: 'failed' })], { kind: 'parked' })).toBe('To do');
+  test('a parked task is never blocked', () => {
+    expect(blocked([run('code', 'b_api', { state: 'failed' })], { kind: 'parked' })).toBe(false);
   });
 });
 

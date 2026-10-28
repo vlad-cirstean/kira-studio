@@ -56,6 +56,8 @@ export function terminalTabKind<
         launchKind: 'shell',
         scriptId: '',
         launchToken: '',
+        taskId: '',
+        branchId: '',
       }) as TerminalState,
     // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a
     // second session with the same launch — which needs no special case.

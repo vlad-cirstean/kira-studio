@@ -5,11 +5,13 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -120,7 +122,7 @@ func adeTaskError(err error) error {
 			return ipcerr.T(c.code, c.key, nil)
 		}
 	}
-	if errors.Is(err, repos.ErrTaskUnnamed) {
+	if errors.Is(err, repos.ErrTaskUnnamed) || errors.Is(err, repos.ErrStatusSet) || errors.Is(err, repos.ErrStatusUnknown) {
 		return ipcerr.BadRequest(err.Error())
 	}
 	if errors.Is(err, ade.ErrInvalidInput) {
@@ -268,6 +270,29 @@ func validateUpdateTask(a adewire.UpdateTaskArgs) error {
 	if p.Kind != nil && *p.Kind != "task" && *p.Kind != "parked" {
 		return adeTaskInvalid("kind must be task or parked")
 	}
+	if p.StatusID != nil && !model.ValidAdeStatusID(*p.StatusID) {
+		return adeTaskInvalid("statusId is not a status id")
+	}
+	return nil
+}
+
+func validateSaveStatuses(a adewire.SaveStatusesArgs) error {
+	if len(a.Statuses) < model.AdeStatusMin || len(a.Statuses) > model.AdeStatusMax {
+		return adeTaskInvalid("statuses must hold 1 to 20 entries")
+	}
+	for _, st := range a.Statuses {
+		if err := (model.AdeTaskStatus{ID: st.ID, Name: strings.TrimSpace(st.Name), Tone: st.Tone, Category: st.Category}).Validate(); err != nil {
+			return adeTaskInvalid(err.Error())
+		}
+	}
+	if len(a.Reassign) > model.AdeStatusMax {
+		return adeTaskInvalid("reassign is too long")
+	}
+	for from, to := range a.Reassign {
+		if !model.ValidAdeStatusID(from) || !model.ValidAdeStatusID(to) {
+			return adeTaskInvalid("reassign must map status ids to status ids")
+		}
+	}
 	return nil
 }
 
@@ -404,6 +429,15 @@ func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTask
 	return t, adeTaskError(err)
 }
 
+// SaveStatuses rewrites the task status set; tasks on a removed status move to its reassign target.
+func (s *AdeTaskService) SaveStatuses(ctx context.Context, args adewire.SaveStatusesArgs) (adewire.SaveStatusesResult, error) {
+	if err := validateSaveStatuses(args); err != nil {
+		return adewire.SaveStatusesResult{}, err
+	}
+	res, err := s.Engine.SaveStatuses(ctx, args)
+	return res, adeTaskError(err)
+}
+
 func (s *AdeTaskService) AddTaskRepo(ctx context.Context, args adewire.AddTaskRepoArgs) (adewire.Branch, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Branch{}, err
@@ -487,6 +521,41 @@ func (s *AdeTaskService) AddExistingBranch(ctx context.Context, args adewire.Add
 		}
 	}
 	r, err := s.Engine.AddExistingBranch(ctx, args)
+	return r, adeTaskError(err)
+}
+
+const adeMaxHostLinkBytes = 2048
+
+func validateHostLinkArgs(args adewire.HostLinkArgs) (adewire.HostLinkArgs, error) {
+	args.URL = strings.TrimSpace(args.URL)
+	if args.URL == "" || len(args.URL) > adeMaxHostLinkBytes || strings.ContainsFunc(args.URL, unicode.IsControl) {
+		return args, adeTaskInvalid("url must be a link of at most 2048 bytes")
+	}
+	if args.TaskID != "" {
+		if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+			return args, err
+		}
+	}
+	return args, nil
+}
+
+// ResolveHostLink names the branch a pasted PR or branch link points at; it changes nothing.
+func (s *AdeTaskService) ResolveHostLink(ctx context.Context, args adewire.HostLinkArgs) (adewire.HostLinkTarget, error) {
+	args, err := validateHostLinkArgs(args)
+	if err != nil {
+		return adewire.HostLinkTarget{}, err
+	}
+	r, err := s.Engine.ResolveHostLink(ctx, args)
+	return r, adeTaskError(err)
+}
+
+// AddHostLink attaches the branch a pasted PR or branch link points at.
+func (s *AdeTaskService) AddHostLink(ctx context.Context, args adewire.HostLinkArgs) (adewire.AddExistingBranchResult, error) {
+	args, err := validateHostLinkArgs(args)
+	if err != nil {
+		return adewire.AddExistingBranchResult{}, err
+	}
+	r, err := s.Engine.AddHostLink(ctx, args)
 	return r, adeTaskError(err)
 }
 
@@ -1011,6 +1080,27 @@ func (s *AdeTaskService) ReviewWindowTarget(ctx context.Context, args adewire.Wi
 	}
 	t, err := s.Engine.ReviewWindowTarget(ctx, args.WindowKey)
 	return t, adeTaskError(err)
+}
+
+// ReviewWorking lists the uncommitted changes of the branch's worktree against its HEAD.
+func (s *AdeTaskService) ReviewWorking(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewWorking, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	r, err := s.Engine.ReviewWorking(ctx, args.BranchID)
+	return r, adeTaskError(err)
+}
+
+// ReviewWorkingDiff reads one uncommitted file of the branch's worktree for a diff tab.
+func (s *AdeTaskService) ReviewWorkingDiff(ctx context.Context, args adewire.ReviewWorkingDiffArgs) (codeworkspace.DiffContent, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return codeworkspace.DiffContent{}, err
+	}
+	if args.Path == "" {
+		return codeworkspace.DiffContent{}, adeTaskInvalid("path is required")
+	}
+	d, err := s.Engine.ReviewWorkingDiff(ctx, args.BranchID, args.Path)
+	return d, adeTaskError(err)
 }
 
 // ReviewAgent returns the task's review agent session and, when it runs, the window hosting its terminal.

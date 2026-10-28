@@ -2,6 +2,9 @@ package model
 
 import (
 	"fmt"
+	"regexp"
+	"slices"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
@@ -47,6 +50,11 @@ type AdeTask struct {
 	Color        int
 	CreatedAt    int64
 	ArchivedAt   *int64
+	// StatusID is the task's status; StatusBy says who set it (AdeStatusBy*). StatusStep is the step key
+	// whose status the engine last applied ("done" when finished, "" not started).
+	StatusID   string
+	StatusBy   string
+	StatusStep string
 }
 
 // Validate asserts what no SQL constraint covers.
@@ -70,6 +78,8 @@ type AdeTaskPatch struct {
 	Notes   *string
 	Color   *int
 	Kind    *string
+	// StatusID moves the task to that status by hand (status_by = user).
+	StatusID *string
 }
 
 // AdeTaskBranch is one row of ade_task_branches. Name "" = branch not created yet.
@@ -394,5 +404,77 @@ func ValidAdeBranchKind(v string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// AdeStatusBy* are ade_tasks.status_by's CHECK values.
+const (
+	AdeStatusByAuto = "auto"
+	AdeStatusByUser = "user"
+)
+
+// AdeStatusCategory* are ade_task_statuses.category's CHECK values; a category drives the status
+// automation picks.
+const (
+	AdeStatusTodo   = "todo"
+	AdeStatusActive = "active"
+	AdeStatusReview = "review"
+	AdeStatusDone   = "done"
+)
+
+// AdeStatusCategories lists the categories in display order.
+var AdeStatusCategories = []string{AdeStatusTodo, AdeStatusActive, AdeStatusReview, AdeStatusDone}
+
+// AdeStatusTones are ade_task_statuses.tone's CHECK values.
+var AdeStatusTones = []string{"amber", "red", "green", "blue", "purple", "grey"}
+
+// Limits of the status set.
+const (
+	AdeStatusMin     = 1
+	AdeStatusMax     = 20
+	AdeStatusNameMax = 40
+	AdeStatusIDMax   = 40
+)
+
+var adeStatusIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+
+// ValidAdeStatusID reports a well-formed status id.
+func ValidAdeStatusID(id string) bool {
+	return len(id) <= AdeStatusIDMax && adeStatusIDPattern.MatchString(id)
+}
+
+// AdeTaskStatus is one row of ade_task_statuses.
+type AdeTaskStatus struct {
+	ID       string
+	Name     string
+	Tone     string
+	Category string
+	Position int
+}
+
+// Validate asserts one status; an empty ID is allowed (a new status gets a slug from its name).
+func (s AdeTaskStatus) Validate() error {
+	if s.ID != "" && !ValidAdeStatusID(s.ID) {
+		return fmt.Errorf("model: ade task status: invalid id %q", s.ID)
+	}
+	if n := utf8.RuneCountInString(s.Name); n < 1 || n > AdeStatusNameMax {
+		return fmt.Errorf("model: ade task status %q: name needs 1-%d characters", s.ID, AdeStatusNameMax)
+	}
+	if !slices.Contains(AdeStatusTones, s.Tone) {
+		return fmt.Errorf("model: ade task status %q: invalid tone %q", s.ID, s.Tone)
+	}
+	if !slices.Contains(AdeStatusCategories, s.Category) {
+		return fmt.Errorf("model: ade task status %q: invalid category %q", s.ID, s.Category)
+	}
+	return nil
+}
+
+// DefaultAdeTaskStatuses is the seed set of migration 0051.
+func DefaultAdeTaskStatuses() []AdeTaskStatus {
+	return []AdeTaskStatus{
+		{ID: "todo", Name: "To do", Tone: "grey", Category: AdeStatusTodo, Position: 0},
+		{ID: "in-progress", Name: "In progress", Tone: "amber", Category: AdeStatusActive, Position: 1},
+		{ID: "in-review", Name: "In review", Tone: "blue", Category: AdeStatusReview, Position: 2},
+		{ID: "done", Name: "Done", Tone: "green", Category: AdeStatusDone, Position: 3},
 	}
 }

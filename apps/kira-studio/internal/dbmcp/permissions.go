@@ -8,6 +8,18 @@ import (
 // modes is one connection's three MCP permission words (M2 §4.1), each one of deny/allow/prompt.
 type modes struct{ read, write, ddl string }
 
+// reviewResults resolves a connection's result review: its own override, else the app setting.
+func (s *Server) reviewResults(c model.ConnectionSummary) bool {
+	switch c.McpReviewResults {
+	case "review":
+		return true
+	case "send":
+		return false
+	default:
+		return s.cfg.PreviewResponses()
+	}
+}
+
 // modesOf reads c's own MCP permission fields.
 func modesOf(c model.ConnectionSummary) modes {
 	return modes{read: c.McpReadMode, write: c.McpWriteMode, ddl: c.McpDdlMode}

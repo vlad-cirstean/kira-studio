@@ -332,10 +332,12 @@ export const useVariablesStore = defineStore('variables', () => {
 interface VariableSetRuntime {
   /** A mutation or reveal failure's message (D10/F10) — shown in the view's own MessageStrip. */
   error: string | null;
+  /** Name filter text (P375); kept here so a tab switch does not drop it. */
+  filterQuery: string;
 }
 
 function defaultVariableSetRuntime(): VariableSetRuntime {
-  return { error: null };
+  return { error: null, filterQuery: '' };
 }
 
 export interface VariableOverviewRow {
@@ -491,6 +493,14 @@ export const useVariableSetStore = defineStore('variableSet', () => {
 
   function variableSetError(tabId: string): string | null {
     return variableSetRuntime[tabId]?.error ?? null;
+  }
+
+  function filterQueryFor(tabId: string): string {
+    return variableSetRuntime[tabId]?.filterQuery ?? '';
+  }
+
+  function setFilterQuery(tabId: string, query: string): void {
+    ensureVariableSetRuntime(tabId).filterQuery = query;
   }
 
   function setVariableSetError(tabId: string, message: string | null): void {
@@ -828,6 +838,8 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     ...toRefs(historyMenuState),
     variableSetError,
     setVariableSetError,
+    filterQueryFor,
+    setFilterQuery,
     upsertVariable,
     deleteVariable,
     reorderVariables,

@@ -66,6 +66,8 @@ export interface OpenTabOpts {
   /** P74 §5.2: a bulk open's own files join the workspace's preview cohort instead of each
    *  replacing the last — never evicts. Ignored when `preview` is falsy. */
   previewCohort?: boolean;
+  /** Id of an existing tab the new one takes the place of: same strip slot, the old tab closes. */
+  replace?: string;
 }
 
 /** Every generic action the store exposes, before an app's own `extend` adds more — also what
@@ -392,7 +394,14 @@ export function createTabsStore<
         workspaceId,
       } as unknown as R;
 
-      insertNewTabRecord(record, workspaceKey, opts);
+      const replaceIdx =
+        opts.replace === undefined ? -1 : tabsState.tabs.findIndex((t) => t.id === opts.replace);
+      if (replaceIdx >= 0 && opts.replace !== undefined) {
+        tabsState.tabs.splice(replaceIdx + 1, 0, record);
+        closeTabInternal(opts.replace);
+      } else {
+        insertNewTabRecord(record, workspaceKey, opts);
+      }
       setActiveTabId(id, workspaceKey);
       host.onOpened?.(record, false);
       saveNow();

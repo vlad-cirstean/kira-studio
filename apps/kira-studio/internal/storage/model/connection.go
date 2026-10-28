@@ -45,6 +45,8 @@ type ConnectionFields struct {
 	// threshold. Separate from AutoExplain, which governs this app's own console — see the
 	// migration's own comment for why one switch cannot mean both.
 	McpAutoExplain bool `json:"mcpAutoExplain"`
+	// Result review on the DB MCP path: inherit (app setting), review (always hold), send (never).
+	McpReviewResults string `json:"mcpReviewResults"`
 }
 
 // ConnectionSummary mirrors packages/shared/domain/connection.ts's connectionSummarySchema.
@@ -105,3 +107,9 @@ var mcpPermissionModes = map[string]bool{"deny": true, "allow": true, "prompt": 
 
 // ValidMcpPermissionMode mirrors connection.ts's mcpPermissionModeSchema (M2).
 func ValidMcpPermissionMode(v string) bool { return mcpPermissionModes[v] }
+
+// mcpReviewResultsValues mirrors connection.ts's mcpReviewResultsSchema.
+var mcpReviewResultsValues = map[string]bool{"inherit": true, "review": true, "send": true}
+
+// ValidMcpReviewResults mirrors connection.ts's mcpReviewResultsSchema (P382).
+func ValidMcpReviewResults(v string) bool { return mcpReviewResultsValues[v] }

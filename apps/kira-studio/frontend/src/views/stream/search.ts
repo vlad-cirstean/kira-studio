@@ -18,6 +18,7 @@ interface StreamSearchState {
   query: string;
   matches: number[]; // row indices, ascending
   index: number; // position within `matches`, or -1 when there are none
+  page?: WeakRef<StreamPage>; // page the scan ran over; a mismatch on remount means rescan
 }
 
 export const useStreamSearchStore = defineStore('streamSearch', () => {
@@ -78,7 +79,12 @@ export const useStreamSearchStore = defineStore('streamSearch', () => {
         if (rowMatches(page, row, needle, decoder)) matches.push(row);
       }
     }
-    searchState[tabId] = { query, matches, index: matches.length > 0 ? 0 : -1 };
+    searchState[tabId] = {
+      query,
+      matches,
+      index: matches.length > 0 ? 0 : -1,
+      ...(page ? { page: new WeakRef(page) } : {}),
+    };
   }
 
   // P31 D16: this module's own matches are already ascending, distinct row indices (one entry

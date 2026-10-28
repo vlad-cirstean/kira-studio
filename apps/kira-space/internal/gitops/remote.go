@@ -70,3 +70,8 @@ func CoreAskPassArgs() []string {
 func IsAncestorArgs(a, b string) []string {
 	return []string{"merge-base", "--is-ancestor", a, b}
 }
+
+// CheckRefFormatBranchArgs builds `git check-ref-format --branch <name>`: exit 0 for a valid name.
+func CheckRefFormatBranchArgs(name string) []string {
+	return []string{"check-ref-format", "--branch", name}
+}

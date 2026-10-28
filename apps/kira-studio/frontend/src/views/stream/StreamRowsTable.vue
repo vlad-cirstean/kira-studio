@@ -237,6 +237,7 @@ const CELL_BASE =
   <StreamSearchToolbar
     v-if="rt?.searchOpen"
     :tab-id="tab.id"
+    :is-open="() => !!streamViewStore.runtime[tab.id]?.searchOpen"
     @go-to-match="onGoToMatch"
     @close="streamViewStore.setSearchOpen(tab.id, false)"
   />

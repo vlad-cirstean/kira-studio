@@ -7,7 +7,7 @@ import type { RepoHead } from './components/GitViewHead.vue';
 import ReviewView from './components/review/ReviewView.vue';
 import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
 import MountRoot from './MountRoot.vue';
-import type { ReviewApi, ReviewTarget } from './state/review.ts';
+import type { ReviewApi, ReviewTarget, ReviewWorkingSection } from './state/review.ts';
 import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 
 export interface MountHandle {
@@ -22,6 +22,8 @@ export interface MountHandle {
   setVisible?(visible: boolean): void;
   /** Pushes new `dateFormat`/`repoHead` into the mounted view; an omitted key is left as is. */
   update?(next: { dateFormat?: DateFormat; repoHead?: RepoHead }): void;
+  /** Review view only: the uncommitted-changes section under the Files list; `null` hides it. */
+  setWorkingChanges?(section: ReviewWorkingSection | null): void;
 }
 
 export interface MountOptions {
@@ -118,6 +120,9 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     },
     setVisible(visible: boolean): void {
       graphVisible.value = visible;
+    },
+    setWorkingChanges(section): void {
+      if (view === 'review') rootProps.workingChanges = section;
     },
     update(next): void {
       if (next.repoHead !== undefined) rootProps.repoHead = next.repoHead;

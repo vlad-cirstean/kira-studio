@@ -481,8 +481,8 @@ custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smar
                                                        -- NULL = ungrouped, FK to
                                                        -- custom_script_collections ON DELETE CASCADE;
                                                        -- sort_order is dense per collection (NULL =
-                                                       -- ungrouped set); Move appends to the end of
-                                                       -- the target set
+                                                       -- ungrouped set); Move places the script
+                                                       -- before beforeId in the target set, or last
 script_runs(id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command,
             outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json,
             tools_json, task_id, task_title, branch_id, branch_label)
@@ -521,7 +521,9 @@ tabs(id, connection_id, path, kind, state_json, order, active, window_key, works
                                                        -- way), so a pre-P100 DB needs no migration
                                                        -- of its own here
 api_collections(id, name, sort_order, origin_json, variables_promoted,
-                 created_at, updated_at)                -- P4; variables_promoted added P5
+                 created_at, updated_at)                -- P4; variables_promoted added P5;
+                                                       -- sort_order is the user's order, set by
+                                                       -- ReorderCollections (P381)
 api_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
            request_json, origin_json, created_at, updated_at)
                                                        -- the folder/request tree; parent_id and
@@ -801,6 +803,11 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
 - The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list.
+- A script keeps one tab per key {scriptId, taskId, branchId} ('' when none), stored in terminal (launchKind script) and script-run tab state; packages/workbench/src/automations/scriptTabs.ts holds the rule.
+- A start for a key whose tab is live (terminal session and run still running, or run running|waiting) focuses that tab and starts nothing; a finished key tab is replaced in place (new tab id, same strip slot, so terminal ids stay per run); no key tab opens a new one.
+- Viewing a run (history, chip, resume, agent reveal) uses the same placement: tab already on that run activates, finished key tab is replaced, live key tab with another run opens a new tab.
+- createTabsStore OpenTabOpts.replace names the tab a new one takes over. The gate lives in the UI only; Go does not refuse concurrent runs of one script.
+- A script row click selects, double-click or Enter opens Edit; the play button, menu Run and Run now are the only starts.
 - A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/agentmcp (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
 - Smart script defaults are model sonnet, 1 USD budget (--max-budget-usd) and 15 min timeout; bounds in internal/scripts/smart.go are 20 params, 20000-char prompt, budget 0.05-25 USD, timeout 1 min-2 h.
 - Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server plus the MCP servers the script ticked, and --permission-prompts none denies instead of asking.
@@ -828,7 +835,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P128 deleted views/repo/RepoTerminalView.vue, which had been a hand-kept-identical second copy of the terminal tab body for repo-scoped terminals.
 - A repo terminal differs from an Automations terminal only in the workspaceId/codeRepoId the opener stamps on the tab record: openRepoTerminalTab (repo-scoped) versus Automations' openTerminalTab (workspace-scoped, visibleWorkspace()'s id).
 - TerminalTabView.vue/TerminalHostView.vue read neither workspaceId nor codeRepoId; the tab prop is typed against TerminalHostView's own prop shape, not either app's tab-record type.
-- Cmd+Enter in every terminal sends `ESC CR` (meta-Enter) via one custom key handler in `terminalRenderer.ts`; a newline in Claude Code and zsh.
+- Shift+Enter in every terminal sends `ESC CR` (meta-Enter) via one custom key handler in `terminalRenderer.ts`; a newline in Claude Code and zsh. Cmd+Enter has no binding (xterm sends `CR`).
 - Terminal scroll options match VS Code (xterm defaults plus `scrollOnEraseInDisplay`). `sessionEnv` sets `CLAUDE_CODE_SCROLL_SPEED=3` unless already set: xterm 6.0.0 has no XTVERSION, so Claude Code otherwise falls back to 1 row per wheel report.
 - Terminal background is `--kira-bg-chrome`, VS Code Dark Modern panel/terminal colour.
 - The Operations dock is a full-width flex sibling below the shell's project/main row, outside any split, because nesting it as a vertical group hung the render process on a tree-row click (never root-caused).
@@ -933,8 +940,9 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - GraphQL support was deleted entirely by a product decision (no query/variables state, no GraphQL StreamLanguage, no server-side envelope builder); raw is plain text only and JavaScript/JSON/HTML/XML became the top-level code mode with its own codeLanguage field.
 - On Postman import (internal/postman/body.go), a raw body with options.raw.language absent or "text" becomes raw; one of the four known languages becomes code with that codeLanguage; an unrecognised language degrades to plain raw instead of failing, with the original language kept in origin_json.
 - A Postman environment export imports as an app environment (secrets encrypted, disabled values skipped, globals refused). CollectionsService.Import takes several paths and imports each file independently, reporting one entry per file.
-- Postman exports only shared variable values; an unshared (local) value arrives as `"value": ""`, which the app cannot recover. Import reports it as the `empty_values` warning (collections and environments), telling the user to share the values in Postman and export again.
-- Collection `variable[]` and environment `values[]` share one entry decoder (`internal/postman/parse.go` `decodeVariableEntry`): scalar values keep literal text, object and array values import as compact JSON, `enabled: false` or `disabled: true` skips and counts the entry. Legacy promotion in `repos/variables.go` calls the same `postman.VariableValue`.
+- Postman exports only shared variable values; an unshared (local) value arrives as `"value": ""`, which the app cannot recover. Import keeps the key with an empty value and reports the `empty_values` warning (collections and environments).
+- Collection `variable[]` and environment `values[]` share one entry decoder (`internal/postman/parse.go` `decodeVariableEntry`): scalar values keep literal text, object and array values import as compact JSON, `enabled: false` or `disabled: true` skips and counts the entry (`disabled_variables`), and a missing or non-scalar key imports as `unnamed_<n>` (`unnamed_variables`). Legacy promotion in `repos/variables.go` calls the same `postman.VariableValue`.
+- A Postman item with neither `item` nor `request` imports as an empty GET request (`missing_request`); only `item[]` and variable entries that are not JSON objects are skipped.
 - Import also accepts the Postman API envelope, one level only: `{"collection":{info,...}}` and `{"environment":{values,...}}`.
 - On Postman export, language "text" is written explicitly for raw bodies, so Postman shows the Text sub-selector instead of relying on a default this app does not control.
 - A Postman graphql body imports as code/json carrying the GraphQL-over-HTTP envelope ({query, variables, operationName}), because refusing the file, skipping the item or importing as none would yield a request that silently does nothing instead of staying runnable.
@@ -1073,6 +1081,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P104 (§3) deleted ViewChrome and ViewHeader because there is no components/ui/reka counterpart for a bespoke layout container, and inlined their markup at each call site over components/ui parts and Tailwind utilities.
 - The shared view chrome look is now a convention each view's own template repeats, not a component it mounts; the logic beneath stays shared.
 - The per-tab runtime store (createRuntimeStore) owns setActionError, toggleSearchOpen and setSearchOpen, so views do not re-implement them.
+- Studio tab views unmount on every tab switch (no keepMounted). Per-tab view UI state (filter inputs, open flags, find query and matches, unapplied filter-row drafts) lives in the view's runtime store, session-only and cleared on tab close, never in a component ref. An open find bar keeps its scan across a switch and rescans only when its page changed; closing the bar clears query and filter-rows toggle (P375).
 - views/shared/viewOp.ts's beginOp/applyLoadFailure are the one load-op preamble and load-failure tail behind every view's load() except Browse, which supersedes by loadSeq, not opId, and has no E_CANCELLED branch.
 - views/shared/page/store.ts is the one two-level page-cache implementation behind all five page modules (grid, documents, keyvalue, stream, console).
 - Visible-window pruning of the page cache is wired into the view side of all five page modules (P5 C3); documents also prunes the parsed-tree cache in views/shared/document/rows.ts to the same window.
@@ -1944,8 +1953,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Failure: cenkalti/backoff/v4 ExponentialBackOff (30 s to 15 min), a hard gate until the host's reset time, the existing per-repo breaker, and a stop under 200 remaining GraphQL budget. A transient remote-read failure never drops rows.
 - Invalidation: a different signed-in account or a bumped GitHostSchemaVersion drops the repo's rows. Turning the host setting off drops them. Rows of a repo with no sync-state write (updated_at, migration 0048) in 30 days are pruned once per process, at the first Registry.Acquire before any syncer reads state, so no run can resurrect a pruned repo as complete.
 - Delivery: repo.changed kind changeRequestsChanged goes through the coalescing subscriber after a run that changed rows. branch.changeRequestIndex serves one record per head branch from SQLite (newest row per branch picked in SQL, so cost tracks branch count), reports `complete` false when refs cannot be read, only branches present in refs plus open requests; git-ui fills byBranch in one assignment, skips per-branch lookups when `complete`, and reloads on the event (one in flight, one queued). Repo-scoped git reloads ignore the kind.
-- ADE storage: ade_tasks.host_url, ade_backlog.host_url. Migration 0044 renames github_url, ade_gh_synced and pr_number. Migration 0050 (P369) drops ade_viewed_sync.
+- ADE storage: ade_tasks.host_url, ade_backlog.host_url. Migration 0044 renames github_url, ade_gh_synced and pr_number. Migration 0050 (P369) drops ade_viewed_sync. Migration 0051 (P379) adds ade_task_statuses with 4 seeds and ade_tasks.status_id, status_by, status_step, backfilled from the entry step.
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
+- BranchLinks (P383) is an optional role: ParseBranchLink (pull, tree, issue links on a claimed host; no host call), ChangeRequestHead (fresh head, author) and ChangeRequestRef (refs/pull/<n>/head on GitHub). ADE ResolveHostLink is read only; AddHostLink re-resolves, fetches one refspec (fork or closed PR: the change-request ref into <owner>/<head>; same-repo open PR: the head into its tracking ref) and attaches through the AddExistingBranch path, so kind follows the tip-author rule. Repo match walks every remote, origin first. Issue links are refused.
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
 
 ## Agent harness (P316)
@@ -2007,9 +2017,13 @@ and `docs/HISTORY.md (v2.0)`.
 
 - In Kira Space, a task owns branches across repos.
 - A branch in Kira Space is one of three kinds: mine (created here, has a name), review (another author's), or parked (kept out of the merge order; shown as Not merging).
+- A review task converts one way to a work item (task menu, UpdateTask kind task): task owner cleared, its review branches become mine and get a worktree plus prepare script. Clicking a review card opens the task panel; its branch panel opens from the task's branch list (P377).
 - A task follows a workflow, a flat list of steps of kind agent (claude -p), script (a shell command), review or manual (your own work, optionally an interactive session).
 - A workflow step runs once (on the first mine branch in task order), each repo, or only <repo>, with one run per step and branch.
-- Task status is derived from the workflow and runs, never typed (decision D10), so the Status field is read-only.
+- Task status is stored (P379): table ade_task_statuses (id slug, name, tone, category todo|active|review|done, position), 1-20 rows, every category present, names unique ignoring case. Tasks hold status_id, status_by (auto|user), status_step; no SQL FK, so a removed id is reassigned in the same transaction as the set write.
+- Status sync is last event wins. The engine re-applies a step's status only when the workflow position key (current step id, `done`, or empty when not started) differs from status_step. A manual move (UpdateTask statusId) sets status_by user and leaves status_step, so it holds until the next step change. A step status id missing from the set resolves to the first status of the kind default (review step: review, else active).
+- Blocked is not a status: a derived overlay (stuck or failed run, failed setup) shown as a red chip beside the status.
+- Workflow step `status:` holds a status id. The parser checks id syntax only and maps legacy names (To do, In progress, In review, Done) to the seed ids.
 - Backlog items are not on the plan until promoted.
 - The Plan uses flat token surfaces only: no textures, shadows, dashed borders or tint washes. State shows as rail, border, outline or chip colour. Each branch row has one `surface` tooltip (`AdeBranchTip`) in the plan colour coding.
 - CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
@@ -2022,7 +2036,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the agentmcp finish_step server, the Tracker, log sink and session store.
 - wireAdeTask calls Recover() then Start() on the task board, and installs board.OnTUIStopped as the tracker's stopped handler.
-- bridge.AdeTaskService binds 64 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
+- bridge.AdeTaskService binds 69 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
 - AdeTaskService push channels are defined in bridge/adewire/channels.go with prefix kira:adetask: and suffixes board, backlog, workflows, repos, runs, log, sessions and open-session; open-session is emitted to one window via EmitTo.
 - bridge/adewire is the frozen wire contract; tests/fixtures/ade-v2/ holds 27 fixtures decoded by adewire/wire_test.go and the mock runtime.
 - layeringtest.RunAllowing admits the adewire package.
@@ -2374,6 +2388,11 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - closeDecision keeps the main window from closing while a review window is open.
 - The review window has three panes: git-ui review files (every changed file, target locked), diff tabs, and the review agent panel. One title bar (AdeReviewHeader inside the shared TitleBar strip, so the drag region and traffic-light inset stay) holds the task colour, title, repo, branch, base and an uncommitted badge.
 - The files pane calls ensureRepoOpen first, because the git socket needs repo.open on its connection.
+- The committed list reloads on repo.changed refsChanged (ReviewFilesState, coalesced), on window focus (AdeReviewFiles) and, with lockTarget, through ReviewSessionState auto-apply (new tip adopted without a manual apply). A selected file re-runs its diff after a reload, or clears if it left the list.
+- Uncommitted changes show in a separate section under the committed list (review-working), never marked reviewed: marks belong to the branch tip. Source is AdeTaskService.ReviewWorking (porcelain status of the worktree against HEAD; branchId resolves the worktree server-side, never a client path). ReviewWorkingDiff returns the HEAD blob and the worktree file. The diff tab is repo-diff with a `working` branchId; it follows live data and has no go-to-file.
+- The uncommitted queries (TanStack, useReviewWorking) refresh on the ade board push, window focus and agent PostToolUse or Stop events whose cwd is inside the worktree (debounced TIMING.fileSettle). No polling: an edit from another tool shows on refocus. FSEvents delivery and WKWebView focus are unverified off macOS.
+- Since-review diff left side: the stored snapshot when the file changed since review (changedSinceReview), otherwise the merge base, so a reviewed file still shows its diff like a PR. Left equal to right is never used.
+- The title bar toggle (ade-review-toggle-agent, useAdeReviewWindowStore.agentPanelVisible) hides the right pane. In a review window Cmd+J toggles it and Cmd+B is a no-op; the main window keeps the layout panels.
 - The title bar's right group (AdeReviewActions) has a Review dropdown (Comment, Approve, Request changes) and Comment on {short}. Both open AdeReviewSubmitDialog, which posts a review or a conversation comment through changeRequest.submitReview or changeRequest.comment. Local review comments stay agent-only and are never part of a submitted review. Own change requests disable approve and request changes; merged or closed ones disable every review event. The review applies to the host's current head (commit_id); a differing local tip shows a warning. Errors render inline; there is no toast.
 - The since-review review_session is pinned (SetPinned, gitreview 0003) so rebases cannot drop the reviewed blobs.
 - The since-review diff's left side is the stored snapshot (review.snapshot), not a git ref; a renamed unchanged file keeps its review.
@@ -2387,7 +2406,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Keep Monaco objects in shallowRef (useDiffEditor), because a deep ref hangs the page.
 - Review entry rule (P240): board/reviewCode.ts reviewChoice hides (parked), disables with a reason (uncreated branch, ahead === 0) or enables each branch; useReviewCode is the one caller of OpenReviewWindow.
 - The ade.reviewCode command uses Cmd/Ctrl+Shift+R as a local binding with no accel.go row; a task with several branches shows a picker.
-- Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[]. A part with `kind: 'branch'` renders as `BranchChip` (git-branch Badge, the git graph ref-badge recipe); ADE builds branch-name parts with `branchParts`.
+- Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[]. A part with `kind: 'branch'` renders as `BranchChip` (git-branch Badge, the git graph ref-badge recipe); ADE builds branch-name parts with `branchParts`. `kind: 'path'` renders `PathChip` (folder icon, same Badge). Both share `ValueChip` (Badge + icon + truncating value).
 
 ### Tests
 
@@ -2709,9 +2728,9 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The held bytes are the TextContent of the result the client would get. Masking happens once, in render.go. The UI parses those bytes into a table (ApprovalResponse.vue) and shows them verbatim on the As sent tab. It never re-renders or re-masks.
 - The text stays out of queue snapshots, which fan out to every window and can be MB-sized. Snapshots carry only isError and bytes; DbMcpService.PendingResponse(requestId) serves the text while the request is queued.
 - Withhold, timeout, abandon and a full queue return an app-authored error with no row data. Approve first re-checks MCP exposure and compares the current mask set with the one used to render (mask.Set.Equal); a change withholds the result so a rule added during review cannot be bypassed.
-- The setting is read fresh per call (bridge previewResponses). A read failure fails closed (review on), since sending unreviewed data is the unsafe direction.
+- Each connection has mcp_review_results (migration 0045, P382): inherit (default), review or send. Inherit reads dbMcp.previewResponses fresh per call (bridge previewResponses); review and send skip that read. A read failure fails closed (review on), since sending unreviewed data is the unsafe direction. A stored value outside the three coerces to review on scan.
 - go-sdk v1.8.0 (mcp/server.go toolForErr) wraps a regular handler error as an IsError text result carrying err.Error(); only a *jsonrpc.Error becomes a protocol error. A bare Go error from run_query therefore reaches the client as that text, and the preview shows the same text.
-- Only run_query is reviewed, as the only tool that returns row data. explain_query, describe_* and list_* are unchanged. There is no per-connection preview setting, no undo for a withheld write and no editing of the result before sending.
+- Only run_query is reviewed, as the only tool that returns row data. explain_query, describe_* and list_* are unchanged. There is no undo for a withheld write and no editing of the result before sending.
 - Both stages and heavy-read prompts raise the Studio window when it is not focused (P338), gated by dbMcp.focusOnApproval (default on, read fresh per open; a read error raises). A stray key landing after the raise can only deny: the dialog focuses Deny on mount and Escape denies.
 - Two stages can hold one call for up to 4 minutes. A client with a shorter MCP tool timeout ends the call as abandoned and the result is discarded.
 
@@ -2722,6 +2741,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - explain_query refuses anything but a leading SELECT/WITH (queryplan.Explainable) and refuses unsupported adapter kinds before connecting.
 - queryplan.Supported accepts only postgres, mysql, mariadb, sqlite and clickhouse adapter kinds.
 - The SELECT/WITH-only restriction on explain_query exists because on ClickHouse EXPLAIN can execute its own target on some forms, so letting DDL/DML through would make the path a write oracle.
+- mcp_review_results is a first-class column, not an options_json key, for the 0022 reason: options round-trips through the connection URI, and a safety gate must not be settable by pasting one.
 - Auto-force-explain uses its own mcp_auto_explain column (migration 0022), deliberately not the human-facing AutoExplain console flag, because one switch cannot mean both showing a warning strip after the fact and blocking an AI client on a modal a human must answer.
 - The heaviness threshold for auto-force-explain is the existing advanced.expensiveQueryRows setting (default 100,000), read fresh per call via explainThreshold in bridge/dbmcp.go.
 
@@ -2747,6 +2767,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The Database MCP settings section holds the enable toggle, the "Review results before the AI gets them" toggle (dbMcp.previewResponses, an instant action that bypasses draft/Save), the "Bring Kira Studio forward for approvals" toggle (dbMcp.focusOnApproval, instant, default on), the registration command and Install button, the token-expiry line, and a read-only Exposed connections glance.
 - The Exposed connections glance shows per-row read/write/DDL modes, auto-explain, and M5's masked-column count, and has no second editor.
 - In project/ConnectionDialog.vue, DetailTab has five values: 'General', 'Advanced', 'Pre-connect', 'MCP', 'Privacy'.
+- The MCP tab of the connection dialog also holds the result review override (inherit, always, never); the glance shows a line only for a connection that overrides it. The connection dialog is size 2xl so the tab fits its fixed height.
 - All permission and description editing happens in the MCP tab of the connection dialog, and all mask-rule editing happens in the Privacy tab.
 - The grid's two masking surfaces are the header menu's 'Mark column as PII' submenu (headerMenu in views/grid/menu.ts) and the toolbar preview toggle (toolbar-mask-preview in views/grid/DataToolbar.vue).
 

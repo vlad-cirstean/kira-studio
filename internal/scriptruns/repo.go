@@ -203,6 +203,20 @@ func (r *Repo) Active(scriptID, exceptID string) (*Run, error) {
 	return &run, nil
 }
 
+// Running returns the newest running run of one script for one task and branch ("" for none),
+// (nil, nil) when none.
+func (r *Repo) Running(scriptID, taskID, branchID string) (*Run, error) {
+	run, err := scan(r.DB.QueryRow(`SELECT `+columns+` FROM script_runs WHERE script_id = ? AND task_id = ? AND branch_id = ? AND state = 'running'
+		ORDER BY created_at DESC, id DESC LIMIT 1`, scriptID, taskID, branchID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("scriptruns: running run of %s: %w", scriptID, err)
+	}
+	return &run, nil
+}
+
 // Waiting returns the runs waiting for the user's answer, oldest first.
 func (r *Repo) Waiting() ([]Run, error) {
 	rows, err := r.DB.Query(`SELECT ` + columns + ` FROM script_runs WHERE state = 'waiting' ORDER BY created_at ASC, id ASC`)

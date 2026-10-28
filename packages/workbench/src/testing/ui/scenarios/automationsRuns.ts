@@ -87,7 +87,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
   }
 
   async function startRun(page: Page, control: { log(): { channel: string; args?: unknown }[] }) {
-    await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
+    await page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-play"]`).click();
     let terminalId = '';
     await expect
       .poll(() => {
@@ -225,7 +225,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
       ],
     });
     await modeTab(page).click();
-    await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
+    await page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-play"]`).click();
     await expect(page.locator('[data-testid="script-error"]')).toHaveText(blocked.blocker);
     expect(control.log().some((e) => e.channel === IPC.terminalOpen)).toBe(false);
   });
@@ -250,7 +250,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
     await page.locator('[data-testid="menu-item-edit"]').click();
     const dialog = page.locator('[data-testid="script-dialog"]');
     const notice = dialog.locator('[data-testid="script-dialog-home-notice"]');
-    await expect(notice.locator('[data-testid="var-chip"][data-var="HOME"]')).toContainText(
+    await expect(notice.locator('[data-chip="path"][data-var="HOME"]')).toContainText(
       options.homeText(dir.path),
     );
     await notice.locator('[data-testid="script-dialog-use-kira"]').click();
@@ -302,7 +302,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
         ],
       });
       await modeTab(page).click();
-      await page.locator(`[data-testid="script-${script.id}"]`).click();
+      await page.locator(`[data-testid="script-${script.id}"] [data-testid="script-play"]`).click();
       let terminalId = '';
       await expect
         .poll(() => {

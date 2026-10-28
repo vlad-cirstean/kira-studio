@@ -12,7 +12,7 @@ import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import AdeAutomationsBlock from '../automation/AdeAutomationsBlock.vue';
-import { archiveTip, STATUS_TONE, statusLabel } from '../board/actions';
+import { archiveTip } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
 import { taskReviewTip } from '../board/reviewCode';
@@ -68,9 +68,9 @@ const quietArchive = computed(
   () => props.card.task.kind !== 'review' && props.card.action?.kind !== 'archive',
 );
 
-const tone = computed(() => (props.card.parked ? 'grey' : STATUS_TONE[props.card.status]));
+const tone = computed(() => (props.card.parked ? 'grey' : props.card.status.tone));
 const label = computed(() =>
-  props.card.parked ? t('space.ade.board.notMerging.label') : statusLabel(props.card.status),
+  props.card.parked ? t('space.ade.board.notMerging.label') : props.card.status.name,
 );
 
 const facts = computed(() => {
@@ -156,6 +156,12 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           data-testid="ade-panel-dot"
         />
         <AdeChip :label="label" :tone="tone" />
+        <AdeChip
+          v-if="card.blocked"
+          :label="t('space.common.status.blocked.status')"
+          tone="red"
+          data-testid="ade-panel-blocked"
+        />
         <Input
           :model-value="titleEdit.text.value"
           :placeholder="card.defaultTitle"

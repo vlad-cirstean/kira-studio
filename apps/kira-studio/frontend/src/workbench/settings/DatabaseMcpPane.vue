@@ -257,6 +257,17 @@ const dbMcpFocusId = useId();
                 ddl: conn.mcpDdlMode,
               })
             }}</FieldDescription>
+            <FieldDescription
+              v-if="conn.mcpReviewResults !== 'inherit'"
+              :data-testid="`db-mcp-connection-review-${conn.id}`"
+              >{{
+                t(
+                  conn.mcpReviewResults === 'review'
+                    ? 'studio.settings.dbMcp.reviewAlways.status'
+                    : 'studio.settings.dbMcp.reviewNever.status',
+                )
+              }}</FieldDescription
+            >
             <FieldDescription v-if="mcpDescriptionFirstLine(conn)">{{
               mcpDescriptionFirstLine(conn)
             }}</FieldDescription>

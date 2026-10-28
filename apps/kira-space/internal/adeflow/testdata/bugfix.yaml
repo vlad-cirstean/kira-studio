@@ -56,7 +56,7 @@ steps:
   - id: release
     name: Release
     kind: script
-    status: In review
+    status: in-review
     runs_on: each repo
     before: auto
     timeout: 15m

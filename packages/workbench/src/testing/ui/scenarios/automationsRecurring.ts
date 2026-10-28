@@ -230,7 +230,6 @@ export function registerRecurringScenarios(
   test('Run without asking is locked while the script has a secret param', async ({ relaunch }) => {
     const secret = {
       name: 'token',
-      label: 'Token',
       type: 'text',
       options: [],
       default: [],

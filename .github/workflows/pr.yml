@@ -94,7 +94,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
       - name: Install WebKit with its system libraries
-        run: sh scripts/retry.sh 2 180 bunx playwright install --with-deps webkit
+        run: sh scripts/retry.sh 2 180 sh scripts/playwright-install.sh webkit
         timeout-minutes: 7
       - run: bun run build:test:studio
       - run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=${{ matrix.shard }}/4
@@ -127,7 +127,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-webkit-chromium-${{ hashFiles('bun.lock') }}
       - name: Install WebKit and Chromium with their system libraries
-        run: sh scripts/retry.sh 2 240 bunx playwright install --with-deps webkit chromium
+        run: sh scripts/retry.sh 2 240 sh scripts/playwright-install.sh webkit chromium
         timeout-minutes: 9
       - run: bun run build:test:studio
       - name: IPC frontend tests (consume the fixtures internal/adapters/*'s own suites generate)

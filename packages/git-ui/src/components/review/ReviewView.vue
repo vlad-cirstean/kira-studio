@@ -4,26 +4,12 @@ import { TransportError } from '@kira/git-ipc';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
 /**
- * The sidebar view's whole root, mounted by `main.ts` in place of
- * `App.vue` when `view === "review"` (same bundle, a different root, selected from the
- * host's own injected initial state). Five real states, never a blank panel: no branch, ask for a
- * base, unrelated histories, nothing to review, and the list — plus two states
- * a real host can reach: `"resolving"` (a brief request in flight) and
- * `"error"` (`review.resolveBase` itself failed — a genuine transport/host error, not one of the
- * four *answers*, still needs a real rendering rather than nothing at all).
+ * The sidebar view's root, mounted by `main.ts` when `view === "review"`. States: no branch, ask
+ * for a base, unrelated histories, nothing to review, the list, plus `resolving` and `error`.
+ * Persists nothing itself (`viewState` is accepted only to share `MountOptions` with `AppRoot`).
  *
- * `NullViewStateStore` is what the mount call site hands this component's `viewState` prop —
- * accepted here only because `AppRoot` and `ReviewView` share one `MountOptions` shape; this
- * component never reads or writes it ("the view persists nothing at all").
- *
- * How the view learns which branch to review (the three arms, all handled here):
- * 1. `props.target` — the cold-bootstrap arm, read once at mount from `html.ts`'s bootstrap
- *    island (a `review.open`/the palette command revealed a *new* webview with a target already
- *    pending).
- * 2. The `review.target` event — pushed to an *already-open* view by the same `review.open` call,
- *    or by the palette command's own `reviewBranch(repoId, undefined)` — handled for the whole
- *    life of this component, not just at mount.
- * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
+ * The branch arrives three ways: `props.target` (cold bootstrap), the `review.target` event (any
+ * time), and the no-branch state's own picker.
  */
 import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
@@ -41,7 +27,12 @@ import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
-import { type ReviewPane, ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
+import {
+  type ReviewPane,
+  ReviewSessionState,
+  type ReviewTarget,
+  type ReviewWorkingSection,
+} from '../../state/review.ts';
 import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
@@ -59,6 +50,7 @@ const props = defineProps<{
   lockTarget?: boolean;
   onReviewApi?: MountOptions['onReviewApi'];
   repoHead?: RepoHead;
+  workingChanges?: ReviewWorkingSection | null;
 }>();
 
 const bridge = new BridgeClient(props.transport);
@@ -81,23 +73,12 @@ watch(repoId, (id) => refsState.setRepoId(id));
 let unsubscribeTarget: (() => void) | undefined;
 let unsubscribeUiAction: (() => void) | undefined;
 
-// One target-sequence token, bumped by every `applyTarget` call — the one place every
-// "which repoId/branch is this view now reviewing" transition funnels through (a `review.target`
-// push, a user's own branch/base pick, `recompare`, `resumeSession`, cold bootstrap). Each
-// caller that applies further state after its own additional awaits (`setBase`, `setPane`,
-// `listMode`/`filter`/`diffMode` restores) captures the token `applyTarget` returns and re-checks
-// it before every one of those later writes, skipping any whose token has gone stale — a newer
-// target already superseded it, so an older override base/pane/filter must not land on top of
-// the newer target's own state. Mirrors `GraphViewState`'s own `#loadGeneration` /
-// `RepoState`'s own open-sequence token for the identical shape.
+// Bumped by every `applyTarget`. Callers that apply more state after their own awaits re-check
+// the token they got back and skip writes a newer target already superseded.
 let targetSequence = 0;
 
-/** `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
- *  operation that rejects becomes a silent, unhandled rejection. Every fire-and-forget call in
- *  this file routes its own rejection through this, into the same live region this file's other
- *  `announce(...)` calls already drive. `transport-closed` (the one code
- *  `bridge.dispose()` itself produces, this file's own `onBeforeUnmount`) is ignored outright —
- *  this view is already gone by the time it lands, so there is nothing left to announce it to. */
+/** Routes a fire-and-forget rejection (`main.ts` sets no errorHandler) into the live region.
+ *  `transport-closed` is ignored: the view is already gone. */
 const { text: liveAnnouncement, announce } = useLiveRegion();
 
 function reportAsyncError(err: unknown, key: MessageKey): void {
@@ -155,7 +136,7 @@ async function bootstrap(): Promise<void> {
   reviewComments.value?.dispose();
 
   await bridge.init();
-  review.value = new ReviewSessionState(bridge);
+  review.value = new ReviewSessionState(bridge, { autoApply: props.lockTarget === true });
   reviewFiles.value = new ReviewFilesState(bridge);
   reviewComments.value = new ReviewCommentsState(bridge);
 
@@ -329,10 +310,15 @@ watch(
     const base = r.resolution.value?.base;
     const branch = r.branch.value;
     const id = repoId.value;
-    return id && branch && base ? { repoId: id, branch, base } : undefined;
+    return id && branch && base ? `${id}\0${branch}\0${base}` : undefined;
   },
-  (target) => {
-    reviewFiles.value?.setTarget(target);
+  (key) => {
+    const [id, branch, base] = key?.split('\0') ?? [];
+    reviewFiles.value?.setTarget(
+      id !== undefined && branch !== undefined && base !== undefined
+        ? { repoId: id, branch, base }
+        : undefined,
+    );
   },
 );
 
@@ -378,6 +364,10 @@ onMounted(() => {
   props.onReviewApi?.({
     selectFile: (path) => reviewFiles.value?.selectFile(path),
     adjacentFile: (path, dir) => adjacentInOrder(orderedPaths.value, path, dir),
+    refresh: () => {
+      reviewFiles.value?.reload();
+      review.value?.checkNow();
+    },
   });
   // Mirrors `App.vue`'s own first-paint mark (the review-view perf metric measures from this, not
   // merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
@@ -581,6 +571,7 @@ useReviewAnnouncements(review, announce);
           :actions="filesActions"
           :list-mode="listMode"
           :filter="filter"
+          :working="workingChanges ?? null"
         />
 
         <ReviewCommentsPane

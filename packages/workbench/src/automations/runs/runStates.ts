@@ -5,8 +5,20 @@ import { shallowReactive } from 'vue';
 // stay reactive.
 const states = shallowReactive(new Map<string, ScriptRunState>());
 
+const byTerminal = shallowReactive(new Map<string, ScriptRunState>());
+
 export function mirrorRuns(runs: readonly ScriptRun[]): void {
-  for (const r of runs) if (states.get(r.id) !== r.state) states.set(r.id, r.state);
+  for (const r of runs) {
+    if (states.get(r.id) !== r.state) states.set(r.id, r.state);
+    if (r.terminalId !== '' && byTerminal.get(r.terminalId) !== r.state) {
+      byTerminal.set(r.terminalId, r.state);
+    }
+  }
+}
+
+/** State of the run a terminal tab carries; the tab id is the terminal id. */
+export function terminalRunState(terminalId: string): ScriptRunState | undefined {
+  return byTerminal.get(terminalId);
 }
 
 export function scriptRunState(runId: string): ScriptRunState | undefined {

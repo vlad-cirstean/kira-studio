@@ -19,5 +19,7 @@
   "color": 9,
   "branchIds": ["d_csv_api", "d_csv_web"],
   "runs": [],
-  "createdAt": 1789030800000
+  "createdAt": 1789030800000,
+  "statusId": "todo",
+  "statusBy": "auto"
 }

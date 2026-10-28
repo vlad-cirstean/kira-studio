@@ -63,6 +63,9 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
         case 'moveStep':
           await setStep.mutateAsync({ taskId, stepId: cmd.stepId });
           return;
+        case 'setStatus':
+          await update.mutateAsync({ taskId, patch: taskPatch({ statusId: cmd.statusId }) });
+          return;
         case 'stopRuns':
           await Promise.all(
             c.task.runs
@@ -95,6 +98,9 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
             taskId,
             patch: taskPatch({ kind: cmd.parked ? 'parked' : 'task' }),
           });
+          return;
+        case 'makeTask':
+          await update.mutateAsync({ taskId, patch: taskPatch({ kind: 'task' }) });
           return;
         case 'link':
           return await control.openExternal(cmd.url);
@@ -143,6 +149,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       sessions: sessions.value.filter((s) => s.taskId === c.task.id),
       sessionLabel: (s) => view(s).tabName,
       plan: m.board.plan,
+      statuses: m.board.statuses,
       cal: m.cal,
       archivePending: dialogs.pending.has(`archive:${c.task.id}`),
       automations: automation.items(),

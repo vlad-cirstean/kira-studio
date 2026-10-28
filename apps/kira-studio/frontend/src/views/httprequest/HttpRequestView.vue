@@ -238,8 +238,11 @@ function setRequestPane(pane: HttpRequestPane): void {
   patchHttpRequestTabState(props.tab.id, { requestPane: pane });
 }
 
-const fieldFilterOpen = ref(false);
-const fieldFilterQuery = ref('');
+const fieldFilterOpen = computed(() => rt.value?.fieldFilterOpen ?? false);
+const fieldFilterQuery = computed({
+  get: () => rt.value?.fieldFilterQuery ?? '',
+  set: (v: string) => httpRequestViewStore.setFieldFilterQuery(props.tab.id, v),
+});
 
 const overviewOpen = ref(false);
 const overviewAnchorRef = ref<HTMLElement | null>(null);
@@ -268,8 +271,8 @@ const resolvedCookiesUrl = computed(() => {
 const cookiesUrl = refDebounced(resolvedCookiesUrl, TIMING.preview);
 const jarCookies = useJarCookies(cookiesUrl, () => !effectiveDisableCookieJar.value);
 function toggleFieldFilter(): void {
-  fieldFilterOpen.value = !fieldFilterOpen.value;
-  if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
+  const open = !fieldFilterOpen.value;
+  httpRequestViewStore.setFieldFilter(props.tab.id, open, open ? fieldFilterQuery.value : '');
 }
 
 function toggleFieldDescriptions(): void {
@@ -556,6 +559,7 @@ onUnmounted(() => {
         <CookiesPane
           v-else-if="tab.state.requestPane === 'cookies'"
           mode="request"
+          :tab-id="tab.id"
           :url="cookiesUrl"
           :cookies="jarCookies.data.value"
           :error="jarCookies.error.value"

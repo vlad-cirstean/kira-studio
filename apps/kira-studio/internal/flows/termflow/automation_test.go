@@ -101,6 +101,36 @@ func TestScriptRunLifecycle(t *testing.T) {
 	}
 }
 
+func TestScriptRunTwice(t *testing.T) {
+	app := flowharness.New(t)
+	rec := newScript(t, app, scripts.CustomScriptFields{Command: "echo started; read x; echo done"})
+
+	mark := app.Events.Mark()
+	openScript(t, app, "w1", "first", rec.ID)
+	waitMatch(t, app, mark, "w1", "first", line("started"))
+	write(t, app, "first", "\n")
+	first := waitRun(t, app, "first", "done")
+
+	openScript(t, app, "w1", "second", rec.ID)
+	second := waitRun(t, app, "second", "running")
+
+	runs, err := app.W.ScriptRuns.List(scriptruns.ListArgs{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 2 || runs[0].ID != second.ID || runs[1].ID != first.ID {
+		t.Fatalf("List = %+v, want second then first", runs)
+	}
+	if runs[0].ScriptID != rec.ID || runs[1].ScriptID != rec.ID || runs[0].TerminalID == runs[1].TerminalID {
+		t.Fatalf("runs share a terminal or miss the script: %+v", runs)
+	}
+	if runs[0].State != "running" || runs[1].State != "done" {
+		t.Fatalf("states = %q, %q, want running, done", runs[0].State, runs[1].State)
+	}
+	// Contract automations: tests/ui/automations-tabs.spec.ts reads the same list.
+	app.Contract(t, "automations", "ScriptRunsService.List#twice", runs, flowharness.Mask("createdAt", "startedAt", "finishedAt"))
+}
+
 func TestScriptRunNonZeroExit(t *testing.T) {
 	app := flowharness.New(t)
 	rec := newScript(t, app, scripts.CustomScriptFields{Command: "echo boom >&2; exit 3"})

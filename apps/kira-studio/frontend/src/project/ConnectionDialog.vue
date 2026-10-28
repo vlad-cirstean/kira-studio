@@ -152,7 +152,7 @@ async function onSave(): Promise<void> {
 
 <template>
   <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
-    <DialogContent size="xl" fixed-height :dirty="dirty" data-testid="connection-dialog">
+    <DialogContent size="2xl" fixed-height :dirty="dirty" data-testid="connection-dialog">
       <DialogHeader v-if="step === 'engine'" close-testid="connection-dialog-close">
         <DialogTitle>{{
           isEdit ? t('studio.project.connectionDialog.changeEngine.title') : t('studio.project.connectionDialog.newConnection.title')

@@ -20,6 +20,9 @@ Automations exist in both apps. Scripts group in collections. Each script runs i
 - Choose the run folder: the automations folder under the app home (**Use automations folder**), or **Choose folder…**.
 - Add parameters. A parameter reaches the command as a variable.
 - Open terminals beside the run history.
+- Start a script with its play button. Click a row to select it; double-click to edit.
+- Running a script again reuses its tab. While it runs, the play button shows the running tab.
+- Drag scripts to reorder them, or drop one into another collection or out of one. Drag a collection header to reorder collections. **Move up** and **Move down** in the row menu, or Alt+Up and Alt+Down, do the same. A search pauses reordering.
 
 ## Smart scripts
 

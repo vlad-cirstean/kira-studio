@@ -52,8 +52,25 @@ func (b *TaskBoard) Recover() error {
 			b.recoveredRebases = append(b.recoveredRebases, r)
 		}
 	}
+	b.syncLiveStatuses()
 	b.emitRuns(runs...)
 	b.notifySessions()
 	b.notifyBoard()
 	return nil
+}
+
+// syncLiveStatuses applies the status of every live task's position once; it corrects the coarse
+// backfill of migration 0051.
+func (b *TaskBoard) syncLiveStatuses() {
+	tasks, err := b.deps.Tasks.ListLive()
+	if err != nil {
+		slog.Warn("ade: recover: list tasks", "scope", "ade", "err", err)
+		return
+	}
+	for _, t := range tasks {
+		mu := b.taskMu(t.ID)
+		mu.Lock()
+		b.syncStatus(t.ID)
+		mu.Unlock()
+	}
 }

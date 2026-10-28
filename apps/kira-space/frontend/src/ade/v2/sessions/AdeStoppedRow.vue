@@ -1,35 +1,61 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { rowVariants } from '@theme/lib/rowVariants';
+import { useFocus } from '@vueuse/core';
+import { revealElement } from '@workbench/behaviour/focus';
 import { useRelativeTime } from '@workbench/behaviour/format';
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import AdeRunLog from '../panel/AdeRunLog.vue';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import type { SessionView } from './sessionView';
 
-const props = defineProps<{ view: SessionView; archived?: boolean }>();
+const props = defineProps<{ view: SessionView; archived?: boolean; selected?: boolean }>();
 
+const emit = defineEmits<{ tookOver: [] }>();
 const takeOver = useAdeTakeOverStore();
 const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 const open = ref(false);
+const rowEl = ref<HTMLElement | null>(null);
+const takeBtn = ref<InstanceType<typeof Button> | null>(null);
+const { focused } = useFocus(takeBtn, { initialValue: props.selected });
+
+function reveal(): void {
+  if (rowEl.value) revealElement(rowEl.value);
+  focused.value = true;
+}
+onMounted(() => props.selected && reveal());
+watch(
+  () => props.selected,
+  (on) => on && reveal(),
+  { flush: 'post' },
+);
+
+function onTakeOver(): void {
+  takeOver.request(props.view.session.id);
+  emit('tookOver');
+}
 </script>
 
 <template>
   <div
-    class="flex items-center gap-2 text-kira-md"
+    ref="rowEl"
+    :class="[rowVariants({ layout: 'tree', selected: !!selected }), 'pl-1.5']"
     data-testid="ade-stopped-row"
+    :data-selected="selected || undefined"
     :data-session-id="view.session.id"
   >
     <span class="size-1.5 shrink-0 rounded-kira-xs bg-disabled" />
     <span class="w-16 shrink-0 text-kira-sm text-muted-foreground">{{ ago }}</span>
     <Button
       v-if="!archived"
+      ref="takeBtn"
       variant="dialog"
       size="kira"
       class="shrink-0"
       :pending="takeOver.pending.has(view.session.id)"
       data-testid="ade-stopped-takeover"
-      @click="takeOver.request(view.session.id)"
+      @click="onTakeOver"
     >
       {{ t('common.action.takeOver.label') }}
     </Button>

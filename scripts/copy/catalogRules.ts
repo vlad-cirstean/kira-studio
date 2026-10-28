@@ -50,6 +50,7 @@ export const PROPER_NOUNS: readonly string[] = [
   'CSV',
   'TSV',
   'HTTP',
+  'GET',
   'HTTPS',
   'gRPC',
   'URL',

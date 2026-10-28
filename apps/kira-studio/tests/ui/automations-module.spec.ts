@@ -130,7 +130,7 @@ test('running a script opens a terminal titled with its name, at its own working
     .locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-run-slot"]`)
     .boundingBox();
   expect(slotBox?.x ?? 0).toBeGreaterThan((nameBox?.x ?? 0) + (nameBox?.width ?? 0));
-  await page.locator(`[data-testid="script-${SCRIPT.id}"]`).click();
+  await page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-play"]`).click();
 
   const terminalTab = tab(page);
   await expect(terminalTab).toHaveCount(1);
@@ -472,7 +472,9 @@ test('contract: a script moves between collections from its context menu', async
   await expect
     .poll(() => control.log().some((e) => e.channel === IPC.customScriptsCreateCollection))
     .toBe(true);
-  await expect.poll(() => moves().at(-1)).toEqual({ id: script.id, collectionId: 'c-web' });
+  await expect
+    .poll(() => moves().at(-1))
+    .toEqual({ ...toCollection, id: script.id, collectionId: 'c-web' });
   await expect(page.locator('[data-testid="script-collection-rename-input"]')).toBeFocused();
 });
 

@@ -1,10 +1,11 @@
 import type { Locator, Page } from '@playwright/test';
+import { registerOrderScenarios } from '@workbench/testing/ui/scenarios/automationsOrder';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
-// P308: scripts reorder within their own set (ungrouped or one collection) and collections reorder
+// P308/P381: scripts reorder within their own set (ungrouped or one collection) and collections reorder
 // among themselves, by drag or Alt+arrows. The Go half is termflow TestScriptOrder; its contract
 // fixes the three call shapes.
 
@@ -182,23 +183,6 @@ test('Alt+Arrow moves within the set; the first script of a collection never mov
   expect(calls(control, IPC.customScriptsReorderCollections)).toHaveLength(1);
 });
 
-test('a script dropped on another collection stays in its own set', async ({ relaunch }) => {
-  const { window: page, control } = await relaunch({
-    control: [LIST, { channel: IPC.customScriptsReorder }],
-  });
-  await open(page);
-
-  await drag(page, row(page, 's1'), row(page, 't1'));
-  await page.waitForTimeout(100);
-  expect(await scriptIds(page, '[data-group-entry]:first-child')).toEqual([
-    'script:t1',
-    'script:t2',
-  ]);
-  for (const args of calls(control, IPC.customScriptsReorder)) {
-    expect(args).toMatchObject({ collectionId: null });
-  }
-});
-
 test('an active search pauses drag', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({ control: [LIST] });
   await open(page);
@@ -211,3 +195,9 @@ test('an active search pauses drag', async ({ relaunch }) => {
   await expect(row(page, 's3')).toBeVisible();
   expect(calls(control, IPC.customScriptsReorder)).toHaveLength(0);
 });
+
+// P381: drag between sets and the Move up/down menu items; shared with Space.
+registerOrderScenarios(
+  { test, contract, ipc: IPC },
+  { extraBase: [], modeTab: (page) => modeTab(page, 'automations') },
+);

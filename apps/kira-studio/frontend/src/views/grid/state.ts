@@ -47,6 +47,9 @@ interface DataViewRuntime extends PagedViewRuntime {
   /** Widths measured for the column set `key` names; reused across reloads while that set is
    *  unchanged. Session-only, dropped with the tab's runtime. */
   settledWidths: { key: string; widths: Record<string, number> } | null;
+  /** Unapplied filter-row text; `null` shows the committed value. Survives a tab switch (P375). */
+  whereDraft: string | null;
+  orderByDraft: string | null;
 }
 
 function defaultRuntime(): DataViewRuntime {
@@ -58,6 +61,8 @@ function defaultRuntime(): DataViewRuntime {
     selection: null,
     maskPreview: false,
     settledWidths: null,
+    whereDraft: null,
+    orderByDraft: null,
   };
 }
 
@@ -306,6 +311,15 @@ export const useGridViewStore = defineStore('gridView', () => {
     ensureRuntime(tabId).settledWidths = { key, widths };
   }
 
+  function setFilterDraft(
+    tabId: string,
+    draft: { where?: string | null; orderBy?: string | null },
+  ): void {
+    const rt = ensureRuntime(tabId);
+    if (draft.where !== undefined) rt.whereDraft = draft.where;
+    if (draft.orderBy !== undefined) rt.orderByDraft = draft.orderBy;
+  }
+
   /** Shown page is stale: connection gone, or read under another connection session. */
   function isStale(tabId: string): boolean {
     const connectionId = useTabsStore().findDataTab(tabId)?.connectionId;
@@ -317,6 +331,7 @@ export const useGridViewStore = defineStore('gridView', () => {
     isStale,
     settledWidthsFor,
     setSettledWidths,
+    setFilterDraft,
     load,
     reload,
     reloadAfterMutation,

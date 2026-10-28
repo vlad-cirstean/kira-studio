@@ -127,7 +127,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789808400000
+      "createdAt": 1789808400000,
+      "statusId": "in-review",
+      "statusBy": "auto"
     },
     {
       "id": "T_bill",
@@ -235,7 +237,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789722000000
+      "createdAt": 1789722000000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_auth",
@@ -532,7 +536,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789635600000
+      "createdAt": 1789635600000,
+      "statusId": "in-review",
+      "statusBy": "auto"
     },
     {
       "id": "T_hooks",
@@ -745,7 +751,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789549200000
+      "createdAt": 1789549200000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_search",
@@ -895,7 +903,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789462800000
+      "createdAt": 1789462800000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_notif",
@@ -958,7 +968,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789376400000
+      "createdAt": 1789376400000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_deps",
@@ -1021,7 +1033,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789290000000
+      "createdAt": 1789290000000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_push",
@@ -1150,7 +1164,9 @@
           "sandbox": null
         }
       ],
-      "createdAt": 1789203600000
+      "createdAt": 1789203600000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_alerts",
@@ -1173,7 +1189,9 @@
       "color": 8,
       "branchIds": ["d_alerts_api", "d_alerts_web"],
       "runs": [],
-      "createdAt": 1789117200000
+      "createdAt": 1789117200000,
+      "statusId": "in-progress",
+      "statusBy": "auto"
     },
     {
       "id": "T_csv",
@@ -1196,7 +1214,9 @@
       "color": 9,
       "branchIds": ["d_csv_api", "d_csv_web"],
       "runs": [],
-      "createdAt": 1789030800000
+      "createdAt": 1789030800000,
+      "statusId": "todo",
+      "statusBy": "auto"
     },
     {
       "id": "R_sara",
@@ -1216,7 +1236,9 @@
       "color": 10,
       "branchIds": ["b_sara"],
       "runs": [],
-      "createdAt": 1788944400000
+      "createdAt": 1788944400000,
+      "statusId": "in-review",
+      "statusBy": "auto"
     },
     {
       "id": "R_li",
@@ -1236,7 +1258,9 @@
       "color": 11,
       "branchIds": ["b_li"],
       "runs": [],
-      "createdAt": 1788858000000
+      "createdAt": 1788858000000,
+      "statusId": "in-review",
+      "statusBy": "auto"
     },
     {
       "id": "T_spike",
@@ -1256,7 +1280,35 @@
       "color": 12,
       "branchIds": ["b_spike"],
       "runs": [],
-      "createdAt": 1788771600000
+      "createdAt": 1788771600000,
+      "statusId": "todo",
+      "statusBy": "auto"
+    }
+  ],
+  "statuses": [
+    {
+      "id": "todo",
+      "name": "To do",
+      "tone": "grey",
+      "category": "todo"
+    },
+    {
+      "id": "in-progress",
+      "name": "In progress",
+      "tone": "amber",
+      "category": "active"
+    },
+    {
+      "id": "in-review",
+      "name": "In review",
+      "tone": "blue",
+      "category": "review"
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "tone": "green",
+      "category": "done"
     }
   ],
   "branches": [

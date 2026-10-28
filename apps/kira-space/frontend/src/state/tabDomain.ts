@@ -91,6 +91,9 @@ export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({
   leftLabel: z.string().nullable().default(null),
   rightLabel: z.string().nullable().default(null),
   review: reviewRefSchema.nullable().default(null),
+  // Uncommitted file of a task branch's worktree (review window): `left`/`right` then only key the
+  // Monaco models, content comes from AdeTaskService.ReviewWorkingDiff.
+  working: /*#__PURE__*/ z.object({ branchId: z.string() }).nullable().default(null),
 });
 export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
 
@@ -191,6 +194,7 @@ export function defaultRepoDiffTabState(
     rightLabel: string;
   },
   review?: { branch: string; branchTip: string; leftLabel: string },
+  working?: { branchId: string },
 ): RepoDiffTabState {
   return {
     left: revision?.left ?? null,
@@ -198,6 +202,7 @@ export function defaultRepoDiffTabState(
     leftLabel: revision?.leftLabel ?? null,
     rightLabel: revision?.rightLabel ?? null,
     review: review ?? null,
+    working: working ?? null,
   };
 }
 

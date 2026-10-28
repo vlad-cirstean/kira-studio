@@ -5,6 +5,7 @@
 package adewire
 
 import (
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
@@ -20,7 +21,7 @@ const (
 	KindManual StepKind = "manual"
 )
 
-// TaskStatus is 'To do' | 'In progress' | 'In review' | 'Done'.
+// TaskStatus is a task status id from the user's status set, such as 'in-progress'.
 type TaskStatus = string
 
 // RunsOn is 'once' | 'each repo' | `only ${string}`.
@@ -448,6 +449,18 @@ type Task struct {
 	BranchIDs        []string  `json:"branchIds"`
 	Runs             []Run     `json:"runs"`
 	CreatedAt        int64     `json:"createdAt"`
+	// StatusID is the task's status; StatusBy says who set it last: 'auto' (a step change) or 'user'.
+	StatusID string `json:"statusId"`
+	StatusBy string `json:"statusBy"`
+}
+
+// TaskStatusDef is one status of the user's set. Category is 'todo' | 'active' | 'review' | 'done'
+// and decides which status automation picks; Tone is an ADE tone name.
+type TaskStatusDef struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Tone     string `json:"tone"`
+	Category string `json:"category"`
 }
 
 type Plan struct {
@@ -473,14 +486,15 @@ type RepoState struct {
 }
 
 type Board struct {
-	Tasks            []Task         `json:"tasks"`
-	Branches         []Branch       `json:"branches"`
-	Plan             Plan           `json:"plan"`
-	Pairs            []Pair         `json:"pairs"`
-	History          []HistoryEntry `json:"history"`
-	Repos            []RepoState    `json:"repos"`
-	WorktreeBasePath string         `json:"worktreeBasePath"`
-	AutofetchMinutes int            `json:"autofetchMinutes"`
+	Tasks            []Task          `json:"tasks"`
+	Statuses         []TaskStatusDef `json:"statuses"`
+	Branches         []Branch        `json:"branches"`
+	Plan             Plan            `json:"plan"`
+	Pairs            []Pair          `json:"pairs"`
+	History          []HistoryEntry  `json:"history"`
+	Repos            []RepoState     `json:"repos"`
+	WorktreeBasePath string          `json:"worktreeBasePath"`
+	AutofetchMinutes int             `json:"autofetchMinutes"`
 }
 
 type RepoHost struct {
@@ -652,6 +666,20 @@ type TaskPatch struct {
 	Notes     *string `json:"notes"`
 	Color     *int    `json:"color"`
 	Kind      *string `json:"kind"` // 'task' | 'parked'
+	// StatusID moves the task to that status by hand.
+	StatusID *string `json:"statusId"`
+}
+
+// SaveStatusesArgs rewrites the status set in order. A status with an empty ID is new. Reassign maps a
+// removed status id to the id its tasks move to; a removed id without an entry goes to the first kept
+// status of its category.
+type SaveStatusesArgs struct {
+	Statuses []TaskStatusDef   `json:"statuses"`
+	Reassign map[string]string `json:"reassign"`
+}
+
+type SaveStatusesResult struct {
+	Statuses []TaskStatusDef `json:"statuses"`
 }
 
 type UpdateTaskArgs struct {
@@ -669,6 +697,23 @@ type AddExistingBranchArgs struct {
 	CodeRepoID string `json:"codeRepoId"`
 	Name       string `json:"name"`
 	TaskID     string `json:"taskId"`
+}
+
+type HostLinkArgs struct {
+	URL    string `json:"url"`
+	TaskID string `json:"taskId"` // '' = new task; ResolveHostLink ignores it
+}
+
+// HostLinkTarget is the branch a pasted link names, before anything is fetched.
+type HostLinkTarget struct {
+	CodeRepoID    string         `json:"codeRepoId"`
+	Remote        string         `json:"remote"`
+	Branch        string         `json:"branch"`    // local name AddHostLink attaches
+	HeadOwner     string         `json:"headOwner"` // '' unless Fork
+	Fork          bool           `json:"fork"`
+	Author        string         `json:"author"` // change request author login; '' for a branch link
+	ChangeRequest *ChangeRequest `json:"changeRequest"`
+	OnTaskID      string         `json:"onTaskId"` // live task already holding Branch
 }
 
 type SetPlanArgs struct {
@@ -814,6 +859,20 @@ type ReviewWindowTarget struct {
 	Branch     string `json:"branch"`
 	Base       string `json:"base"`
 	Worktree   string `json:"worktree"`
+}
+
+// ReviewWorking is the uncommitted work of a branch's worktree against its HEAD (P384). Worktree
+// is "" when the branch has none, with no Files. Head is "" for an unborn HEAD.
+type ReviewWorking struct {
+	Worktree string                 `json:"worktree"`
+	Head     string                 `json:"head"`
+	Files    []porcelain.FileChange `json:"files"`
+}
+
+// ReviewWorkingDiffArgs names one uncommitted file of a branch's worktree.
+type ReviewWorkingDiffArgs struct {
+	BranchID string `json:"branchId"`
+	Path     string `json:"path"`
 }
 
 // ReviewAgentState is the task's review agent row; HostWindowKey is ” unless it runs.

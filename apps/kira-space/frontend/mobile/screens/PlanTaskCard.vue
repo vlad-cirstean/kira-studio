@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import AdeChip from '@ade/AdeChip.vue';
-import { statusLabel } from '@ade/board/actions';
 import StatusDot from '@theme/components/StatusDot.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
@@ -18,15 +17,6 @@ import { useTaskActions } from '../state/useTaskActions';
 const props = defineProps<{ card: PlanCard; open: boolean }>();
 defineEmits<{ toggle: [] }>();
 
-const STATUS_TONE = {
-  'To do': 'grey',
-  'In progress': 'amber',
-  'In review': 'blue',
-  Done: 'green',
-  Blocked: 'red',
-} as const;
-const tone = computed(() => STATUS_TONE[props.card.status]);
-
 const { permissions } = storeToRefs(useAuthStore());
 const actions = useTaskActions(() => props.card);
 const canMove = computed(() => permissions.value.write && props.card.blocks.length > 0);
@@ -34,7 +24,7 @@ const stopFirst = computed(() => props.card.moves.live);
 </script>
 
 <template>
-  <li class="border-b border-border" data-testid="plan-task" :data-status="card.status">
+  <li class="border-b border-border" data-testid="plan-task" :data-status="card.status.id">
     <button
       type="button"
       class="flex w-full items-start gap-3 bg-transparent px-3 py-3 text-left text-fg"
@@ -45,7 +35,13 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <AdeChip :label="statusLabel(card.status)" :tone="tone" />
+          <AdeChip :label="card.status.name" :tone="card.status.tone" />
+          <AdeChip
+            v-if="card.blocked"
+            :label="t('space.common.status.blocked.status')"
+            tone="red"
+            data-testid="plan-blocked"
+          />
           <span v-if="card.progress.label" class="text-muted-foreground" data-testid="plan-step">{{
             card.progress.label
           }}</span>

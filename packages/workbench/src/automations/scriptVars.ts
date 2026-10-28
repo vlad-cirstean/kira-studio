@@ -15,7 +15,7 @@ export interface ScriptVarSource {
 const PARAM_ENV_PREFIX = 'KIRA_PARAM_';
 const BUILTIN_ENV_PREFIX = 'KIRA_';
 
-function paramEnvName(name: string): string {
+export function paramEnvName(name: string): string {
   return PARAM_ENV_PREFIX + name.toUpperCase();
 }
 
@@ -27,7 +27,7 @@ const PROMPT_VAR_RE = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const ENV_VAR_RE = /\$(?:\{(KIRA_[A-Za-z0-9_]*)\}|(KIRA_[A-Za-z0-9_]*))/g;
 
 function paramDetail(p: ScriptParam): string {
-  return p.label || p.default.join(', ') || p.type;
+  return p.default.join(', ') || p.type;
 }
 
 function builtins(src: ScriptVarSource): readonly string[] {
@@ -141,7 +141,6 @@ export function scriptHover(
     if (ref.builtin) return [t('automations.script.adeSet.tooltip')];
     if (!ref.param) return [t('automations.script.unknownParam.tooltip')];
     const lines = [t('automations.script.paramNamed.label', { name: ref.param.name })];
-    if (ref.param.label) lines.push(ref.param.label);
     if (src.kind === 'smart' && ref.param.secret)
       lines.push(t('automations.script.secretInPrompt.error'));
     else if (ref.param.secret) lines.push(t('common.secret.label'));

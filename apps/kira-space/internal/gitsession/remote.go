@@ -46,6 +46,9 @@ type RemoteOpParams struct {
 	ConfirmToken      string  `json:"confirmToken,omitempty"`
 	// RemoteBranch (sandbox MCP push) overrides the upstream-derived remote branch for push and forcePush.
 	RemoteBranch string `json:"remoteBranch,omitempty"`
+	// Refspecs (fetch only) replaces the whole-remote fetch with exactly these refspecs, no prune.
+	// In-process only, so the wire shape is unchanged.
+	Refspecs []string `json:"-"`
 }
 
 // RemoteOpError mirrors @kira/git-ipc's own remote.run error shape.
@@ -438,6 +441,9 @@ func (e *RepoEntry) runFetch(roCtx, spawnCtx context.Context, conn *Conn, deps R
 	}
 
 	argv := gitops.FetchArgs(params.Remote, params.Prune, params.PruneTags)
+	if len(params.Refspecs) > 0 {
+		argv = gitops.FetchRefspecsArgs(params.Remote, params.Refspecs)
+	}
 	var res gitclient.Result
 	if err := e.withAskpass(spawnCtx, conn, deps, func(env []string) error {
 		r, rerr := e.runRemoteSpawn(spawnCtx, argv, env, onStderr)

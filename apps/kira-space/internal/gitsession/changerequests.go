@@ -91,6 +91,10 @@ type hostState struct {
 	refsStaleAt   time.Time
 	refreshing    map[string]bool
 
+	// remoteURLs caches every remote's URL, origin first (RemoteFor); dropped with the host detection.
+	remoteURLs      []remoteURL
+	remoteURLsValid bool
+
 	snapshot      []githost.ChangeRequest
 	snapshotAt    time.Time
 	snapshotValid bool
@@ -125,6 +129,7 @@ func (s *hostState) resetCaches() {
 	s.gen++
 	s.snapshotFetch = nil
 	s.remoteChecked = false
+	s.remoteURLs, s.remoteURLsValid = nil, false
 	s.setting = ""
 	s.provider = nil
 	s.repo = githost.Repo{}
@@ -181,6 +186,7 @@ func (s *hostState) markStale() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.remoteChecked = false
+	s.remoteURLsValid = false
 	s.refsStaleAt = time.Now()
 }
 

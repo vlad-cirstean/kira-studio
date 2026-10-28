@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ScriptKind, ScriptParam, ScriptParamType } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
@@ -8,9 +9,10 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
-import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import { useId } from 'vue';
+
+import { paramEnvName } from './scriptVars';
 
 const params = defineModel<ScriptParam[]>({ required: true });
 defineProps<{ kind: ScriptKind; errors?: readonly (readonly string[])[] }>();
@@ -18,10 +20,24 @@ const idBase = useId();
 // A literal env var name, not copy; a catalog message can't hold `<>`.
 const PARAM_VAR = '$KIRA_PARAM_<NAME>';
 
+const TYPE_ITEMS = [
+  { value: 'text', label: t('common.field.text.label'), testid: 'text' },
+  { value: 'select', label: t('common.action.select.label'), testid: 'select' },
+  {
+    value: 'multiselect',
+    label: t('automations.params.multiselect.option'),
+    testid: 'multiselect',
+  },
+] as const;
+
+function tokenHint(kind: ScriptKind, name: string): string {
+  return kind === 'script' ? paramEnvName(name) : `{${name}}`;
+}
+
 function add(): void {
   params.value = [
     ...params.value,
-    { name: '', label: '', type: 'text', options: [], default: [], required: false, secret: false },
+    { name: '', type: 'text', options: [], default: [], required: false, secret: false },
   ];
 }
 
@@ -112,34 +128,31 @@ function toggleDefault(i: number, option: string, on: boolean): void {
         <Input
           :model-value="p.name"
           :placeholder="t('common.field.name.label')"
-          class="w-32 font-data"
+          class="min-w-0 flex-1 font-data"
           :data-testid="`param-name-${i}`"
           @update:model-value="(v) => patch(i, { name: String(v) })"
         />
-        <Input
-          :model-value="p.label"
-          :placeholder="t('git.dialog.stash.saveLabel.label')"
-          class="min-w-0 flex-1"
-          :data-testid="`param-label-${i}`"
-          @update:model-value="(v) => patch(i, { label: String(v) })"
-        />
-        <NativeSelect
-          :model-value="p.type"
-          variant="bordered"
+        <SecondaryTabs
+          variant="segmented"
           size="kira-lg"
-          :data-testid="`param-type-${i}`"
+          :model-value="p.type"
+          :items="TYPE_ITEMS.map((it) => ({ ...it, testid: `param-type-${i}-${it.testid}` }))"
           @update:model-value="(v) => setType(i, v as ScriptParamType)"
-        >
-          <option value="text">{{ t('common.field.text.label') }}</option>
-          <option value="select">{{ t('common.action.select.label') }}</option>
-          <option value="multiselect">{{ t('automations.params.multiselect.option') }}</option>
-        </NativeSelect>
+        />
         <TooltipIconButton
           icon="trash"
           :label="t('automations.params.remove.tooltip', { name: p.name })"
           @click="remove(i)"
         />
       </div>
+      <span
+        v-if="p.name"
+        class="font-data text-kira-sm text-muted-foreground"
+        :data-testid="`param-token-${i}`"
+        >{{
+          tokenHint(kind, p.name)
+        }}</span
+      >
       <FieldError v-for="m in errors?.[i] ?? []" :key="m" :data-testid="`param-error-${i}`">{{
         m
       }}</FieldError>
