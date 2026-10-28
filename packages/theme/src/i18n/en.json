@@ -2013,6 +2013,9 @@
       "resetToDefault": {
         "label": "Reset to default"
       },
+      "restart": {
+        "label": "Restart"
+      },
       "restore": {
         "label": "Restore"
       },
@@ -2625,11 +2628,6 @@
     }
   },
   "docker": {
-    "action": {
-      "restart": {
-        "label": "Restart"
-      }
-    },
     "container": {
       "noMatches": {
         "emptyHint": "No container matches the search."
@@ -8210,6 +8208,11 @@
         },
         "waitingId": {
           "status": "Waiting for session ID"
+        }
+      },
+      "sessionTab": {
+        "copyId": {
+          "label": "Copy session ID"
         }
       },
       "setup": {

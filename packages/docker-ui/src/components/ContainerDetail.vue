@@ -179,7 +179,7 @@ function act(action: ContainerAction): void {
                 @click="act('restart')"
               >
                 <CodiconIcon name="debug-restart" :size="12" />
-                {{ t('docker.action.restart.label') }}
+                {{ t('common.action.restart.label') }}
               </Button>
             </span>
           </div>

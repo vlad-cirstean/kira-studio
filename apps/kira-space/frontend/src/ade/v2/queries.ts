@@ -32,6 +32,7 @@ import type {
   RefreshArgs,
   RepoBranches,
   RepoBranchesArgs,
+  RestartSessionArgs,
   ReviewAgentLaunch,
   ReviewForwardText,
   RunArgs,
@@ -357,6 +358,12 @@ export function useOpenReviewWindow() {
 
 export function useTakeOver() {
   return useMutation({ mutationFn: (args: TakeOverArgs) => control.adeTaskTakeOver(args) });
+}
+
+export function useRestartSession() {
+  return useMutation({
+    mutationFn: (args: RestartSessionArgs) => control.adeTaskRestartSession(args),
+  });
 }
 
 export function useLaunchStep() {

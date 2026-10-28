@@ -855,6 +855,9 @@ export interface TakeOverArgs {
   sessionId: string;
   stopIfRunning: boolean /* false on a running run = E_BAD_REQUEST, D3 */;
 }
+export interface RestartSessionArgs {
+  sessionId: string;
+}
 export interface LaunchStepArgs {
   taskId: string;
   message: string;

@@ -4,8 +4,8 @@ import AdeTip from './AdeTip.vue';
 import { type ActivityKind, activityLabel } from './activity';
 
 // Activity glyph of a session: `!` needs input, a green dot working, `z` waiting on a monitor, an
-// open dot idle, a square stopped (mockup `act`).
-const props = defineProps<{ kind: ActivityKind; size?: 12 | 14 }>();
+// open dot idle, a square stopped (mockup `act`). `bare` drops the tooltip when a parent has one.
+const props = defineProps<{ kind: ActivityKind; size?: 12 | 14; bare?: boolean }>();
 
 const big = computed(() => props.size === 14);
 const badge = computed(() => (big.value ? 'size-3.5' : 'size-3'));
@@ -13,7 +13,7 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
 </script>
 
 <template>
-  <AdeTip :text="activityLabel(kind)">
+  <AdeTip :text="bare ? '' : activityLabel(kind)">
     <span :data-activity="kind" class="inline-flex shrink-0 items-center justify-center">
       <span
         v-if="kind === 'input'"

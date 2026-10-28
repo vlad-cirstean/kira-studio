@@ -427,6 +427,8 @@ const spaceControl = {
     unwrap(AdeTaskService.FinishReview(args)),
   adeTaskTakeOver: (args: V2.TakeOverArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.TakeOver(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskRestartSession: (args: V2.RestartSessionArgs): Promise<V2.Launch> =>
+    unwrap(AdeTaskService.RestartSession(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskLaunchStep: (args: V2.LaunchStepArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.LaunchStep(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskStartBranch: (args: V2.StartBranchArgs): Promise<V2.Launch> =>

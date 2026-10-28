@@ -219,6 +219,7 @@ export const IPC = {
   adeTaskSendReview: 'kira:adetask:sendReview',
   adeTaskFinishReview: 'kira:adetask:finishReview',
   adeTaskTakeOver: 'kira:adetask:takeOver',
+  adeTaskRestartSession: 'kira:adetask:restartSession',
   adeTaskLaunchStep: 'kira:adetask:launchStep',
   adeTaskStartBranch: 'kira:adetask:startBranch',
   adeTaskSend: 'kira:adetask:send',
