@@ -11,7 +11,7 @@ Source: user request. Phases run top to bottom.
 | P390 | ADE git module last in order | Done |
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Done |
 | P392 | Review others' PRs: approve and comment; agent panel button to far right | Done |
-| P393 | Terminals: Cmd+click opens link | Todo |
+| P393 | Terminals: Cmd+click opens link | Done |
 | P394 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
 | P395 | Close chapter, open PR | Todo |
 
@@ -60,6 +60,8 @@ Result: plan `plans/P392.md`. Cause: review target branch was a ref spelling (`o
 ### P393 Terminals: Cmd+click opens link
 
 In every terminal, Cmd+click on a link opens it.
+
+Result: plan `plans/P393.md`. Cause: web-links addon default handler calls `window.open`, which does nothing in the Wails webview, and had no modifier check. `terminalRenderer.ts` now routes plain-text (`WebLinksAddon`) and OSC 8 (`linkHandler`) links through one `activate`: Cmd-click (mac) or Ctrl-click, http(s) only, via new `TerminalRendererDeps.openLink`/`linkActivation`. Hover hint shows target URL and modifier. Studio gets `control.openExternal`; lint U79 path moved to `bridge/index.ts`. Phone taps open via `window.open` noopener. No Go change, no contract bump. Flow `TestTerminalLinkOpen` (both apps) + contract `terminal-link.json`; shared UI scenario `terminalLinks.ts` (2 specs per app); phone spec. UI harness runs a mac UA, so specs use Meta. Hint hid via `hidden` class lost to tooltip `inline-flex`; now inline `display`. CodeGraph MCP unavailable.
 
 ### P394 Code review, 1 round (Opus review, Sonnet fix)
 
