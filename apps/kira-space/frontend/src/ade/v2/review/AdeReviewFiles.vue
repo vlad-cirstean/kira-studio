@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { MountHandle, ReviewApi } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { useWindowFocus } from '@vueuse/core';
 import { errorText } from '@workbench/bridge/codedError';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { loadGitUi } from '../../../repo/git/gitUiModule';
 import { gitTransportFor } from '../../../repo/git/transport';
 import { ensureRepoOpen } from '../../../state/repoOpenHold';
@@ -21,6 +22,12 @@ const navigation = useReviewNavigationStore();
 
 // Opens a file's diff in the centre tabs, as a click in the file list does.
 defineExpose({ selectFile: (path: string) => api?.selectFile(path) });
+
+// A missed watcher event (sleep, dropped FS event) heals when the window regains focus.
+const focused = useWindowFocus();
+watch(focused, (now, was) => {
+  if (now && !was) api?.refresh();
+});
 
 onMounted(async () => {
   if (!container.value) return;
