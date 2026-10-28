@@ -16,7 +16,7 @@ Source: user request. Phases run top to bottom.
 | P381 | Reorder collections and other folders | Done |
 | P382 | MCP show-results customizable per connection | Done |
 | P383 | Add a work item from a GitHub link, branch taken from the link | Done |
-| P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Todo |
+| P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Done |
 | P385 | Postman import accepts partial data again | Todo |
 | P386 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
 | P387 | Close chapter, open PR | Todo |
@@ -94,6 +94,8 @@ Result: plan `plans/P383.md`. New optional `githost.BranchLinks` role (GitHub: `
 - Show uncommitted changes, clearly separated from committed ones.
 - Marking a file reviewed keeps its diff visible on return (as on GitHub), not the plain file.
 - Add the missing button that hides the agent panel.
+
+Result: plan `plans/P384.md`. Stale cause: Files target triple did not change on a new commit, so `review.files` never re-ran. Fix: `ReviewFilesState` reloads on `refsChanged` (coalesced), `ReviewSessionState` auto-applies the new tip in locked mode, window focus refresh. Reviewed file: since-review left side is the snapshot only when `changedSinceReview`, else merge base. Uncommitted: `AdeTaskService.ReviewWorking` and `ReviewWorkingDiff` (branchId resolves the worktree server-side; 69 methods), separate `review-working` section with no marks, `repo-diff` tab with `working` branchId, header badge; refresh on board push, window focus, agent PostToolUse/Stop inside the worktree (`TIMING.fileSettle`). Agent panel: `ade-review-toggle-agent`, Cmd+J toggles it in a review window, Cmd+B no-op there. Tests: `TestReviewWorking` (adeflow, contract `ade-review-working`), reviewflow incremental test, git-ui `reviewFiles.spec.ts`, 7 new cases in `ade-v2-review.spec.ts`. Checks: lint, typecheck, lint:dead, build:space, flows (adeflow, reviewflow, all), full Space UI (737) pass. Extra fix: `AdeSessionsTab` reveal watch re-runs when the session lists load (`ade-v2-sessions` failed under load; event landed before the query resolved). Unverified here: real WKWebView focus and FSEvents delivery on macOS.
 
 ### P385 Postman import accepts partial data again
 
