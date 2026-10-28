@@ -195,9 +195,9 @@ export class ReviewFilesState {
     }
   }
 
-  /** Composes the reshaped `editor.openRangeDiff` params from data this
-   *  class already holds — `sinceReview` uses the file's own `reviewedAtSha`, falling back to
-   *  `#mergeBase` when it is `null` (never reviewed); `range` mode always uses `#mergeBase` (the
+  /** Composes the `editor.openRangeDiff` params from data this class already holds —
+   *  `sinceReview` uses the file's own `reviewedAtSha` only when it changed since that review,
+   *  else `#mergeBase` (never reviewed, or reviewed and unchanged); `range` mode always uses `#mergeBase` (the
    *  three-dot set `review.files` already returns, not a two-dot diff against `target.base`).
    *  A fire-and-forget host action, not a fetch: nothing here is superseded the way `#loadDiff`'s
    *  reactive state is. */
@@ -209,15 +209,14 @@ export class ReviewFilesState {
     const entry = this.files.value.find((e) => e.change.path === path);
     if (!entry) return;
     const change = entry.change;
-    // This used to read the shared
-    // `reviewedAtSha` ref, which #loadDiff (fired concurrently, not awaited — see selectFile)
-    // only populates from ITS OWN response, arriving after this runs. On the very first click
-    // after setTarget, or on the file switch immediately following one, that ref still held
-    // either nothing or the PREVIOUS file's own sha, sending "since review" open requests against
-    // the wrong revision. `entry.review.reviewedAtSha` is this file's own value, already in hand
-    // from the file list — no race, no dependency on #loadDiff's timing.
+    // The file's own sha from the list, not `#loadDiff`'s shared ref, which lags the click.
+    // A reviewed file with no change since keeps the full branch diff (as on GitHub): left =
+    // `reviewedAtSha` would equal the tip and show the plain file.
+    const review = entry.review;
     const sinceReview =
-      this.diffMode.value === 'sinceReview' ? entry.review.reviewedAtSha : undefined;
+      this.diffMode.value === 'sinceReview' && review.kind !== 'none' && review.changedSinceReview
+        ? review.reviewedAtSha
+        : undefined;
     const leftRev = sinceReview ?? this.#mergeBase;
     const leftLabel = sinceReview ? t('git.review.lastReview.label') : target.base;
     await this.#bridge.request('editor.openRangeDiff', {
