@@ -26,3 +26,9 @@ func FetchRefspecArgs(remote, branch string, prune bool) []string {
 	refspec := "refs/heads/" + branch + ":refs/remotes/" + remote + "/" + branch
 	return append(argv, remote, refspec)
 }
+
+// FetchRefspecsArgs builds `git fetch --progress <remote> <refspec>...`: exactly the given refspecs,
+// never pruning. Callers build refspecs only from names that passed a ref-format check.
+func FetchRefspecsArgs(remote string, refspecs []string) []string {
+	return append([]string{"fetch", "--progress", remote}, refspecs...)
+}

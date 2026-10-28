@@ -5,10 +5,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 )
@@ -311,6 +313,42 @@ func (e *RepoEntry) Remotes(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return strings.Fields(string(raw)), nil
+}
+
+// RemoteFor names the remote whose URL points at host repo r under provider p, origin first. False
+// when the repo's host setting is off or pins another provider, or no remote matches.
+func (e *RepoEntry) RemoteFor(ctx context.Context, p githost.Provider, r githost.Repo) (string, bool) {
+	if s := e.hostSetting(); s == githost.SettingOff || (s != "" && s != githost.SettingAuto && s != p.ID()) {
+		return "", false
+	}
+	names, err := e.Remotes(ctx)
+	if err != nil {
+		return "", false
+	}
+	sort.SliceStable(names, func(i, j int) bool { return names[i] == "origin" && names[j] != "origin" })
+	for _, name := range names {
+		res, err := e.runAllowingExit(ctx, gitops.RemoteGetURLArgs(name), 0, 128)
+		if err != nil || res.ExitCode != 0 {
+			continue
+		}
+		got, ok := p.ParseRemote(strings.TrimSpace(string(res.Stdout)))
+		if ok && strings.EqualFold(got.Host, r.Host) && strings.EqualFold(got.Owner, r.Owner) && strings.EqualFold(got.Name, r.Name) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// CheckBranchName reports whether name is a valid branch name per `git check-ref-format --branch`.
+func (e *RepoEntry) CheckBranchName(ctx context.Context, name string) (bool, error) {
+	if name == "" || strings.HasPrefix(name, "-") {
+		return false, nil
+	}
+	res, err := e.runAllowingExit(ctx, gitops.CheckRefFormatBranchArgs(name), 0, 128)
+	if err != nil {
+		return false, err
+	}
+	return res.ExitCode == 0, nil
 }
 
 // WorktreeHeadRef is the ref checked out in the worktree at dir ("HEAD" when detached).
