@@ -10,7 +10,8 @@ import type { SpaceMode } from '../state/mode';
 // P128 §2.6/§2.7/§2.8: this app's own module list — mirrors Kira Studio's own workbench/modes.ts.
 // One file lists a module; MODE_ORDER/MODES both widened as each module landed (git at step 6,
 // terminal at step 7, ade here at step 8).
-export const MODE_ORDER: SpaceMode[] = ['git', 'ade', 'automations', 'memory'];
+// P390: git last.
+export const MODE_ORDER: SpaceMode[] = ['ade', 'automations', 'memory', 'git'];
 
 // The base `ModeDef` union, not `ModeRegistry<SpaceMode, PanelModeDef>` — `ade`
 // below is the app's first `layout: 'full'` module. Kira Studio's own `MODES` stays pinned to

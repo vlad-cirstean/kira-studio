@@ -14,12 +14,13 @@ function modeTab(page: Page, mode: 'git' | 'automations' | 'ade') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
-test('the title bar lists Git, Agents, Terminal, then Memory', async ({ relaunch }) => {
+test('the title bar lists Agents, Automations, Memory, then Git', async ({ relaunch }) => {
   const { window: page } = await relaunch();
   const modes = await page
     .locator('[data-testid="mode-tab"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-mode')));
-  expect(modes).toEqual(['git', 'ade', 'automations', 'memory']);
+  expect(modes).toEqual(['ade', 'automations', 'memory', 'git']);
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
 });
 
 test('a window boots into whatever mode windowsEnsure answers with, with no Git panel mounted alongside it', async ({
