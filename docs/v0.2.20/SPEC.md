@@ -14,7 +14,7 @@ Source: user request. Phases run top to bottom.
 | P379 | ADE tasks: customizable statuses, manual moves both ways | Done |
 | P380 | Automation scripts reuse one tab per script; start only from the play icon | Done |
 | P381 | Reorder collections and other folders | Done |
-| P382 | MCP show-results customizable per connection | Todo |
+| P382 | MCP show-results customizable per connection | Done |
 | P383 | Add a work item from a GitHub link, branch taken from the link | Todo |
 | P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Todo |
 | P385 | Postman import accepts partial data again | Todo |
@@ -79,6 +79,8 @@ Result: plan `plans/P381.md`. API collections: `CollectionsRepo.ReorderCollectio
 ### P382 MCP show-results customizable per connection
 
 Result display settings for MCP "show results" set per connection.
+
+Result: plan `plans/P382.md`. New per-connection `mcpReviewResults` (inherit, review, send; column `mcp_review_results`, migration 0045, default inherit). `dbmcp.reviewResults` gates `run_query`: inherit reads `dbMcp.previewResponses`, review always holds, send never. Repo scan coerces an unknown value to review (fail closed). Input normalizes `""` to inherit and refuses other values; `zeroExemptFields` clears it; DataGrip import sets inherit. Shared zod `mcpReviewResultsSchema` (default inherit). UI: segmented "Review results" control in the connection MCP tab (inherit label shows the app state), glance line in Settings > Database MCP for non-inherit rows, preview switch description mentions the override. Tests: `TestDbMcpReviewPerConnection` (contract `dbmcp-review-connection`), `dbmcp-review-connection.spec.ts` (3), `connection-dialog-tabs` review assertions; `connection-order` contract gains the field. Checks: lint, typecheck, lint:go, lint:dead, Go tests incl. all flows, build:studio, full Studio UI (all green but the `api-order` focus test), visual, `test:claude:studio` pass. Deviations from plan: migration registered in `embed.go`; fixtures and draft default landed in commit 1 (typecheck demands them); connection dialog moved from size `xl` to `2xl` (h-160) since the MCP tab no longer fit the fixed height (U2 bars a height class); create/update mocks in `tooltips`, `fake-data`, `mutations` specs gained the field; two visual baselines refreshed (connection dialog width, Database MCP pane text); i18n option keys split into `reviewInheritOn/Off.option` (no ICU select). Not done: per-connection render limits, default dialog view. Known flake, not caused here: `api-order.spec.ts` "Move up is disabled on the first, Alt+ArrowDown moves and keeps focus" fails under parallel load, passes alone; no files it touches changed in this phase.
 
 ### P383 Add a work item from a GitHub link
 
