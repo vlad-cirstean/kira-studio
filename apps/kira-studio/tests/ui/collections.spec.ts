@@ -632,9 +632,15 @@ test('collections — Postman import of a collection, an environment and a bad f
   const files = page.locator('[data-testid="import-report-file"]');
   await expect(files).toHaveCount(4);
   await expect(files.nth(0)).toHaveAttribute('data-kind', 'collection');
-  await expect(files.nth(0)).toContainText('Imported “Multi”: 1 request, 0 folders.');
+  await expect(files.nth(0)).toContainText('Imported “Multi”: 2 requests, 0 folders.');
   await expect(files.nth(0).locator('li[data-kind="empty_values"]')).toContainText(
-    '1 variables arrived without a value. Postman exports only shared values; share them in Postman, then export again.',
+    '1 variables were imported without a value. Postman exports only shared values; fill them in here.',
+  );
+  await expect(files.nth(0).locator('li[data-kind="unnamed_variables"]')).toContainText(
+    '1 variables had no name and were imported as unnamed_1, unnamed_2 and so on.',
+  );
+  await expect(files.nth(0).locator('li[data-kind="missing_request"]')).toContainText(
+    '1 items had no request and were imported as empty GET requests.',
   );
   await expect(files.nth(1)).toHaveAttribute('data-kind', 'environment');
   await expect(files.nth(1)).toContainText('Imported environment “Staging”: 6 variables.');
@@ -642,16 +648,19 @@ test('collections — Postman import of a collection, an environment and a bad f
     '1 disabled variables were skipped.',
   );
   await expect(files.nth(1).locator('li[data-kind="empty_values"]')).toContainText(
-    '1 variables arrived without a value.',
+    '1 variables were imported without a value.',
   );
   await expect(files.nth(2)).toHaveAttribute('data-kind', 'failed');
   await expect(files.nth(2)).toContainText(
     'Couldn’t import bad.json: postman: not a Postman collection or environment',
   );
   await expect(files.nth(3)).toHaveAttribute('data-kind', 'environment');
-  await expect(files.nth(3)).toContainText('Imported environment “Wrapped”: 2 variables.');
+  await expect(files.nth(3)).toContainText('Imported environment “Wrapped”: 3 variables.');
   await expect(files.nth(3).locator('li[data-kind="empty_values"]')).toContainText(
-    '1 variables arrived without a value.',
+    '1 variables were imported without a value.',
+  );
+  await expect(files.nth(3).locator('li[data-kind="unnamed_variables"]')).toContainText(
+    '1 variables had no name',
   );
   const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
   expect(importCalls[0].args).toEqual(

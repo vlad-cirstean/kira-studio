@@ -518,14 +518,14 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 		}
 		return p
 	}
-	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"variable":[{"key":"base","value":"https://example.test"},{"key":"blank","value":""},{"key":"cfg","value":{"k":[1]}},{"key":"off","value":"x","disabled":true}],"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
+	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"variable":[{"key":"base","value":"https://example.test"},{"key":"blank","value":""},{"key":"cfg","value":{"k":[1]}},{"key":"off","value":"x","disabled":true},{"value":"k"}],"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}},{"name":"Bare"}]}`)
 	env, err := os.ReadFile(filepath.Join("testdata", "environment.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	environment := write("environment.json", string(env))
 	bad := write("bad.json", `{"hello":"world"}`)
-	wrapped := write("wrapped.json", `{"environment":{"name":"Wrapped","values":[{"key":"a","value":"1"},{"key":"b","value":""}]}}`)
+	wrapped := write("wrapped.json", `{"environment":{"name":"Wrapped","values":[{"key":"a","value":"1"},{"key":"b","value":""},{"value":"z"}]}}`)
 
 	// Contract api-postman-multi, read by tests/ui/collections.spec.ts "Postman import of a
 	// collection, an environment and a bad file".
@@ -561,11 +561,12 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 		return m
 	}
 	colEntry := res.Files[0]
-	if colEntry.Kind != "collection" || colEntry.Collection == nil || colEntry.Collection.Requests != 1 {
+	if colEntry.Kind != "collection" || colEntry.Collection == nil || colEntry.Collection.Requests != 2 {
 		t.Fatalf("collection entry = %+v", colEntry)
 	}
 	if diff := cmp.Diff(map[string]int{
-		postman.WarnVariablesImported: 3, postman.WarnEmptyValues: 1, postman.WarnDisabledVariables: 1,
+		postman.WarnVariablesImported: 4, postman.WarnEmptyValues: 1, postman.WarnDisabledVariables: 1,
+		postman.WarnUnnamedVariables: 1, postman.WarnMissingRequest: 1,
 	}, warningCounts(colEntry.Collection.Warnings)); diff != "" {
 		t.Errorf("collection warnings (-want +got):\n%s", diff)
 	}
@@ -582,13 +583,13 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	}
 	wrapEntry := res.Files[3]
 	if wrapEntry.Kind != "environment" || wrapEntry.Environment == nil || wrapEntry.Environment.Name != "Wrapped" ||
-		wrapEntry.Environment.Variables != 2 ||
-		!cmp.Equal(map[string]int{postman.WarnEmptyValues: 1}, warningCounts(wrapEntry.Environment.Warnings)) {
-		t.Errorf("wrapped entry = %+v, want Wrapped with 2 variables and one empty value", wrapEntry)
+		wrapEntry.Environment.Variables != 3 ||
+		!cmp.Equal(map[string]int{postman.WarnEmptyValues: 1, postman.WarnUnnamedVariables: 1}, warningCounts(wrapEntry.Environment.Warnings)) {
+		t.Errorf("wrapped entry = %+v, want Wrapped with 3 variables, one empty and one unnamed", wrapEntry)
 	}
 
-	if got := tree(t, app, colEntry.Collection.CollectionID); len(got) != 1 {
-		t.Errorf("collection tree = %q, want the one request", got)
+	if got := tree(t, app, colEntry.Collection.CollectionID); len(got) != 2 {
+		t.Errorf("collection tree = %q, want Ping and Bare", got)
 	}
 	colVars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeCollection, OwnerID: colEntry.Collection.CollectionID})
 	if err != nil {
@@ -598,7 +599,7 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	for _, v := range colVars {
 		gotCol[v.Name] = v.Value
 	}
-	if diff := cmp.Diff(map[string]string{"base": "https://example.test", "blank": "", "cfg": `{"k":[1]}`}, gotCol); diff != "" {
+	if diff := cmp.Diff(map[string]string{"base": "https://example.test", "blank": "", "cfg": `{"k":[1]}`, "unnamed_1": "k"}, gotCol); diff != "" {
 		t.Errorf("collection variables (-want +got):\n%s", diff)
 	}
 	envs, err := app.W.Variables.ListEnvironments()
