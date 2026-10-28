@@ -10,13 +10,10 @@ Source: user request. Phases run top to bottom.
 | P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Done |
 | P390 | ADE git module last in order | Todo |
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Todo |
-| P392 | Bug: three-finger swipe up (Mission Control) moves focus to another space | Todo |
-| P393 | Review others' PRs: approve and comment; agent panel button to far right | Todo |
-| P394 | Terminals: Cmd+click opens link | Todo |
-| P395 | Task repos and branches: add, edit and delete independently | Todo |
-| P396 | One project picker and one branch picker across the app | Todo |
-| P397 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
-| P398 | Close chapter, open PR | Todo |
+| P392 | Review others' PRs: approve and comment; agent panel button to far right | Todo |
+| P393 | Terminals: Cmd+click opens link | Todo |
+| P394 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
+| P395 | Close chapter, open PR | Todo |
 
 ## Rows
 
@@ -49,31 +46,19 @@ Move the git module to the last position in the ADE module order.
 
 Studio and Space. Scrollbars hidden by default; shown only while the pointer is inside that panel. Like a modern app.
 
-### P392 Bug: three-finger swipe up moves focus to another space
-
-Three-finger swipe up (macOS Mission Control, to see the apps on the space) moves focus to another space. Find the cause (likely window focus/activation handling) and fix.
-
-### P393 Review others' PRs: approve and comment; agent panel button to far right
+### P392 Review others' PRs: approve and comment; agent panel button to far right
 
 - Reviewing another person's work must allow approving the PR and leaving comments, same as for own PRs.
 - Move the agent panel button to the far right.
 
-### P394 Terminals: Cmd+click opens link
+### P393 Terminals: Cmd+click opens link
 
 In every terminal, Cmd+click on a link opens it.
 
-### P395 Task repos and branches: add, edit and delete independently
-
-A task can add repos and branches. Add edit and delete for both. Today, a repo added without a branch cannot get a branch added later; fix that.
-
-### P396 One project picker and one branch picker across the app
-
-Several project and branch picker implementations exist, each flawed. Replace them with one shared project picker and one shared branch picker used everywhere. Remove the old implementations.
-
-### P397 Code review, 1 round (Opus review, Sonnet fix)
+### P394 Code review, 1 round (Opus review, Sonnet fix)
 
 One round per `CLAUDE.md` "Code review". Base: last commit of v0.2.20 close (`6bd97b9a2`'s chapter content) to chapter HEAD; planner states exact base in the findings file.
 
-### P398 Close chapter, open PR
+### P395 Close chapter, open PR
 
 Per `CLAUDE.md` "Closing a chapter". Tag `v0.2.21`.
