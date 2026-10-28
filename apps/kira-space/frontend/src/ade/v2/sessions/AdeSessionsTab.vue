@@ -42,9 +42,10 @@ const current = computed(
 const stoppedOpen = ref(false);
 const revealed = ref<string | null>(null);
 
+// Re-runs when the lists load, since the event can land before the sessions query resolves.
 watch(
-  () => ui.revealSessionId,
-  (id) => {
+  [() => ui.revealSessionId, stopped, running],
+  ([id]) => {
     if (!id) return;
     if (stopped.value.some((v) => v.session.id === id)) {
       if (!props.archived) {
