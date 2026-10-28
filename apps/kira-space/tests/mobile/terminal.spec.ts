@@ -51,6 +51,27 @@ test.describe('with agent input', () => {
       .toEqual(['\x1b', '\x03', '\x1b[A', '\r']);
   });
 
+  test('tapping a link opens it in a new tab', async ({ page, server }) => {
+    const url = 'https://github.com/acme/api/pull/7';
+    await page.addInitScript(() => {
+      const opened: unknown[][] = [];
+      (window as unknown as { __opened: unknown[][] }).__opened = opened;
+      window.open = (...args: unknown[]) => {
+        opened.push(args);
+        return null;
+      };
+    });
+    const socket = await scriptSocket(page);
+    await open(page, server);
+    socket.route.send(Buffer.from(`${url}\r\n`));
+    const row = page.locator('.xterm-rows > div', { hasText: url });
+    await expect(row).toBeVisible();
+    await row.tap({ position: { x: 20, y: 6 }, force: true });
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __opened: unknown[][] }).__opened))
+      .toEqual([[url, '_blank', 'noopener,noreferrer']]);
+  });
+
   test('the compose row pastes the text and presses Enter', async ({ page, server }) => {
     const socket = await scriptSocket(page);
     await open(page, server);
