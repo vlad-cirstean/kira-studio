@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
@@ -7,12 +8,14 @@ import { computed } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { taskTitle } from '../board/labels';
 import { taskColor } from '../palette';
+import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import type { ReviewWindowTarget } from '../wire';
 import AdeReviewActions from './AdeReviewActions.vue';
 import { useReviewContext } from './useReviewContext';
 import { useReviewWorking } from './useReviewWorking';
 
 const props = defineProps<{ target: ReviewWindowTarget }>();
+const store = useAdeReviewWindowStore();
 
 const { task, branch, repoLabel } = useReviewContext(() => props.target);
 const working = useReviewWorking(() => props.target.branchId);
@@ -58,6 +61,18 @@ const hint = computed(() =>
         <TooltipContent>{{ hint }}</TooltipContent>
       </Tooltip>
     </div>
-    <AdeReviewActions :target="target" />
+    <div class="wails-no-drag flex shrink-0 items-center gap-1">
+      <TooltipIconButton
+        :icon="store.agentPanelVisible ? 'layout-sidebar-right' : 'layout-sidebar-right-off'"
+        :label="t('space.ade.review.agentPanel.toggle.label')"
+        :icon-size="16"
+        variant="title"
+        size="title"
+        :aria-pressed="store.agentPanelVisible"
+        data-testid="ade-review-toggle-agent"
+        @click="store.toggleAgentPanel()"
+      />
+      <AdeReviewActions :target="target" />
+    </div>
   </TitleBarBase>
 </template>

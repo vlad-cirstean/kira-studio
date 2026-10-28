@@ -85,8 +85,15 @@ onMounted(() => {
     control.onOpenSettings(() => {
       settingsStore.settingsOpen = true;
     }),
-    control.onToggleProjectPanel(layoutStore.toggleProjectPanel),
-    control.onToggleOperationsPanel(layoutStore.toggleOperationsPanel),
+    // A review window has no project panel, and its secondary panel is the agent panel; the layout
+    // is shared across windows, so toggling it from here would move the main window's panels.
+    control.onToggleProjectPanel(() => {
+      if (!reviewWindow.target) layoutStore.toggleProjectPanel();
+    }),
+    control.onToggleOperationsPanel(() => {
+      if (reviewWindow.target) reviewWindow.toggleAgentPanel();
+      else layoutStore.toggleOperationsPanel();
+    }),
     control.onTabNext(tabsStore.activateNextTab),
     control.onTabPrev(tabsStore.activatePrevTab),
     control.onTabClose(tabsStore.closeActiveTab),

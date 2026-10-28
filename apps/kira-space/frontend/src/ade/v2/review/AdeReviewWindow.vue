@@ -111,6 +111,7 @@ const right = useLiveSize(
         </div>
       </section>
       <ResizeHandle
+        v-if="store.agentPanelVisible"
         :label="t('space.ade.panel.resize.label')"
         data-testid="ade-panel-resize-handle"
         direction="reverse"
@@ -119,6 +120,7 @@ const right = useLiveSize(
         v-bind="right.bind"
       />
       <section
+        v-if="store.agentPanelVisible"
         class="flex min-h-0 flex-none flex-col overflow-hidden rounded-kira border border-border bg-bg"
         :style="{ width: `${right.size.value}px` }"
         :aria-label="t('space.ade.review.agent.label')"

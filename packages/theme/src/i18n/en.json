@@ -8005,6 +8005,11 @@
             "label": "Start review agent"
           }
         },
+        "agentPanel": {
+          "toggle": {
+            "label": "Agent panel"
+          }
+        },
         "copy": {
           "none": {
             "tooltip": "No open review comments to copy"
