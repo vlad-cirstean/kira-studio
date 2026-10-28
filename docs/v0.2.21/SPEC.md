@@ -8,7 +8,7 @@ Source: user request. Phases run top to bottom.
 |---|---|---|
 | P388 | ADE task list: calmer look, clear active-task marker, visible separators | Done |
 | P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Done |
-| P390 | ADE git module last in order | Todo |
+| P390 | ADE git module last in order | Done |
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Todo |
 | P392 | Review others' PRs: approve and comment; agent panel button to far right | Todo |
 | P393 | Terminals: Cmd+click opens link | Todo |
@@ -41,6 +41,8 @@ Result: plan `plans/P389.md`. Plan top bar gone: `AdePlanHeader` renamed `AdePla
 ### P390 ADE git module last in order
 
 Move the git module to the last position in the ADE module order.
+
+Result: plan `plans/P390.md`. Space `MODE_ORDER` is now `ade, automations, memory, git` (`workbench/modes.ts`). Default start module stays `git` (`WindowModes.Default`); persisted mode is a name, so no migration; no numeric shortcuts exist. `modules.spec.ts` order test updated and asserts Git active at boot. Docs: `apps/kira-space/README.md`, `docs/ARCHITECTURE.md`. Re-recorded 3 framed shots (`space-agents-board`, `space-git-graph`, `space-memory`) and site `space-desktop`/`space-phone` baselines; all viewed, Git last. Checks: `typecheck`, `lint` clean; `test:ui:space` 746 pass; `test:visual:space` 20 pass, no diff; screenshots re-run stable. CodeGraph MCP unavailable.
 
 ### P391 Both apps: scrollbars hidden until pointer is in the panel
 
