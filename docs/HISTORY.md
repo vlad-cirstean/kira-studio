@@ -7120,3 +7120,50 @@ Pending user action: apply `docs/pending-changes/.github__workflows__pr.yml.patc
 ### v0.2.19 P373 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.19/` removed.
 <!-- /chapter v0.2.19 -->
+
+<!-- chapter v0.2.20 -->
+## v0.2.20
+Source: docs/v0.2.20/ at 7adbb54f5e12. 14 phases.
+
+### v0.2.20 P374 (Done)
+Script params redesign. Dropped `label` (Go `Param`, zod, hover, fixtures, contracts; stored rows load unchanged). New `ValueChip` base; `BranchChip` and new `PathChip` use it; `VarText` renders `kind: 'path'`. Folder lines in run preview, script dialog, ADE context use path/branch chips. `ParamsEditor` has segmented type picker plus token hint. `ParamsForm` select is a radio list (leading None when optional), multiselect a checkbox list. Removed unused catalog keys `kiraHome`, `scriptId`.
+
+### v0.2.20 P375 (Done)
+Studio tab switch keeps filter value and results. Cause: tab views unmount; inputs sat in component refs, find bars cleared scans on unmount. Inputs and open flags now live in per-view runtime stores (session-only, cleared on tab close). Find bar keeps query, options, filter-rows toggle; `isOpen` prop tells switch from close; scan rescans on remount only when page changed (`WeakRef`). Also kept: browse/definition filters, HTTP/gRPC field, header, cookie, schema, history filters, variable set and environments filter, unapplied filter-row drafts. New `tests/ui/tab-filter-state.spec.ts`. Not done: gRPC and variable-tab UI scenarios.
+
+### v0.2.20 P376 (Done)
+Terminal Shift+Enter inserts newline. Key handler in `terminalRenderer.ts` (sole xterm host) maps Shift+Enter to `ESC CR`; Cmd+Enter binding removed (sends `CR`). Updated `ARCHITECTURE.md` and Space spec. Not verified: macOS WKWebView with real Claude Code and zsh.
+
+### v0.2.20 P377 (Done)
+Foreign-branch review tasks. `UpdateTask` kind `task` converts a review task: owner cleared, review branches become mine, engine gives each a worktree plus prepare script. review to parked and task to review stay refused. Menu item `Convert to work item`. Review card row click selects the task; right-click opens task menu. Flow test `TestReviewConvert`. Not verified: remote-only foreign branch conversion.
+
+### v0.2.20 P378 (Done)
+Finished/stopped agents behind dropdown. New `AdeStoppedMenu` popover beside running strip; hidden when none stopped. Store field `revealSessionId` opens popover and focuses row on explicit open of a stopped session. Archived panel keeps inline list. Full Space UI suite not run for this phase.
+
+### v0.2.20 P379 (Done)
+ADE task statuses. Table `ade_task_statuses` (migration 0051; 4 seeds, 6 tones, categories todo/active/review/done, 1-20 rows); tasks hold `status_id`, `status_by`, `status_step`. Engine `syncStatus` re-applies a step status only when workflow position key changes; manual move (`UpdateTask statusId`) sticks until then. Blocked is a derived chip. New `AdeTaskService.SaveStatuses`. UI: menu `Status` submenu, `AdeStatusPicker`, Settings `Task statuses` pane, inspector `Edit statuses`. Tests: `TestTaskStatuses`, migration backfill test, `ade-v2-task-status.spec.ts`. Not done: phone status writes, kanban board.
+
+### v0.2.20 P380 (Done)
+Automation scripts reuse one tab per script. Tab key `{scriptId, taskId, branchId}`. Live tab: start focuses it, starts nothing. Finished tab: replaced in place via `OpenTabOpts.replace`. Row click selects, double-click/Enter edits; only `script-play` starts. Tests: `TestScriptRunTwice`, `automations-tabs.spec.ts` both apps. Not done: server-side refusal of concurrent runs (later added in P386), stop/restart from play button.
+
+### v0.2.20 P381 (Done)
+Reorder collections and folders. API: `CollectionsRepo.ReorderCollections` (dense order, `ErrInvalidOrder` to `E_BAD_REQUEST`), bridge `CollectionsService.ReorderCollections`; folders and requests reuse `MoveItems`. Tree drag for collection rows; menu `Move up`/`Move down`. Automations: `custom_scripts` `Move` takes `beforeId`; scripts drag between collections; Escape cancels cross-list drop. Tests: `TestCollectionOrder`, `TestScriptOrder`, `api-order.spec.ts`, shared `automationsOrder.ts`. Not verified: macOS WKWebView drag feel.
+
+### v0.2.20 P382 (Done)
+MCP show-results per connection. New `mcpReviewResults` (inherit, review, send; column `mcp_review_results`, migration 0045, default inherit). `dbmcp.reviewResults` gates `run_query`; unknown stored value coerces to review (fail closed). UI: segmented "Review results" control in connection MCP tab, glance line in Settings > Database MCP. Connection dialog size `xl` to `2xl`. Tests: `TestDbMcpReviewPerConnection`, `dbmcp-review-connection.spec.ts`. Not done: per-connection render limits, default dialog view.
+
+### v0.2.20 P383 (Done)
+Add work item from GitHub link. Optional `githost.BranchLinks` role (GitHub). IPC `ResolveHostLink` (read only) and `AddHostLink` (re-resolve, fetch one refspec, attach). Fork PR lands as `<owner>/<head>` (`pr-<n>` when head repo gone); branch link picks longest existing branch prefix after full fetch. Merged PR, issue link, main branch, unknown repo refused. New task from PR takes title and `hostUrl`. UI: link paste in Add > Existing branch. Tests: `TestParseBranchLink`, `TestHostLink`, `TestHostLinkUnauthenticated`, `ade-v2-add-link.spec.ts`.
+
+### v0.2.20 P384 (Done)
+Review window fixes. Stale cause: Files target triple unchanged on new commit, so `review.files` never re-ran. `ReviewFilesState` reloads on `refsChanged`; `ReviewSessionState` auto-applies new tip in locked mode; window-focus refresh. Reviewed file keeps diff (left side snapshot only when `changedSinceReview`, else merge base). Uncommitted changes: `AdeTaskService.ReviewWorking` and `ReviewWorkingDiff`, separate `review-working` section, header badge; refresh on board push, focus, agent PostToolUse/Stop. Agent panel toggle `ade-review-toggle-agent`, Cmd+J. Unverified: real WKWebView focus and FSEvents on macOS.
+
+### v0.2.20 P385 (Done)
+Postman import accepts partial data. Regression from v0.2.18 P361. Every JSON-object entry imports; defaults counted per warning kind. Keyless variables import as `unnamed_<n>`; items with neither `item` nor `request` import as empty GET "Untitled request" (`missing_request`). Disabled variables stay skipped. Non-object entries still skipped.
+
+### v0.2.20 P386 (Done)
+Code review, 1 round, base `902cf7e`. 7 findings (2 medium, 5 low), all fixed. Fork PR link forces review kind and skips prepare script. `ScriptRuns.Start` refuses second running run of same script, task, branch (`E_CONFLICT`); play button reopens running smart run tab. `normalizeSet` reserves removed status ids. `useSaveStatuses` swaps placeholder ids. `ProjectTree` move chord awaits. Generated `unnamed_<n>` skips real keys. `RepoEntry.remoteURLList` caches until refsChanged. Settings dialog snapshots refreshed.
+
+### v0.2.20 P387 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.20/` removed. PR opened to `main`.
+<!-- /chapter v0.2.20 -->
