@@ -963,6 +963,14 @@ func (s *AdeTaskService) TakeOver(ctx context.Context, args adewire.TakeOverArgs
 	return l, adeTaskError(err)
 }
 
+func (s *AdeTaskService) RestartSession(ctx context.Context, args adewire.RestartSessionArgs) (adewire.Launch, error) {
+	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
+		return adewire.Launch{}, err
+	}
+	l, err := s.Engine.RestartSession(ctx, args)
+	return l, adeTaskError(err)
+}
+
 func (s *AdeTaskService) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (adewire.Launch, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Launch{}, err

@@ -909,6 +909,10 @@ type TakeOverArgs struct {
 	StopIfRunning bool   `json:"stopIfRunning"`
 }
 
+type RestartSessionArgs struct {
+	SessionID string `json:"sessionId"`
+}
+
 type LaunchStepArgs struct {
 	TaskID  string `json:"taskId"`
 	Message string `json:"message"`
