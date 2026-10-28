@@ -6,7 +6,7 @@ Source: user request. Phases run top to bottom.
 
 | Phase | Title | Status |
 |---|---|---|
-| P388 | ADE task list: calmer look, clear active-task marker, visible separators | Todo |
+| P388 | ADE task list: calmer look, clear active-task marker, visible separators | Done |
 | P389 | ADE tightening: drop plan top bar, drop task toolbar, drop session bar | Todo |
 | P390 | ADE git module last in order | Todo |
 | P391 | Both apps: scrollbars hidden until pointer is in the panel | Todo |
@@ -27,6 +27,8 @@ ADE tasks view is busy and colorful; hard to focus on what is essential. Fix:
 - Reduce color and visual noise; keep only what is essential.
 - Add a clear visual indicator for the task open in the right panel.
 - Make the separation between tasks more visible.
+
+Result: plan `plans/P388.md`. Plan cards neutral: colour only on task status tag, red failures, amber needs-you/stale; task colour only as head dot. Task open in panel wears `border-focus ring-1` plus `aria-current`; head, branch row, span and history rows use `bg-select`. `Separator` (`ade-task-separator`) between tasks. `AdeTaskActionButton` gains `quiet`. Specs: geometry test rewritten, two new tests in `ade-v2-plan.spec.ts`. Checks: `bun run lint`, `typecheck` (pre-commit), `lint:dead` clean; `ade-` UI specs 314 pass; visual suite: only `ade-plan-branches` diffed, 4 baselines re-recorded (Inter font confirmed); screenshots re-run stable, 2 PNGs updated. `check-ui-primitives.sh` U37 exemptions added for `AdeBranchRow.vue`, `AdeDayBand.vue`. CodeGraph MCP unavailable.
 
 ### P389 ADE tightening: drop plan top bar, drop task toolbar, drop session bar
 
