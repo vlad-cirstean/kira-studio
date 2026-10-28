@@ -8,6 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
 // mainFeature is main with a.txt (3 lines), then feature adding line4.
@@ -144,4 +145,25 @@ func TestRefsChangedKeepsReviewState(t *testing.T) {
 	if d := sinceReview(t, gs, id, "feature", "a.txt"); d.DeltaSource != "unchanged" {
 		t.Fatalf("DeltaSource = %q, want unchanged", d.DeltaSource)
 	}
+}
+
+// Backend half of the review window's refresh: a commit on the reviewed branch reaches the stream
+// as refsChanged, and review.files then answers with the new tip and file.
+func TestReviewFilesAfterCommit(t *testing.T) {
+	app := flowharness.New(t)
+	gs := app.OpenGitStream()
+	repo := mainFeature(app)
+	id := openRepo(t, gs, repo.Dir)
+
+	call[gitsession.RangeFilesResult](t, gs, "review.files", gitrpc.ReviewFilesParams{RepoID: id, Branch: "feature", Base: "main"})
+	var tip string
+	external(t, gs, func() {
+		tip = repo.Commit("second feature commit", map[string]string{"b.txt": "new\n"})
+	})
+
+	got := call[gitsession.RangeFilesResult](t, gs, "review.files", gitrpc.ReviewFilesParams{RepoID: id, Branch: "feature", Base: "main"})
+	if got.BranchTip != tip {
+		t.Fatalf("branchTip = %s, want the new tip %s", got.BranchTip, tip)
+	}
+	fileEntry(t, got.Files, "b.txt")
 }
