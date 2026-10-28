@@ -41,6 +41,12 @@ interface SortableReorderOptions {
   /** With `keyboard`: a move fires only when focus sits in this selector's element inside the
    *  item. For items that nest other focusable rows (a collection holds script rows). */
   keyboardHandle?: string;
+  /** Lists sharing a name exchange items. Omitted keeps the list isolated. */
+  group?: string;
+  /** With `group`: the id of a dragged element, read on the list it lands in. */
+  itemId?: (el: HTMLElement) => string | null;
+  /** With `group`: an item from another list was dropped here, before `beforeId` (null = last). */
+  onAdd?: (id: string, beforeId: string | null) => void;
 }
 
 /** P137's TabStrip pattern, shared: vue-draggable-plus in forceFallback mode bound to an id mirror
@@ -74,7 +80,9 @@ export function useSortableReorder(
       preventOnFilter: false,
       direction: options.direction,
       disabled: options.disabled?.() ?? false,
-      group: { name: 'sortable-reorder', pull: false, put: false },
+      group: options.group
+        ? { name: options.group, pull: true, put: true }
+        : { name: 'sortable-reorder', pull: false, put: false },
       forceFallback: true,
       fallbackOnBody: options.fallbackOnBody ?? true,
       fallbackTolerance: DRAG_TOLERANCE_PX,
@@ -85,6 +93,17 @@ export function useSortableReorder(
       },
       onEnd: () => {
         dragging.value = false;
+      },
+      // The library has already moved its id mirror and DOM; the real order only changes when the
+      // backend snapshot lands, so put both back and let that snapshot re-render.
+      onAdd: (evt) => {
+        const id = options.itemId?.(evt.item);
+        const beforeId = ids()[evt.newDraggableIndex ?? -1] ?? null;
+        rowIds.value = [...ids()];
+        if (!cancelled && id) options.onAdd?.(id, beforeId);
+      },
+      onRemove: () => {
+        rowIds.value = [...ids()];
       },
       onUpdate: (evt) => {
         const current = ids();

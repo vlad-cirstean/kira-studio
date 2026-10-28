@@ -9,8 +9,13 @@ const props = defineProps<{
   handle?: string;
   keyboardHandle?: string;
   disabled?: boolean;
+  group?: string;
+  itemId?: (el: HTMLElement) => string | null;
 }>();
-const emit = defineEmits<{ move: [fromId: string, toId: string] }>();
+const emit = defineEmits<{
+  move: [fromId: string, toId: string];
+  add: [id: string, beforeId: string | null];
+}>();
 
 // A parent that rebuilds `ids` on every render would reset Sortable's list mid-drag: only a changed
 // content replaces the array handed down.
@@ -32,8 +37,12 @@ useSortableReorder(
     draggable: props.draggable,
     handle: props.handle,
     keyboardHandle: props.keyboardHandle,
-    disabled: () => props.disabled === true || stableIds.value.length < 2,
+    // A grouped list stays live when empty or single: it still takes drops from its peers.
+    disabled: () => props.disabled === true || (!props.group && stableIds.value.length < 2),
     keyboard: true,
+    group: props.group,
+    itemId: props.itemId,
+    onAdd: (id, beforeId) => emit('add', id, beforeId),
   },
 );
 </script>

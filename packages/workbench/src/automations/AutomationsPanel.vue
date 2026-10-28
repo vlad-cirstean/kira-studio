@@ -18,12 +18,18 @@ import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import SortableList from '@workbench/components/SortableList.vue';
-import { moveToCollectionMenu } from '@workbench/lib/collectionMenu';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef } from 'vue';
 import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
+import {
+  type CollectionMenuActions,
+  collectionMenu,
+  newScriptItems,
+  type ScriptMenuActions,
+  scriptMenu,
+} from './panelMenus';
 import { useRerun, useRunScript } from './runScript';
 import RunsSection from './runs/RunsSection.vue';
 import { useLiveRunByScript } from './runs/runsQueries';
@@ -107,9 +113,17 @@ function openGroup(id: string): void {
   collapsed.value = collapsed.value.filter((n) => n !== id);
 }
 
-// Drag and Alt+arrow reorder stay inside one set; a search shows a filtered subset, so it pauses them.
+// A search shows a filtered subset, so it pauses drag, Alt+arrow and the Move up/down items.
 const reorderOff = computed(() => search.value.trim() !== '');
 const ungroupedIds = computed(() => view.value.ungrouped.map((s) => s.id));
+// Scripts drag between the ungrouped list and every open collection; the lists share this group.
+const SCRIPT_GROUP = 'automation-scripts';
+function scriptIdOf(el: HTMLElement): string | null {
+  return el.dataset.navKey?.replace(/^script:/, '') ?? null;
+}
+function dropScript(collectionId: string | null, id: string, beforeId: string | null): void {
+  void guarded(() => scripts.move(id, collectionId, beforeId));
+}
 const groupIds = computed(() => view.value.groups.map((g) => g.collection.id));
 
 function reorderScripts(
@@ -186,33 +200,14 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   },
 });
 
-function newScriptItems(collectionId: string | null): MenuItem[] {
-  return [
-    {
-      type: 'item',
-      id: 'new-script',
-      label: t('automations.script.new.label'),
-      icon: 'add',
-      run: () => {
-        editor.value = { script: null, kind: 'script', collectionId };
-      },
-    },
-    {
-      type: 'item',
-      id: 'new-smart-script',
-      label: t('automations.script.newSmart.label'),
-      icon: 'sparkle',
-      run: () => {
-        editor.value = { script: null, kind: 'smart', collectionId };
-      },
-    },
-  ];
+function openEditor(kind: ScriptKind, collectionId: string | null): void {
+  editor.value = { script: null, kind, collectionId };
 }
 
 // The header "+" opens a dropdown under the button, the tab strip "+" pattern.
 function onAddClick(e: MouseEvent): void {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, newScriptItems(null));
+  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, newScriptItems(openEditor, null));
 }
 
 interface NavItem {
@@ -343,95 +338,62 @@ function navItemOf(kind: 'script' | 'group', id: string): NavItem {
   );
 }
 
-function onContextMenu(e: MouseEvent, script: CustomScript): void {
-  const items: MenuItem[] = [
-    {
-      type: 'item',
-      id: 'run',
-      label: t('common.action.run.label'),
-      icon: 'play',
-      run: () => runScript(script),
-    },
-    ...(script.schedule
-      ? ([
-          {
-            type: 'item',
-            id: 'run-now',
-            label: t('automations.script.runNow.label'),
-            icon: 'debug-start',
-            run: () => {
-              const { taskId, branchId } = script.schedule ?? { taskId: '', branchId: '' };
-              if (!scriptTabs.focusLive({ scriptId: script.id, taskId, branchId })) {
-                confirmStore.openNow(script.id);
-              }
-            },
-          },
-          {
-            type: 'item',
-            id: 'edit-schedule',
-            label: t('automations.script.editSchedule.label'),
-            icon: 'watch',
-            run: () => {
-              editor.value = {
-                script,
-                kind: script.kind,
-                collectionId: null,
-                initialTab: 'schedule',
-              };
-            },
-          },
-        ] satisfies MenuItem[])
-      : []),
-    {
-      type: 'item',
-      id: 'edit',
-      label: t('common.action.edit.label'),
-      icon: 'edit',
-      run: () => editScript(script),
-    },
-    moveToCollectionMenu({
-      collections: scripts.collections(),
-      current: script.collectionId,
-      allowNone: true,
-      onMove: (id) => guarded(() => scripts.move(script.id, id)),
-      onNew: () => moveToNewCollection(script),
+// Alt+arrow stays on the lists' keyboard handling; these items run the same swap by menu.
+function setIdsOf(script: CustomScript): readonly string[] {
+  const group = view.value.groups.find((g) => g.collection.id === script.collectionId);
+  return group ? group.rows.map((r) => r.id) : ungroupedIds.value;
+}
+
+function stepIds(ids: readonly string[], id: string, step: -1 | 1): string[] | null {
+  const neighbour = ids[ids.indexOf(id) + step];
+  return ids.includes(id) && neighbour ? moveId(ids, id, neighbour) : null;
+}
+
+const scriptActions: ScriptMenuActions = {
+  run: runScript,
+  runNow: (script) => {
+    const { taskId, branchId } = script.schedule ?? { taskId: '', branchId: '' };
+    if (!scriptTabs.focusLive({ scriptId: script.id, taskId, branchId })) {
+      confirmStore.openNow(script.id);
+    }
+  },
+  editSchedule: (script) => {
+    editor.value = { script, kind: script.kind, collectionId: null, initialTab: 'schedule' };
+  },
+  edit: editScript,
+  collections: () => scripts.collections(),
+  moveTo: (script, id) => guarded(() => scripts.move(script.id, id)),
+  moveToNew: moveToNewCollection,
+  remove: onRemove,
+  canMoveStep: (script, step) =>
+    !reorderOff.value && stepIds(setIdsOf(script), script.id, step) !== null,
+  moveStep: (script, step) => {
+    const order = stepIds(setIdsOf(script), script.id, step);
+    if (order) void guarded(() => scripts.reorder(script.collectionId, order));
+  },
+};
+
+const collectionActions: CollectionMenuActions = {
+  newScript: openEditor,
+  rename: (collection) =>
+    contextMenuStore.afterClose(() => {
+      renamingId.value = collection.id;
     }),
-    { type: 'separator' },
-    {
-      type: 'item',
-      id: 'remove',
-      label: t('common.action.remove.label'),
-      icon: 'trash',
-      danger: true,
-      run: () => onRemove(script),
-    },
-  ];
-  openMenu(navItemOf('script', script.id), e, items);
+  remove: confirmDeleteCollection,
+  canMoveStep: (collection, step) =>
+    !reorderOff.value && stepIds(groupIds.value, collection.id, step) !== null,
+  moveStep: (collection, step) => {
+    const order = stepIds(groupIds.value, collection.id, step);
+    if (order) void guarded(() => scripts.reorderCollections(order));
+  },
+};
+
+function onContextMenu(e: MouseEvent, script: CustomScript): void {
+  openMenu(navItemOf('script', script.id), e, scriptMenu(script, scriptActions));
 }
 
 function onCollectionContextMenu(e: MouseEvent, collection: ScriptCollection): void {
-  openMenu(navItemOf('group', collection.id), e, [
-    ...newScriptItems(collection.id),
-    {
-      type: 'item',
-      id: 'rename',
-      label: t('common.action.rename.label'),
-      icon: 'edit',
-      run: () =>
-        contextMenuStore.afterClose(() => {
-          renamingId.value = collection.id;
-        }),
-    },
-    { type: 'separator' },
-    {
-      type: 'item',
-      id: 'delete',
-      label: t('common.action.delete.label'),
-      icon: 'trash',
-      danger: true,
-      run: () => confirmDeleteCollection(collection),
-    },
-  ]);
+  openMenu(navItemOf('group', collection.id), e, collectionMenu(collection, collectionActions));
 }
 
 // Right-click on empty space (the empty state included), the API tree's own P105 §5.1 pattern.
@@ -439,7 +401,7 @@ const bodyEl = useTemplateRef<HTMLElement>('bodyEl');
 useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
   e.preventDefault();
   contextMenuStore.openContextMenu(e, [
-    ...newScriptItems(null),
+    ...newScriptItems(openEditor, null),
     {
       type: 'item',
       id: 'new-collection',
@@ -493,9 +455,12 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             <SortableList
               :ids="ungroupedIds"
               draggable='[data-nav-key^="script:"]'
+              :group="SCRIPT_GROUP"
+              :item-id="scriptIdOf"
               :disabled="reorderOff"
-              class="flex flex-col"
+              :class="['flex flex-col', ungroupedIds.length === 0 && 'min-h-2']"
               @move="(from, to) => reorderScripts(null, ungroupedIds, from, to)"
+              @add="(id, beforeId) => dropScript(null, id, beforeId)"
             >
               <ScriptRow
                 v-for="script in view.ungrouped"
@@ -541,8 +506,11 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   v-if="isOpen(group.collection.id)"
                   :ids="group.rows.map((s) => s.id)"
                   draggable='[data-nav-key^="script:"]'
+                  :group="SCRIPT_GROUP"
+                  :item-id="scriptIdOf"
                   :disabled="reorderOff"
-                  class="flex flex-col"
+                  :class="['flex flex-col', group.rows.length === 0 && 'min-h-2']"
+                  @add="(id, beforeId) => dropScript(group.collection.id, id, beforeId)"
                   @move="
                   (from, to) =>
                     reorderScripts(
