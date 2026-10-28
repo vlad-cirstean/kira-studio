@@ -2721,9 +2721,9 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The held bytes are the TextContent of the result the client would get. Masking happens once, in render.go. The UI parses those bytes into a table (ApprovalResponse.vue) and shows them verbatim on the As sent tab. It never re-renders or re-masks.
 - The text stays out of queue snapshots, which fan out to every window and can be MB-sized. Snapshots carry only isError and bytes; DbMcpService.PendingResponse(requestId) serves the text while the request is queued.
 - Withhold, timeout, abandon and a full queue return an app-authored error with no row data. Approve first re-checks MCP exposure and compares the current mask set with the one used to render (mask.Set.Equal); a change withholds the result so a rule added during review cannot be bypassed.
-- The setting is read fresh per call (bridge previewResponses). A read failure fails closed (review on), since sending unreviewed data is the unsafe direction.
+- Each connection has mcp_review_results (migration 0045, P382): inherit (default), review or send. Inherit reads dbMcp.previewResponses fresh per call (bridge previewResponses); review and send skip that read. A read failure fails closed (review on), since sending unreviewed data is the unsafe direction. A stored value outside the three coerces to review on scan.
 - go-sdk v1.8.0 (mcp/server.go toolForErr) wraps a regular handler error as an IsError text result carrying err.Error(); only a *jsonrpc.Error becomes a protocol error. A bare Go error from run_query therefore reaches the client as that text, and the preview shows the same text.
-- Only run_query is reviewed, as the only tool that returns row data. explain_query, describe_* and list_* are unchanged. There is no per-connection preview setting, no undo for a withheld write and no editing of the result before sending.
+- Only run_query is reviewed, as the only tool that returns row data. explain_query, describe_* and list_* are unchanged. There is no undo for a withheld write and no editing of the result before sending.
 - Both stages and heavy-read prompts raise the Studio window when it is not focused (P338), gated by dbMcp.focusOnApproval (default on, read fresh per open; a read error raises). A stray key landing after the raise can only deny: the dialog focuses Deny on mount and Escape denies.
 - Two stages can hold one call for up to 4 minutes. A client with a shorter MCP tool timeout ends the call as abandoned and the result is discarded.
 
@@ -2734,6 +2734,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - explain_query refuses anything but a leading SELECT/WITH (queryplan.Explainable) and refuses unsupported adapter kinds before connecting.
 - queryplan.Supported accepts only postgres, mysql, mariadb, sqlite and clickhouse adapter kinds.
 - The SELECT/WITH-only restriction on explain_query exists because on ClickHouse EXPLAIN can execute its own target on some forms, so letting DDL/DML through would make the path a write oracle.
+- mcp_review_results is a first-class column, not an options_json key, for the 0022 reason: options round-trips through the connection URI, and a safety gate must not be settable by pasting one.
 - Auto-force-explain uses its own mcp_auto_explain column (migration 0022), deliberately not the human-facing AutoExplain console flag, because one switch cannot mean both showing a warning strip after the fact and blocking an AI client on a modal a human must answer.
 - The heaviness threshold for auto-force-explain is the existing advanced.expensiveQueryRows setting (default 100,000), read fresh per call via explainThreshold in bridge/dbmcp.go.
 
@@ -2759,6 +2760,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The Database MCP settings section holds the enable toggle, the "Review results before the AI gets them" toggle (dbMcp.previewResponses, an instant action that bypasses draft/Save), the "Bring Kira Studio forward for approvals" toggle (dbMcp.focusOnApproval, instant, default on), the registration command and Install button, the token-expiry line, and a read-only Exposed connections glance.
 - The Exposed connections glance shows per-row read/write/DDL modes, auto-explain, and M5's masked-column count, and has no second editor.
 - In project/ConnectionDialog.vue, DetailTab has five values: 'General', 'Advanced', 'Pre-connect', 'MCP', 'Privacy'.
+- The MCP tab of the connection dialog also holds the result review override (inherit, always, never); the glance shows a line only for a connection that overrides it. The connection dialog is size 2xl so the tab fits its fixed height.
 - All permission and description editing happens in the MCP tab of the connection dialog, and all mask-rule editing happens in the Privacy tab.
 - The grid's two masking surfaces are the header menu's 'Mark column as PII' submenu (headerMenu in views/grid/menu.ts) and the toolbar preview toggle (toolbar-mask-preview in views/grid/DataToolbar.vue).
 
