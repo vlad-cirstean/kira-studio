@@ -17,19 +17,20 @@ type hostLinkFixture struct {
 	app      *flowharness.App
 	repoID   string
 	forkTip  string
+	xTip     string
 	clone    *flowharness.Repo
 	authFail bool
 }
 
 // pullJSON is a GitHub pull response.
-func pullJSON(number int, title, headRef, headOwner, login, mergedAt string) string {
+func pullJSON(number int, title, headRef, headOwner, login, mergedAt, sha string) string {
 	merged := "null"
 	if mergedAt != "" {
 		merged = `"` + mergedAt + `"`
 	}
 	return fmt.Sprintf(`{"number":%d,"title":%q,"html_url":"https://github.com/acme/api/pull/%d","state":"open","draft":false,`+
-		`"merged_at":%s,"user":{"login":%q},"head":{"ref":%q,"sha":"x","repo":{"owner":{"login":%q}}},"base":{"ref":"main"},"updated_at":"2026-03-01T00:00:00Z"}`,
-		number, title, number, merged, login, headRef, headOwner)
+		`"merged_at":%s,"user":{"login":%q},"head":{"ref":%q,"sha":%q,"repo":{"owner":{"login":%q}}},"base":{"ref":"main"},"updated_at":"2026-03-01T00:00:00Z"}`,
+		number, title, number, merged, login, headRef, sha, headOwner)
 }
 
 // newHostLinkFixture builds a base repo served at github.com/acme/api over a local ssh stand-in:
@@ -53,6 +54,7 @@ func newHostLinkFixture(t *testing.T, authFail bool) *hostLinkFixture {
 	commitAs("me@example.com", "login", "login.txt")
 	seed.Git("checkout", "-q", "-b", "feat/x", "main")
 	commitAs("sara@example.com", "x", "x.txt")
+	xTip := seed.Git("rev-parse", "HEAD")
 	seed.Git("checkout", "-q", "-b", "fork-main", "main")
 	seed.Git("commit", "-q", "--allow-empty", "--author=Sara <sara@example.com>", "-m", "fork change")
 	forkTip := seed.Git("rev-parse", "HEAD")
@@ -87,16 +89,20 @@ func newHostLinkFixture(t *testing.T, authFail bool) *hostLinkFixture {
 		Gh: []fakeagent.GhRule{
 			{Match: "--version", Emit: write("version.txt", "gh version 2.42.0 (2024-01-08)\n")},
 			auth,
-			{Match: "api/pulls/11", Emit: write("p11.json", pullJSON(11, "Fix login", "feat/login", "acme", "me", ""))},
-			{Match: "api/pulls/12", Emit: write("p12.json", pullJSON(12, "Fork change", "main", "forker", "sara", ""))},
-			{Match: "api/pulls/14", Emit: write("p14.json", pullJSON(14, "Spoof", "main", "evil", "evil", ""))},
-			{Match: "api/pulls/13", Emit: write("p13.json", pullJSON(13, "Old", "feat/old", "acme", "me", "2026-02-01T00:00:00Z"))},
+			{Match: "pulls/12/reviews", Emit: write("review.json", "{}")},
+			{Match: "issues/12/comments", Emit: write("comment.json", "{}")},
+			{Match: "head=acme:feat%2Fx", Emit: write("px-list.json", "["+pullJSON(15, "X change", "feat/x", "acme", "sara", "", xTip)+"]")},
+			{Match: "api/pulls/15", Emit: write("p15.json", pullJSON(15, "X change", "feat/x", "acme", "sara", "", xTip))},
+			{Match: "api/pulls/11", Emit: write("p11.json", pullJSON(11, "Fix login", "feat/login", "acme", "me", "", "x"))},
+			{Match: "api/pulls/12", Emit: write("p12.json", pullJSON(12, "Fork change", "main", "forker", "sara", "", forkTip))},
+			{Match: "api/pulls/14", Emit: write("p14.json", pullJSON(14, "Spoof", "main", "evil", "evil", "", "x"))},
+			{Match: "api/pulls/13", Emit: write("p13.json", pullJSON(13, "Old", "feat/old", "acme", "me", "2026-02-01T00:00:00Z", "x"))},
 			{Match: "api/pulls/99", Stderr: "gh: Not Found (HTTP 404)", Exit: 1},
 			{Match: "/pulls?", Emit: write("empty.json", "[]")},
 		},
 	})
 	rec := importRepo(t, app, clone.Dir)
-	return &hostLinkFixture{app: app, repoID: rec.ID, forkTip: forkTip, clone: clone, authFail: authFail}
+	return &hostLinkFixture{app: app, repoID: rec.ID, forkTip: forkTip, xTip: xTip, clone: clone, authFail: authFail}
 }
 
 func (f *hostLinkFixture) resolve(t *testing.T, url string) (adewire.HostLinkTarget, error) {

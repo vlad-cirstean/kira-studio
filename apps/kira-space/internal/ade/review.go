@@ -3,6 +3,7 @@ package ade
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
@@ -75,7 +76,28 @@ func (b *TaskBoard) reviewTarget(ctx context.Context, tc *taskCtx, sb model.AdeT
 	return adewire.ReviewWindowTarget{
 		TaskID: tc.task.ID, BranchID: sb.ID, CodeRepoID: sb.CodeRepoID, GitRepoID: entry.Summary.RepoID,
 		Branch: branch, Base: base, Worktree: worktree,
+		ChangeRequest: b.linkedChangeRequest(ctx, entry, tc.task.HostURL),
 	}, nil
+}
+
+// linkedChangeRequest is the change request number the task's link names when that link points at
+// entry's host repo; 0 otherwise. A task holds one branch per repo, so it is this branch's.
+func (b *TaskBoard) linkedChangeRequest(ctx context.Context, entry *gitsession.RepoEntry, hostURL string) int {
+	if hostURL == "" || b.deps.Registry == nil || b.deps.Registry.Hosts.Registry == nil {
+		return 0
+	}
+	p, _, link, ok := b.deps.Registry.Hosts.Registry.ParseBranchLink(ctx, hostURL)
+	if !ok || link.Issue || link.Number <= 0 {
+		return 0
+	}
+	hp, hr, ok := entry.HostRepo(ctx)
+	if !ok || hp.ID() != p.ID() {
+		return 0
+	}
+	if strings.EqualFold(hr.Host, link.Repo.Host) && strings.EqualFold(hr.Owner, link.Repo.Owner) && strings.EqualFold(hr.Name, link.Repo.Name) {
+		return link.Number
+	}
+	return 0
 }
 
 // reviewableBranch rejects a branch a review cannot target: archived, not mine or review, or not created.

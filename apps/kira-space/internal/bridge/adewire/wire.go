@@ -859,6 +859,9 @@ type ReviewWindowTarget struct {
 	Branch     string `json:"branch"`
 	Base       string `json:"base"`
 	Worktree   string `json:"worktree"`
+	// ChangeRequest is the branch's change request number when the task's link names it; 0 = find
+	// it by branch.
+	ChangeRequest int `json:"changeRequest"`
 }
 
 // ReviewWorking is the uncommitted work of a branch's worktree against its HEAD (P384). Worktree
