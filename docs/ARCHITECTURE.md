@@ -1281,6 +1281,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Motion and touch tokens --kira-motion (150ms), --kira-ease and --kira-touch-target (44px; h-touch, size-touch, min-h-touch) are defined in tokens.css.
 - App code must not set duration-*, ease-* or animate-in/out classes (U75).
 - prefers-reduced-motion: reduce zeroes transitions and animations in base.css, except Spinner.
+- Native scrollbars (base.css, pointer: fine only) keep a 12px classic gutter; the thumb is transparent until the pointer is inside that scroller. Thumb colour rides --kira-scrollbar-thumb, set by :where(:hover) on the scroller and reset on every element, because WebKit never repaints a :hover::-webkit-scrollbar-thumb rule and scrollbar-color/scrollbar-width drop the custom styling. Thumb :active keeps a dragged bar shown. Monaco and xterm keep their own hover-reveal scrollbars.
 - QueryState shows its default loading state after TIMING.spinnerDelay (300ms), while Button pending shows its spinner at once.
 - The drag ghost class is SORTABLE_GHOST_CLASS (U76).
 - Mobile code never hard-codes h-11 (U82).
