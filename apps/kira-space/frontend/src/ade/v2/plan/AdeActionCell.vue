@@ -6,7 +6,6 @@ import { computed } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { type BranchAction, type Tone, tagLabel } from '../board/actions';
-import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
 import AdeBranchTip from './AdeBranchTip.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
@@ -22,17 +21,20 @@ const { liveNow } = usePlanModel();
 const label = computed(() => tagLabel(props.tag, liveNow.value.getTime()));
 const emit = defineEmits<{ act: [action: BranchAction] }>();
 
-const ACTION_BTN_CLASS: Record<BranchAction['kind'], string> = {
-  forcePush: TONE_SOLID_CLASS.amber,
-  rebase: TONE_SOLID_CLASS.amber,
-  queue: TONE_SOLID_CLASS.red,
-  changeBase: TONE_SOLID_CLASS.amber,
-  abortRebase: TONE_SOLID_CLASS.red,
-  seeLog: TONE_SOLID_CLASS.amber,
-  takeOver: TONE_SOLID_CLASS.red,
-  seeError: TONE_SOLID_CLASS.red,
-  start: ACTION_CLASS.agent,
+const ACTION_VARIANT: Record<BranchAction['kind'], 'dialog' | 'dialog-danger'> = {
+  forcePush: 'dialog',
+  rebase: 'dialog',
+  queue: 'dialog-danger',
+  changeBase: 'dialog',
+  abortRebase: 'dialog-danger',
+  seeLog: 'dialog',
+  takeOver: 'dialog-danger',
+  seeError: 'dialog-danger',
+  start: 'dialog',
 };
+const tone = computed(() =>
+  !props.row || props.tag.tone === 'red' || props.tag.tone === 'amber' ? props.tag.tone : 'grey',
+);
 const TESTID: Record<BranchAction['kind'], string> = {
   forcePush: 'ade-force-push',
   rebase: 'ade-rebase',
@@ -53,28 +55,17 @@ const TESTID: Record<BranchAction['kind'], string> = {
     data-testid="ade-action-cell"
   >
     <AdeBranchTip v-if="row" :row="row" :color="color ?? null">
-      <AdeChip
-        :label="label"
-        :tone="tag.tone"
-        class="max-w-30 shrink truncate"
-        data-testid="ade-tag"
-      />
+      <AdeChip :label="label" :tone="tone" class="max-w-30 shrink truncate" data-testid="ade-tag" />
     </AdeBranchTip>
     <AdeTip v-else :text="tag.tip" :parts="tag.tipParts">
-      <AdeChip
-        :label="label"
-        :tone="tag.tone"
-        class="max-w-30 shrink truncate"
-        data-testid="ade-tag"
-      />
+      <AdeChip :label="label" :tone="tone" class="max-w-30 shrink truncate" data-testid="ade-tag" />
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.act?.id ?? a.kind" :text="a.tip" :parts="a.tipParts">
       <TooltipDisabledTrigger :disabled="a.disabled === true">
         <Button
-          variant="dialog"
+          :variant="ACTION_VARIANT[a.kind]"
           size="kira-lg"
-          class="shrink-0 "
-          :class="ACTION_BTN_CLASS[a.kind]"
+          class="shrink-0"
           :disabled="a.disabled"
           :data-testid="TESTID[a.kind]"
           @click.stop="emit('act', a)"

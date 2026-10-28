@@ -7,7 +7,6 @@ import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { TONE_SOLID_CLASS } from '../tones';
 import AdeTaskCard from './AdeTaskCard.vue';
 import type { BranchRowModel, CardModel } from './usePlanModel';
 
@@ -143,8 +142,10 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
       >
-        <CodiconIcon name="check" :size="12" class="shrink-0 text-tone-purple" />
-        <span class="shrink-0 whitespace-nowrap text-kira-sm text-tone-purple">{{ h.how }}</span>
+        <CodiconIcon name="check" :size="12" class="shrink-0 text-muted-foreground" />
+        <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{
+          h.how
+        }}</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{
           h.repos
         }}</span>
@@ -155,7 +156,6 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         <Button
           variant="dialog"
           size="kira"
-          :class="TONE_SOLID_CLASS.amber"
           data-testid="ade-band-rollover"
           @click="emit('rollover')"
         >
@@ -165,10 +165,9 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
       <div v-if="over" class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-red">
         <span>{{ overflowNote }}</span>
         <Button
-          variant="dialog"
+          variant="dialog-danger"
           size="kira"
           class="max-w-90 truncate"
-          :class="TONE_SOLID_CLASS.red"
           data-testid="ade-band-overflow-move"
           @click="emit('overflowMove')"
         >
@@ -187,19 +186,12 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         v-for="s in spans"
         :key="s.taskId"
         variant="toolbar"
-        class="ml-54.5 h-row w-auto justify-start gap-2 border border-l-4 border-border px-2 font-normal"
-        :style="{ borderLeftColor: s.color }"
+        class="ml-54.5 h-row w-auto justify-start gap-2 border border-border px-2 font-normal"
         data-testid="ade-span-row"
         @click="emit('select', s.taskId)"
       >
         <CodiconIcon name="indent" :size="12" class="shrink-0 text-subtle" />
-        <span
-          class="shrink-0 whitespace-nowrap text-kira-sm"
-          :class="s.merges ? 'text-tone-amber' : 'text-subtle'"
-          >{{
-            s.note
-          }}</span
-        >
+        <span class="shrink-0 whitespace-nowrap text-kira-sm text-subtle">{{ s.note }}</span>
         <span class="min-w-0 truncate font-medium text-fg">{{ s.title }}</span>
       </Button>
     </div>
