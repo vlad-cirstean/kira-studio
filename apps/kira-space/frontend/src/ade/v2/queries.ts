@@ -183,9 +183,20 @@ function withSavedStatuses(board: Board, args: SaveStatusesArgs): Board {
 }
 
 export function useSaveStatuses() {
+  const optimistic = optimisticUpdate<Board, SaveStatusesArgs>(
+    queryClient,
+    boardKey,
+    withSavedStatuses,
+  );
   return useMutation({
     mutationFn: (args: SaveStatusesArgs) => control.adeTaskSaveStatuses(args),
-    ...optimisticUpdate<Board, SaveStatusesArgs>(queryClient, boardKey, withSavedStatuses),
+    ...optimistic,
+    // The result carries the real ids of new statuses; the board push may land after this resolves.
+    onSuccess: (result) => {
+      queryClient.setQueryData<Board>(boardKey, (b) =>
+        b ? { ...b, statuses: result.statuses } : b,
+      );
+    },
   });
 }
 

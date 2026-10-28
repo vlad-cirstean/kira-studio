@@ -60,18 +60,17 @@ function lastOfCategory(s: TaskStatusDef): boolean {
 async function commit(
   next: TaskStatusDef[],
   reassign: Record<string, string> = {},
-): Promise<boolean> {
+): Promise<TaskStatusDef[] | null> {
   error.value = '';
   try {
-    await save.mutateAsync({ statuses: next, reassign });
-    return true;
+    return (await save.mutateAsync({ statuses: next, reassign })).statuses;
   } catch (err) {
     error.value = errorText(err);
-    return false;
+    return null;
   }
 }
 
-function edit(id: string, patch: Partial<TaskStatusDef>): Promise<boolean> {
+function edit(id: string, patch: Partial<TaskStatusDef>): Promise<TaskStatusDef[] | null> {
   return commit(statuses.value.map((s) => (s.id === id ? { ...s, ...patch } : s)));
 }
 
@@ -99,7 +98,8 @@ async function add(): Promise<void> {
     ...statuses.value,
     { id: '', name: uniqueName(), tone: 'grey', category: 'active' } satisfies TaskStatusDef,
   ];
-  if (await commit(next)) fresh.value = ids.value.find((id) => !before.has(id)) ?? '';
+  const saved = await commit(next);
+  if (saved) fresh.value = saved.find((s) => !before.has(s.id))?.id ?? '';
 }
 
 function move(from: string, to: string): void {
