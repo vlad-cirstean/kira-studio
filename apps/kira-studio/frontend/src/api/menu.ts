@@ -30,7 +30,7 @@ export interface CollectionMenuActions {
   moveToNewCollection(rows: readonly CollectionRowVm[]): void;
   copyUrl(row: CollectionRowVm): void;
   /** One place within the row's own sibling set. */
-  moveStep(row: CollectionRowVm, step: -1 | 1): void;
+  moveStep(row: CollectionRowVm, step: -1 | 1): Promise<void>;
   canMoveStep(row: CollectionRowVm, step: -1 | 1): boolean;
   importPostman(): void;
   /** P7 D12: the background menu's own "Import from curl…" item — opens the paste-a-curl-command
