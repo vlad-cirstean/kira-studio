@@ -67,7 +67,13 @@ function createLinkHint(term: Terminal): LinkHint | null {
       el.style.display = '';
       const left = Math.min(event.clientX - box.left, Math.max(0, box.width - el.offsetWidth));
       el.style.left = `${Math.max(0, left)}px`;
-      el.style.top = `${event.clientY - box.top + 16}px`;
+      const below = event.clientY - box.top + 16;
+      // Links sit near the bottom (above Claude Code's input), so flip above the pointer there.
+      const top =
+        below + el.offsetHeight > box.height
+          ? event.clientY - box.top - el.offsetHeight - 8
+          : below;
+      el.style.top = `${Math.max(0, top)}px`;
     },
     hide() {
       el.style.display = 'none';

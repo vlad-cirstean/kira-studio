@@ -75,4 +75,19 @@ export function registerTerminalLinkScenarios(env: Env, options: Options): void 
     await expect.poll(() => opened(control)).toHaveLength(1);
     expect(opened(control)[0]?.args).toEqual({ url });
   });
+
+  test('contract: hint of a link on the last row stays inside the terminal', async ({
+    relaunch,
+  }) => {
+    const { window: page } = await relaunch({ control: BASE });
+    await printLine(page, `${'filler\r\n'.repeat(80)}${url}`);
+    const row = page.locator('.xterm-rows > div', { hasText: url });
+    await expect(row).toBeVisible();
+
+    await row.hover({ position: { x: 20, y: 6 }, force: true });
+    await expect(hint(page)).toBeVisible();
+    const screen = await page.locator('.xterm-screen').boundingBox();
+    const box = await hint(page).boundingBox();
+    expect(box && screen && box.y + box.height <= screen.y + screen.height).toBe(true);
+  });
 }
