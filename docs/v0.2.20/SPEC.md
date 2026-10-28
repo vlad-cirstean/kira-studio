@@ -17,7 +17,7 @@ Source: user request. Phases run top to bottom.
 | P382 | MCP show-results customizable per connection | Done |
 | P383 | Add a work item from a GitHub link, branch taken from the link | Done |
 | P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Done |
-| P385 | Postman import accepts partial data again | Todo |
+| P385 | Postman import accepts partial data again | Done |
 | P386 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
 | P387 | Close chapter, open PR | Todo |
 
@@ -100,6 +100,8 @@ Result: plan `plans/P384.md`. Stale cause: Files target triple did not change on
 ### P385 Postman import accepts partial data again
 
 An earlier phase made the Postman import reject items with missing values. The export itself lacked that data. Revert to importing partial data too.
+
+Result: plan `plans/P385.md`. Earlier change: v0.2.18 P361. Missing values were never refused (`value` null/absent/`""` imports as `""`); what got dropped was keyless entries (silent) and request-less items (`malformed_item`), and `empty_values` told users to re-export. Rule now: every JSON-object entry imports, defaults counted per warning kind; non-object entries still skipped. Keyless variables import as `unnamed_<n>` (`unnamed_variables`); items with neither `item` nor `request` import as empty GET "Untitled request" (`missing_request`); `empty_values` and `malformed_item` reworded. User override: disabled variables (`enabled: false` / `disabled: true`) stay skipped with `disabled_variables` as before; a disabled keyless entry takes no `unnamed_<n>` number. Tests: parser tables, roundtrip, flow `TestPostmanImportCollectionAndEnvironment` (contract `api-postman-multi`), UI spec. Checks: lint, postman/bridge/storage/apiflow Go tests, `collections.spec.ts` (14) pass. Added `GET` to catalog `PROPER_NOUNS`.
 
 ### P386 Code review
 
