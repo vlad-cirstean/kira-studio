@@ -317,7 +317,7 @@ func (b *TaskBoard) repoCandidates(ctx context.Context, codeRepoID string, taken
 // none until Start or Take over.
 func (b *TaskBoard) AddExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs) (adewire.AddExistingBranchResult, error) {
 	var sb model.AdeTaskBranch
-	res, err := b.attachExistingBranch(ctx, args, &sb)
+	res, err := b.attachExistingBranch(ctx, args, &sb, newTaskFields{})
 	if err != nil {
 		return res, err
 	}
@@ -351,7 +351,10 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 	b.notifyBoard()
 }
 
-func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch) (adewire.AddExistingBranchResult, error) {
+// newTaskFields are the task fields an attach sets when it creates the task.
+type newTaskFields struct{ Title, HostURL string }
+
+func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch, nf newTaskFields) (adewire.AddExistingBranchResult, error) {
 	if err := b.requireRepos([]string{args.CodeRepoID}); err != nil {
 		return adewire.AddExistingBranchResult{}, err
 	}
@@ -391,7 +394,7 @@ func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddEx
 	var task model.AdeTask
 	var sb model.AdeTaskBranch
 	if args.TaskID == "" {
-		task = model.AdeTask{ID: b.newID(), Kind: model.AdeTaskKindTask, CreatedAt: now}
+		task = model.AdeTask{ID: b.newID(), Kind: model.AdeTaskKindTask, CreatedAt: now, Title: nf.Title, HostURL: nf.HostURL}
 		if kind == model.AdeBranchKindReview {
 			task.Kind, task.Owner = model.AdeTaskKindReview, row.AuthorName
 		}

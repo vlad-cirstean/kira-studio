@@ -698,6 +698,23 @@ type AddExistingBranchArgs struct {
 	TaskID     string `json:"taskId"`
 }
 
+type HostLinkArgs struct {
+	URL    string `json:"url"`
+	TaskID string `json:"taskId"` // '' = new task; ResolveHostLink ignores it
+}
+
+// HostLinkTarget is the branch a pasted link names, before anything is fetched.
+type HostLinkTarget struct {
+	CodeRepoID    string         `json:"codeRepoId"`
+	Remote        string         `json:"remote"`
+	Branch        string         `json:"branch"`    // local name AddHostLink attaches
+	HeadOwner     string         `json:"headOwner"` // '' unless Fork
+	Fork          bool           `json:"fork"`
+	Author        string         `json:"author"` // change request author login; '' for a branch link
+	ChangeRequest *ChangeRequest `json:"changeRequest"`
+	OnTaskID      string         `json:"onTaskId"` // live task already holding Branch
+}
+
 type SetPlanArgs struct {
 	Order []string           `json:"order"`
 	Days  map[string]*string `json:"days"`

@@ -348,6 +348,10 @@ const spaceControl = {
     unwrap(AdeTaskService.AddExistingBranch(args)).then((r) =>
       trust<V2.AddExistingBranchResult>(r),
     ),
+  adeTaskResolveHostLink: (args: V2.HostLinkArgs): Promise<V2.HostLinkTarget> =>
+    unwrap(AdeTaskService.ResolveHostLink(args)).then((r) => trust<V2.HostLinkTarget>(r)),
+  adeTaskAddHostLink: (args: V2.HostLinkArgs): Promise<V2.AddExistingBranchResult> =>
+    unwrap(AdeTaskService.AddHostLink(args)).then((r) => trust<V2.AddExistingBranchResult>(r)),
   adeTaskSetPlan: (args: V2.SetPlanArgs): Promise<void> => unwrap(AdeTaskService.SetPlan(args)),
   adeTaskSetQueuedAfter: (args: V2.SetQueuedAfterArgs): Promise<void> =>
     unwrap(AdeTaskService.SetQueuedAfter(args)),

@@ -722,6 +722,21 @@ export interface AddExistingBranchArgs {
   name: string;
   taskId: string /* '' = new task */;
 }
+export interface HostLinkArgs {
+  url: string;
+  taskId: string /* '' = new task; ResolveHostLink ignores it */;
+}
+/** The branch a pasted link names, before anything is fetched. */
+export interface HostLinkTarget {
+  codeRepoId: string;
+  remote: string;
+  branch: string /* local name AddHostLink attaches */;
+  headOwner: string /* '' unless fork */;
+  fork: boolean;
+  author: string /* change request author login; '' for a branch link */;
+  changeRequest: ChangeRequest | null;
+  onTaskId: string /* live task already holding branch */;
+}
 export interface SetPlanArgs {
   order: string[];
   days: Record<string, string | null> /* null = Later */;

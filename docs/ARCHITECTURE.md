@@ -2034,7 +2034,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the agentmcp finish_step server, the Tracker, log sink and session store.
 - wireAdeTask calls Recover() then Start() on the task board, and installs board.OnTUIStopped as the tracker's stopped handler.
-- bridge.AdeTaskService binds 65 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
+- bridge.AdeTaskService binds 67 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
 - AdeTaskService push channels are defined in bridge/adewire/channels.go with prefix kira:adetask: and suffixes board, backlog, workflows, repos, runs, log, sessions and open-session; open-session is emitted to one window via EmitTo.
 - bridge/adewire is the frozen wire contract; tests/fixtures/ade-v2/ holds 27 fixtures decoded by adewire/wire_test.go and the mock runtime.
 - layeringtest.RunAllowing admits the adewire package.

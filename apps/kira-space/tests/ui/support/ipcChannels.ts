@@ -178,6 +178,8 @@ export const IPC = {
   adeTaskCreateTask: 'kira:adetask:createTask',
   adeTaskCandidateBranches: 'kira:adetask:candidateBranches',
   adeTaskAddExistingBranch: 'kira:adetask:addExistingBranch',
+  adeTaskResolveHostLink: 'kira:adetask:resolveHostLink',
+  adeTaskAddHostLink: 'kira:adetask:addHostLink',
   adeTaskUpdateTask: 'kira:adetask:updateTask',
   adeTaskAddTaskRepo: 'kira:adetask:addTaskRepo',
   adeTaskSetPlan: 'kira:adetask:setPlan',

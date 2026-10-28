@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
@@ -519,6 +520,41 @@ func (s *AdeTaskService) AddExistingBranch(ctx context.Context, args adewire.Add
 		}
 	}
 	r, err := s.Engine.AddExistingBranch(ctx, args)
+	return r, adeTaskError(err)
+}
+
+const adeMaxHostLinkBytes = 2048
+
+func validateHostLinkArgs(args adewire.HostLinkArgs) (adewire.HostLinkArgs, error) {
+	args.URL = strings.TrimSpace(args.URL)
+	if args.URL == "" || len(args.URL) > adeMaxHostLinkBytes || strings.ContainsFunc(args.URL, unicode.IsControl) {
+		return args, adeTaskInvalid("url must be a link of at most 2048 bytes")
+	}
+	if args.TaskID != "" {
+		if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+			return args, err
+		}
+	}
+	return args, nil
+}
+
+// ResolveHostLink names the branch a pasted PR or branch link points at; it changes nothing.
+func (s *AdeTaskService) ResolveHostLink(ctx context.Context, args adewire.HostLinkArgs) (adewire.HostLinkTarget, error) {
+	args, err := validateHostLinkArgs(args)
+	if err != nil {
+		return adewire.HostLinkTarget{}, err
+	}
+	r, err := s.Engine.ResolveHostLink(ctx, args)
+	return r, adeTaskError(err)
+}
+
+// AddHostLink attaches the branch a pasted PR or branch link points at.
+func (s *AdeTaskService) AddHostLink(ctx context.Context, args adewire.HostLinkArgs) (adewire.AddExistingBranchResult, error) {
+	args, err := validateHostLinkArgs(args)
+	if err != nil {
+		return adewire.AddExistingBranchResult{}, err
+	}
+	r, err := s.Engine.AddHostLink(ctx, args)
 	return r, adeTaskError(err)
 }
 
