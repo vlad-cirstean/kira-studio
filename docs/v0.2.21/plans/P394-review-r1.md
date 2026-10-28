@@ -52,3 +52,10 @@ Fix: rename the function to `TestContractVersion_Is55`.
 - Scrollbar CSS (`packages/theme/src/base.css:53`): the `:where(:hover)` custom property is invalidated only along the hover chain that changes. The universal reset stops inheritance from spreading past each element's direct children. No concrete cost was found that would justify a trace. Behaviour is covered by `scenarios/scrollbars.ts`.
 - Removed components (`AdeSessionBar`, `AdeSessionId`, `AdePlanHeader`): no live references remain. Leftover testids appear only in negative assertions. `docker.action.restart.label` was removed with no remaining callers. The tone maps are still used.
 - Rules: every new `.vue` file is `<script setup lang="ts">`, with no scoped styles. Uses shadcn `Tooltip`/`Separator`/`Button`, the existing context-menu store, and TanStack mutation. The archived guard on Take over/Stop still holds, because the tab row is hidden when archived.
+
+## Fix notes
+
+- F1: fixed in `28e11a9af`. `RestartSession` holds the task lock across Stop, close, resume; `TakeOver` body split into `takeOverLocked`. No Go race test: the window needs a terminal that outlives SIGTERM, timing-dependent and flaky; existing `TestRestartSession` covers the path.
+- F2: fixed in `28e11a9af`. `Stop` marks stopped first, forgets only on success.
+- F3: fixed in `f6796796f`. Hint flips above the pointer near the bottom; new scenario in `terminalLinks.ts` fails without the fix.
+- F4: fixed in `7a530b5d5`.
