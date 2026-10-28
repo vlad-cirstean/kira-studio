@@ -9,7 +9,12 @@ import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { logError } from '@workbench/bridge/log';
 import { useRowHeight } from '@workbench/lib/rowHeight';
-import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import {
+  type MenuItem,
+  runMenuShortcut,
+  runMenuShortcutAsync,
+  useContextMenuStore,
+} from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
@@ -221,13 +226,15 @@ function viaMenu(id: ShortcutId): (key: string) => void {
     if (row) runMenuShortcut(menuForRow(row), id);
   };
 }
-// Rows are index-keyed, so after a move the focused element would show another row: scroll to the
-// moved row and focus it again.
+// Rows are index-keyed, so after a move the focused element would show another row: wait for the
+// move to land, scroll to the moved row and focus it again.
 function moveViaMenu(id: ShortcutId): (key: string) => void {
-  const run = viaMenu(id);
   return (key) => {
-    run(key);
-    void revealKey(key).then(() => nav.focusKey(key));
+    const row = treeStore.visibleRows.find((r) => r.key === key);
+    if (!row) return;
+    void runMenuShortcutAsync(menuForRow(row), id)
+      .then(() => revealKey(key))
+      .then(() => nav.focusKey(key));
   };
 }
 useTreeShortcuts(nav, {
