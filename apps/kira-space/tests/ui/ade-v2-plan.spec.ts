@@ -314,6 +314,16 @@ test('the Plan scrolls inside the window instead of growing it', async ({ relaun
   expect(m.scroll).toBeGreaterThan(m.client);
 });
 
+test('the Plan has no top bar; Refresh all sits in the repo row', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const plan = page.locator('[data-testid="ade-plan"]');
+  await expect(plan.locator('[data-slot="panel-header"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-plan-header"]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="ade-plan-repos"] [data-testid="ade-refresh-all"]'),
+  ).toBeVisible();
+});
+
 test('a branch row shows its own progress under the name', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const row = page.locator('[data-testid="ade-branch-row"][data-branch-id="b_meter"]');

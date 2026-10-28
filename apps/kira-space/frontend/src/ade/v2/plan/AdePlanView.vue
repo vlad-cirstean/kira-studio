@@ -24,7 +24,7 @@ import { useConfirmRun } from '../useConfirmRun';
 import AdeDayBand from './AdeDayBand.vue';
 import AdeDayControls from './AdeDayControls.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
-import AdePlanHeader, { type RepoChipModel } from './AdePlanHeader.vue';
+import AdePlanRepos, { type RepoChipModel } from './AdePlanRepos.vue';
 import { usePlanDrag } from './usePlanDrag';
 import type { BranchRowModel } from './usePlanModel';
 import { usePlanModel } from './usePlanModel';
@@ -328,7 +328,7 @@ function onForcePush(row: BranchRowModel): void {
     >
       <template v-if="model">
         <div ref="headerEl" class="sticky top-0 z-2 bg-bg">
-          <AdePlanHeader
+          <AdePlanRepos
             :repos="chips"
             :all-pending="refreshingAll"
             :ripple="model.ripple"
