@@ -18,7 +18,7 @@ Source: user request. Phases run top to bottom.
 | P383 | Add a work item from a GitHub link, branch taken from the link | Done |
 | P384 | Review window: fresh diffs, uncommitted changes, reviewed files keep diff, hide agent panel | Done |
 | P385 | Postman import accepts partial data again | Done |
-| P386 | Code review, 1 round (Opus review, Sonnet fix) | Todo |
+| P386 | Code review, 1 round (Opus review, Sonnet fix) | Done |
 | P387 | Close chapter, open PR | Todo |
 
 ## Rows
@@ -106,6 +106,8 @@ Result: plan `plans/P385.md`. Earlier change: v0.2.18 P361. Missing values were 
 ### P386 Code review
 
 One round, per `CLAUDE.md`. Base: last commit of `v0.2.19` (`902cf7e`). Findings file under `plans/`.
+
+Result: 7 findings (0 high, 2 medium, 5 low), all fixed; findings file deleted. F1 fork PR link: `AddHostLink` forces review kind and skips the prepare script when the head repo is a fork (`newTaskFields.ForceReview`); flow case in `TestHostLink` (fork tip authored with the user's email). F2 concurrent runs: `ScriptRuns.Start` refuses a second running run of the same script, task and branch (`E_CONFLICT`, `backend.core.scriptRun.alreadyRunning.body`), serialized by `startMu`; the play button reopens the tab of a running smart run from the run list instead of starting (closing the tab no longer allows a second start); flow case `one live run per script`, UI case in `automationsSmart.ts`; `run cap` flow test now uses four scripts. F3: `normalizeSet` reserves every old id, so a new status never takes a removed id; `TestTaskStatuses` case. F4: `useSaveStatuses` swaps placeholder ids for the saved ones, `add()` reads the new id from the result. F5: `ProjectTree` move chord awaits via `runMenuShortcutAsync`. F6: generated `unnamed_<n>` keys skip real keys of the array. F7: `RepoEntry.remoteURLList` caches remote URLs until refsChanged. Load fixes: `repo-graph-keep-state` first-row wait and `ade-v2-review` hunk-mark wait take 15 s. Settings dialog snapshots refreshed (sidebar gained Task statuses and Prompts in earlier phases; image reviewed, only the sidebar differs). Checks: lint, typecheck, lint:dead, build:space, build:test (both), `go test ./...` (139 packages), Claude test modules vet clean, Studio ui, ui-clipboard, ui-timing, ipc-frontend and visual (661), Space ui, mobile and visual (838 passed, 1 skipped) pass. Studio automations-row snapshot unchanged.
 
 ### P387 Close chapter, open PR
 
