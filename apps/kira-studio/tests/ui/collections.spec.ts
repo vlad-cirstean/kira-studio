@@ -7,7 +7,7 @@ import { collectionRow } from './support/apiRows';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
-import { settleFrames } from './support/tree';
+import { dragRow, settleFrames } from './support/tree';
 
 // P4 §6.3: four tests, one snapshot per channel (mockRuntime.ts: a channel with exactly one
 // snapshot answers args-blind, which is what lets a test assert on a call's args afterwards
@@ -20,7 +20,15 @@ const NOW = '2026-01-01T00:00:00.000Z';
 
 // One collection, one folder inside it, and two requests — one at the root, one in the folder.
 const TREE = {
-  collections: [{ id: 'col-1', name: 'Orders API', sortOrder: 0, createdAt: NOW, updatedAt: NOW }],
+  collections: [
+    {
+      id: 'col-1',
+      name: 'Orders API',
+      sortOrder: 0,
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  ],
   items: [
     {
       id: 'item-folder',
@@ -144,8 +152,20 @@ test('contract: collections — a request moves to another collection from its c
     ...TREE,
     collections: [
       ...TREE.collections,
-      { id: 'col-2', name: 'Billing API', sortOrder: 1, createdAt: NOW, updatedAt: NOW },
-      { id: 'col-new', name: 'New collection', sortOrder: 2, createdAt: NOW, updatedAt: NOW },
+      {
+        id: 'col-2',
+        name: 'Billing API',
+        sortOrder: 1,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'col-new',
+        name: 'New collection',
+        sortOrder: 2,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
     ],
   };
   const { window: page, control } = await relaunch({
@@ -414,8 +434,20 @@ test('collections — search filters the tree, keeps ancestors, and restores the
 // (D16c) — and each row there still opens the same openVariableSetTab('environment', …) the
 // category's rows used to, which is what the tail of this test still checks.
 const ENVIRONMENTS = [
-  { id: 'env-prod', name: 'Prod', sortOrder: 0, isActive: true, color: 'green' },
-  { id: 'env-staging', name: 'Staging', sortOrder: 1, isActive: false, color: 'amber' },
+  {
+    id: 'env-prod',
+    name: 'Prod',
+    sortOrder: 0,
+    isActive: true,
+    color: 'green',
+  },
+  {
+    id: 'env-staging',
+    name: 'Staging',
+    sortOrder: 1,
+    isActive: false,
+    color: 'amber',
+  },
 ];
 
 test('collections — no environments category in the panel; the header action opens the environments tab, and a row there opens one as a variables tab', async ({
@@ -494,8 +526,12 @@ test('environments reorder by dragging the grip; refused while filtered (P140)',
     if (!src || !dst) throw new Error('environment row has no box');
     await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
     await page.mouse.down();
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, { steps: 5 });
-    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, { steps: 15 });
+    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, {
+      steps: 5,
+    });
+    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, {
+      steps: 15,
+    });
     await page.waitForTimeout(300);
     await page.mouse.up();
   };
@@ -525,7 +561,9 @@ test('collections — Postman import builds the contract tree and export asks fo
     'CollectionsService.List',
   );
   const result = contract<{
-    files: { collection: { name: string; requests: number; folders: number } }[];
+    files: {
+      collection: { name: string; requests: number; folders: number };
+    }[];
   }>('api-postman', 'CollectionsService.Import');
   const report = result.files[0].collection;
   const importArgs = contract('api-postman', 'args:CollectionsService.Import');
@@ -540,7 +578,10 @@ test('collections — Postman import builds the contract tree and export asks fo
       response: contract('api-postman', 'FilesService.ChooseOpenMany'),
     },
     { channel: IPC.collectionsImport, response: result },
-    { channel: IPC.filesChooseSave, response: contract('api-postman', 'FilesService.ChooseSave') },
+    {
+      channel: IPC.filesChooseSave,
+      response: contract('api-postman', 'FilesService.ChooseSave'),
+    },
     {
       channel: IPC.collectionsExport,
       response: contract('api-postman', 'CollectionsService.Export'),
@@ -622,10 +663,10 @@ test('collections — Postman import of a collection, an environment and a bad f
 test('collections — after a restart the tree and the active environment come back', async ({
   relaunch,
 }) => {
-  const tree = contract<{ collections: { id: string }[]; items: { id: string; name: string }[] }>(
-    'api-restart',
-    'CollectionsService.List',
-  );
+  const tree = contract<{
+    collections: { id: string }[];
+    items: { id: string; name: string }[];
+  }>('api-restart', 'CollectionsService.List');
   const envs = contract<{ id: string; name: string; isActive: boolean }[]>(
     'api-restart',
     'VariablesService.ListEnvironments',
@@ -697,19 +738,6 @@ const primary = (page: Page) =>
     navigator.userAgent.includes('Mac') ? ('Meta' as const) : ('Control' as const),
   );
 
-/** Press on `from`'s centre, cross the drag tolerance, then park at `fraction` of `to`'s height. */
-async function dragRow(page: Page, from: Locator, to: Locator, fraction: number): Promise<void> {
-  const src = await from.boundingBox();
-  const dst = await to.boundingBox();
-  if (!src || !dst) throw new Error('row has no box');
-  const x = src.x + src.width * 0.6;
-  await page.mouse.move(x, src.y + src.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(x, src.y + src.height / 2 + 10, { steps: 4 });
-  await page.mouse.move(x, dst.y + dst.height * fraction, { steps: 10 });
-  await settleFrames(page);
-}
-
 test('contract: collections — a multi-selection drags into a folder and deletes as one', async ({
   relaunch,
 }) => {
@@ -732,13 +760,17 @@ test('contract: collections — a multi-selection drags into a folder and delete
 
   // Ctrl/Cmd toggles one row.
   await collectionRow(page, 'item-health').click();
-  await collectionRow(page, 'item-status').click({ modifiers: [await primary(page)] });
+  await collectionRow(page, 'item-status').click({
+    modifiers: [await primary(page)],
+  });
   await expect(selectedRows(page)).toHaveCount(2);
 
   await dragRow(page, collectionRow(page, 'item-health'), collectionRow(page, 'item-archive'), 0.5);
   await expect(collectionRow(page, 'item-archive')).toHaveAttribute('data-drop-zone', 'into');
   await expect(page.locator('[data-testid="collection-drag-count"]')).toHaveText('2');
-  await page.screenshot({ path: test.info().outputPath('drag-into-folder.png') });
+  await page.screenshot({
+    path: test.info().outputPath('drag-into-folder.png'),
+  });
   await page.mouse.up();
   await expect
     .poll(() => moveCalls(control).at(0)?.args)
@@ -763,7 +795,9 @@ test('contract: collections — a multi-selection drags into a folder and delete
 
   // Delete the folder and a request together: one confirm, one call.
   await collectionRow(page, 'item-folder').click();
-  await collectionRow(page, 'item-health').click({ modifiers: [await primary(page)] });
+  await collectionRow(page, 'item-health').click({
+    modifiers: [await primary(page)],
+  });
   const mod = await primary(page);
   await page.keyboard.press(mod === 'Meta' ? 'Meta+Backspace' : 'Delete');
   const dialog = page.locator('[data-testid="confirm-dialog"]');
@@ -773,7 +807,11 @@ test('contract: collections — a multi-selection drags into a folder and delete
   await page.locator('[data-testid="confirm-dialog-confirm"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.collectionsDeleteMany)?.args)
-    .toEqual({ ...deleteArgs, collectionIds: [], itemIds: ['item-folder', 'item-health'] });
+    .toEqual({
+      ...deleteArgs,
+      collectionIds: [],
+      itemIds: ['item-folder', 'item-health'],
+    });
 });
 
 test('collections — right-click inside a selection opens the set menu and keeps the selection', async ({
@@ -784,7 +822,9 @@ test('collections — right-click inside a selection opens the set menu and keep
   await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
 
   await collectionRow(page, 'item-health').click();
-  await collectionRow(page, 'item-status').click({ modifiers: [await primary(page)] });
+  await collectionRow(page, 'item-status').click({
+    modifiers: [await primary(page)],
+  });
   await collectionRow(page, 'item-health').click({ button: 'right' });
   await expect(page.locator('[data-testid="menu-item-delete"]')).toContainText('Delete 2 items');
   await expect(page.locator('[data-testid="menu-item-move-to-collection"]')).toBeVisible();

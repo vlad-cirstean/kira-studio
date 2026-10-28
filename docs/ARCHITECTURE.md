@@ -481,8 +481,8 @@ custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smar
                                                        -- NULL = ungrouped, FK to
                                                        -- custom_script_collections ON DELETE CASCADE;
                                                        -- sort_order is dense per collection (NULL =
-                                                       -- ungrouped set); Move appends to the end of
-                                                       -- the target set
+                                                       -- ungrouped set); Move places the script
+                                                       -- before beforeId in the target set, or last
 script_runs(id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command,
             outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json,
             tools_json, task_id, task_title, branch_id, branch_label)
@@ -521,7 +521,9 @@ tabs(id, connection_id, path, kind, state_json, order, active, window_key, works
                                                        -- way), so a pre-P100 DB needs no migration
                                                        -- of its own here
 api_collections(id, name, sort_order, origin_json, variables_promoted,
-                 created_at, updated_at)                -- P4; variables_promoted added P5
+                 created_at, updated_at)                -- P4; variables_promoted added P5;
+                                                       -- sort_order is the user's order, set by
+                                                       -- ReorderCollections (P381)
 api_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
            request_json, origin_json, created_at, updated_at)
                                                        -- the folder/request tree; parent_id and

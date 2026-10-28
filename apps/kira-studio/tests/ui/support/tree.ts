@@ -186,3 +186,21 @@ export async function openBrowseLeaf(page: Page, path: string): Promise<void> {
     .click({ button: 'right' });
   await page.click('[data-testid="menu-item-open"]');
 }
+
+/** Press on `from`, cross the drag tolerance, then park at `fraction` of `to`'s height. */
+export async function dragRow(
+  page: Page,
+  from: Locator,
+  to: Locator,
+  fraction: number,
+): Promise<void> {
+  const src = await from.boundingBox();
+  const dst = await to.boundingBox();
+  if (!src || !dst) throw new Error('row has no box');
+  const x = src.x + src.width * 0.6;
+  await page.mouse.move(x, src.y + src.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(x, src.y + src.height / 2 + 10, { steps: 4 });
+  await page.mouse.move(x, dst.y + dst.height * fraction, { steps: 10 });
+  await settleFrames(page);
+}
