@@ -12,7 +12,7 @@ Source: user request. Phases run top to bottom.
 | P377 | Foreign-branch review tasks: convert to work item, open normal task view | Done |
 | P378 | Finished/stopped agents behind a dropdown | Done |
 | P379 | ADE tasks: customizable statuses, manual moves both ways | Done |
-| P380 | Automation scripts reuse one tab per script; start only from the play icon | Todo |
+| P380 | Automation scripts reuse one tab per script; start only from the play icon | Done |
 | P381 | Reorder collections and other folders | Todo |
 | P382 | MCP show-results customizable per connection | Todo |
 | P383 | Add a work item from a GitHub link, branch taken from the link | Todo |
@@ -67,6 +67,8 @@ Result: plan `plans/P379.md`. Status now stored: table `ade_task_statuses` (migr
 ### P380 Automation scripts reuse one tab per script; start only from the play icon
 
 Running the same automation script reuses its existing tab. A script starts only from its play icon; clicking elsewhere on the row does not start it.
+
+Result: plan `plans/P380.md`. Tab key `{scriptId, taskId, branchId}` stored in terminal and script-run tab state (`automations/scriptTabs.ts`). Live key tab: start focuses it, starts nothing (gated at play, menu `Run`/`Run now`, run dialog, Space ADE start). Finished key tab: replaced in place via new `OpenTabOpts.replace` (new tab id). Run views (history, chip, resume, agent reveal) share the placement. Row click selects, double-click/Enter edits; `script-play` button starts. Tests: `TestScriptRunTwice` both apps (contract `ScriptRunsService.List#twice`), `automations-tabs.spec.ts` both apps (5 shared + 1 Space ADE), existing specs moved to the play button. Checks: lint, typecheck, lint:dead, lint:go, flows both apps, builds, full Studio UI (627) and Space UI (718 + fixed smart spec). Deviations: terminal liveness also reads the run state by terminal id (`runStates.terminalRunState`), since a run can end before the exit event; `useLiveRunByScript` moved into `runsQueries.ts` (N10 line limit); second smart start in the spec differs by one-off prompt (mock keys by args). Not done: server-side refusal of concurrent runs, stop/restart from the play button.
 
 ### P381 Reorder collections and other folders
 
