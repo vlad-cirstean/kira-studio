@@ -19,6 +19,7 @@ import type {
   FinishReviewArgs,
   FocusSessionArgs,
   ForwardReviewResult,
+  HostLinkArgs,
   ImportWorkflowArgs,
   LaunchStepArgs,
   MoveBacklogItemArgs,
@@ -113,6 +114,23 @@ export function useAddExistingBranch() {
   return useMutation({
     mutationFn: (args: AddExistingBranchArgs) => control.adeTaskAddExistingBranch(args),
   });
+}
+
+/** The branch a pasted PR or branch link names; read only, so it runs as the user types. */
+export function useResolveHostLink(url: MaybeRefOrGetter<string>) {
+  return useQuery(() => {
+    const u = toValue(url).trim();
+    return {
+      queryKey: ['adetask', 'hostLink', u] as const,
+      queryFn: () => control.adeTaskResolveHostLink({ url: u, taskId: '' }),
+      enabled: u.startsWith('https://'),
+      staleTime: 30_000,
+    };
+  });
+}
+
+export function useAddHostLink() {
+  return useMutation({ mutationFn: (args: HostLinkArgs) => control.adeTaskAddHostLink(args) });
 }
 
 export function useAddBacklogItem() {

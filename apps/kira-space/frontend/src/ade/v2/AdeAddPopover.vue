@@ -10,15 +10,24 @@ import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/po
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
+import { refDebounced } from '@vueuse/core';
 import { matchesQuery } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
 import { useRepos } from '../../repo/state/reposQueries';
 import AdeCandidateRow from './AdeCandidateRow.vue';
+import AdeLinkTarget from './AdeLinkTarget.vue';
 import { firstWork, offsetToIso } from './board/calendar';
 import { parseJira } from './jira';
 import { usePlanModel } from './plan/usePlanModel';
-import { useAddExistingBranch, useCandidates, useCreateTask } from './queries';
+import {
+  useAddExistingBranch,
+  useAddHostLink,
+  useCandidates,
+  useCreateTask,
+  useResolveHostLink,
+} from './queries';
 import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
 import type { CandidateBranch } from './wire';
@@ -98,6 +107,32 @@ const shown = computed<CandidateBranch[]>(() => {
     matchesQuery(`${b.name} ${repoLabel(b.codeRepoId)} ${b.author}`, q.value),
   );
 });
+
+const isLink = computed(() => /^https?:\/\//i.test(q.value.trim()));
+const linkUrl = refDebounced(
+  computed(() => q.value.trim()),
+  TIMING.search,
+);
+const link = useResolveHostLink(() => (isLink.value ? linkUrl.value : ''));
+const addLink = useAddHostLink();
+const linkPending = computed(
+  () => link.isFetching.value || (isLink.value && linkUrl.value !== q.value.trim()),
+);
+
+async function pickLink(): Promise<void> {
+  error.value = '';
+  try {
+    const res = await addLink.mutateAsync({
+      url: linkUrl.value,
+      taskId: attachTo.value?.taskId ?? '',
+    });
+    ui.select(res.task.id);
+    open.value = false;
+    q.value = '';
+  } catch (err) {
+    error.value = errorText(err);
+  }
+}
 
 async function pick(b: CandidateBranch): Promise<void> {
   error.value = '';
@@ -198,7 +233,17 @@ async function pick(b: CandidateBranch): Promise<void> {
             data-testid="ade-branch-search"
           />
         </div>
-        <div class="max-h-70 overflow-auto p-1">
+        <AdeLinkTarget
+          v-if="isLink"
+          :target="link.data.value"
+          :repo="repoLabel(link.data.value?.codeRepoId ?? '')"
+          :pending="linkPending"
+          :error="link.error.value ? errorText(link.error.value) : ''"
+          :busy="addLink.isPending.value"
+          :attach="!!attachTo"
+          @add="pickLink"
+        />
+        <div v-else class="max-h-70 overflow-auto p-1">
           <AdeCandidateRow
             v-for="b in shown"
             :key="`${b.codeRepoId}/${b.name}`"

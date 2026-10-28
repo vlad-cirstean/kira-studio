@@ -6775,6 +6775,20 @@
         "jira": {
           "placeholder": "Paste a link or key (optional)"
         },
+        "link": {
+          "author": {
+            "label": "By {author}"
+          },
+          "fork": {
+            "label": "Fork of {owner}"
+          },
+          "onTask": {
+            "label": "Already on a task"
+          },
+          "pending": {
+            "label": "Reading link…"
+          }
+        },
         "noBranchesYet": {
           "hint": "Add repositories from the task panel, or {agent} declares them."
         },
@@ -6782,7 +6796,7 @@
           "placeholder": "Context for {agent} (optional)"
         },
         "searchBranches": {
-          "placeholder": "Search branches in all repositories"
+          "placeholder": "Search branches or paste a PR or branch link"
         },
         "tabBranch": {
           "label": "Existing branch"
