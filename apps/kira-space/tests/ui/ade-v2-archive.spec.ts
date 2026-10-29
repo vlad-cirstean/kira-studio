@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeFixture, emitAgentEvent, openPlan } from './support/adeV2';
+import { adeFixture, archivedTaskFx, emitAgentEvent, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -89,11 +89,13 @@ test('a history row opens the archived panel with its sessions', async ({ relaun
   const stopped = { ...fx.sessions.find((s) => s.id === 'sp11'), id: 'h5s1', taskId: 'H_5' };
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskSessions, response: { ...fx, sessions: [...fx.sessions, stopped] } },
+    { channel: IPC.adeTaskArchivedTask, response: archivedTaskFx('H_5') },
   ]);
   await page.locator(t('ade-load-history')).click();
   await expect(page.locator(t('ade-history-row'))).toHaveCount(5);
   await page.locator(t('ade-history-row')).first().click();
   await expect(page.locator(t('ade-panel-title'))).toBeVisible();
+  await page.locator(t('ade-panel-tab-sessions')).click();
   await expect(page.locator(t('ade-sessions-tab'))).toBeVisible();
   await expect(page.locator(t('ade-session-takeover'))).toHaveCount(0);
   await expect(page.locator(t('ade-stopped-takeover'))).toHaveCount(0);

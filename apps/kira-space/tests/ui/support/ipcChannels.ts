@@ -234,6 +234,8 @@ export const IPC = {
   adeTaskReviewWorkingDiff: 'kira:adetask:reviewWorkingDiff',
   adeTaskArchiveRisk: 'kira:adetask:archiveRisk',
   adeTaskArchiveTask: 'kira:adetask:archiveTask',
+  adeTaskArchivedTask: 'kira:adetask:archivedTask',
+  adeTaskRestoreTask: 'kira:adetask:restoreTask',
   adeTaskRecordMerge: 'kira:adetask:recordMerge',
   adeTaskSetQueuedAfter: 'kira:adetask:setQueuedAfter',
   adeTaskRebasePreview: 'kira:adetask:rebasePreview',
