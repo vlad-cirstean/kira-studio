@@ -508,7 +508,7 @@ func (r *AdeTaskRepo) DetachBranch(id string, replacement *model.AdeTaskBranch, 
 func (r *AdeTaskRepo) queryBranches(where string, args ...any) ([]model.AdeTaskBranch, error) {
 	rows, err := r.DB.Query(`SELECT b.id, b.task_id, b.code_repo_id, b.name, b.kind, b.base, b.base_branch_id, b.base_pending_from, b.queued_after, b.position,
 		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin, b.cr_number, b.cr_title, b.cr_state, b.cr_url
-		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE ` + where + ` ORDER BY b.task_id, b.position, b.id`, args...)
+		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE `+where+` ORDER BY b.task_id, b.position, b.id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade task branches: %w", err)
 	}

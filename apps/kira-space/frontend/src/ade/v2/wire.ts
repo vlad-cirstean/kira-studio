@@ -462,7 +462,7 @@ export interface ArchivedBranch {
   branchUrl: string;
   comments: ArchivedComment[];
 }
-export interface ArchivedComment {
+interface ArchivedComment {
   path: string;
   start: number;
   end: number;
