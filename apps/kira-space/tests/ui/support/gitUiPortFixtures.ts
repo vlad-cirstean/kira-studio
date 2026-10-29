@@ -321,7 +321,7 @@ export async function openCommitDetail(relaunch: Relaunch): Promise<Page> {
 
 const STASH_SHA = '44'.repeat(20);
 
-/** One row per branch-picker tab; `feature-auth` and the stash `auth work` both match "auth". */
+/** One row per refs-popover tab; `feature-auth` and the stash `auth work` both match "auth". */
 export const PICKER_RESULTS = {
   'refs.list': {
     branches: [refRow('main'), refRow('feature-auth')],
@@ -394,7 +394,7 @@ export const PICKER_RESULTS = {
 };
 
 /** Opens the graph with the five picker tabs seeded and the branch picker panel open. */
-export async function openBranchPicker(relaunch: Relaunch): Promise<Page> {
+export async function openRefsPopover(relaunch: Relaunch): Promise<Page> {
   const page = await openPortGraph(relaunch, {
     chunks: singleRowChunks([rootRow(SHA_A, 'A commit')]),
     results: PICKER_RESULTS,

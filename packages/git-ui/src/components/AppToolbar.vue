@@ -47,17 +47,17 @@ import type { RepoState } from '../state/repo.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
-// Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
+import PullStrategyPicker from './PullStrategyPicker.vue';
+import RefreshButton from './RefreshButton.vue';
+// Plain (not `import type`) imports, for two different reasons. RefsPopover: vue-tsc needs the
 // real import to infer the template's inline @branchFromStash handler's parameter type from
-// BranchPicker's own emits declaration — a type-only import here breaks that inference (TS7006).
+// RefsPopover's own emits declaration — a type-only import here breaks that inference (TS7006).
 // PullStrategyPicker and RefreshButton: a .vue default export is a *value* — the component object
 // the template instantiates. `import type` erases it, and Vue then renders the tag as an unknown
 // element with nothing inside it. The script's only reference to RefreshButton is
 // `InstanceType<typeof …>`, so biome's useImportType cannot tell (it is off for `**/*.vue` in
 // `biome.json` for exactly this class of false positive); the template is the real caller.
-import BranchPicker from './BranchPicker.vue';
-import PullStrategyPicker from './PullStrategyPicker.vue';
-import RefreshButton from './RefreshButton.vue';
+import RefsPopover from './RefsPopover.vue';
 import UndoButton from './UndoButton.vue';
 
 const props = defineProps<{
@@ -70,7 +70,7 @@ const props = defineProps<{
   /** G26 D3 — see `StackList.vue`'s own doc comment. */
   stackState: StackState;
   actions: DetailActions | undefined;
-  /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
+  /** G24 D9: `RefsPopover.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
   changeRequestState?: ChangeRequestState;
   /** Whether `App.vue`'s own search row is currently open — drives the toggle button's `active`
@@ -87,17 +87,17 @@ const emit = defineEmits<{
    *  like `createBranchHere`/`createTagHere`'s own dialog state, since this button has no
    *  pre-flight endpoint of its own to preview first (the dialog IS the confirm step). */
   (event: 'stashChanges'): void;
-  /** Forwarded straight from `BranchPicker.vue`'s own emit — see `StashList.vue`'s doc comment. */
+  /** Forwarded straight from `RefsPopover.vue`'s own emit — see `StashList.vue`'s doc comment. */
   (event: 'branchFromStash', entry: StashEntry): void;
-  /** G28 D13: forwarded straight from `BranchPicker.vue`'s own emits — see
+  /** G28 D13: forwarded straight from `RefsPopover.vue`'s own emits — see
    *  `GlobalStashList.vue`'s/`StashList.vue`'s own doc comments. */
   (event: 'saveGlobalStash'): void;
   (event: 'saveEntryToGlobalStash', entry: StashEntry): void;
-  /** G25: forwarded straight from `BranchPicker.vue` -> `WorktreeList.vue`'s own emits — see
+  /** G25: forwarded straight from `RefsPopover.vue` -> `WorktreeList.vue`'s own emits — see
    *  `WorktreeList.vue`'s own doc comment on why this toolbar does not act on them itself. */
   (event: 'switchWorktree', path: string): void;
   (event: 'createWorktree', seed?: WorktreeCreateSeed): void;
-  /** G26: forwarded straight from `BranchPicker.vue` -> `StackList.vue`'s own emits — `App.vue`
+  /** G26: forwarded straight from `RefsPopover.vue` -> `StackList.vue`'s own emits — `App.vue`
    *  owns `StackDialog.vue`'s actual open state, the same "toolbar owns no dialog state itself"
    *  shape every other dialog-opening emit above already follows. */
   (event: 'openRestackDialog', branch: string): void;
@@ -119,7 +119,7 @@ function copy(text: string, message: string): void {
   props.actions?.copy(text, message);
 }
 
-// P74 §3.3: BranchPicker.vue's own branch-row badge and StackList.vue's own row badge each open
+// P74 §3.3: RefsPopover.vue's own branch-row badge and StackList.vue's own row badge each open
 // a PR the same way CommitMeta.vue's facts-row icon/change request row do — one action, threaded
 // down rather than reimplemented at either call site.
 function openChangeRequest(number: number): void {
@@ -127,7 +127,7 @@ function openChangeRequest(number: number): void {
 }
 
 const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
-const branchPickerRef = ref<InstanceType<typeof BranchPicker> | null>(null);
+const refsPopoverRef = ref<InstanceType<typeof RefsPopover> | null>(null);
 const pullStrategyPickerRef = ref<InstanceType<typeof PullStrategyPicker> | null>(null);
 
 // ---------------------------------------------------------------------------------------
@@ -265,7 +265,7 @@ async function doCancel(): Promise<void> {
 // `defineExpose`.
 defineExpose({
   refresh: () => refreshButtonRef.value?.refresh(),
-  openBranchPicker: (tab?: PickerTab) => branchPickerRef.value?.open(tab),
+  openBranchPicker: (tab?: PickerTab) => refsPopoverRef.value?.open(tab),
   fetch: doFetch,
   pull: () => pullStrategyPickerRef.value?.run(),
   push: doPush,
@@ -286,8 +286,8 @@ const stashDisabled = computed(
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (the layout, not a page banner). -->
   <ViewToolbar role="toolbar" :aria-label="t('git.toolbar.region.aria')">
-    <BranchPicker
-      ref="branchPickerRef"
+    <RefsPopover
+      ref="refsPopoverRef"
       :refs="refsState"
       :ops="opsState"
       :stash="stashState"

@@ -29,7 +29,7 @@ export class StashState {
   /** The global bucket's own list, reloaded on the same signal `entries` is (a
    *  `refs/kira/globalstash/**` write is a ref write like any other, already covered by
    *  `watcher.ts`'s existing refs-dir coverage). A separate ref rather than folding into
-   *  `entries` — `GlobalStashList.vue` is its own `BranchPicker` section, and `selected`
+   *  `entries` — `GlobalStashList.vue` is its own `RefsPopover` section, and `selected`
    *  below searches both without either list needing to know about the other's own shape. */
   readonly globalEntries: ShallowRef<readonly StashEntry[]> = shallowRef([]);
   /** `null` selects nothing. Otherwise the sha of the entry whose file list `changes` holds —

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * `BranchPicker.vue`'s fourth section — mirrors `StashList.vue`'s own "one row per
+ * `RefsPopover.vue`'s fourth section — mirrors `StashList.vue`'s own "one row per
  * entry, row-level actions, no filter box" shape (a worktree list is rarely more than a handful of
  * entries). Switch reuses the existing `repo.open` flow (each worktree is already its own
  * `RepoEntry`/`RepoSummary` — "switch" needs no worktree-specific request at all), so this
@@ -185,7 +185,7 @@ async function confirmRemove(): Promise<void> {
       t('git.worktree.list.empty')
     }}</InlineState>
 
-    <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
+    <!-- P131 Part 2 §5: opens inside RefsPopover's own modal Popover panel (§5.2) -- reka's
          modal content there prevents the panel dismissing under this nested Dialog. -->
     <Dialog :open="pendingRemove !== undefined" @update:open="(v) => !v && cancelRemove()">
       <DialogContent :aria-describedby="undefined" size="md" :dirty="typedToken !== ''">

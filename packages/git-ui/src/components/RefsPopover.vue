@@ -54,8 +54,8 @@ import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
-import BranchPickerBranches from './BranchPickerBranches.vue';
 import GlobalStashList from './GlobalStashList.vue';
+import RefsPopoverBranches from './RefsPopoverBranches.vue';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import TagList from './TagList.vue';
@@ -472,7 +472,7 @@ watch(visibleBranchNames, (names) => {
             :aria-label="t(TAB_LABELS[activeTab])"
           >
             <AttributeTooltip :container="rowsScrollEl" />
-            <BranchPickerBranches
+            <RefsPopoverBranches
               v-if="activeTab === 'branches'"
               :refs="refs"
               :ops="ops"
@@ -502,7 +502,7 @@ watch(visibleBranchNames, (names) => {
                   @click="caps.branchesRemote.showMore()"
                 />
               </template>
-            </BranchPickerBranches>
+            </RefsPopoverBranches>
 
             <template v-else-if="activeTab === 'tags'">
               <TagList

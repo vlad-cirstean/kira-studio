@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import {
-  openBranchPicker,
   openPortGraph,
+  openRefsPopover,
   PICKER_RESULTS,
   rootRow,
   SHA_A,
@@ -12,7 +12,7 @@ import {
 // The branch picker's five-tab fold inside Space. Ported from the VS Code webview suite.
 
 test('five tabs show badges that match the seeded counts', async ({ relaunch }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
   // Branches, Tags, Stashes, Worktrees, Stacks.
   await expect(
     page.locator('[data-testid="branch-tabs"] [data-testid="picker-tab-badge"]'),
@@ -20,14 +20,14 @@ test('five tabs show badges that match the seeded counts', async ({ relaunch }) 
 });
 
 test('Stashes swaps the body and relabels the filter', async ({ relaunch }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
   await page.getByRole('button', { name: /^Stashes/ }).click();
   await expect(page.locator('[data-testid="branch-section"][aria-label="Stashes"]')).toBeVisible();
   await expect(page.locator('input[aria-label="Filter stashes"]')).toBeVisible();
 });
 
 test('a query on Branches badges Stashes and survives the tab switch', async ({ relaunch }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
   await page.locator('input[aria-label="Filter branches"]').fill('auth');
 
   const stashesTab = page.getByRole('button', { name: /^Stashes/ });
@@ -45,7 +45,7 @@ test('a query on Branches badges Stashes and survives the tab switch', async ({ 
 test('the filter takes focus on open; ArrowDown enters the rows, ArrowUp returns', async ({
   relaunch,
 }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
   const filter = page.locator('input[aria-label="Filter branches"]');
   await expect(filter).toBeFocused();
 

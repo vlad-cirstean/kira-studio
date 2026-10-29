@@ -13,7 +13,7 @@
  *   here in words — resolving it is the `ConflictBanner.vue`, not a second UI here.
  *
  * The modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
- * `DialogTitle`'s default slot, and the parent picker is the shared `BranchPicker`.
+ * `DialogTitle`'s default slot, and the parent picker is the shared `BranchPicker` (workbench).
  */
 import type { RestackPreflight } from '@kira/git-ipc';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';

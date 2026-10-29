@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
-  openBranchPicker,
   openPortGraph,
+  openRefsPopover,
   PICKER_RESULTS,
   rootRow,
   SHA_A,
@@ -15,7 +15,7 @@ const tid = (page: Page, id: string) => page.locator(`[data-testid="${id}"]`);
 const featureRow = (page: Page) => page.locator('[data-row-id="branch:refs/heads/feature-auth"]');
 
 test('branch row menu labels', async ({ relaunch }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
 
   await featureRow(page).getByRole('button', { name: 'More actions' }).click();
   await expect(tid(page, 'context-menu')).toBeVisible();

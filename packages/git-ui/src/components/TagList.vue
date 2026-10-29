@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * The picker's tags section, as its own component ("a real component… not a sibling dropdown").
- * Renders exactly what `BranchPicker.vue` hands it (already filtered/sorted/capped by
+ * Renders exactly what `RefsPopover.vue` hands it (already filtered/sorted/capped by
  * `refListModel.ts`'s shared fold) plus its own annotated/lightweight distinction and its own
- * ref-scoped context menu — the same menu shape `BranchPicker.vue`'s branch/remote rows use, built
+ * ref-scoped context menu — the same menu shape `RefsPopover.vue`'s branch/remote rows use, built
  * here because tag rows live in this file's own template, not that one's.
  */
 import { shortSha } from '@kira/git-core';
@@ -28,9 +28,9 @@ const props = defineProps<{
   ops: OpsState;
   knownRemotes: readonly string[];
   inProgress: InProgressOperation | null;
-  /** P77 §7.3: the roving-tabindex list's own "current" row id (`BranchPicker.vue`'s own
+  /** P77 §7.3: the roving-tabindex list's own "current" row id (`RefsPopover.vue`'s own
    *  `activeRowId`) — every row binds `tabindex`/`data-row-id` off it; the actual key handling
-   *  lives in `BranchPicker.vue`, which owns the body every tab's rows render into. */
+   *  lives in `RefsPopover.vue`, which owns the body every tab's rows render into. */
   focusedRowId?: string;
 }>();
 

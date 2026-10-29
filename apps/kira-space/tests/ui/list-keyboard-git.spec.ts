@@ -4,8 +4,8 @@ import {
   manyRowShas,
   manyRows,
   oneChunk,
-  openBranchPicker,
   openCommitDetail,
+  openRefsPopover,
   openReviewListing,
 } from './support/gitUiPortFixtures';
 
@@ -57,7 +57,7 @@ test('commit file tree — moving onto a file previews its diff', async ({ relau
 test('branch picker — filter hands off to rows, arrows and Home/End move, Shift+F10 returns focus', async ({
   relaunch,
 }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
   const filter = page.locator('input[aria-label="Filter branches"]');
   const main = page.locator('[data-row-id="branch:refs/heads/main"]');
   const auth = page.locator('[data-row-id="branch:refs/heads/feature-auth"]');

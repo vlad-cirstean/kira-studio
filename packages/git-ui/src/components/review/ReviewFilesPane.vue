@@ -34,7 +34,7 @@ import type { ReviewWorkingSection } from '../../state/review.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
 import FileTree from '../FileTree.vue';
 
-// P131 Part 3 §5.5: a local option shape for the ToggleGroup below — matches BranchPicker.vue's
+// P131 Part 3 §5.5: a local option shape for the ToggleGroup below — matches RefsPopover.vue's
 // own PickerTabOption precedent, not a shared package export.
 interface DiffModeOption {
   readonly id: ReviewDiffMode;

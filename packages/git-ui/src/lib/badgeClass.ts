@@ -8,7 +8,7 @@ export function refBadgeClass(variant: RefBadgeVariant = 'default', ...extra: st
   return cn(badgeVariants({ variant }), 'h-graph-h-xs font-data text-graph-sm', ...extra);
 }
 
-// Keyed by string: CommitMeta and BranchPicker carry the state as a plain string.
+// Keyed by string: CommitMeta and RefsPopover carry the state as a plain string.
 const PR_BADGE_VARIANT: Record<string, RefBadgeVariant> = {
   open: 'ok',
   draft: 'default',

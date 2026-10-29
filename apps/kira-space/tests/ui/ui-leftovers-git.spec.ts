@@ -3,9 +3,9 @@ import { expect, test } from './fixtures';
 import { gitStreamRequests } from './support/gitStreamMock';
 import {
   COMMIT_DETAIL,
-  openBranchPicker,
   openCommitDetail,
   openPortGraph,
+  openRefsPopover,
   PICKER_RESULTS,
   type Relaunch,
   refRow,
@@ -46,7 +46,7 @@ test('search: arrows move the active option, the first Esc closes the dropdown a
 });
 
 test('branch picker: the trigger is the shared picker trigger', async ({ relaunch }) => {
-  const page = await openBranchPicker(relaunch);
+  const page = await openRefsPopover(relaunch);
   // PopoverTrigger and TooltipTrigger overwrite data-slot, so assert the shared look instead.
   const trigger = page.locator('[data-testid="branch-trigger"]');
   await expect(trigger).toBeVisible();

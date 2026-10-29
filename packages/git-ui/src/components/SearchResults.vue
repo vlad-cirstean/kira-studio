@@ -2,7 +2,7 @@
 import { shortSha } from '@kira/git-core';
 /**
  * `docs/plans/P11.md` W12: the grouped dropdown `SearchBox.vue` renders inside its own `Popover`
- * (the same nesting `BranchPicker.vue` uses for `TagList.vue`/`StashList.vue`) — refs first
+ * (the same nesting `RefsPopover.vue` uses for `TagList.vue`/`StashList.vue`) — refs first
  * (local / remote / tag subsections, each labelled), then commits, each hit showing its kind and,
  * when it matched somewhere other than the subject or ref name, a field label. `role="listbox"`
  * with `aria-activedescendant` set on the *input* (`SearchBox.vue`'s own, per the ARIA combobox

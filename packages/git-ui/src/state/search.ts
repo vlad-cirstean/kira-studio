@@ -321,7 +321,7 @@ export class SearchState {
     // allowed to touch the network at all — warms ChangeRequestState's own byBranch cache so the very next
     // keystroke's own synchronous refHits computed already has PR records to match against (F16's
     // own "adds no process and no network round trip to a keystroke"). G32 round-3 performance
-    // review, finding #3: unlike BranchPicker.vue's own equivalent warm (capped to what it
+    // review, finding #3: unlike RefsPopover.vue's own equivalent warm (capped to what it
     // actually renders), this one genuinely needs the full branch list — a search can match ANY
     // branch, not just a visible page of one — so it is deliberately NOT capped here; ensureSnapshot
     // itself still bounds how many requests are ever in flight at once (PR_ENSURE_SNAPSHOT_

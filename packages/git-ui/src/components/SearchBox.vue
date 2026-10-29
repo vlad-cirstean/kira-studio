@@ -7,7 +7,7 @@
  * D9/item 9 later moved this whole component out of the toolbar into its own row below it, but
  * the box's own internal anatomy is unchanged), the inline `n of N` match count, an inline regex
  * error wired to the input via `aria-describedby` (probe 4) — and, nested inside this same root
- * the way `BranchPicker.vue` nests `TagList.vue`/`StashList.vue` inside its own open panel,
+ * the way `RefsPopover.vue` nests `TagList.vue`/`StashList.vue` inside its own open panel,
  * `SearchResults.vue`'s grouped dropdown.
  *
  * **Why the dropdown lives here, not as an `App.vue`-positioned sibling.** `SearchResults.vue`

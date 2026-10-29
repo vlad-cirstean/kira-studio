@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * `BranchPicker.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
+ * `RefsPopover.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
  * pre-order bottom-to-top with `depth`-driven indent, a PR badge and track text reused verbatim
  * from `ChangeRequestState.byBranch`/`RefRow`, a stale chip, and a header "Restack" button
  * per stack. Row-level "Set stack parent…"/"Remove from stack" mirror `WorktreeList.vue`'s own
@@ -38,9 +38,9 @@ const props = defineProps<{
   orphans: PickerList<StackBranch>;
   ops: OpsState;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a
-   *  plain, badge-free list (mirrors `BranchPicker.vue`'s own `pr` prop). */
+   *  plain, badge-free list (mirrors `RefsPopover.vue`'s own `pr` prop). */
   changeRequests?: ChangeRequestState;
-  /** P74 §3.3 — see `BranchPicker.vue`'s own doc comment, threaded straight through from
+  /** P74 §3.3 — see `RefsPopover.vue`'s own doc comment, threaded straight through from
    *  `AppToolbar.vue`. */
   openChangeRequest: (number: number) => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */

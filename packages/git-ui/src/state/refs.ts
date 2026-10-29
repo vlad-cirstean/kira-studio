@@ -10,7 +10,7 @@ import { RepoScopedReload } from './repoScopedReload.ts';
  * `repo.changed` with `kind === "refsChanged"` — exactly the watcher signal `git branch`/`git
  * tag`/a ref write of any kind touches (`packages/git/src/watcher.ts`) — and derives the three
  * things more than one component needs (`currentBranchName`, `badgesBySha`, `worktreeBranches`)
- * so `BranchPicker.vue`, `TagList.vue` and the graph's own ref badges (`refBadges.ts`) never
+ * so `RefsPopover.vue`, `TagList.vue` and the graph's own ref badges (`refBadges.ts`) never
  * each recompute their own copy.
  */
 export class RefsState {

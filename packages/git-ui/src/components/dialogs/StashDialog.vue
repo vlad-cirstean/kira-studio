@@ -61,7 +61,7 @@ const props = defineProps<{
    *  re-read fresh every time the dialog opens (a setting change mid-session should be seen the
    *  next time this opens, not only after a reload). */
   includeUntrackedDefault: boolean;
-  /** Set by `StashList.vue`'s "Create branch from stash…" row action, via `BranchPicker.vue` →
+  /** Set by `StashList.vue`'s "Create branch from stash…" row action, via `RefsPopover.vue` →
    *  `App.vue`; `undefined` when branch mode is not open. */
   branchTarget: StashEntry | undefined;
   /** G28 D13: toggled by the global-stash section's own header button and the palette's

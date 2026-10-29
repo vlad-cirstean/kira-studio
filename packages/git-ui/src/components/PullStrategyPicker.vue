@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * The toolbar's Pull control — a split button, `[Pull] [▾]`, mirroring
- * `BranchPicker.vue`'s own trigger/panel shape but at toolbar scale. The main button runs Pull
+ * `RefsPopover.vue`'s own trigger/panel shape but at toolbar scale. The main button runs Pull
  * following the resolved default (the ladder, no override); the chevron opens a small popover
  * offering the three explicit strategies plus that same default, each running Pull immediately
  * on selection rather than staging a separate confirm step — a second click to *run* what the

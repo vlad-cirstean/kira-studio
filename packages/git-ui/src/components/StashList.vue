@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * `docs/plans/P9.md` W14 (§3.1, §7.6's "dedicated stash list"; OQ3 puts it beside `TagList.vue`,
- * inside `BranchPicker.vue`). One row per `StashEntry`: message, relative date, file count and a
- * `-u` marker. There is no filter box here (unlike `TagList.vue`) — `BranchPicker.vue`'s own
+ * inside `RefsPopover.vue`). One row per `StashEntry`: message, relative date, file count and a
+ * `-u` marker. There is no filter box here (unlike `TagList.vue`) — `RefsPopover.vue`'s own
  * filter now scopes to the active tab (P77 §5) and hands this component an already filtered/
  * capped `section` prop, the same `TagList.vue` contract (P77 §11) — this component owns no fold
  * of its own any more.
@@ -45,14 +45,14 @@ const props = defineProps<{
   focusedRowId?: string;
 }>();
 
-/** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
+/** Bubbled to `RefsPopover.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
  *  mirroring `createBranchHere`'s own App.vue-owned dialog state (this component has nowhere of
  *  its own to render a name-entry dialog into). `saveEntryToGlobalStash` is the same
  *  shape for the save-mode's own pre-selected source. */
 const emit = defineEmits<{
   (e: 'branchFromStash', entry: StashEntry): void;
   (e: 'saveEntryToGlobalStash', entry: StashEntry): void;
-  /** P77 §14 (N9): `BranchPicker.vue` closes the panel through `closeForCheckout()` on this — the
+  /** P77 §14 (N9): `RefsPopover.vue` closes the panel through `closeForCheckout()` on this — the
    *  same focus-to-trigger-before-close fix a checkout already gets, so the pane the click fills
    *  is not left behind the popover. */
   (e: 'selected'): void;

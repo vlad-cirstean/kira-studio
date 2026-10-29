@@ -785,7 +785,7 @@ async function onStashMenuSelect(captured: StashEntry, id: string): Promise<void
 }
 
 /** `StashList.vue`'s own "Create branch from stash…" row action, bubbled through
- *  `BranchPicker.vue` — same target field the badge context menu's `stashBranch` case sets. */
+ *  `RefsPopover.vue` — same target field the badge context menu's `stashBranch` case sets. */
 function handleBranchFromStash(entry: StashEntry): void {
   stashBranchTarget.value = entry;
 }
@@ -811,7 +811,7 @@ const repoSettingsDialogOpen = ref(false);
 
 // WorktreeDialog.vue's own create-phase seed — same "App.vue owns the state, the
 // dialog owns nothing of its own" shape stackDialogTarget below already follows. Opened (and
-// re-seeded) by the toolbar/branch-picker button, the `createWorktree` palette action, and a
+// re-seeded) by the toolbar refs-popover button, the `createWorktree` palette action, and a
 // "Create worktree here…" row action; `undefined` closes it.
 const worktreeCreateRequest = ref<WorktreeCreateSeed | undefined>(undefined);
 
@@ -831,7 +831,7 @@ function handleOpenRestackDialog(branch: string): void {
 }
 
 /** `WorktreeList.vue`'s own "Switch to this worktree" row action, bubbled through
- *  `BranchPicker.vue`/`AppToolbar.vue` — the same `repo.open` + `handleRepoOpened` path
+ *  `RefsPopover.vue`/`AppToolbar.vue` — the same `repo.open` + `handleRepoOpened` path
  *  `revealCommitInGraph` above already uses (each worktree is already its own `RepoEntry`, so
  *  "switch" needs no worktree-specific request at all). */
 async function handleSwitchWorktree(path: string): Promise<void> {
@@ -900,10 +900,10 @@ const toolbarBindings = computed(() => ({
 // ---------------------------------------------------------------------------------------
 // The ref-badge context menu — a right-click that lands on a
 // `refBadges.ts` badge (`CommitGrid.vue`'s own hit-test) instead of bare row space opens this,
-// the same `buildRefMenu` table `BranchPicker.vue`'s dropdown already renders, titled with the
+// the same `buildRefMenu` table `RefsPopover.vue`'s dropdown already renders, titled with the
 // branch name so it "cannot be misread". Renaming has no inline row to swap into here (a
 // badge is a DOM fragment inside a commit's message cell, not a list item), so it opens
-// `RenameRefDialog.vue` instead of `BranchPicker.vue`'s own inline field.
+// `RenameRefDialog.vue` instead of `RefsPopover.vue`'s own inline field.
 // ---------------------------------------------------------------------------------------
 const renameRefDialogState = ref<{ open: boolean; currentName: string }>({
   open: false,

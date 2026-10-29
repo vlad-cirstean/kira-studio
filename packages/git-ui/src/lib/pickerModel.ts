@@ -1,5 +1,5 @@
 /**
- * P77 §9: `BranchPicker.vue`'s tab fold — one filter box (§5), a per-tab ordering/pin/cap pass
+ * P77 §9: `RefsPopover.vue`'s tab fold — one filter box (§5), a per-tab ordering/pin/cap pass
  * (§6), and the row-id list §7.3's roving keyboard focus walks. Kept beside `refListModel.ts`/
  * `stashListModel.ts`/`stackListModel.ts` as the same "pure fold out of the template" convention
  * those three already follow — no Vue, no bridge, so `pickerModel.spec.ts` exercises it directly
@@ -24,7 +24,7 @@
  * stash stack and Stacks keep their existing order (§6.1's own reasons: a version sequence, a
  * stack-position addressing scheme, and a forest whose order IS its structure, respectively).
  * `capWithPins`/`capStackGroups` never cap a pinned row out and never split a stack group mid-order
- * (§6.2's "pin before cap"); `capSteps` (threaded from `BranchPicker.vue`, §6.3) lets a caller raise
+ * (§6.2's "pin before cap"); `capSteps` (threaded from `RefsPopover.vue`, §6.3) lets a caller raise
  * one list's own cap for the current panel-open without touching any other list's.
  */
 import { orderWorktrees, worktreeLabel } from '@kira/git-core';
@@ -191,7 +191,7 @@ export function filterPickerInput(input: PickerInput, filter: string): FilteredP
 }
 
 /** One tab's ordered, uncapped lists (every other tab's lists are empty — the body renders one
- *  tab). `BranchPicker.vue` caps each list with `useCappedList`. */
+ *  tab). `RefsPopover.vue` caps each list with `useCappedList`. */
 export interface OrderedPicker {
   readonly branchesLocal: readonly RefRow[];
   readonly branchesRemote: readonly RefRow[];

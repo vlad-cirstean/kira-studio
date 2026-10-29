@@ -262,7 +262,7 @@ test('git module: branch picker (P256)', async ({ relaunch }) => {
   await win.locator('[data-testid="branch-trigger"]').click();
   const picker = win.getByRole('dialog');
   await expect(picker).toBeVisible();
-  await expect(picker).toHaveScreenshot('git-branch-picker.png');
+  await expect(picker).toHaveScreenshot('git-refs-popover.png');
 });
 
 test('git module: row context menu (P258)', async ({ relaunch }) => {
