@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Separator } from '@theme/components/ui/separator';
 import { t } from '@theme/i18n';
 import { SORTABLE_CHOSEN_CLASS, SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import { computed, ref } from 'vue';
@@ -70,14 +69,15 @@ const over = computed(() => props.band.overflowTaskIds.length > 0 && !greyed.val
 const accepts = computed(() => !props.band.isPast && !props.band.dayOff);
 const highlight = computed(() => props.dragOver && accepts.value);
 
-const rowBgClass = computed(() => (greyed.value ? 'bg-chrome' : ''));
 const rulerBorderClass = computed(() => {
   if (props.band.isToday) return 'border-r-tone-amber-solid';
   return props.band.isPast || greyed.value ? 'border-r-border' : 'border-r-border-strong';
 });
 const dotClass = computed(() => {
   if (props.band.isToday) return 'border-tone-amber-solid bg-tone-amber-solid';
-  return props.band.isPast || greyed.value ? 'border-border bg-bg' : 'border-border-strong bg-bg';
+  return props.band.isPast || greyed.value
+    ? 'border-border bg-chrome'
+    : 'border-border-strong bg-chrome';
 });
 const labelClass = computed(() => {
   if (greyed.value) return 'text-disabled';
@@ -101,7 +101,7 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
   <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the band holds nested interactive rows. -->
   <div
     class="flex border-t"
-    :class="[solidBorder ? 'border-t-border-strong' : 'border-t-border', rowBgClass]"
+    :class="solidBorder ? 'border-t-border-strong' : 'border-t-border'"
     data-testid="ade-day-band"
     data-ade-band
     :data-ade-day="band.key"
@@ -176,8 +176,8 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         </Button>
       </div>
       <template v-for="(card, i) in cards" :key="card.task.id">
-        <Separator v-if="i > 0" class="bg-border-strong" data-testid="ade-task-separator" />
         <AdeTaskCard
+          :class="i > 0 ? 'mt-2' : undefined"
           :card="card"
           @select="emit('select', card.task.id)"
           @force-push="(row) => emit('forcePush', row)"

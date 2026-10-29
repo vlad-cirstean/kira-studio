@@ -318,7 +318,7 @@ function onForcePush(row: BranchRowModel): void {
 <template>
   <div
     ref="scrollEl"
-    :class="cn(paneFrame, 'relative flex-1 overflow-auto')"
+    :class="cn(paneFrame, 'relative flex-1 overflow-auto bg-chrome')"
     data-testid="ade-plan"
   >
     <QueryState
@@ -327,7 +327,7 @@ function onForcePush(row: BranchRowModel): void {
       :loading-label="t('space.ade.plan.view.loading.loading')"
     >
       <template v-if="model">
-        <div ref="headerEl" class="sticky top-0 z-2 bg-bg">
+        <div ref="headerEl" class="sticky top-0 z-2 bg-chrome">
           <AdePlanRepos
             :repos="chips"
             :all-pending="refreshingAll"
