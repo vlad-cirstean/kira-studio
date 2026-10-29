@@ -2071,8 +2071,11 @@ and `docs/HISTORY.md (v2.0)`.
 - A deployment environment (ade_repo_envs) is a name plus a shell command that prints the deployed commit SHA; it runs in the repo root on board refresh and marks branches ▲name ✓/⚠/?.
 - In the deployment environments UI, a new row stays a local draft and is written only once both name and command are filled.
 - Run and setup logs keep a tail of 2 MiB per log in chunks of at most 8 KiB, set truncated once head chunks drop, and batch writes every 250 ms.
-- Archive keeps all task data (P399): logs, review sessions and comments are never purged; per-log size cap still bounds each log.
-- TaskBoard.Start runs the log purge once, then hourly, and runs PRAGMA incremental_vacuum after a purge that removed rows.
+- Archive keeps all task data (P399): logs, review sessions and comments are never purged; per-log size cap still bounds each log. Archive closes review windows only; review sessions stay pinned.
+- Migration 0052 (P399) adds cr_* columns to ade_task_branches. Archive snapshots each branch's change request there (best effort, 5 s) so the archived view shows it when the host is unreachable.
+- AdeTaskService.ArchivedTask returns an archived task read-only: task, statuses, branches (live PR when the host answers, else the snapshot; prSource says which), stored review comments, no worktree paths. Phone reads it at /api/ade/archived-task.
+- AdeTaskService.RestoreTask revives the task and the branch rows archived with it (same archived_at), adds a Later plan row, and returns the task. It refuses when a branch name is live on another task; nothing changes then. Worktrees come back on next launch via ensureWorktree.
+- The Archived tab (ade/v2/archived) lists board.history; the panel is read-only, with Restore to edit. The Plan's history items open the same panel.
 - The per-repo prepare timeout is the GitRepoSettings leaf worktreePrepareTimeout (default 15m, max 2h), shared with git-ui worktree add; Spec.Timeout must be > 0.
 
 ### Git facts
