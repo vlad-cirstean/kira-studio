@@ -463,7 +463,7 @@ func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddEx
 		}
 		if draft != nil {
 			// A repo added without a branch gets this one in the same row.
-			if _, _, err := b.editableRow(draft.TaskID, draft.ID); err != nil {
+			if _, _, err := b.editableRow(ctx, draft.TaskID, draft.ID); err != nil {
 				return adewire.AddExistingBranchResult{}, err
 			}
 			err = b.deps.Tasks.DetachBranch(draft.ID, &sb, now)

@@ -17,7 +17,7 @@ import (
 // editableRow loads the row's task and refuses a change while anything works on the row. The caller
 // holds the task mutex. A running session is refused, not closed, so no terminal sits in a removed
 // worktree.
-func (b *TaskBoard) editableRow(taskID, branchID string) (*taskCtx, model.AdeTaskBranch, error) {
+func (b *TaskBoard) editableRow(ctx context.Context, taskID, branchID string) (*taskCtx, model.AdeTaskBranch, error) {
 	tc, err := b.loadTaskCtx(taskID)
 	if err != nil {
 		return nil, model.AdeTaskBranch{}, err
@@ -36,7 +36,11 @@ func (b *TaskBoard) editableRow(taskID, branchID string) (*taskCtx, model.AdeTas
 		return nil, model.AdeTaskBranch{}, invalid("a review branch cannot change")
 	}
 	label := cmp.Or(row.Name, tc.nick[row.CodeRepoID])
-	open, err := b.runningTUI(func(s model.AdeSession) bool { return s.BranchID == row.ID })
+	// A step session carries no branch id; its cwd is the worktree.
+	wt := b.worktreePath(ctx, row)
+	open, err := b.runningTUI(func(s model.AdeSession) bool {
+		return s.BranchID == row.ID || (wt != "" && s.TaskID == taskID && s.Cwd == wt)
+	})
 	if err != nil {
 		return nil, model.AdeTaskBranch{}, err
 	}
@@ -149,7 +153,7 @@ func (b *TaskBoard) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranc
 	mu := b.taskMu(cur.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
-	tc, old, err := b.editableRow(cur.TaskID, args.BranchID)
+	tc, old, err := b.editableRow(ctx, cur.TaskID, args.BranchID)
 	if err != nil {
 		return adewire.Branch{}, err
 	}
@@ -227,7 +231,7 @@ func (b *TaskBoard) RemoveTaskBranch(ctx context.Context, branchID string) error
 	mu := b.taskMu(cur.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
-	_, old, err := b.editableRow(cur.TaskID, branchID)
+	_, old, err := b.editableRow(ctx, cur.TaskID, branchID)
 	if err != nil {
 		return err
 	}
@@ -254,7 +258,7 @@ func (b *TaskBoard) RemoveTaskRepo(ctx context.Context, branchID string) error {
 	mu := b.taskMu(cur.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
-	_, old, err := b.editableRow(cur.TaskID, branchID)
+	_, old, err := b.editableRow(ctx, cur.TaskID, branchID)
 	if err != nil {
 		return err
 	}
@@ -275,7 +279,7 @@ func (b *TaskBoard) UpdateTaskRepo(ctx context.Context, args adewire.UpdateTaskR
 	mu := b.taskMu(cur.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
-	tc, old, err := b.editableRow(cur.TaskID, args.BranchID)
+	tc, old, err := b.editableRow(ctx, cur.TaskID, args.BranchID)
 	if err != nil {
 		return adewire.Branch{}, err
 	}
