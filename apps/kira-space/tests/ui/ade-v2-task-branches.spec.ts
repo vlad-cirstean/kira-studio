@@ -131,8 +131,16 @@ test('a review task offers no row menu', async ({ relaunch }) => {
 test('Add branch on the task still attaches an existing branch to a new row', async ({
   relaunch,
 }) => {
-  const { window: page } = await openPlan(relaunch);
+  const { window: page, control } = await openPlan(relaunch, [candidates]);
   await openTask(page, 'T_alerts');
   await page.locator(t('ade-add-branch')).click();
   await expect(page.locator(t('ade-add-popover'))).toBeVisible();
+  await page.locator(t('ade-branch-search')).fill('invoice');
+  await page.locator(t('ade-candidate')).first().click();
+  await expect.poll(() => calls(control, IPC.adeTaskAddExistingBranch)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskAddExistingBranch)[0]?.args).toEqual({
+    codeRepoId: 'repo-web-app',
+    name: 'fix/invoice-rounding',
+    taskId: 'T_alerts',
+  });
 });
