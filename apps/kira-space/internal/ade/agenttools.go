@@ -241,31 +241,32 @@ func (b *TaskBoard) DeclareRepos(ctx context.Context, taskID string, refs []stri
 	return b.spaceInfo(ctx, tc)
 }
 
-// validateAgentBranch refuses a name git rejects and the names an agent must never take.
-func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo, name string) error {
+// checkNewBranchName returns the refusal text for a name git rejects or one a new branch must never
+// take, "" when the name is fine.
+func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, name string) (string, error) {
 	switch {
 	case name == "" || strings.TrimSpace(name) != name:
-		return agentmcp.ToolError("The branch name is empty or has leading or trailing spaces.")
+		return "The branch name is empty or has leading or trailing spaces.", nil
 	case len(name) > maxBranchNameBytes:
-		return agentmcp.ToolError(fmt.Sprintf("The branch name is longer than %d bytes.", maxBranchNameBytes))
+		return fmt.Sprintf("The branch name is longer than %d bytes.", maxBranchNameBytes), nil
 	case strings.HasPrefix(name, "-") || strings.Contains(name, "@{") || name == "HEAD":
-		return agentmcp.ToolError(fmt.Sprintf("%q is not a valid branch name.", name))
+		return fmt.Sprintf("%q is not a valid branch name.", name), nil
 	}
 	cmd := exec.CommandContext(ctx, "git", "check-ref-format", "--branch", name)
 	cmd.Dir = rec.Root
 	if err := cmd.Run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			return agentmcp.ToolError(fmt.Sprintf("%q is not a valid git branch name.", name))
+			return fmt.Sprintf("%q is not a valid git branch name.", name), nil
 		}
-		return fmt.Errorf("ade: check branch name: %w", err)
+		return "", fmt.Errorf("ade: check branch name: %w", err)
 	}
 	if main := b.mainShortName(ctx, rec.ID); main != "" && name == main {
-		return agentmcp.ToolError(fmt.Sprintf("%q is the repo's main branch. Pick a new feature branch name.", name))
+		return fmt.Sprintf("%q is the repo's main branch. Pick a new feature branch name.", name), nil
 	}
 	cfgs, err := b.deps.RepoConfig.List()
 	if err != nil {
-		return err
+		return "", err
 	}
 	for _, c := range cfgs {
 		if c.CodeRepoID != rec.ID {
@@ -273,9 +274,21 @@ func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo,
 		}
 		for _, t := range c.IntegrationBranches {
 			if t == name {
-				return agentmcp.ToolError(fmt.Sprintf("%q is an integration branch of the repo. Pick a new feature branch name.", name))
+				return fmt.Sprintf("%q is an integration branch of the repo. Pick a new feature branch name.", name), nil
 			}
 		}
+	}
+	return "", nil
+}
+
+// validateAgentBranch refuses a name git rejects and the names an agent must never take.
+func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo, name string) error {
+	msg, err := b.checkNewBranchName(ctx, rec, name)
+	if err != nil {
+		return err
+	}
+	if msg != "" {
+		return agentmcp.ToolError(msg)
 	}
 	return nil
 }

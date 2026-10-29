@@ -535,8 +535,15 @@ func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model
 			slog.Warn("ade board: unreadable pass of task", "scope", "ade", "task", t.ID, "err", err)
 		}
 	}
+	live := make(map[string]bool, len(branchIDs))
+	for _, id := range branchIDs {
+		live[id] = true
+	}
 	for _, r := range runs {
 		if r.Purpose == model.AdeRunPurposeReview { // a round shows through its review run
+			continue
+		}
+		if r.BranchID != "" && !live[r.BranchID] { // history of a detached branch
 			continue
 		}
 		w := toWireRun(r)

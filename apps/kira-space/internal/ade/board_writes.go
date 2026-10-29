@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -358,67 +359,117 @@ type newTaskFields struct {
 	ForceReview bool
 }
 
+// existingBranch is a git branch an attach resolved: its inventory row and the kind it attaches as.
+type existingBranch struct {
+	row  porcelain.InventoryRef
+	kind string
+}
+
+// resolveExisting finds the branch in the repo's inventory and refuses one already on a live task.
+// taskKind is the target task's kind ("" for a task not created yet). The caller holds the repo mutex.
+func (b *TaskBoard) resolveExisting(ctx context.Context, codeRepoID, name, taskKind string, forceReview bool) (existingBranch, error) {
+	entry, err := b.openRepo(ctx, codeRepoID)
+	if err != nil {
+		return existingBranch{}, err
+	}
+	inv, err := entry.BranchInventory(ctx)
+	if err != nil {
+		return existingBranch{}, err
+	}
+	remote, _ := entry.DefaultRemote(ctx)
+	row, found := resolveQueuedRef(inv, name, remote)
+	if !found {
+		return existingBranch{}, invalid("branch %q not found", name)
+	}
+	userEmail, err := entry.ConfigValue(ctx, "user.email")
+	if err != nil {
+		return existingBranch{}, err
+	}
+	live, err := b.deps.Tasks.BranchesLive()
+	if err != nil {
+		return existingBranch{}, err
+	}
+	for _, br := range live {
+		if br.CodeRepoID == codeRepoID && br.Name == name {
+			return existingBranch{}, repos.ErrBranchOnTask
+		}
+	}
+	kind := resolveKind(row, userEmail, "")
+	if forceReview {
+		kind = model.AdeBranchKindReview
+	}
+	if taskKind == model.AdeTaskKindParked {
+		kind = model.AdeBranchKindParked
+	}
+	return existingBranch{row: row, kind: kind}, nil
+}
+
+// draftOf is the task's live not-created branch in the repo, nil when it has none.
+func (b *TaskBoard) draftOf(taskID, codeRepoID string) (*model.AdeTaskBranch, error) {
+	live, err := b.deps.Tasks.BranchesLive()
+	if err != nil {
+		return nil, err
+	}
+	for _, br := range live {
+		if br.TaskID == taskID && br.CodeRepoID == codeRepoID && br.Name == "" {
+			return &br, nil
+		}
+	}
+	return nil, nil
+}
+
 func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch, nf newTaskFields) (adewire.AddExistingBranchResult, error) {
 	if err := b.requireRepos([]string{args.CodeRepoID}); err != nil {
 		return adewire.AddExistingBranchResult{}, err
+	}
+	if args.TaskID != "" {
+		// Task lock before repo lock, the order every task write takes them in.
+		tmu := b.taskMu(args.TaskID)
+		tmu.Lock()
+		defer tmu.Unlock()
 	}
 	mu := b.repoMutex(args.CodeRepoID)
 	mu.Lock()
 	defer mu.Unlock()
 
-	entry, err := b.openRepo(ctx, args.CodeRepoID)
-	if err != nil {
-		return adewire.AddExistingBranchResult{}, err
-	}
-	inv, err := entry.BranchInventory(ctx)
-	if err != nil {
-		return adewire.AddExistingBranchResult{}, err
-	}
-	remote, _ := entry.DefaultRemote(ctx)
-	row, found := resolveQueuedRef(inv, args.Name, remote)
-	if !found {
-		return adewire.AddExistingBranchResult{}, invalid("branch %q not found", args.Name)
-	}
-	userEmail, err := entry.ConfigValue(ctx, "user.email")
-	if err != nil {
-		return adewire.AddExistingBranchResult{}, err
-	}
-	live, err := b.deps.Tasks.BranchesLive()
-	if err != nil {
-		return adewire.AddExistingBranchResult{}, err
-	}
-	for _, br := range live {
-		if br.CodeRepoID == args.CodeRepoID && br.Name == args.Name {
-			return adewire.AddExistingBranchResult{}, repos.ErrBranchOnTask
+	var task model.AdeTask
+	var err error
+	if args.TaskID != "" {
+		if task, err = b.deps.Tasks.GetTask(args.TaskID); err != nil {
+			return adewire.AddExistingBranchResult{}, err
 		}
 	}
-
-	kind := resolveKind(row, userEmail, "")
-	if nf.ForceReview {
-		kind = model.AdeBranchKindReview
+	target, err := b.resolveExisting(ctx, args.CodeRepoID, args.Name, task.Kind, nf.ForceReview)
+	if err != nil {
+		return adewire.AddExistingBranchResult{}, err
 	}
+
 	now := b.deps.Now().UnixMilli()
-	var task model.AdeTask
 	var sb model.AdeTaskBranch
 	if args.TaskID == "" {
 		task = model.AdeTask{ID: b.newID(), Kind: model.AdeTaskKindTask, CreatedAt: now, Title: nf.Title, HostURL: nf.HostURL}
-		if kind == model.AdeBranchKindReview {
-			task.Kind, task.Owner = model.AdeTaskKindReview, row.AuthorName
+		if target.kind == model.AdeBranchKindReview {
+			task.Kind, task.Owner = model.AdeTaskKindReview, target.row.AuthorName
 		}
-		sb = model.AdeTaskBranch{ID: b.newID(), TaskID: task.ID, CodeRepoID: args.CodeRepoID, Name: args.Name, Kind: kind, AddedAt: now}
+		sb = model.AdeTaskBranch{ID: b.newID(), TaskID: task.ID, CodeRepoID: args.CodeRepoID, Name: args.Name, Kind: target.kind, AddedAt: now}
 		if task, err = b.deps.Tasks.CreateTask(task, []model.AdeTaskBranch{sb}, nil); err != nil {
 			return adewire.AddExistingBranchResult{}, err
 		}
 	} else {
-		if task, err = b.deps.Tasks.GetTask(args.TaskID); err != nil {
+		sb = model.AdeTaskBranch{ID: b.newID(), TaskID: task.ID, CodeRepoID: args.CodeRepoID, Name: args.Name, Kind: target.kind, AddedAt: now}
+		draft, err := b.draftOf(task.ID, args.CodeRepoID)
+		if err != nil {
 			return adewire.AddExistingBranchResult{}, err
 		}
-		if task.Kind == model.AdeTaskKindParked {
-			kind = model.AdeBranchKindParked
+		if draft != nil {
+			// A repo added without a branch gets this one in the same row.
+			if _, _, err := b.editableRow(draft.TaskID, draft.ID); err != nil {
+				return adewire.AddExistingBranchResult{}, err
+			}
+			err = b.deps.Tasks.DetachBranch(draft.ID, &sb, now)
+		} else {
+			sb, err = b.deps.Tasks.AddBranch(sb)
 		}
-		sb, err = b.deps.Tasks.AddBranch(model.AdeTaskBranch{
-			ID: b.newID(), TaskID: task.ID, CodeRepoID: args.CodeRepoID, Name: args.Name, Kind: kind, AddedAt: now,
-		})
 		if err != nil {
 			return adewire.AddExistingBranchResult{}, err
 		}

@@ -27,26 +27,35 @@ type linkedBranch struct {
 func (b *TaskBoard) linkedBranches(ctx context.Context, tc *taskCtx) ([]linkedBranch, error) {
 	var out []linkedBranch
 	for _, sb := range tc.branches {
-		if sb.Name == "" {
-			continue
-		}
-		path, err := b.worktreeOf(ctx, sb)
+		lb, ok, err := b.linkedBranchOf(ctx, sb)
 		if err != nil {
 			return nil, err
 		}
-		if path == "" {
-			continue
+		if ok {
+			out = append(out, lb)
 		}
-		entry, err := b.openRepo(ctx, sb.CodeRepoID)
-		if err != nil {
-			return nil, err
-		}
-		if filepath.Clean(path) == filepath.Clean(entry.Summary.Root) {
-			continue
-		}
-		out = append(out, linkedBranch{sb: sb, path: path, entry: entry})
 	}
 	return out, nil
+}
+
+// linkedBranchOf reports the branch's linked worktree; false for a not-created branch or one checked
+// out at the repo root.
+func (b *TaskBoard) linkedBranchOf(ctx context.Context, sb model.AdeTaskBranch) (linkedBranch, bool, error) {
+	if sb.Name == "" {
+		return linkedBranch{}, false, nil
+	}
+	path, err := b.worktreeOf(ctx, sb)
+	if err != nil || path == "" {
+		return linkedBranch{}, false, err
+	}
+	entry, err := b.openRepo(ctx, sb.CodeRepoID)
+	if err != nil {
+		return linkedBranch{}, false, err
+	}
+	if filepath.Clean(path) == filepath.Clean(entry.Summary.Root) {
+		return linkedBranch{}, false, nil
+	}
+	return linkedBranch{sb: sb, path: path, entry: entry}, true, nil
 }
 
 // ArchiveRisk reports what archiving the task would discard.

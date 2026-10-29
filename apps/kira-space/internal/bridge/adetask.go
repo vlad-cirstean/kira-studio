@@ -494,6 +494,55 @@ func (s *AdeTaskService) SetBranchBase(ctx context.Context, args adewire.SetBran
 	return adeTaskError(s.Engine.SetBranchBase(ctx, args))
 }
 
+// SetTaskBranch gives a task row an existing git branch or creates a new one for it.
+func (s *AdeTaskService) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranchArgs) (adewire.Branch, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.Branch{}, err
+	}
+	if err := validateAdeBranchName(args.Name, "name"); err != nil {
+		return adewire.Branch{}, err
+	}
+	br, err := s.Engine.SetTaskBranch(ctx, args)
+	return br, adeTaskError(err)
+}
+
+// UpdateTaskRepo swaps the repo of a row whose branch is not created.
+func (s *AdeTaskService) UpdateTaskRepo(ctx context.Context, args adewire.UpdateTaskRepoArgs) (adewire.Branch, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.Branch{}, err
+	}
+	if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
+		return adewire.Branch{}, err
+	}
+	br, err := s.Engine.UpdateTaskRepo(ctx, args)
+	return br, adeTaskError(err)
+}
+
+// RemoveTaskBranch detaches a row's branch; the repo stays on the task.
+func (s *AdeTaskService) RemoveTaskBranch(ctx context.Context, args adewire.BranchArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RemoveTaskBranch(ctx, args.BranchID))
+}
+
+// RemoveTaskRepo detaches a row, its branch included.
+func (s *AdeTaskService) RemoveTaskRepo(ctx context.Context, args adewire.BranchArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RemoveTaskRepo(ctx, args.BranchID))
+}
+
+// TaskBranchRisk reports what removing a row's branch would discard.
+func (s *AdeTaskService) TaskBranchRisk(ctx context.Context, args adewire.BranchArgs) (adewire.BranchRisk, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.BranchRisk{}, err
+	}
+	r, err := s.Engine.TaskBranchRisk(ctx, args.BranchID)
+	return r, adeTaskError(err)
+}
+
 // RepoBranches lists the bases the picker offers for a repo.
 func (s *AdeTaskService) RepoBranches(ctx context.Context, args adewire.RepoBranchesArgs) (adewire.RepoBranches, error) {
 	if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {

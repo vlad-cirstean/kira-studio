@@ -693,6 +693,19 @@ type AddTaskRepoArgs struct {
 	Base       *BaseChoice `json:"base"`
 }
 
+// SetTaskBranchArgs names the branch a task row takes: an existing git branch, or a new name to create.
+type SetTaskBranchArgs struct {
+	BranchID string `json:"branchId"`
+	Name     string `json:"name"`
+	Existing bool   `json:"existing"`
+}
+
+// UpdateTaskRepoArgs swaps the repo of a row whose branch is not created.
+type UpdateTaskRepoArgs struct {
+	BranchID   string `json:"branchId"`
+	CodeRepoID string `json:"codeRepoId"`
+}
+
 type AddExistingBranchArgs struct {
 	CodeRepoID string `json:"codeRepoId"`
 	Name       string `json:"name"`
