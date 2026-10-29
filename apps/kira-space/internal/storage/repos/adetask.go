@@ -1,6 +1,7 @@
 package repos
 
 import (
+	"cmp"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -431,6 +432,57 @@ func (r *AdeTaskRepo) AddBranch(b model.AdeTaskBranch) (model.AdeTaskBranch, err
 		return model.AdeTaskBranch{}, fmt.Errorf("repos: commit add ade task branch: %w", err)
 	}
 	return b, nil
+}
+
+// DetachBranch takes a live branch off its live task in one transaction. A branch never created and
+// without runs is deleted; any other is archived, so its runs, reviews and marks stay as history.
+// Live branches stacked on it fall back to its name (its ref stays in git) or, while it is not
+// created, to its own base; branches queued after it are freed. A non-nil replacement takes the old
+// position (ErrBranchOnTask on a taken name).
+func (r *AdeTaskRepo) DetachBranch(id string, replacement *model.AdeTaskBranch, now int64) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin detach ade branch %s: %w", id, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	old, err := scanAdeTaskBranch(tx.QueryRow(`SELECT `+adeTaskBranchColumns+` FROM ade_task_branches
+		WHERE id = ? AND archived_at IS NULL AND task_id IN (SELECT id FROM ade_tasks WHERE archived_at IS NULL)`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrBranchMissing
+	}
+	if err != nil {
+		return fmt.Errorf("repos: load ade branch %s: %w", id, err)
+	}
+	var runs int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE branch_id = ?`, id).Scan(&runs); err != nil {
+		return fmt.Errorf("repos: count ade runs of branch %s: %w", id, err)
+	}
+	if old.Name == "" && runs == 0 {
+		_, err = tx.Exec(`DELETE FROM ade_task_branches WHERE id = ?`, id)
+	} else {
+		_, err = tx.Exec(`UPDATE ade_task_branches SET archived_at = ? WHERE id = ?`, now, id)
+	}
+	if err != nil {
+		return fmt.Errorf("repos: detach ade branch %s: %w", id, err)
+	}
+	newBase := cmp.Or(old.Name, old.Base)
+	if _, err := tx.Exec(`UPDATE ade_task_branches SET base_branch_id = '', base = ?, base_pending_from = ''
+		WHERE base_branch_id = ? AND archived_at IS NULL`, newBase, id); err != nil {
+		return fmt.Errorf("repos: free ade branches stacked on %s: %w", id, err)
+	}
+	if _, err := tx.Exec(`UPDATE ade_task_branches SET queued_after = '' WHERE queued_after = ?`, id); err != nil {
+		return fmt.Errorf("repos: free ade branches queued after %s: %w", id, err)
+	}
+	if replacement != nil {
+		replacement.Position = old.Position
+		if err := insertTaskBranch(tx, *replacement); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit detach ade branch %s: %w", id, err)
+	}
+	return nil
 }
 
 func (r *AdeTaskRepo) queryBranches(where string) ([]model.AdeTaskBranch, error) {
