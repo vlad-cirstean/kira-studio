@@ -1,2 +1,5 @@
 [install]
 exact = true
+
+[test]
+preload = ["./packages/workbench/src/testing/unit/window.ts", "./packages/workbench/src/testing/unit/wailsRuntime.ts"]

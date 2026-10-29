@@ -105,7 +105,6 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
 <template>
   <AdePanelFrame
     v-model="ui.taskTab"
-    :title="t('common.task.label')"
     :tabs="[
       { value: 'task', label: t('common.task.label') },
       { value: 'notes', label: t('space.common.notes.label') },

@@ -566,6 +566,7 @@ export interface ReviewWindowTarget {
   branch: string;
   base: string;
   worktree: string;
+  changeRequest: number /* the task link's change request; 0 = find it by branch */;
 }
 export interface ReviewWorking {
   worktree: string /* '' = the branch has no worktree */;
@@ -854,6 +855,9 @@ export interface ReadLogArgs {
 export interface TakeOverArgs {
   sessionId: string;
   stopIfRunning: boolean /* false on a running run = E_BAD_REQUEST, D3 */;
+}
+export interface RestartSessionArgs {
+  sessionId: string;
 }
 export interface LaunchStepArgs {
   taskId: string;

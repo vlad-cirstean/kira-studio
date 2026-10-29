@@ -67,7 +67,7 @@ test('the dropdown works from the keyboard', async ({ relaunch }) => {
   await expect(page.locator(t('ade-stopped-trigger'))).toBeFocused();
 });
 
-test('tabs are named after the step; the pane shows the full Claude session id with a copy button', async ({
+test('tabs are named after the step; the tab menu copies the full Claude session id', async ({
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch);
@@ -75,6 +75,7 @@ test('tabs are named after the step; the pane shows the full Claude session id w
   await expect(page.locator(t('ade-session-tab-tk01'))).toContainText('Implement · ');
   await expect(page.locator(t('ade-session-tab-b1c2'))).toContainText('Implement · ');
   await expect(page.locator(t('ade-session-tab-tk01'))).not.toContainText('claude ');
+  await expect(page.locator(t('ade-session-id'))).toHaveCount(0);
 
   await page.evaluate(() => {
     const w = window as unknown as { __clipboard: string[] };
@@ -83,11 +84,66 @@ test('tabs are named after the step; the pane shows the full Claude session id w
       w.__clipboard.push(text);
     };
   });
-  await expect(page.locator(t('ade-session-id'))).toContainText('claude-tk01');
-  await page.locator(t('ade-session-id')).getByRole('button').click();
+  await page.locator(t('ade-session-tab-tk01')).click({ button: 'right' });
+  await page.locator(t('menu-item-ade-session-copy-id')).click();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard))
     .toEqual(['claude-tk01']);
+});
+
+test('a TUI tab shows its state and age on hover', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-tk01')).hover();
+  await expect(page.locator(t('ade-session-tip'))).toContainText('Interactive · ');
+  await expect(page.locator(`${t('ade-tui-pane')} ${t('ade-tui-label')}`)).toHaveCount(0);
+});
+
+test('contract: Restart closes the session and reopens it in a new terminal', async ({
+  relaunch,
+}) => {
+  const launch = contract<Record<string, string>>(
+    'ade-session-restart',
+    'AdeTaskService.RestartSession',
+  );
+  expect(Object.keys(launch).sort()).toEqual(['command', 'cwd', 'sessionId', 'terminalId']);
+  const { window: page, control } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskRestartSession,
+      response: { ...launch, sessionId: 'tk01', terminalId: 'term-tk01-r' },
+    },
+  ]);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-tk01')).click({ button: 'right' });
+  await page.locator(t('menu-item-ade-session-restart')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskRestartSession)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskRestartSession)[0]?.args).toEqual({ sessionId: 'tk01' });
+  await expect.poll(() => calls(control, IPC.terminalOpen)).toHaveLength(1);
+  expect(JSON.stringify(calls(control, IPC.terminalOpen)[0]?.args)).toContain('term-tk01-r');
+  await expect(page.locator(t('ade-session-tab-tk01'))).toHaveAttribute('data-selected', 'true');
+});
+
+test('a refused Restart shows its error on the panel', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskRestartSession,
+      error: { code: 'E_BAD_REQUEST', message: 'the session is not running' },
+    },
+  ]);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-tk01')).click({ button: 'right' });
+  await page.locator(t('menu-item-ade-session-restart')).click();
+  await expect(page.locator(t('ade-panel-action-error'))).toContainText(
+    'the session is not running',
+  );
+});
+
+test('a headless tab has no Restart', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-b1c2')).click({ button: 'right' });
+  await expect(page.locator(t('menu-item-ade-session-restart'))).toHaveCount(0);
+  await expect(page.locator(t('menu-item-ade-session-copy-id'))).toBeVisible();
 });
 
 test('a branch scope shows only that branch', async ({ relaunch }) => {
@@ -100,13 +156,15 @@ test('a branch scope shows only that branch', async ({ relaunch }) => {
   await expect(page.locator(t('ade-session-tab-tk01'))).toBeVisible();
 });
 
-test('a headless run shows its status bar and log, and Stop sends the run id', async ({
+test('a headless tab shows its status on hover, its log, and Stop sends the run id', async ({
   relaunch,
 }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openSessions(page, 'T_bill');
   await page.locator(t('ade-session-tab-b1c2')).click();
-  await expect(page.locator(t('ade-headless-label'))).toContainText('Background run · step');
+  await page.mouse.move(0, 0);
+  await page.locator(t('ade-session-tab-b1c2')).hover();
+  await expect(page.locator(t('ade-session-tip'))).toContainText('Background run · step');
   await expect(page.locator(t('ade-run-log-line')).first()).toBeVisible();
   await page.locator(t('ade-session-stop')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStopRun)).toHaveLength(1);

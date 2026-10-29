@@ -863,6 +863,99 @@ reviewTest('contract: a refused review shows the host reason', async ({ relaunch
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
+const FOREIGN = 'ade-review-foreign';
+const foreignTarget = (key: string) => {
+  const { branch, changeRequest } = contract(
+    FOREIGN,
+    `AdeTaskService.ReviewWindowTarget#${key}`,
+  ) as { branch: string; changeRequest: number };
+  return { ...target, branch, changeRequest };
+};
+const foreignHead = (contract(FOREIGN, 'git:changeRequest.reviewState#fork') as { headSha: string })
+  .headSha;
+
+reviewTest(
+  "contract: another person's change request can be approved and commented on",
+  async ({ relaunch }) => {
+    const page = await openReview(
+      relaunch,
+      [{ channel: IPC.adeTaskReviewWindowTarget, response: foreignTarget('fork') }],
+      {
+        'changeRequest.reviewState': contract(FOREIGN, 'git:changeRequest.reviewState#fork'),
+        'changeRequest.submitReview': contract(FOREIGN, 'git:changeRequest.submitReview#fork'),
+        'changeRequest.comment': contract(FOREIGN, 'git:changeRequest.comment#fork'),
+      },
+    );
+    await page.locator(t('ade-review-actions-trigger')).click();
+    for (const event of ['approve', 'requestChanges', 'comment']) {
+      await expect(page.locator(t(`ade-review-action-${event}`))).not.toHaveAttribute(
+        'data-disabled',
+        '',
+      );
+      await expect(page.locator(t(`ade-review-action-${event}-reason`))).toHaveCount(0);
+    }
+    await page.locator(t('ade-review-action-approve')).click();
+    await page.locator(t('ade-review-submit')).click();
+    await expect(page.locator(t('ade-review-posted'))).toContainText('Review submitted');
+    expect((await gitStreamParams(page, 'changeRequest.reviewState'))[0]).toEqual({
+      repoId: target.gitRepoId,
+      branch: 'forker/main',
+      number: 12,
+    });
+    expect(await gitStreamParams(page, 'changeRequest.submitReview')).toEqual([
+      { repoId: target.gitRepoId, number: 12, event: 'approve', body: '', headSha: foreignHead },
+    ]);
+    await page.locator(t('ade-review-cr-comment')).click();
+    await page.locator(t('ade-review-submit-body')).fill('Looks good, one nit');
+    await page.locator(t('ade-review-submit')).click();
+    await expect(page.locator(t('ade-review-posted'))).toContainText('Comment posted');
+    expect(await gitStreamParams(page, 'changeRequest.comment')).toEqual([
+      { repoId: target.gitRepoId, number: 12, body: 'Looks good, one nit' },
+    ]);
+  },
+);
+
+reviewTest(
+  'contract: a remote-only branch finds its change request by head name',
+  async ({ relaunch }) => {
+    const page = await openReview(
+      relaunch,
+      [{ channel: IPC.adeTaskReviewWindowTarget, response: foreignTarget('remote') }],
+      { 'changeRequest.reviewState': contract(FOREIGN, 'git:changeRequest.reviewState#remote') },
+    );
+    await page.locator(t('ade-review-actions-trigger')).click();
+    await expect(page.locator(t('ade-review-action-approve'))).not.toHaveAttribute(
+      'data-disabled',
+      '',
+    );
+    const [params] = await gitStreamParams(page, 'changeRequest.reviewState');
+    expect(params).toEqual({ repoId: target.gitRepoId, branch: 'origin/feat/x' });
+  },
+);
+
+reviewTest('a branch with no change request shows why Review is off', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], { 'changeRequest.reviewState': { kind: 'none' } });
+  const trigger = page.locator(t('ade-review-actions-trigger'));
+  await expect(trigger).toBeDisabled();
+  await trigger.locator('..').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText(
+    'No CR found for this branch.',
+  );
+});
+
+reviewTest(
+  'the agent panel button sits at the far right of the title bar',
+  async ({ relaunch }) => {
+    const page = await openReview(relaunch, [], actionsGit());
+    await page.locator(t('ade-review-actions-trigger')).waitFor();
+    const bar = await boxOf(page.locator('.wails-drag'));
+    const comment = await boxOf(page.locator(t('ade-review-cr-comment')));
+    const toggle = await boxOf(page.locator(t('ade-review-toggle-agent')));
+    expect(toggle.x).toBeGreaterThanOrEqual(comment.x + comment.width);
+    expect(bar.x + bar.width - (toggle.x + toggle.width)).toBeLessThanOrEqual(8);
+  },
+);
+
 const openCommentDialog = async (
   relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
   viewport?: { width: number; height: number },

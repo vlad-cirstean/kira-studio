@@ -43,3 +43,5 @@ Each paired phone has two switches in the device list:
 Agent input also needs the global switch **Let phones reply to agents and control their terminals**. It is off by default. A new pairing gets Changes on and Agent input off.
 
 When a phone controls a terminal, the desktop window shows **Reconnect here** to take control back.
+
+Tap a link in a terminal to open it on the phone.

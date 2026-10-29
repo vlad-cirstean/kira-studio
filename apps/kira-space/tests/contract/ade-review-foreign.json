@@ -1,0 +1,66 @@
+{
+  "AdeTaskService.ReviewWindowTarget#fork": {
+    "base": "origin/main",
+    "branch": "forker/main",
+    "branchId": "<masked>",
+    "changeRequest": 12,
+    "codeRepoId": "<masked>",
+    "gitRepoId": "<masked>",
+    "taskId": "<masked>",
+    "worktree": "<masked>"
+  },
+  "AdeTaskService.ReviewWindowTarget#remote": {
+    "base": "origin/main",
+    "branch": "origin/feat/x",
+    "branchId": "<masked>",
+    "changeRequest": 0,
+    "codeRepoId": "<masked>",
+    "gitRepoId": "<masked>",
+    "taskId": "<masked>",
+    "worktree": "<masked>"
+  },
+  "git:changeRequest.comment#fork": {
+    "kind": "ok"
+  },
+  "git:changeRequest.reviewState#fork": {
+    "author": "sara",
+    "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host": {
+      "changeRequest": "Pull request",
+      "changeRequestNoun": "pull request",
+      "changeRequestShort": "PR",
+      "cli": "GitHub CLI (gh)",
+      "id": "github",
+      "label": "GitHub"
+    },
+    "kind": "ok",
+    "localHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "number": 12,
+    "own": false,
+    "state": "open",
+    "title": "Fork change",
+    "viewer": "octocat"
+  },
+  "git:changeRequest.reviewState#remote": {
+    "author": "sara",
+    "headSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "host": {
+      "changeRequest": "Pull request",
+      "changeRequestNoun": "pull request",
+      "changeRequestShort": "PR",
+      "cli": "GitHub CLI (gh)",
+      "id": "github",
+      "label": "GitHub"
+    },
+    "kind": "ok",
+    "localHeadSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "number": 15,
+    "own": false,
+    "state": "open",
+    "title": "X change",
+    "viewer": "octocat"
+  },
+  "git:changeRequest.submitReview#fork": {
+    "kind": "ok"
+  }
+}

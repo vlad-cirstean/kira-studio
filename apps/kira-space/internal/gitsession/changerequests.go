@@ -652,6 +652,11 @@ func (e *RepoEntry) BranchURL(ctx context.Context, branch string) (string, bool)
 	return p.BranchURL(repo, branch), true
 }
 
+// HostRepo is the provider and host repository of this entry's origin remote.
+func (e *RepoEntry) HostRepo(ctx context.Context) (githost.Provider, githost.Repo, bool) {
+	return e.hostRepo(ctx)
+}
+
 // HostInfo describes the host this entry resolves to; false when off or no host matches.
 func (e *RepoEntry) HostInfo(ctx context.Context) (githost.Info, bool) {
 	p, _, ok := e.hostRepo(ctx)

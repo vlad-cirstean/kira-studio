@@ -856,10 +856,8 @@ suites). Tooling lives in `scripts/mutation/` and `tools/mutation/` (own `packag
 - **TS workarounds** (all inside the scripts and `stryker.config.mjs`, no repo test/source edit):
   1. Bun's 5s per-test timeout kills the 100k-sha `shaTable` test under instrumentation:
      `bun.bunArgs --timeout 60000`.
-  2. The runner eager-imports every mutated module before any spec, so modules reaching
-     `/wails/runtime.js` fail before `wailsRuntime.ts` registers its `mock.module`. `ts.sh`
-     appends a `[test] preload` block (`window.ts`, `wailsRuntime.ts`) to the snapshot's
-     `bunfig.toml` only.
+  2. The runner eager-imports every mutated module before any spec. Root `bunfig.toml` `[test] preload`
+     (`window.ts`, `wailsRuntime.ts`) registers the `/wails/runtime.js` mock first; the snapshot copies it.
   3. `tabs-save-retries-after-failure` and `tabs-save-serialized` specs race on `setTimeout(0)`
      under instrumentation: excluded from the area's test list in `areas.json`, with reason.
   4. Workspace packages carry their own `node_modules` (isolated linker) which Stryker's sandbox

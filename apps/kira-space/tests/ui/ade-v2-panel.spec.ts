@@ -223,6 +223,28 @@ test('a branch opens Details with merged and deployed rows; back to the task', a
   await expect(page.locator('[data-testid="ade-task-tab"]')).toBeVisible();
 });
 
+test("the panel has no toolbar; actions sit at the tab row's right end", async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await openTask(page, 'T_auth');
+  const panel = page.locator('[data-testid="ade-panel"]');
+  await expect(panel.locator('[data-slot="panel-header"]')).toHaveCount(0);
+  const actions = panel.locator('[data-testid="ade-panel-actions"]');
+  await expect(actions.locator('[data-testid="ade-panel-more"]')).toBeVisible();
+  await expect(actions.locator('[data-testid^="ade-task-action-"]').first()).toBeVisible();
+  const box = await actions.boundingBox();
+  const panelBox = await panel.boundingBox();
+  const tab = await panel.locator('[data-testid="ade-panel-tab-task"]').boundingBox();
+  if (!box || !panelBox || !tab) {
+    throw new Error('missing bounding box');
+  }
+  expect(panelBox.x + panelBox.width - (box.x + box.width)).toBeLessThanOrEqual(8);
+  expect(box.y + box.height).toBeGreaterThan(tab.y);
+  expect(box.y).toBeLessThan(tab.y + tab.height);
+  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_cart"]').first().click();
+  await expect(page.locator('[data-testid="ade-branch-details"]')).toBeVisible();
+  await expect(panel.locator('[data-slot="panel-header"]')).toHaveCount(0);
+});
+
 test('a branch row on the Plan selects the branch', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_cart"]').first().click();

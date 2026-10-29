@@ -9,8 +9,8 @@ import type { ReviewWindowTarget } from '../wire';
 
 type OkState = Extract<ChangeRequestReviewState, { kind: 'ok' }>;
 
-const reviewStateKey = (gitRepoId: string, branch: string) =>
-  ['changeRequestReviewState', gitRepoId, branch] as const;
+const reviewStateKey = (gitRepoId: string, branch: string, number: number) =>
+  ['changeRequestReviewState', gitRepoId, branch, number] as const;
 
 export interface ReviewGate {
   enabled: boolean;
@@ -33,7 +33,9 @@ export function reviewGate(s: OkState, event: ChangeRequestReviewEvent): ReviewG
 
 /** The review facts of the window's change request, the review and comment posts, and the open link. */
 export function useChangeRequestReview(target: () => ReviewWindowTarget) {
-  const key = computed(() => reviewStateKey(target().gitRepoId, target().branch));
+  const key = computed(() =>
+    reviewStateKey(target().gitRepoId, target().branch, target().changeRequest),
+  );
   const transport = async () => {
     const tg = target();
     const tr = gitTransportFor(tg.codeRepoId);
@@ -42,11 +44,14 @@ export function useChangeRequestReview(target: () => ReviewWindowTarget) {
   };
   const state = useQuery({
     queryKey: key,
-    queryFn: async (): Promise<ChangeRequestReviewState> =>
-      (await transport()).request('changeRequest.reviewState', {
-        repoId: target().gitRepoId,
-        branch: target().branch,
-      }),
+    queryFn: async (): Promise<ChangeRequestReviewState> => {
+      const tg = target();
+      return (await transport()).request('changeRequest.reviewState', {
+        repoId: tg.gitRepoId,
+        branch: tg.branch,
+        ...(tg.changeRequest > 0 ? { number: tg.changeRequest } : {}),
+      });
+    },
     staleTime: 60_000,
     refetchOnWindowFocus: true,
   });

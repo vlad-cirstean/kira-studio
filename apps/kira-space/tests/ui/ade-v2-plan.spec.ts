@@ -223,7 +223,7 @@ test('the day-off confirm says what moves, offers Cancel and Escape leaves the p
   expect(control.log().filter((e) => e.channel === IPC.adeTaskSetPlan)).toHaveLength(0);
 });
 
-test('a card is a 6px rounded box with a 4px task edge, a 68px header and 8px gaps', async ({
+test('a card is a 6px rounded box with a 1px edge, a 68px header and a separator between tasks', async ({
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch);
@@ -236,17 +236,81 @@ test('a card is a 6px rounded box with a 4px task edge, a 68px header and 8px ga
       left: s.borderLeftWidth,
     };
   });
-  expect(style).toEqual({ radius: '6px', top: '1px', left: '4px' });
+  expect(style).toEqual({ radius: '6px', top: '1px', left: '1px' });
   const head = await box.locator('[data-testid="ade-card-head"]').boundingBox();
   expect(head?.height).toBe(68);
 
-  const rects = await bandOf(page, 3)
+  const band = bandOf(page, 3);
+  const rects = await band
     .locator('[data-testid="ade-card"]')
     .evaluateAll((els) =>
       els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })),
     );
   expect(rects.length).toBeGreaterThanOrEqual(2);
-  expect((rects[1]?.top ?? 0) - (rects[0]?.bottom ?? 0)).toBe(8);
+  const lines = await band
+    .locator('[data-testid="ade-task-separator"]')
+    .evaluateAll((els) =>
+      els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })),
+    );
+  expect(lines).toHaveLength(rects.length - 1);
+  expect(lines[0]?.top ?? 0).toBeGreaterThanOrEqual(rects[0]?.bottom ?? 0);
+  expect(lines[0]?.bottom ?? 0).toBeLessThanOrEqual(rects[1]?.top ?? 0);
+});
+
+test('the task open in the panel is marked on its card, spans and branch rows', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  const marked = page.locator('[data-testid="ade-card"][aria-current="true"]');
+  const [focusColor, badgeColor] = await page.evaluate(() =>
+    ['--kira-focus', '--kira-badge'].map((v) => {
+      const span = document.createElement('span');
+      span.style.color = `var(${v})`;
+      document.body.appendChild(span);
+      const color = getComputedStyle(span).color;
+      span.remove();
+      return color;
+    }),
+  );
+
+  await card(page, 'T_search').locator('[data-testid="ade-card-head"]').click();
+  await expect(card(page, 'T_search')).toHaveAttribute('aria-current', 'true');
+  await expect(marked).toHaveCount(1);
+  expect(await card(page, 'T_search').evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(
+    focusColor,
+  );
+
+  await card(page, 'T_push').locator('[data-testid="ade-card-head"]').click();
+  await expect(card(page, 'T_push')).toHaveAttribute('aria-current', 'true');
+  expect(await card(page, 'T_search').evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(
+    badgeColor,
+  );
+  await expect(card(page, 'T_search')).not.toHaveAttribute('aria-current', 'true');
+
+  const row = card(page, 'T_push').locator('[data-testid="ade-branch-row"]').first();
+  await row.click();
+  await expect(card(page, 'T_push')).toHaveAttribute('aria-current', 'true');
+  await expect(row).toHaveAttribute('data-selected', 'true');
+
+  const span = page.locator('[data-testid="ade-span-row"]').first();
+  const taskId = await span.getAttribute('data-task-id');
+  await span.click();
+  await expect(card(page, taskId ?? '')).toHaveAttribute('aria-current', 'true');
+  await expect(span).toHaveAttribute('data-selected', 'true');
+});
+
+test('plan cards use colour only for status, problems and the repo badge', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await expect(page.locator('[data-testid="ade-card"][style*="border-left-color"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-action-cell"] [class*="-solid"]')).toHaveCount(0);
+  await expect(card(page, 'T_search').locator('[data-testid="ade-step-label"]')).not.toHaveClass(
+    /tone-amber|tone-green/,
+  );
+  const repoBadges = page.locator('[data-testid="ade-branch-repo"]');
+  await expect(repoBadges.first()).toHaveAttribute('style', /--repo: var\(--kira-conn-/);
+  await expect(page.locator('[data-testid="ade-branch-repo"]:not([style*="--repo"])')).toHaveCount(
+    0,
+  );
 });
 
 test('the Plan scrolls inside the window instead of growing it', async ({ relaunch }) => {
@@ -257,6 +321,16 @@ test('the Plan scrolls inside the window instead of growing it', async ({ relaun
     .evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight, win: innerHeight }));
   expect(m.client).toBeLessThan(m.win);
   expect(m.scroll).toBeGreaterThan(m.client);
+});
+
+test('the Plan has no top bar; Refresh all sits in the repo row', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const plan = page.locator('[data-testid="ade-plan"]');
+  await expect(plan.locator('[data-slot="panel-header"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-plan-header"]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="ade-plan-repos"] [data-testid="ade-refresh-all"]'),
+  ).toBeVisible();
 });
 
 test('a branch row shows its own progress under the name', async ({ relaunch }) => {

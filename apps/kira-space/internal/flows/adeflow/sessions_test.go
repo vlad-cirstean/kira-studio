@@ -170,3 +170,65 @@ func TestInteractiveSessions(t *testing.T) {
 		t.Fatal("second StartBranch while one session runs succeeded")
 	}
 }
+
+func TestRestartSession(t *testing.T) {
+	dir := t.TempDir()
+	flag := func(n string) string { return filepath.Join(dir, n) }
+	// A minute-long grace proves Stop bypasses Reconcile's wait.
+	app := flowharness.New(t, flowharness.WithTrackerGrace(time.Minute))
+	// Call 1 is the headless run; calls 2 and 3 are the interactive session and its restart, held open.
+	claude(app, map[string][]fakeagent.Action{"*": {
+		{Name: "done"}, {WaitFile: flag("first")}, {WaitFile: flag("second")},
+	}})
+	t.Cleanup(func() {
+		for _, n := range []string{"first", "second"} {
+			_ = os.WriteFile(flag(n), nil, 0o644)
+		}
+	})
+	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
+	rec := importRepo(t, app, repo.Dir)
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
+	task := createTask(t, app, "Fix login", "flow", rec.ID)
+	br := branchOf(t, board(t, app), task.ID, rec.ID)
+	if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{br.ID: "feat/api-work"}}); err != nil {
+		t.Fatal(err)
+	}
+	run := waitRun(t, app, task.ID, "one", "done")
+	headless := run.SessionID
+	app.WindowMgr.OpenWindow(shell.WindowRecord{Key: sessionWindow})
+
+	first, err := app.W.AdeTask.TakeOver(ctx, adewire.TakeOverArgs{SessionID: headless})
+	if err != nil {
+		t.Fatal(err)
+	}
+	openLaunch(t, app, first)
+	old := waitSession(t, app, first.SessionID, "running")
+
+	restarted, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: old.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.SessionID != old.ID || restarted.TerminalID == old.TerminalID || restarted.Cwd != old.Cwd ||
+		!strings.Contains(restarted.Command, "--resume") {
+		t.Fatalf("restart launch = %+v, want the same session resumed in a new terminal (old %+v)", restarted, old)
+	}
+	if got := sessionByID(t, app, old.ID).State; got != "stopped" {
+		t.Fatalf("session state before the reopen = %q, want stopped at once", got)
+	}
+	if _, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: old.ID}); err == nil {
+		t.Fatal("RestartSession of a stopped session succeeded")
+	}
+	openLaunch(t, app, restarted)
+	if got := waitSession(t, app, old.ID, "running"); got.TerminalID != restarted.TerminalID {
+		t.Fatalf("reopened session terminal = %q, want %q", got.TerminalID, restarted.TerminalID)
+	}
+	app.Contract(t, "ade-session-restart", "AdeTaskService.RestartSession", restarted,
+		flowharness.Mask("terminalId", "sessionId", "command"))
+
+	if _, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: headless}); err == nil {
+		t.Fatal("RestartSession of a headless session succeeded")
+	}
+	if _, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: "missing"}); err == nil {
+		t.Fatal("RestartSession of an unknown session succeeded")
+	}
+}

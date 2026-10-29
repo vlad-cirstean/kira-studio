@@ -138,7 +138,7 @@ function menuItems(c: DockerContainer): MenuItem[] {
     {
       type: 'item',
       id: 'restart',
-      label: t('docker.action.restart.label'),
+      label: t('common.action.restart.label'),
       icon: 'debug-restart',
       disabled: !running,
       run: () => act(c, 'restart'),

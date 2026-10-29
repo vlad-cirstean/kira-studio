@@ -3,15 +3,12 @@ import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { useDateFormat } from '@vueuse/core';
 import { useAutomationsModule } from '@workbench/automations/module';
-import { useRelativeTime } from '@workbench/behaviour/format';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref } from 'vue';
 import { useMobileTerminalsStore } from '../../../state/mobileTerminals';
 import { useTerminalsStore } from '../../../state/terminals';
-import { activityLabel } from '../activity';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import AdeSessionBar from './AdeSessionBar.vue';
 import type { SessionView } from './sessionView';
 
 // An interactive session: the terminal when this window holds it, else a Show button that raises
@@ -24,12 +21,10 @@ const terminal = useAutomationsModule();
 const focus = useFocusSession();
 const ui = useAdeBoardUiStore();
 const missing = ref(false);
-const ago = useRelativeTime(() => props.view.session.lastActiveAt);
 
 const held = computed(() => terminals.terminalSession(props.view.session.terminalId) !== undefined);
 const hold = computed(() => phones.holdOf(props.view.session.terminalId));
 const returnsAt = useDateFormat(() => hold.value?.returnsAt ?? 0, 'HH:mm');
-const needsYou = computed(() => props.view.kind === 'input');
 const tab = computed(() => ({
   id: props.view.session.terminalId,
   state: {
@@ -52,11 +47,6 @@ async function show(): Promise<void> {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-tui-pane">
-    <AdeSessionBar :view="view" :needs-you="needsYou">
-      <span class="truncate" data-testid="ade-tui-label">{{
-        t('space.ade.tui.status.label', { activity: activityLabel(view.kind), ago })
-      }}</span>
-    </AdeSessionBar>
     <div v-if="held" class="relative flex min-h-0 flex-1 flex-col">
       <TerminalHostView
         :key="view.session.terminalId"

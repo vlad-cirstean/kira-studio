@@ -81,6 +81,8 @@ onMounted(async () => {
     }),
     onTerminalOutput: () => () => {},
     writeTerminal: (_id, bytes) => fromTerminal(bytes),
+    openLink: (url) => void window.open(url, '_blank', 'noopener,noreferrer'),
+    linkActivation: 'tap',
   });
   attached.term.onWriteParsed(() => {
     appCursor.value = attached?.term.modes.applicationCursorKeysMode ?? false;

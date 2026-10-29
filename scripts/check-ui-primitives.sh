@@ -113,6 +113,8 @@ U91 apps/kira-space/frontend/src/workbench/OperationsPanel.vue # tooltip shows t
 U91 packages/workbench/src/memory/import/ImportJobDetail.vue # tooltip lists the import roots, not the title text
 U34 apps/kira-space/frontend/src/workbench/settings/MobileQr.vue # QR needs a white ground for scanner contrast
 U37 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # plan board task card selected fill, P129 board visual exempt per P263 §2.10
+U37 apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue # plan board branch row selected fill, board visual exempt per P263 §2.10
+U37 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # plan board history and span row selected fill, board visual exempt per P263 §2.10
 U62 apps/kira-space/frontend/src/views/repo/useReadonlyFileViewer.ts # Monaco editor.focus(), not DOM focus
 U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
 U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
@@ -210,7 +212,7 @@ U75@@vt@@@@duration-, ease-, animate-in, animate-out outside theme (motion token
 U76@@vt@@sortableReorder.ts@@ghostClass/chosenClass outside sortableReorder.ts (use SORTABLE_GHOST_CLASS, SORTABLE_CHOSEN_CLASS)@@\b(?:ghost|chosen)Class:
 U77@@vt@@@@bare void on a bridge call (use fireAndForget)@@\bvoid\s+(?:(?:ctx|props)\.)?(?:control|bridge)\.\w+\(
 U78@@s@@@@Button inside EmptyState in a side panel (the front door has no action button)@@(?s)<EmptyState\b(?&t)(?<!/)>(?:(?!</EmptyState>).)*?<Button\b
-U79@@vt@@apps/kira-space/frontend/src/bridge/index.ts|apps/kira-studio/frontend/src/docker/context.ts@@direct linkOpenExternal or LinkService.OpenExternal (use createOpenExternal)@@linkOpenExternal\(|LinkService\.OpenExternal\(
+U79@@vt@@apps/kira-space/frontend/src/bridge/index.ts|apps/kira-studio/frontend/src/bridge/index.ts@@direct linkOpenExternal or LinkService.OpenExternal (use createOpenExternal)@@linkOpenExternal\(|LinkService\.OpenExternal\(
 U80@@v@@@@ShowMoreButton without useCappedList@@(?s)\A(?!.*useCappedList\().*ShowMoreButton
 U80@@vt@@/behaviour/!|/testing/!@@hand-rolled render cap (use useCappedList)@@capRows\(|_ROW_CAP\b
 U81@@vt@@@@empty .catch(() => {}) (use fireAndForget or give the error a surface)@@\.catch\(\s*\(\s*\w*\s*\)\s*=>\s*\{\s*\}\s*\)

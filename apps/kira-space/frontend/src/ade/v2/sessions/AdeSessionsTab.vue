@@ -4,6 +4,7 @@ import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeHeadlessPane from './AdeHeadlessPane.vue';
+import AdeSessionActions from './AdeSessionActions.vue';
 import AdeSessionStrip from './AdeSessionStrip.vue';
 import AdeStoppedList from './AdeStoppedList.vue';
 import AdeStoppedMenu from './AdeStoppedMenu.vue';
@@ -78,14 +79,10 @@ watch(stoppedOpen, (open) => {
         @select="(id) => (ui.sessionId = id)"
       />
       <AdeStoppedMenu v-model:open="stoppedOpen" :views="stopped" :selected-id="revealed" />
+      <AdeSessionActions v-if="current" :view="current" />
     </div>
     <template v-if="current">
-      <AdeHeadlessPane
-        v-if="current.headless"
-        :key="current.session.id"
-        :view="current"
-        :archived="archived"
-      />
+      <AdeHeadlessPane v-if="current.headless" :key="current.session.id" :view="current" />
       <AdeTuiPane v-else :key="current.session.id" :view="current" />
     </template>
     <AdeStoppedList v-else-if="archived && stopped.length" :views="stopped" archived />

@@ -2116,7 +2116,12 @@ export type Contract = {
     };
     /** Fresh review facts of the branch's change request. Go-served. */
     'changeRequest.reviewState': {
-      params: { repoId: string; branch: string };
+      params: {
+        repoId: string;
+        branch: string;
+        /** > 0: the known change request; skips the branch lookup. */
+        number?: number;
+      };
       result: ChangeRequestReviewState;
     };
     /** Submits a review on the host, applied to `headSha`. Go-served. */

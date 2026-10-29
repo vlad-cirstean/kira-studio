@@ -95,6 +95,8 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
     for (const [name, member] of Object.entries(control)) {
       if (typeof member !== 'function') continue;
       if (name.startsWith('on') || name === 'appFlushed' || name === 'windowFlushed') continue;
+      // createOpenExternal swallows failures by design (announces, never throws).
+      if (name === 'openExternal') continue;
       if (leakProne.has(name)) continue;
       const result = (member as (...args: unknown[]) => unknown)('a', 'b', 'c', 'd');
       if (!result || typeof (result as Promise<unknown>).then !== 'function') continue;

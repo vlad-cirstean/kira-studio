@@ -245,7 +245,6 @@ function deployNote(d: Deployment): string {
 <template>
   <AdePanelFrame
     v-model="ui.branchTab"
-    :title="t('common.field.branch.label')"
     :tabs="[
       { value: 'details', label: t('common.details.title') },
       { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },

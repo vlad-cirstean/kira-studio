@@ -172,7 +172,7 @@ func (p *Provider) Checks(ctx context.Context, r githost.Repo, nodeIDs []string)
 
 func (p *Provider) ReviewTarget(ctx context.Context, r githost.Repo, number int) (githost.ReviewTarget, githost.Status) {
 	pr, s := p.client.PullForReview(ctx, Repo(r), number)
-	return githost.ReviewTarget{State: pr.State, HeadSha: pr.HeadSha, Author: pr.Author}, toStatus(s)
+	return githost.ReviewTarget{Title: pr.Title, State: pr.State, HeadSha: pr.HeadSha, Author: pr.Author}, toStatus(s)
 }
 
 func (p *Provider) SubmitReview(ctx context.Context, r githost.Repo, number int, rv githost.Review) githost.Status {

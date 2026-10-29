@@ -62,6 +62,7 @@ const hint = computed(() =>
       </Tooltip>
     </div>
     <div class="wails-no-drag flex shrink-0 items-center gap-1">
+      <AdeReviewActions :target="target" />
       <TooltipIconButton
         :icon="store.agentPanelVisible ? 'layout-sidebar-right' : 'layout-sidebar-right-off'"
         :label="t('space.ade.review.agentPanel.toggle.label')"
@@ -72,7 +73,6 @@ const hint = computed(() =>
         data-testid="ade-review-toggle-agent"
         @click="store.toggleAgentPanel()"
       />
-      <AdeReviewActions :target="target" />
     </div>
   </TitleBarBase>
 </template>

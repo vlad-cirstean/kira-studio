@@ -153,6 +153,7 @@ type Review struct {
 
 // ReviewTarget is one change request's current review facts, read fresh.
 type ReviewTarget struct {
+	Title   string
 	State   string // "open" | "draft" | "merged" | "closed"
 	HeadSha string
 	Author  string // host login; "" when the host has none (a deleted account)

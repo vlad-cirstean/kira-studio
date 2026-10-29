@@ -46,13 +46,25 @@ textarea,
 
 /* Touch devices (mobile, iPad) keep native overlay scrollbars. */
 @media (pointer: fine) {
+  /* P391: thumb hidden until the pointer is inside its scroller. WebKit repaints the thumb only
+     when the owner's own style changes, so the colour rides a custom property set by :hover on the
+     scroller (a :hover::-webkit-scrollbar-thumb rule never repaints). Reset on every element so a
+     scroller inside a hovered panel stays hidden. :active keeps a dragged thumb shown outside. */
+  :where(*) {
+    --kira-scrollbar-thumb: transparent;
+  }
+
+  :where(:hover) {
+    --kira-scrollbar-thumb: var(--kira-scrollbar);
+  }
+
   ::-webkit-scrollbar {
     width: 12px;
     height: 12px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--kira-scrollbar);
+    background: var(--kira-scrollbar-thumb);
     border-radius: var(--kira-radius);
     border: 3px solid transparent;
     background-clip: padding-box;

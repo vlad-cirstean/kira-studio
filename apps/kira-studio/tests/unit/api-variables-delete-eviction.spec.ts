@@ -37,7 +37,9 @@ const { control } = await import('../../frontend/src/bridge/control');
 // own tests are done.
 const originalVariablesListEnvironments = control.variablesListEnvironments;
 const originalCollectionsList = control.collectionsList;
+const originalTabsSave = control.tabsSave;
 afterAll(() => {
+  control.tabsSave = originalTabsSave;
   control.variablesListEnvironments = originalVariablesListEnvironments;
   control.collectionsList = originalCollectionsList;
 });
@@ -46,6 +48,9 @@ afterAll(() => {
 ).variablesListEnvironments = async () => [];
 (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
   async () => ({ collections: [], items: [] });
+// Closing tabs on delete triggers tabsSave; unmocked it never settles and wedges the shared
+// tabs store's saveChain for every later spec.
+(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 restoreAfterEach(control);
 const { useVariablesStore } = await import('../../frontend/src/api/state/variables');
 const { apiVariablesKey, apiEnvironmentsKey, apiCollectionsTreeKey, loadVariableRows } =

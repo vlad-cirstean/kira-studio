@@ -19,7 +19,6 @@ import { fixItems } from '../board/menu';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
-import { TONE_TAG_CLASS } from '../tones';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchTip from './AdeBranchTip.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
@@ -31,6 +30,8 @@ const dialogs = useAdeDialogsStore();
 const contextMenu = useContextMenuStore();
 const { model } = usePlanModel();
 const repos = useRepos();
+const repoLinks = useRepoLinksStore();
+const repoTintOf = computed(() => repoTint(repoLinks.repoColorOf(props.row.branch.codeRepoId)));
 const reviewCode = useReviewCode();
 const automation = useRunAutomation();
 const choice = computed(() => reviewCode.choiceOf(props.row));
@@ -129,31 +130,20 @@ function onMenu(ev: MouseEvent): void {
   ]);
 }
 
-const repoLinks = useRepoLinksStore();
-const repoTintOf = computed(() => repoTint(repoLinks.repoColorOf(props.row.branch.codeRepoId)));
 const SEG: Record<string, string> = {
-  done: 'bg-tone-green-solid',
-  running: 'bg-tone-amber-solid',
+  done: 'bg-muted-foreground',
+  running: 'bg-fg',
   bad: 'bg-tone-red-solid',
 };
 const segClass = (state: string): string => SEG[state] ?? 'bg-border-strong';
 const progClass = computed(() => {
-  const tone = props.row.prog?.tone;
-  if (tone === 'red') return 'text-tone-red';
-  if (tone === 'green') return 'text-tone-green';
-  return tone === 'grey' ? 'text-muted-foreground' : 'text-tone-amber';
+  return props.row.prog?.tone === 'red' ? 'text-tone-red' : 'text-muted-foreground';
 });
 const baseName = computed(() => {
   const part = props.row.base?.label.find((p) => typeof p !== 'string');
   return part && typeof part !== 'string' ? part.value : '';
 });
-const baseVariant = computed(() => {
-  if (props.row.base?.pending) return 'warn';
-  return props.row.base?.tone === 'blue' ? 'info' : 'default';
-});
-const elbowClass = computed(() =>
-  props.row.base?.tone === 'blue' ? 'border-tone-blue-solid' : 'border-border-strong',
-);
+const baseVariant = computed(() => (props.row.base?.pending ? 'warn' : 'default'));
 </script>
 
 <template>
@@ -161,7 +151,7 @@ const elbowClass = computed(() =>
   <div
     ref="rowEl"
     class="group box-border flex h-board-row w-full items-center gap-1.5 px-2"
-    :class="selected ? 'ring-1 ring-inset ring-focus' : ''"
+    :class="selected ? 'bg-select' : ''"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -176,8 +166,7 @@ const elbowClass = computed(() =>
     <span class="relative shrink-0 self-stretch" :style="{ width: `${row.depth * 16}px` }">
       <span
         v-if="row.depth"
-        class="absolute -top-1 right-0.5 box-border h-4.5 w-2 rounded-bl-kira-sm border-b-2 border-l-2"
-        :class="elbowClass"
+        class="absolute -top-1 right-0.5 box-border h-4.5 w-2 rounded-bl-kira-sm border-b-2 border-l-2 border-border-strong"
       />
     </span>
     <AdeBranchTip v-model:open="tipOpen" :row="row" :color="color">
@@ -199,15 +188,7 @@ const elbowClass = computed(() =>
           data-testid="ade-base-marker"
           :data-pending="row.base.pending || undefined"
         />
-        <Badge
-          v-if="row.isReview"
-          variant="chip"
-          :class="TONE_TAG_CLASS.blue"
-          data-testid="ade-owner-pill"
-          >{{
-            row.branch.owner
-          }}</Badge
-        >
+        <Badge v-if="row.isReview" data-testid="ade-owner-pill">{{ row.branch.owner }}</Badge>
         <span
           v-if="row.branch.origin === 'agent'"
           class="inline-flex shrink-0 text-subtle"

@@ -29,6 +29,7 @@ const { state, openChangeRequest } = useChangeRequestReview(() => props.target);
 const data = computed(() => state.data.value);
 const ok = computed(() => (data.value?.kind === 'ok' ? data.value : null));
 const unavailable = computed(() => (data.value?.kind === 'unavailable' ? data.value : null));
+const none = computed(() => data.value?.kind === 'none');
 const failed = computed(() =>
   state.isError.value && !data.value ? errorText(state.error.value) : null,
 );
@@ -57,11 +58,11 @@ function done(kind: 'review' | 'comment'): void {
 
 <template>
   <div
-    v-if="ok || unavailable || failed"
-    class="wails-no-drag ml-auto flex shrink-0 items-center gap-1"
+    v-if="ok || unavailable || failed || none"
+    class="wails-no-drag flex shrink-0 items-center gap-1"
     data-testid="ade-review-actions"
   >
-    <Tooltip v-if="unavailable || failed">
+    <Tooltip v-if="unavailable || failed || none">
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger>
           <Button
@@ -75,9 +76,11 @@ function done(kind: 'review' | 'comment'): void {
         </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{
-        unavailable
-          ? unavailable.status.reason
-          : t('space.ade.review.actions.stateFailed.hint', { reason: failed ?? '' })
+        none
+          ? t('space.ade.review.actions.none.hint', { short })
+          : unavailable
+            ? unavailable.status.reason
+            : t('space.ade.review.actions.stateFailed.hint', { reason: failed ?? '' })
       }}</TooltipContent>
     </Tooltip>
     <template v-else-if="ok">

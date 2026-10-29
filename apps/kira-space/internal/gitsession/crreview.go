@@ -42,33 +42,67 @@ func reviewUnavailable(status githost.Status) ChangeRequestReviewState {
 	return ChangeRequestReviewState{Kind: "unavailable", Status: &s}
 }
 
-// ChangeRequestReviewState reads the review facts of branch's change request, fresh from the host.
-func (e *RepoEntry) ChangeRequestReviewState(ctx context.Context, branch string) (ChangeRequestReviewState, error) {
+// hostHeadName is the head name the host knows branch by: an origin remote-tracking spelling
+// ("origin/feat/x") loses its remote prefix; any other spelling is returned as is.
+func (e *RepoEntry) hostHeadName(ctx context.Context, branch string) (string, error) {
+	snapshot, err := e.Refs(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, r := range snapshot.Branches {
+		if r.ShortName == branch {
+			return branch, nil
+		}
+	}
+	for _, r := range snapshot.RemoteBranches {
+		if r.ShortName == branch {
+			if head, ok := strings.CutPrefix(r.Refname, "refs/remotes/origin/"); ok {
+				return head, nil
+			}
+			break
+		}
+	}
+	return branch, nil
+}
+
+// ChangeRequestReviewState reads the review facts of a change request, fresh from the host.
+// number > 0 names it; otherwise it is the one found for branch by its host head name.
+func (e *RepoEntry) ChangeRequestReviewState(ctx context.Context, branch string, number int) (ChangeRequestReviewState, error) {
 	p, rv, repo, ok := e.reviewHost(ctx)
 	if !ok {
 		return ChangeRequestReviewState{Kind: "disabled"}, nil
 	}
-	lookup := e.ResolveBranchChangeRequest(ctx, branch)
-	switch lookup.Kind {
-	case "disabled":
-		return ChangeRequestReviewState{Kind: "disabled"}, nil
-	case "unavailable":
-		return ChangeRequestReviewState{Kind: "unavailable", Status: lookup.Status}, nil
+	title := ""
+	if number <= 0 {
+		head, err := e.hostHeadName(ctx, branch)
+		if err != nil {
+			return ChangeRequestReviewState{}, err
+		}
+		lookup := e.ResolveBranchChangeRequest(ctx, head)
+		switch lookup.Kind {
+		case "disabled":
+			return ChangeRequestReviewState{Kind: "disabled"}, nil
+		case "unavailable":
+			return ChangeRequestReviewState{Kind: "unavailable", Status: lookup.Status}, nil
+		}
+		if len(lookup.ChangeRequests) == 0 {
+			return ChangeRequestReviewState{Kind: "none"}, nil
+		}
+		number, title = lookup.ChangeRequests[0].Number, lookup.ChangeRequests[0].Title
 	}
-	if len(lookup.ChangeRequests) == 0 {
-		return ChangeRequestReviewState{Kind: "none"}, nil
-	}
-	cr := lookup.ChangeRequests[0]
 
 	if status, armed := e.host.breakerStatus(); armed {
 		return reviewUnavailable(status), nil
 	}
-	t, status := rv.ReviewTarget(ctx, repo, cr.Number)
+	t, status := rv.ReviewTarget(ctx, repo, number)
 	if !status.OK() {
 		if status.RateLimited {
 			e.host.armBreaker(status)
 		}
 		return reviewUnavailable(status), nil
+	}
+	if t.Title != "" {
+		title = t.Title
 	}
 
 	local, err := e.branchTip(ctx, branch)
@@ -80,7 +114,7 @@ func (e *RepoEntry) ChangeRequestReviewState(ctx context.Context, branch string)
 	}
 	viewer := p.Account(ctx, repo.Host)
 	return ChangeRequestReviewState{
-		Kind: "ok", Host: githost.Describe(p), Number: cr.Number, Title: cr.Title, State: t.State,
+		Kind: "ok", Host: githost.Describe(p), Number: number, Title: title, State: t.State,
 		HeadSha: t.HeadSha, LocalHeadSha: local, Author: t.Author, Viewer: viewer,
 		Own: t.Author != "" && strings.EqualFold(t.Author, viewer),
 	}, nil

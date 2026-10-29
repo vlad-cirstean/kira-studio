@@ -356,7 +356,7 @@ func (f *Forge) ReviewTarget(_ context.Context, _ githost.Repo, number int) (git
 	if !ok {
 		return githost.ReviewTarget{}, f.goneStatus()
 	}
-	return githost.ReviewTarget{State: cr.State, HeadSha: cr.HeadSha, Author: f.authors[number]},
+	return githost.ReviewTarget{Title: cr.Title, State: cr.State, HeadSha: cr.HeadSha, Author: f.authors[number]},
 		githost.Status{Kind: githost.KindOK, Host: Host}
 }
 

@@ -140,10 +140,13 @@ func (r *Router) handleChangeRequestReviewState(ctx context.Context, c *gitsessi
 			if err := validRefArg("branch", p.Branch); err != nil {
 				return "", err
 			}
+			if p.Number < 0 {
+				return "", ipcerr.Contract("gitrpc: changeRequest.reviewState: number must not be negative")
+			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p ChangeRequestReviewStateParams) (ChangeRequestReviewStateResult, error) {
-			s, err := entry.ChangeRequestReviewState(ctx, p.Branch)
+			s, err := entry.ChangeRequestReviewState(ctx, p.Branch, p.Number)
 			if err != nil {
 				return ChangeRequestReviewStateResult{}, mapDetailError(err)
 			}

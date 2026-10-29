@@ -53,3 +53,5 @@ Kira Space adds two more triggers:
 
 - Run a script on a task or branch from Agents. **Run in the task's worktree when started from ADE** picks the worktree as run folder.
 - Use a script as a workflow step.
+
+Cmd-click (macOS) or Ctrl-click a link in a terminal to open it in your browser.

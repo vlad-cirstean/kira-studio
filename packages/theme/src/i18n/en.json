@@ -2013,6 +2013,9 @@
       "resetToDefault": {
         "label": "Reset to default"
       },
+      "restart": {
+        "label": "Restart"
+      },
       "restore": {
         "label": "Restore"
       },
@@ -2625,11 +2628,6 @@
     }
   },
   "docker": {
-    "action": {
-      "restart": {
-        "label": "Restart"
-      }
-    },
     "container": {
       "noMatches": {
         "emptyHint": "No container matches the search."
@@ -7965,6 +7963,9 @@
           "merged": {
             "hint": "This {short} is merged."
           },
+          "none": {
+            "hint": "No {short} found for this branch."
+          },
           "open": {
             "label": "View {short}"
           },
@@ -8210,6 +8211,11 @@
         },
         "waitingId": {
           "status": "Waiting for session ID"
+        }
+      },
+      "sessionTab": {
+        "copyId": {
+          "label": "Copy session ID"
         }
       },
       "setup": {
@@ -13629,6 +13635,9 @@
     "terminal": {
       "exited": {
         "status": "Process exited with code {code}"
+      },
+      "link": {
+        "tooltip": "{modifier}-click to open"
       },
       "startFailed": {
         "error": "Couldn’t start the terminal."

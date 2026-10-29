@@ -73,3 +73,19 @@ func TestOpenLinks(t *testing.T) {
 		t.Fatalf("browser opened %v, want only %v", got, want)
 	}
 }
+
+func TestTerminalLinkOpen(t *testing.T) {
+	app := flowharness.New(t)
+	const url = "https://github.com/acme/api/pull/7"
+	args := bridge.LinkOpenExternalArgs{URL: url}
+	app.Contract(t, "terminal-link", "args:LinkService.OpenExternal", args)
+	if err := app.W.Link.OpenExternal(args); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.W.Link.OpenExternal(bridge.LinkOpenExternalArgs{URL: "mailto:dev@example.com"}); err == nil {
+		t.Error("OpenExternal(mailto) succeeded")
+	}
+	if got := app.Browser.Opened(); !slices.Equal(got, []string{url}) {
+		t.Fatalf("browser opened %v, want only [%s]", got, url)
+	}
+}

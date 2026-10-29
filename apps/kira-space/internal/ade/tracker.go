@@ -544,6 +544,63 @@ func (t *Tracker) armGraceLocked(recordID string) {
 	})
 }
 
+// forgetLocked drops every in-memory trace of a live record and returns its activity clock (now
+// when none was kept); ok is false when no terminal is tracked for it. mu is held.
+func (t *Tracker) forgetLocked(recordID string, now time.Time) (lastActive int64, ok bool) {
+	terminalID, ok := t.byRecord[recordID]
+	if !ok {
+		return 0, false
+	}
+	delete(t.byRecord, recordID)
+	delete(t.live, terminalID)
+	delete(t.spawnedAt, recordID)
+	lastActive, kept := t.lastActive[recordID]
+	if kept {
+		delete(t.lastActive, recordID)
+	} else {
+		lastActive = now.UnixMilli()
+	}
+	delete(t.agentSessionID, recordID)
+	delete(t.fresh, recordID)
+	if timer := t.graceTimers[recordID]; timer != nil {
+		timer.Stop()
+		delete(t.graceTimers, recordID)
+	}
+	return lastActive, true
+}
+
+// Stop ends a live record now, skipping Reconcile's grace window: its terminal is about to be
+// closed on purpose (Restart). ErrSessionNotRunning when no live terminal is tracked for it.
+func (t *Tracker) Stop(recordID string) error {
+	t.mu.Lock()
+	_, tracked := t.byRecord[recordID]
+	lastActive, kept := t.lastActive[recordID]
+	t.mu.Unlock()
+	if !tracked {
+		return ErrSessionNotRunning
+	}
+	if !kept {
+		lastActive = t.deps.Now().UnixMilli()
+	}
+	// Mark before forgetting: a failed write leaves the live terminal tracked, so a retry works.
+	if err := t.deps.Store.MarkStopped(recordID, lastActive); err != nil {
+		return fmt.Errorf("ade: stop: mark stopped: %w", err)
+	}
+	t.mu.Lock()
+	t.forgetLocked(recordID, t.deps.Now())
+	t.mu.Unlock()
+	if t.deps.OnChange != nil {
+		t.deps.OnChange()
+	}
+	t.mu.Lock()
+	onStopped := t.deps.OnStopped
+	t.mu.Unlock()
+	if onStopped != nil {
+		onStopped(recordID)
+	}
+	return nil
+}
+
 // Reconcile reads the live agent set and stops every tracked record whose terminal is gone and
 // whose grace window has elapsed — called after every Registry.OnChange (spawn and exit) and once,
 // scheduled, after each Compose's own grace window. Idempotent and safe to call from any
@@ -574,18 +631,7 @@ func (t *Tracker) Reconcile() {
 	}
 	flushed := make(map[string]int64, len(toStop))
 	for _, recordID := range toStop {
-		terminalID := t.byRecord[recordID]
-		delete(t.byRecord, recordID)
-		delete(t.live, terminalID)
-		delete(t.spawnedAt, recordID)
-		if v, ok := t.lastActive[recordID]; ok {
-			flushed[recordID] = v
-			delete(t.lastActive, recordID)
-		} else {
-			flushed[recordID] = now.UnixMilli()
-		}
-		delete(t.agentSessionID, recordID)
-		delete(t.fresh, recordID)
+		flushed[recordID], _ = t.forgetLocked(recordID, now)
 	}
 	t.mu.Unlock()
 

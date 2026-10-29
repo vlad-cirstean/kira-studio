@@ -7167,3 +7167,32 @@ Code review, 1 round, base `902cf7e`. 7 findings (2 medium, 5 low), all fixed. F
 ### v0.2.20 P387 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.20/` removed. PR opened to `main`.
 <!-- /chapter v0.2.20 -->
+
+<!-- chapter v0.2.21 -->
+## v0.2.21
+Source: docs/v0.2.21/ at cb20b9faeed1. 8 phases.
+
+### v0.2.21 P388 (Done)
+ADE task list calmer. Plan cards neutral: colour only on task status tag, red failures, amber needs-you/stale; task colour only as head dot. Task open in panel wears `border-focus ring-1` plus `aria-current`; head, branch row, span and history rows use `bg-select`. `Separator` (`ade-task-separator`) between tasks. `AdeTaskActionButton` gains `quiet`. Task card edge is `border-badge`; branch-row repo badge wears repo colour via `repoTint`, ADE fixture repos coloured. Geometry test rewritten, two new specs in `ade-v2-plan.spec.ts`; 4 visual baselines re-recorded. `check-ui-primitives.sh` U37 exemptions added for `AdeBranchRow.vue`, `AdeDayBand.vue`.
+
+### v0.2.21 P389 (Done)
+ADE tightening. Plan top bar gone: `AdePlanHeader` renamed `AdePlanRepos`, Refresh all at right end of repo row. `AdePanelFrame` drops `PanelHeader`; actions (`ade-panel-actions`) at tab row right end. `AdeSessionBar` and `AdeSessionId` deleted: session tab tooltip (`AdeSessionTabTip`, state and age) and right-click menu (`useSessionMenu`: Restart for running TUI, Copy session ID); Take over and Stop move to the tab row (`AdeSessionActions`). Go: `Tracker.Stop` (no grace wait), `TaskBoard.RestartSession` (stop, close terminal, Take over), `AdeTaskService.RestartSession`, flow test `TestRestartSession`, contract `ade-session-restart.json`. i18n: `common.action.restart.label` replaces `docker.action.restart.label`.
+
+### v0.2.21 P390 (Done)
+ADE git module last. Space `MODE_ORDER` is `ade, automations, memory, git` (`workbench/modes.ts`). Default start module stays `git`; persisted mode is a name, so no migration. `modules.spec.ts` order test updated and asserts Git active at boot. Docs: `apps/kira-space/README.md`, `docs/ARCHITECTURE.md`. Space framed shots and site baselines re-recorded.
+
+### v0.2.21 P391 (Done)
+Scrollbars hidden until pointer is in the panel, both apps. `packages/theme/src/base.css` (pointer: fine): thumb colour rides `--kira-scrollbar-thumb`, transparent on every element, shown by `:where(:hover)`; `:active` keeps a dragged thumb shown. 12px gutter kept, no layout shift. `scrollbar-color`/`scrollbar-width` unused (they drop `::-webkit-scrollbar` styling in WebKit). Monaco, xterm untouched. Shared scenario `scenarios/scrollbars.ts` (3 tests) run by both apps. Docs: `docs/ARCHITECTURE.md`.
+
+### v0.2.21 P392 (Done)
+Review others' PRs: approve and comment. Cause: review target branch was a ref spelling (`origin/feat/x`, fork `<owner>/<head>`), so the PR lookup missed and no actions showed. `changeRequest.reviewState` looks up the host head name and takes optional `number`; contract 54 to 55, additive. `ReviewWindowTarget.changeRequest` carries the task link's PR number (covers forks). Kind `none` shows a disabled Review button with reason. `ade-review-toggle-agent` is the last title bar item. Flow `TestReviewForeignChangeRequest` + contract `ade-review-foreign.json`; 4 UI specs in `ade-v2-review.spec.ts`.
+
+### v0.2.21 P393 (Done)
+Terminals: Cmd+click opens link. Cause: web-links addon default handler calls `window.open`, which does nothing in the Wails webview, and had no modifier check. `terminalRenderer.ts` routes plain-text (`WebLinksAddon`) and OSC 8 (`linkHandler`) links through one `activate`: Cmd-click (mac) or Ctrl-click, http(s) only, via `TerminalRendererDeps.openLink`/`linkActivation`. Hover hint shows target URL and modifier. Studio gets `control.openExternal`. Phone taps open via `window.open` noopener. Flow `TestTerminalLinkOpen` (both apps) + contract `terminal-link.json`; shared UI scenario `terminalLinks.ts`.
+
+### v0.2.21 P394 (Done)
+Code review, round 1, base `6bd97b9a2`. 4 findings (1 medium, 3 low), all fixed. `RestartSession` holds the task lock across stop, close and resume, so a concurrent Take over cannot start a second resume. `Tracker.Stop` marks stopped before forgetting. Terminal link hint flips above the pointer near the bottom edge. Contract version test renamed `Is55`.
+
+### v0.2.21 P395 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.21/` removed. PR opened to `main`; `docs/v0.2.22/` kept.
+<!-- /chapter v0.2.21 -->

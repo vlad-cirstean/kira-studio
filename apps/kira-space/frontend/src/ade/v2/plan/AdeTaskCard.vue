@@ -17,7 +17,6 @@ import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, useTemplateRef } from 'vue';
-import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import AdeAutomationChip from '../automation/AdeAutomationChip.vue';
 import type { BranchAction } from '../board/actions';
@@ -78,30 +77,21 @@ function act(row: BranchRowModel, a: BranchAction): void {
   } else if (a.kind === 'start') dialogs.start(row.id);
 }
 
+const headSelected = computed(() => props.card.selected && ui.selectedBranchId === null);
 const p = computed(() => props.card.progress);
 const segClass = (state: string): string => {
-  if (state === 'done') return 'bg-tone-green-solid';
+  if (state === 'done') return 'bg-muted-foreground';
   if (state === 'todo') return 'bg-border-strong';
   if (state === 'skipped') return 'bg-border';
-  return p.value.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid';
+  return p.value.bad ? 'bg-tone-red-solid' : 'bg-fg';
 };
-const labelTone = computed(() => {
-  if (p.value.finished) return 'green';
-  return p.value.bad ? 'red' : 'amber';
-});
-
-// The left border colour is task data (`card.color`) except on a review card, which wears blue.
-const boxStyle = computed(() =>
-  props.card.review ? undefined : { borderLeftColor: props.card.color },
-);
 const boxClass = computed(() => {
   const c = props.card;
   return [
     c.parked ? 'bg-bg' : '',
     'cursor-grab',
-    c.review ? 'border-l-tone-blue-solid' : '',
-    c.allMerged ? 'border-y-tone-purple-solid/60 border-r-tone-purple-solid/60' : '',
-    c.ripple && !c.selected ? 'outline outline-1 outline-tone-amber-solid' : '',
+    c.selected ? 'border-focus ring-1 ring-focus' : 'border-badge',
+    c.ripple && !c.selected ? 'outline-dashed outline-1 outline-border-strong' : '',
   ];
 });
 </script>
@@ -116,7 +106,7 @@ const boxClass = computed(() => {
   >
     <div class="flex w-52.5 shrink-0 flex-col pt-px" data-testid="ade-task-cells">
       <AdeActionCell v-if="card.tag" :tag="card.tag" tall @contextmenu="taskMenu.open">
-        <AdeTaskActionButton :card="card" />
+        <AdeTaskActionButton :card="card" quiet />
       </AdeActionCell>
       <AdeActionCell
         v-for="row in card.rows"
@@ -132,9 +122,9 @@ const boxClass = computed(() => {
     <Card
       variant="section"
       :data-task-id="card.task.id"
-      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden border-l-4"
+      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden"
       :class="boxClass"
-      :style="boxStyle"
+      :aria-current="card.selected || undefined"
       data-testid="ade-card"
       @contextmenu="taskMenu.open"
     >
@@ -143,7 +133,7 @@ const boxClass = computed(() => {
         v-if="!card.review"
         ref="head"
         class="box-border flex h-17 w-full flex-col justify-center gap-1 border-b border-b-border px-2 py-1.5"
-        :class="card.selected ? 'bg-hover' : ''"
+        :class="headSelected ? 'bg-select' : 'hover:bg-hover'"
         role="button"
         tabindex="0"
         data-testid="ade-card-head"
@@ -172,12 +162,14 @@ const boxClass = computed(() => {
                 />
               </span>
             </AdeTip>
-            <AdeChip
-              :label="p.label"
-              :tone="labelTone"
-              class="max-w-36 shrink-0 truncate"
+            <span
+              class="max-w-36 shrink-0 truncate text-kira-sm"
+              :class="p.bad ? 'text-tone-red' : 'text-muted-foreground'"
               data-testid="ade-step-label"
-            />
+              >{{
+                p.label
+              }}</span
+            >
             <AdeTip v-if="p.showBar" :text="p.barTip">
               <span class="inline-flex shrink-0 items-center gap-1">
                 <span
@@ -185,11 +177,13 @@ const boxClass = computed(() => {
                 >
                   <span
                     class="block h-full"
-                    :class="p.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid'"
+                    :class="p.bad ? 'bg-tone-red-solid' : 'bg-muted-foreground'"
                     :style="{ width: `${p.percent}%` }"
                   />
                 </span>
-                <span class="text-kira-sm text-fg">{{ formatPercent(p.percent) }}</span>
+                <span class="text-kira-sm text-muted-foreground">{{
+                  formatPercent(p.percent)
+                }}</span>
               </span>
             </AdeTip>
           </template>

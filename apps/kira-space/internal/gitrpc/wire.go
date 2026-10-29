@@ -791,6 +791,8 @@ type ChangeRequestReviewStateResult struct {
 type ChangeRequestReviewStateParams struct {
 	RepoID string `json:"repoId"`
 	Branch string `json:"branch"`
+	// Number > 0: the change request is known; the branch lookup is skipped.
+	Number int `json:"number,omitempty"`
 }
 
 // ChangeRequestSubmitReviewParams is changeRequest.submitReview's own request.

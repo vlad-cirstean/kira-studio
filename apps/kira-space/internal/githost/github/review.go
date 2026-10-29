@@ -8,12 +8,14 @@ import (
 
 // PullReview is the review facts of one pull request.
 type PullReview struct {
+	Title   string
 	State   string // "open" | "draft" | "merged" | "closed"
 	HeadSha string
 	Author  string // "" when GitHub reports user as null (a deleted account)
 }
 
 type rawReviewPull struct {
+	Title  string  `json:"title"`
 	State  string  `json:"state"`
 	Draft  bool    `json:"draft"`
 	Merged *string `json:"merged_at"`
@@ -51,7 +53,7 @@ func (c *Client) PullForReview(ctx context.Context, repo Repo, number int) (Pull
 	if !status.OK() {
 		return PullReview{}, status
 	}
-	out := PullReview{State: deriveState(raw.State, raw.Draft, raw.Merged), HeadSha: raw.Head.Sha}
+	out := PullReview{Title: raw.Title, State: deriveState(raw.State, raw.Draft, raw.Merged), HeadSha: raw.Head.Sha}
 	if raw.User != nil {
 		out.Author = raw.User.Login
 	}
