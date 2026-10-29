@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"log/slog"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -151,6 +152,7 @@ func (r *WindowRegistry) Focus(key string) bool {
 	if !ok || e.win == nil {
 		return false
 	}
+	slog.Info("window raise", "scope", "window", "key", key)
 	// The App-level unhide does not self-dispatch; AppKit aborts when [NSApp unhide:] runs off the main thread.
 	application.InvokeSync(unhideApp)
 	e.win.Show()
