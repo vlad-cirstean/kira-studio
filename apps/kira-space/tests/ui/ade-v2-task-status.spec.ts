@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeBoard, openPlan } from './support/adeV2';
+import { adeBoard, openPlan, openTask } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -23,11 +23,6 @@ interface Saved {
 }
 interface SaveArgs extends Saved {
   reassign: Record<string, string>;
-}
-
-async function openTask(page: Page, id: string): Promise<void> {
-  await page.locator(`${card(id)} ${t('ade-card-head')}`).click();
-  await expect(page.locator(t('ade-task-tab'))).toBeVisible();
 }
 
 async function openPane(page: Page): Promise<void> {

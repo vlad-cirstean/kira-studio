@@ -123,7 +123,11 @@ async function remove(what: 'branch' | 'repo'): Promise<void> {
           <CodiconIcon name="ellipsis" :size="13" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" data-testid="ade-task-branch-menu-content">
+      <DropdownMenuContent
+        align="end"
+        data-testid="ade-task-branch-menu-content"
+        @close-auto-focus.prevent
+      >
         <template v-if="row.draft">
           <DropdownMenuItem data-testid="ade-task-branch-add" @select="openForm('branch')">{{
             t('space.ade.taskTab.branchMenu.addBranch.label')

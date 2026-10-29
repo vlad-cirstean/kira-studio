@@ -2029,6 +2029,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Backlog items are not on the plan until promoted.
 - The Plan uses flat token surfaces only: no textures, shadows, dashed borders or tint washes. State shows as rail, border, outline or chip colour. Each branch row has one `surface` tooltip (`AdeBranchTip`) in the plan colour coding.
 - CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
+- A task holds one row per repo; `name = ""` means branch not created. SetTaskBranch, UpdateTaskRepo, RemoveTaskBranch, RemoveTaskRepo edit rows independently, refused while a session, launch or background run uses the row, and on review tasks. Detach hard-deletes a never-created, run-less row, else archives it and hides its runs from the task wire. Dependents fall back to the old branch name as base. Git refs never change; detach removes the task link and ADE linked worktree only.
 - A review item with no plan day sits above the first task that builds on or conflicts with it, else in Later. Moving it to a day pins that day; moving it to Later clears the day and returns it to that placement (P368).
 - A repoless task refuses Start (no branch to run on) until a repo is added. This is designed behavior.
 - An estimate is free text h or d, settable, changeable and clearable at any time; only the cap (480h, 60d) applies.

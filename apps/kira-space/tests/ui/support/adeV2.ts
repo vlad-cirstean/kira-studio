@@ -282,3 +282,11 @@ export const SCRIPTS: ControlSnapshot = {
   channel: IPC.customScriptsList,
   response: { collections: [], scripts: [PLAIN, SMART] },
 };
+
+/** Selects the card of `id` and waits for its Task tab. */
+export async function openTask(page: Page, id: string): Promise<void> {
+  await page
+    .locator(`[data-testid="ade-card"][data-task-id="${id}"] [data-testid="ade-card-head"]`)
+    .click();
+  await page.locator('[data-testid="ade-task-tab"]').waitFor();
+}
