@@ -4,13 +4,6 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@theme/components/ui/command';
-import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -18,11 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@theme/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { t } from '@theme/i18n';
+import ProjectPicker from '@workbench/components/pickers/ProjectPicker.vue';
 import { computed, ref } from 'vue';
 import { ORIGIN_LABEL, SCOPE_LABEL } from './labels';
-import { useMemoryProjects } from './queries';
+import { useMemoryProjectOptions } from './queries';
 
 // P275: search narrowing (scope and origin checkboxes) and the project whose facts rank first.
 // Every box checked and an empty list both mean "all".
@@ -48,16 +41,12 @@ const active = computed(
   () => (scopes.value.length > 0 ? 1 : 0) + (origins.value.length > 0 ? 1 : 0),
 );
 
-const projects = useMemoryProjects();
+const projects = useMemoryProjectOptions();
 const pickerOpen = ref(false);
-const search = ref('');
-const known = computed(() => projects.data.value ?? []);
-const typed = computed(() => search.value.trim());
 
-function pick(key: string): void {
-  project.value = key;
+function clear(): void {
+  project.value = '';
   pickerOpen.value = false;
-  search.value = '';
 }
 </script>
 
@@ -97,58 +86,31 @@ function pick(key: string): void {
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
-    <Popover v-model:open="pickerOpen">
-      <PopoverTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="status"
-          class="min-w-0 max-w-48 justify-between"
-          data-testid="memory-boost-project"
-        >
-          <span class="truncate font-data">{{
-            project || t('memory.panel.boostProject.label')
-          }}</span>
-          <CodiconIcon name="chevron-down" :size="12" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent class="w-96 p-0">
-        <Command :model-value="project" @update:model-value="(v) => pick(String(v))">
-          <CommandInput
-            v-model="search"
-            :placeholder="t('memory.add.findProject.placeholder')"
-            data-testid="memory-boost-project-search"
-          />
-          <CommandList>
-            <CommandGroup>
-              <CommandItem
-                v-if="typed !== '' && !known.includes(typed)"
-                :value="typed"
-                data-testid="memory-boost-project-custom"
-              >
-                {{ t('common.picker.useValue.label', { value: typed }) }}
-              </CommandItem>
-              <CommandItem
-                v-for="key in known"
-                :key="key"
-                :value="key"
-                :data-testid="`memory-boost-project-option-${key}`"
-              >
-                <span class="font-data">{{ key }}</span>
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
+    <ProjectPicker
+      v-model:open="pickerOpen"
+      :model-value="project || null"
+      custom
+      size="kira"
+      trigger="toolbar"
+      class="max-w-48"
+      testid="memory-boost-project"
+      :projects="projects.options.value"
+      :placeholder="t('memory.panel.boostProject.label')"
+      :loading="projects.isPending.value"
+      @update:model-value="(v) => (project = v ?? '')"
+    >
+      <template #footer>
         <Button
           v-if="project"
           variant="toolbar"
           size="status"
           class="w-full"
           data-testid="memory-boost-project-clear"
-          @click="pick('')"
+          @click="clear"
         >
           {{ t('memory.panel.boostProject.clear.label') }}
         </Button>
-      </PopoverContent>
-    </Popover>
+      </template>
+    </ProjectPicker>
   </div>
 </template>
