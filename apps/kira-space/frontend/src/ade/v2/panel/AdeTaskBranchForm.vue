@@ -50,7 +50,10 @@ watch(open, (o) => {
   error.value = '';
 });
 
-const candidates = useCandidates(() => open.value && props.mode === 'branch');
+const candidates = useCandidates(
+  () => props.branch.codeRepoId,
+  () => open.value && props.mode === 'branch',
+);
 const shown = computed<CandidateBranch[]>(() =>
   (candidates.data.value?.branches ?? []).filter(
     (b) =>

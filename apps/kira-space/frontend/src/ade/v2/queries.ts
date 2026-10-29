@@ -74,7 +74,7 @@ export {
 // popover opens on demand) and a failed optimistic write.
 
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
-const candidatesKey = ['adetask', 'candidates'] as const;
+const candidatesKey = (codeRepoId: string) => ['adetask', 'candidates', codeRepoId] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
@@ -89,11 +89,14 @@ export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
   );
 }
 
-/** Branches that can join the plan; refetched on every open so a just-pushed branch shows. */
-export function useCandidates(enabled: () => boolean) {
+/**
+ * Branches that can join the plan, of one repo or ('' ) every repo; refetched on every open so a
+ * just-pushed branch shows.
+ */
+export function useCandidates(codeRepoId: () => string, enabled: () => boolean) {
   return useQuery(() => ({
-    queryKey: candidatesKey,
-    queryFn: () => control.adeTaskCandidateBranches(),
+    queryKey: candidatesKey(codeRepoId()),
+    queryFn: () => control.adeTaskCandidateBranches({ codeRepoId: codeRepoId() }),
     staleTime: 0,
     enabled: enabled(),
   }));

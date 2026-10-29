@@ -465,6 +465,10 @@ export interface CandidateBranch {
   remoteOnly: boolean;
   mine: boolean;
 }
+export interface CandidateBranchesArgs {
+  /** '' = every repo. */
+  codeRepoId: string;
+}
 export interface CandidateBranchesResult {
   branches: CandidateBranch[] /* newest first */;
 }
@@ -683,6 +687,7 @@ export interface RepoBranchesArgs {
   codeRepoId: string;
   branchId: string;
 }
+export type BaseExclusion = '' | 'self' | 'stacked';
 export interface BasePick {
   name: string;
   local: boolean;
@@ -692,7 +697,7 @@ export interface BasePick {
   taskTitle: string;
   draft: boolean;
   /** Why it cannot be chosen; '' = choosable. */
-  excluded: string;
+  excluded: BaseExclusion;
 }
 export interface RepoBranches {
   mainName: string;

@@ -534,6 +534,11 @@ type CandidateBranch struct {
 	Mine         bool   `json:"mine"`
 }
 
+// CandidateBranchesArgs scopes the listing to one repo; empty = every repo.
+type CandidateBranchesArgs struct {
+	CodeRepoID string `json:"codeRepoId"`
+}
+
 type CandidateBranchesResult struct {
 	Branches []CandidateBranch `json:"branches"`
 }
@@ -1029,7 +1034,8 @@ type RepoBranchesArgs struct {
 	BranchID   string `json:"branchId"`
 }
 
-// BasePick is one base the picker offers; Excluded is why it cannot be chosen (” = choosable).
+// BasePick is one base the picker offers; Excluded is why it cannot be chosen: "" (choosable),
+// "self" (the branch itself) or "stacked" (stacked on it).
 type BasePick struct {
 	Name      string `json:"name"`
 	Local     bool   `json:"local"`

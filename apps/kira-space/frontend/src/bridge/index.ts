@@ -352,8 +352,10 @@ const spaceControl = {
     unwrap(AdeTaskService.RemoveTaskRepo(args)),
   adeTaskTaskBranchRisk: (args: V2.BranchArgs): Promise<V2.BranchRisk> =>
     unwrap(AdeTaskService.TaskBranchRisk(args)).then((r) => trust<V2.BranchRisk>(r)),
-  adeTaskCandidateBranches: (): Promise<V2.CandidateBranchesResult> =>
-    unwrap(AdeTaskService.CandidateBranches()).then((r) => trust<V2.CandidateBranchesResult>(r)),
+  adeTaskCandidateBranches: (args: V2.CandidateBranchesArgs): Promise<V2.CandidateBranchesResult> =>
+    unwrap(AdeTaskService.CandidateBranches(args)).then((r) =>
+      trust<V2.CandidateBranchesResult>(r),
+    ),
   adeTaskAddExistingBranch: (args: V2.AddExistingBranchArgs): Promise<V2.AddExistingBranchResult> =>
     unwrap(AdeTaskService.AddExistingBranch(args)).then((r) =>
       trust<V2.AddExistingBranchResult>(r),

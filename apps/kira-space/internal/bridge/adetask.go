@@ -366,8 +366,13 @@ func (s *AdeTaskService) ForcePush(ctx context.Context, args adewire.BranchArgs)
 	return r, adeTaskError(err)
 }
 
-func (s *AdeTaskService) CandidateBranches(ctx context.Context) (adewire.CandidateBranchesResult, error) {
-	r, err := s.Engine.CandidateBranches(ctx)
+func (s *AdeTaskService) CandidateBranches(ctx context.Context, args adewire.CandidateBranchesArgs) (adewire.CandidateBranchesResult, error) {
+	if args.CodeRepoID != "" {
+		if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
+			return adewire.CandidateBranchesResult{}, err
+		}
+	}
+	r, err := s.Engine.CandidateBranches(ctx, args.CodeRepoID)
 	return r, adeTaskError(err)
 }
 

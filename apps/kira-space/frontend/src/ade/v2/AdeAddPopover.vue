@@ -99,7 +99,10 @@ async function addNew(): Promise<void> {
 }
 
 const q = ref('');
-const candidates = useCandidates(() => open.value && tab.value === 'branch');
+const candidates = useCandidates(
+  () => '',
+  () => open.value && tab.value === 'branch',
+);
 const addBranch = useAddExistingBranch();
 const shown = computed<CandidateBranch[]>(() => {
   const all = candidates.data.value?.branches ?? [];

@@ -234,9 +234,9 @@ func (b *TaskBoard) AddTaskRepo(ctx context.Context, args adewire.AddTaskRepoArg
 	return zeroBranch(sb, cmpNonEmpty(sb.Base, b.mainShortName(ctx, sb.CodeRepoID)), nil), nil
 }
 
-// CandidateBranches lists, per code repo, local and remote-only branches that are not on a live
-// task and not the repo's main, newest commit first.
-func (b *TaskBoard) CandidateBranches(ctx context.Context) (adewire.CandidateBranchesResult, error) {
+// CandidateBranches lists local and remote-only branches that are not on a live task and not the
+// repo's main, newest commit first. An empty codeRepoID covers every repo.
+func (b *TaskBoard) CandidateBranches(ctx context.Context, codeRepoID string) (adewire.CandidateBranchesResult, error) {
 	repoList, err := b.deps.CodeRepos.List()
 	if err != nil {
 		return adewire.CandidateBranchesResult{}, err
@@ -254,6 +254,9 @@ func (b *TaskBoard) CandidateBranches(ctx context.Context) (adewire.CandidateBra
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(boardFanOut)
 	for _, rec := range repoList {
+		if codeRepoID != "" && rec.ID != codeRepoID {
+			continue
+		}
 		g.Go(func() error {
 			found, err := b.repoCandidates(gctx, rec.ID, taken)
 			if err != nil {

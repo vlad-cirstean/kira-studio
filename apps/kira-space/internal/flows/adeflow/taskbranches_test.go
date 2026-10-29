@@ -39,6 +39,26 @@ func TestTaskReposAndBranches(t *testing.T) {
 	a, b, c := importRepo(t, app, repoA.Dir), importRepo(t, app, repoB.Dir), importRepo(t, app, repoC.Dir)
 	gitOut(t, repoA.Dir, "branch", "feat/a-existing")
 	gitOut(t, repoA.Dir, "branch", "feat/a-other")
+	gitOut(t, repoB.Dir, "branch", "feat/b-one")
+
+	// Candidates cover one repo when asked, every repo when not.
+	names := func(codeRepoID string) map[string]bool {
+		res, err := app.W.AdeTask.CandidateBranches(ctx, adewire.CandidateBranchesArgs{CodeRepoID: codeRepoID})
+		if err != nil {
+			t.Fatalf("CandidateBranches(%q): %v", codeRepoID, err)
+		}
+		out := map[string]bool{}
+		for _, c := range res.Branches {
+			out[c.Name] = true
+		}
+		return out
+	}
+	if got := names(a.ID); len(got) != 2 || !got["feat/a-existing"] || !got["feat/a-other"] {
+		t.Fatalf("candidates of repo a = %v, want only its two branches", got)
+	}
+	if got := names(""); len(got) != 3 || !got["feat/b-one"] {
+		t.Fatalf("candidates of every repo = %v, want three", got)
+	}
 
 	task := createTask(t, app, "Edit repos", "")
 	if _, err := app.W.AdeTask.AddTaskRepo(ctx, adewire.AddTaskRepoArgs{TaskID: task.ID, CodeRepoID: a.ID}); err != nil {

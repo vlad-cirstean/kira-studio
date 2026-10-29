@@ -219,9 +219,9 @@ func (b *TaskBoard) RepoBranches(ctx context.Context, args adewire.RepoBranchesA
 	exclusion := func(id, name string) string {
 		switch {
 		case id != "" && id == args.BranchID, name != "" && name == self.Name:
-			return "this branch"
+			return "self"
 		case id != "" && below[id]:
-			return "it is stacked on this branch"
+			return "stacked"
 		}
 		return ""
 	}

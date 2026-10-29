@@ -181,7 +181,7 @@ func TestTaskBranches(t *testing.T) {
 	repo.Git("fetch", "-q")
 	rec := importRepo(t, app, repo.Dir)
 
-	cands, err := app.W.AdeTask.CandidateBranches(ctx)
+	cands, err := app.W.AdeTask.CandidateBranches(ctx, adewire.CandidateBranchesArgs{})
 	if err != nil {
 		t.Fatal(err)
 	}
