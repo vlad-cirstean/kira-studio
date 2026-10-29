@@ -8,7 +8,7 @@ Source: user request. Phases run top to bottom.
 |---|---|---|
 | P396 | Bug: three-finger swipe up moves focus to another space | Todo |
 | P397 | Task repos and branches: add, edit and delete independently | Done |
-| P398 | One project picker and one branch picker across the app | Todo |
+| P398 | One project picker and one branch picker across the app | Done |
 | P399 | Archived work stays viewable with all data | Todo |
 | P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Todo |
 | P401 | Task board: 7-day window, Later section, no date control | Todo |
@@ -30,6 +30,8 @@ A task can add repos and branches. Add edit and delete for both. Today, a repo a
 ### P398 One project picker and one branch picker across the app
 
 Several project and branch picker implementations exist, each flawed. Replace them with one shared project picker and one shared branch picker used everywhere. Remove the old implementations.
+
+**Result.** `ProjectPicker` and `BranchPicker` in `packages/workbench/src/components/pickers/` (shadcn-vue Command, self-filtered, cap 50 with Show more, inline reasons for disabled options, create and custom entry). Replaced 14 old implementations at 16 call sites across ADE, memory, automations and git-ui; `AdeCandidateRow`, `AdeBasePicker`, `BaseSelector`, `ReviewBranchPicker`, the dead worktree datalist and `buildRefListSections` are gone. Backend: candidate branches per repo, base exclusions as codes (`self`, `stacked`), flow tests for both. git-ui toolbar popover renamed `RefsPopover`. Workflow step "Runs on" is now tabs plus a project picker. UI specs updated, new picker assertions added, four workflow-graph snapshots regenerated.
 
 ### P399 Archived work stays viewable with all data
 

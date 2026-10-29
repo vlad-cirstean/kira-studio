@@ -688,7 +688,7 @@ export interface RepoBranchesArgs {
   branchId: string;
 }
 export type BaseExclusion = '' | 'self' | 'stacked';
-export interface BasePick {
+interface BasePick {
   name: string;
   local: boolean;
   remote: boolean;
