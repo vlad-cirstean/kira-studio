@@ -297,6 +297,9 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 	lastCommit := row.CommitterUnix * 1000
 	wb.LastCommitAt = &lastCommit
 	wb.Worktree = row.WorktreePath
+	if wb.Worktree == "" && wb.Setup != nil && wb.Setup.State == "ready" {
+		wb.Setup = nil // worktree gone (archive, restore): a ready setup row is stale
+	}
 	if err := sc.fillUpstream(ctx, wb, sb, row); err != nil {
 		return out, err
 	}

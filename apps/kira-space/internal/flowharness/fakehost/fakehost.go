@@ -33,6 +33,7 @@ type Forge struct {
 	rev      int
 	account  string
 	limited  time.Time
+	offline  bool
 	authors  map[int]string
 	reviews  map[int][]githost.Review
 	comments map[int][]string
@@ -192,9 +193,19 @@ func (f *Forge) Open(_ context.Context, _ githost.Repo) ([]githost.ChangeRequest
 	return f.match(func(cr githost.ChangeRequest) bool { return cr.State == "open" || cr.State == "draft" })
 }
 
+// SetOffline makes every listing lookup answer unauthenticated, as a host the person signed out of.
+func (f *Forge) SetOffline(v bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.offline = v
+}
+
 func (f *Forge) match(keep func(githost.ChangeRequest) bool) ([]githost.ChangeRequest, githost.Status) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.offline {
+		return nil, githost.Status{Kind: githost.KindUnauthenticated, Host: Host, Reason: "offline"}
+	}
 	var out []githost.ChangeRequest
 	for _, cr := range f.crs {
 		if keep(cr) {
