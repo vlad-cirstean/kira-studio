@@ -154,6 +154,32 @@ func TestPhoneReadsRealAde(t *testing.T) {
 	}
 }
 
+func TestPhoneReadsArchivedTask(t *testing.T) {
+	f := newFixture(t)
+	if err := f.app.W.AdeTask.ArchiveTask(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	p, _ := pairedPhone(t, f)
+	want, err := f.app.W.AdeTask.ArchivedTask(ctx, adewire.TaskArgs{TaskID: f.task.ID})
+	if err != nil || len(want.Branches) == 0 {
+		t.Fatalf("bound archived task = %+v, %v", want, err)
+	}
+	r := p.get("/api/ade/archived-task?taskId=" + f.task.ID)
+	if r.Status != http.StatusOK {
+		t.Fatalf("GET archived-task = %d %s", r.Status, r.Body)
+	}
+	var got any
+	r.json(t, &got)
+	if !reflect.DeepEqual(got, normalize(t, want)) {
+		t.Errorf("GET archived-task differs from the bound service\n got: %s\nwant: %s", r.Body, mustJSON(normalize(t, want)))
+	}
+	for _, k := range []string{"cwd", "worktree"} {
+		if hasKey(got, k) {
+			t.Errorf("GET archived-task leaks %q: %s", k, r.Body)
+		}
+	}
+}
+
 func mustJSON(v any) string {
 	raw, _ := json.Marshal(v)
 	return string(raw)

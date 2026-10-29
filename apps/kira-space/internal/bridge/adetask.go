@@ -1112,6 +1112,24 @@ func (s *AdeTaskService) ArchiveTask(ctx context.Context, args adewire.TaskArgs)
 	return adeTaskError(s.Engine.ArchiveTask(ctx, args.TaskID))
 }
 
+// ArchivedTask reads an archived task with everything it kept.
+func (s *AdeTaskService) ArchivedTask(ctx context.Context, args adewire.TaskArgs) (adewire.ArchivedTask, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.ArchivedTask{}, err
+	}
+	r, err := s.Engine.ArchivedTask(ctx, args.TaskID)
+	return r, adeTaskError(err)
+}
+
+// RestoreTask unarchives a task into Later.
+func (s *AdeTaskService) RestoreTask(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.RestoreTask(ctx, args.TaskID)
+	return t, adeTaskError(err)
+}
+
 // OpenReviewWindow opens the branch's review window, or focuses it when already open. true = opened.
 func (s *AdeTaskService) OpenReviewWindow(ctx context.Context, args adewire.BranchArgs) (bool, error) {
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {

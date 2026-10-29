@@ -478,6 +478,46 @@ type HistoryEntry struct {
 	ArchivedAt  int64    `json:"archivedAt"`
 }
 
+// ArchivedTask is everything an archived task kept, read-only. It carries no worktree path.
+type ArchivedTask struct {
+	Task       Task             `json:"task"`
+	ArchivedAt int64            `json:"archivedAt"`
+	Statuses   []TaskStatusDef  `json:"statuses"`
+	Branches   []ArchivedBranch `json:"branches"`
+	Repos      []RepoHost       `json:"repos"`
+}
+
+// ArchivedBranch is one branch row of an archived task. Removed marks a row detached before the
+// archive. PRSource is "live" (host answered), "archived" (snapshot taken at archive) or "".
+type ArchivedBranch struct {
+	ID            string            `json:"id"`
+	CodeRepoID    string            `json:"codeRepoId"`
+	Name          string            `json:"name"`
+	Kind          string            `json:"kind"`
+	Base          string            `json:"base"`
+	Origin        string            `json:"origin"`
+	AddedAt       int64             `json:"addedAt"`
+	MergedAt      *int64            `json:"mergedAt"`
+	ArchivedAt    int64             `json:"archivedAt"`
+	Removed       bool              `json:"removed"`
+	ChangeRequest *ChangeRequest    `json:"changeRequest"`
+	PRSource      string            `json:"prSource"`
+	BranchURL     string            `json:"branchUrl"`
+	Comments      []ArchivedComment `json:"comments"`
+}
+
+// ArchivedComment is a stored review comment, unanchored: the branch tip may be gone.
+type ArchivedComment struct {
+	Path      string `json:"path"`
+	Start     int    `json:"start"`
+	End       int    `json:"end"`
+	Body      string `json:"body"`
+	Kind      string `json:"kind"`
+	State     string `json:"state"`
+	Reply     string `json:"reply"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
 type RepoState struct {
 	CodeRepoID  string `json:"codeRepoId"`
 	MainName    string `json:"mainName"`

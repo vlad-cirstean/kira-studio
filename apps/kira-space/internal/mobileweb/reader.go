@@ -18,6 +18,7 @@ type Reader interface {
 	Backlog(ctx context.Context) (adewire.BacklogResult, error)
 	Repos(ctx context.Context) (adewire.ReposResult, error)
 	ReadLog(ctx context.Context, args adewire.ReadLogArgs) (adewire.LogPage, error)
+	ArchivedTask(ctx context.Context, args adewire.TaskArgs) (adewire.ArchivedTask, error)
 	HostProviders(ctx context.Context) (githost.Providers, error)
 }
 
