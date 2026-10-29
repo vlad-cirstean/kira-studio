@@ -10,7 +10,7 @@ Source: user request. Phases run top to bottom.
 | P397 | Task repos and branches: add, edit and delete independently | Done |
 | P398 | One project picker and one branch picker across the app | Done |
 | P399 | Archived work stays viewable with all data | Done |
-| P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Todo |
+| P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Done |
 | P401 | Task board: 7-day window, Later section, no date control | Todo |
 | P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Todo |
 | P403 | Chapter close | Todo |
@@ -42,6 +42,8 @@ Archived work must be visible in the UI. Opening an archived task shows its sess
 ### P400 Task board: no same-day delimiters, terminal-dark background, distinguishable task colors
 
 Remove the delimiters between tasks in the same day. Change the board background to the darker grey terminals use. Keep the existing task colors; tasks are still hard to tell apart, so adjust contrast or spacing until they separate clearly.
+
+**Result.** Separators out; later cards in a day get `mt-2` (16px gap). Plan pane, sticky header and ruler dots use `bg-chrome`; weekend/day-off tint dropped. Cards get a 3px `border-l` in task colour (inline `borderLeftColor`); parked fill `bg-chrome`. Palette unchanged. UI spec rewritten, stale colour assertion updated, 3 plan baselines re-recorded. Full `test:ui:space` and `test:visual:space` pass, `lint:dead` clean.
 
 ### P401 Task board: 7-day window, Later section, no date control
 
