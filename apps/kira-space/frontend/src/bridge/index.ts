@@ -342,6 +342,16 @@ const spaceControl = {
     unwrap(AdeTaskService.UpdateTask(args)).then((r) => trust<V2.Task>(r)),
   adeTaskAddTaskRepo: (args: V2.AddTaskRepoArgs): Promise<V2.Branch> =>
     unwrap(AdeTaskService.AddTaskRepo(args)).then((r) => trust<V2.Branch>(r)),
+  adeTaskSetTaskBranch: (args: V2.SetTaskBranchArgs): Promise<V2.Branch> =>
+    unwrap(AdeTaskService.SetTaskBranch(args)).then((r) => trust<V2.Branch>(r)),
+  adeTaskUpdateTaskRepo: (args: V2.UpdateTaskRepoArgs): Promise<V2.Branch> =>
+    unwrap(AdeTaskService.UpdateTaskRepo(args)).then((r) => trust<V2.Branch>(r)),
+  adeTaskRemoveTaskBranch: (args: V2.BranchArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveTaskBranch(args)),
+  adeTaskRemoveTaskRepo: (args: V2.BranchArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveTaskRepo(args)),
+  adeTaskTaskBranchRisk: (args: V2.BranchArgs): Promise<V2.BranchRisk> =>
+    unwrap(AdeTaskService.TaskBranchRisk(args)).then((r) => trust<V2.BranchRisk>(r)),
   adeTaskCandidateBranches: (): Promise<V2.CandidateBranchesResult> =>
     unwrap(AdeTaskService.CandidateBranches()).then((r) => trust<V2.CandidateBranchesResult>(r)),
   adeTaskAddExistingBranch: (args: V2.AddExistingBranchArgs): Promise<V2.AddExistingBranchResult> =>

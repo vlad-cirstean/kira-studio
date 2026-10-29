@@ -8375,6 +8375,49 @@
           "option": "Add repository…",
           "tooltip": "Add a branch in this repository; created when work starts"
         },
+        "branchForm": {
+          "existing": {
+            "label": "Existing"
+          },
+          "new": {
+            "label": "New"
+          },
+          "repo": {
+            "aria": "Task repository"
+          }
+        },
+        "branchMenu": {
+          "addBranch": {
+            "label": "Add branch…"
+          },
+          "blocked": {
+            "error": "Can’t change {name}: {reason}"
+          },
+          "changeBranch": {
+            "label": "Change branch…"
+          },
+          "changeRepo": {
+            "label": "Change repository…"
+          },
+          "removeBranch": {
+            "label": "Remove branch"
+          },
+          "removeBranchConfirm": {
+            "title": "Remove branch from task?"
+          },
+          "removeConfirm": {
+            "body": "{name} leaves the task and its worktree goes. The git branch stays. Lost with the worktree: {risk}."
+          },
+          "removeRepo": {
+            "label": "Remove repository"
+          },
+          "removeRepoConfirm": {
+            "title": "Remove repository from task?"
+          },
+          "trigger": {
+            "aria": "Repository and branch actions"
+          }
+        },
         "issue": {
           "label": "Issue"
         },

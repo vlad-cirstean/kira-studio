@@ -150,6 +150,11 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskRebase, response: { runId: 'run-rebase', noOp: false } },
     { channel: IPC.adeTaskAbortRebase },
     { channel: IPC.adeTaskSetBranchBase },
+    { channel: IPC.adeTaskSetTaskBranch, response: adeFixture('branch') },
+    { channel: IPC.adeTaskUpdateTaskRepo, response: adeFixture('branch') },
+    { channel: IPC.adeTaskRemoveTaskBranch },
+    { channel: IPC.adeTaskRemoveTaskRepo },
+    { channel: IPC.adeTaskTaskBranchRisk, response: adeFixture('branch-risk-clean') },
     { channel: IPC.adeTaskRepoBranches, response: REPO_BRANCHES },
     { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
   ];

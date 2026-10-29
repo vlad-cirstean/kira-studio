@@ -727,6 +727,16 @@ export interface AddTaskRepoArgs {
   codeRepoId: string;
   base: BaseChoice | null;
 }
+export interface SetTaskBranchArgs {
+  branchId: string;
+  name: string;
+  /** true = attach the git branch `name`; false = create a branch of that name. */
+  existing: boolean;
+}
+export interface UpdateTaskRepoArgs {
+  branchId: string;
+  codeRepoId: string;
+}
 export interface AddExistingBranchArgs {
   codeRepoId: string;
   name: string;

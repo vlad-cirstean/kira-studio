@@ -44,6 +44,7 @@ import type {
   SendReviewArgs,
   SetBranchBaseArgs,
   SetPlanArgs,
+  SetTaskBranchArgs,
   SetTaskStepArgs,
   SetTaskWorkflowArgs,
   StartBranchArgs,
@@ -54,6 +55,7 @@ import type {
   TaskArgs,
   UpdateBacklogItemArgs,
   UpdateTaskArgs,
+  UpdateTaskRepoArgs,
   ValidateWorkflowYamlArgs,
 } from './wire';
 
@@ -143,6 +145,31 @@ export function useAddBacklogItem() {
 
 export function useAddTaskRepo() {
   return useMutation({ mutationFn: (args: AddTaskRepoArgs) => control.adeTaskAddTaskRepo(args) });
+}
+
+export function useSetTaskBranch() {
+  return useMutation({
+    mutationFn: (args: SetTaskBranchArgs) => control.adeTaskSetTaskBranch(args),
+  });
+}
+
+export function useUpdateTaskRepo() {
+  return useMutation({
+    mutationFn: (args: UpdateTaskRepoArgs) => control.adeTaskUpdateTaskRepo(args),
+  });
+}
+
+export function useRemoveTaskBranch() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRemoveTaskBranch(args) });
+}
+
+export function useRemoveTaskRepo() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRemoveTaskRepo(args) });
+}
+
+/** What removing a row's branch would discard; read fresh at click time, like the archive risk. */
+export function useTaskBranchRisk() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskTaskBranchRisk(args) });
 }
 
 /** Applies a task patch to a board snapshot: a `null` field is unchanged, `clearJira` drops Jira. */

@@ -24,6 +24,7 @@ import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
 import AdeStatusPicker from './AdeStatusPicker.vue';
+import AdeTaskBranchMenu from './AdeTaskBranchMenu.vue';
 import AdeWorkflowBlock from './AdeWorkflowBlock.vue';
 import { useLinkFields } from './useLinkFields';
 
@@ -79,8 +80,9 @@ async function saveEst(value: string): Promise<void> {
 const spanDays = computed(() => props.card.entry.span);
 
 // ---- branches
+const usedRepoIds = computed(() => props.card.rows.map((r) => r.branch.codeRepoId));
 const lackedRepos = computed(() => {
-  const used = new Set(props.card.rows.map((r) => r.branch.codeRepoId));
+  const used = new Set(usedRepoIds.value);
   return (repos.data.value?.repos ?? []).filter((r) => !used.has(r.codeRepoId));
 });
 const addRepoValue = ref('');
@@ -205,31 +207,37 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
           {{ t('space.ade.taskTab.addBranch.label') }}
         </Button>
       </div>
-      <Button
-        size="kira"
-        v-for="row in card.rows"
-        :key="row.id"
-        variant="toolbar"
-        class="min-h-row w-full justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
-        data-testid="ade-task-branch"
-        :data-branch-id="row.id"
-        @click="ui.selectBranch(task.id, row.id)"
-      >
-        <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
-        <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
-        <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-          <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
-            c.label
-          }}</span>
-        </AdeTip>
-        <span
-          class="min-w-0 flex-1 truncate font-data text-kira-md"
-          :class="row.draft ? 'text-muted-foreground' : ''"
-          >{{
-            branchLabel(row)
-          }}</span
+      <div v-for="row in card.rows" :key="row.id" class="flex items-center gap-1 bg-elevated">
+        <Button
+          size="kira"
+          variant="toolbar"
+          class="min-h-row min-w-0 flex-1 justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
+          data-testid="ade-task-branch"
+          :data-branch-id="row.id"
+          @click="ui.selectBranch(task.id, row.id)"
         >
-      </Button>
+          <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
+          <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
+          <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
+            <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
+              c.label
+            }}</span>
+          </AdeTip>
+          <span
+            class="min-w-0 flex-1 truncate font-data text-kira-md"
+            :class="row.draft ? 'text-muted-foreground' : ''"
+            >{{
+              branchLabel(row)
+            }}</span
+          >
+        </Button>
+        <AdeTaskBranchMenu
+          v-if="!review"
+          :row="row"
+          :used-repo-ids="usedRepoIds"
+          @error="(m: string) => (fieldError = m)"
+        />
+      </div>
     </div>
   </div>
 </template>
