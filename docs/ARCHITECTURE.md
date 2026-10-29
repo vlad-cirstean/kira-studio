@@ -1341,6 +1341,18 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - check-ui-primitives.sh keeps 38 named PERMANENT lines, each with a reason; its built-in exempt column fails when an entry exempts nothing (suffix ! opts a blanket directory out).
 - vue-tsc checkUnknownComponents, inside typecheck, catches unresolved components.
 
+### Shared pickers (P398)
+
+- One ProjectPicker and one BranchPicker, in packages/workbench/src/components/pickers/, serve every project or branch choice in Studio, Space and git-ui. Callers feed PickerOption[]; no caller builds its own list, combobox or select.
+- Both wrap PickerPopover (trigger, Popover, inline mode) over PickerCombobox (shadcn-vue Command with ignoreFilter). foldOptions in lib/pickerOptions.ts filters, groups and orders; useCappedList plus ShowMoreButton cap a section at 50.
+- Test ids derive from the caller's testid: the trigger is testid, then testid-search, testid-option-<id>, testid-custom, testid-error, testid-more, testid-content. A PickerOption.testid overrides the option id.
+- Reka single-select toggles on reselect, so pickers act on the select event, never on the model change.
+- BranchPicker create offers "Create branch <name>" for a validated new name; custom offers "Use <value>" for any ref or sha. ProjectPicker custom offers free entry for keys outside the list.
+- A disabled option shows its reason inline, never hover-only.
+- ADE base exclusions ship as codes (self, stacked) in adewire.BasePick.Excluded; the frontend owns the text. Candidate branches load per repo (adeTaskCandidateBranches takes codeRepoId).
+- git-ui option builders live in lib/refOptions.ts. Suggested base options use the s: value prefix so the same ref in the branch list keeps a unique value.
+- The git-ui toolbar popover (tabs for branches, tags, stashes, worktrees, stacks) is RefsPopover.vue, separate from the shared picker.
+
 ## Process model
 
 Two processes for the Studio and Api modules: the **webview** running the Vue renderer, and the
@@ -1735,12 +1747,12 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 | `packages/git-ui` | The UI itself — the graph panel, the review panel, the dialogs, the file tree — Vue, mounted by Kira Space |
 | `packages/kira-ui` | Deleted (P267). Was `floatingPosition.ts` only; `AutocompleteField` and `PointPopover` position through reka `Popover` |
 
-- BranchPicker.vue's tab fold (branches, tags, stashes, worktrees, stacks in one tabbed picker) is a pure-fold module, pickerModel.ts in packages/git-ui/src/components/, with no Vue and no bridge, so pickerModel.test.ts exercises it directly with plain fixtures.
+- RefsPopover.vue's tab fold (branches, tags, stashes, worktrees, stacks in one tabbed popover) is a pure-fold module, pickerModel.ts in packages/git-ui/src/lib/, with no Vue and no bridge, so pickerModel.spec.ts exercises it directly with plain fixtures.
 - The convention of keeping a pure fold out of the template is also followed by refListModel.ts, stashListModel.ts and stackListModel.ts.
 - filterPickerInput scopes the single filter box to the active tab while still computing every tab's own live match count, so a query typed on one tab hints a match on another.
 - orderAndCapTab ranks local branches HEAD-first, then worktree-checked-out rows, then committerDate descending, while tags, the stash stack and stacks keep their own existing order (version sequence, stack-position addressing, and a forest whose order is its structure).
 - capWithPins and capStackGroups never cap a pinned row out and never split a stack group mid-order; capSteps lets a caller raise one list's own cap for the current panel-open without touching any other list's.
-- refListModel.ts is deliberately not modified for the picker, because its buildRefListSections has two other consumers (review/BaseSelector.vue, review/ReviewView.vue) whose sort must not silently change to recency.
+- refListModel.ts keeps no branch-list fold; the review and dialog branch pickers use the shared BranchPicker.
 - Every viewport-anchored floating surface in both frontends goes through Floating UI's collision-aware middleware (flip/shift/size), rendered teleported so no overflow: hidden ancestor can clip it.
 - The floating-surface audit is stated per mechanism, not per module, because a first pass judged one frontend clear based on its most common mechanism and missed a second; a native title attribute, a Monaco hover/suggest widget, and any bespoke click-point popup are each their own path, and a module is not clear because one mechanism is.
 - A Monaco hover/suggest widget's container defaults to the editor's own DOM node unless explicitly reparented to document.body (P60a fixed this, 789fc4c7).
@@ -2850,7 +2862,7 @@ the git UI is its only caller (`repo/git/hostHandlers.ts:433`), binding Space's 
 **The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
 Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
-anchor: the PR surfaces (`CommitMeta.vue`, `BranchPicker.vue`/`StackList.vue` stack badges,
+anchor: the PR surfaces (`CommitMeta.vue`, `RefsPopover.vue`/`StackList.vue` stack badges,
 `refBadges.ts`'s SlickGrid formatter) go through `changeRequest.browserUrl`/`GitHostService.OpenChangeRequestURL`,
 and a URL found inside a commit message body (`linkify.ts`) goes through a new generic
 `link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
