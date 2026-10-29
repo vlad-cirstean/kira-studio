@@ -223,7 +223,7 @@ test('the day-off confirm says what moves, offers Cancel and Escape leaves the p
   expect(control.log().filter((e) => e.channel === IPC.adeTaskSetPlan)).toHaveLength(0);
 });
 
-test('a card is a 6px rounded box with a 1px edge, a 68px header and a separator between tasks', async ({
+test('a card is a 6px rounded box with a task-colour left edge on the terminal ground, 16px from its same-day neighbour', async ({
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch);
@@ -234,27 +234,44 @@ test('a card is a 6px rounded box with a 1px edge, a 68px header and a separator
       radius: s.borderTopLeftRadius,
       top: s.borderTopWidth,
       left: s.borderLeftWidth,
+      leftColor: s.borderLeftColor,
+      bg: s.backgroundColor,
     };
   });
-  expect(style).toEqual({ radius: '6px', top: '1px', left: '1px' });
+  expect({ radius: style.radius, top: style.top, left: style.left }).toEqual({
+    radius: '6px',
+    top: '1px',
+    left: '3px',
+  });
+  const dot = await box
+    .locator('[data-testid="ade-card-dot"]')
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(style.leftColor).toBe(dot);
+  const [chrome, plan] = await Promise.all([
+    page.evaluate(() => {
+      const span = document.createElement('span');
+      span.style.color = 'var(--kira-bg-chrome)';
+      document.body.appendChild(span);
+      const color = getComputedStyle(span).color;
+      span.remove();
+      return color;
+    }),
+    page.locator('[data-testid="ade-plan"]').evaluate((el) => getComputedStyle(el).backgroundColor),
+  ]);
+  expect(plan).toBe(chrome);
+  expect(style.bg).not.toBe(plan);
   const head = await box.locator('[data-testid="ade-card-head"]').boundingBox();
   expect(head?.height).toBe(68);
 
   const band = bandOf(page, 3);
+  await expect(band.locator('[data-testid="ade-task-separator"]')).toHaveCount(0);
   const rects = await band
     .locator('[data-testid="ade-card"]')
     .evaluateAll((els) =>
       els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })),
     );
   expect(rects.length).toBeGreaterThanOrEqual(2);
-  const lines = await band
-    .locator('[data-testid="ade-task-separator"]')
-    .evaluateAll((els) =>
-      els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })),
-    );
-  expect(lines).toHaveLength(rects.length - 1);
-  expect(lines[0]?.top ?? 0).toBeGreaterThanOrEqual(rects[0]?.bottom ?? 0);
-  expect(lines[0]?.bottom ?? 0).toBeLessThanOrEqual(rects[1]?.top ?? 0);
+  expect((rects[1]?.top ?? 0) - (rects[0]?.bottom ?? 0)).toBe(16);
 });
 
 test('the task open in the panel is marked on its card, spans and branch rows', async ({
@@ -299,9 +316,10 @@ test('the task open in the panel is marked on its card, spans and branch rows', 
   await expect(span).toHaveAttribute('data-selected', 'true');
 });
 
-test('plan cards use colour only for status, problems and the repo badge', async ({ relaunch }) => {
+test('plan cards use colour only for task edge, status, problems and the repo badge', async ({
+  relaunch,
+}) => {
   const { window: page } = await openPlan(relaunch);
-  await expect(page.locator('[data-testid="ade-card"][style*="border-left-color"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="ade-action-cell"] [class*="-solid"]')).toHaveCount(0);
   await expect(card(page, 'T_search').locator('[data-testid="ade-step-label"]')).not.toHaveClass(
     /tone-amber|tone-green/,
