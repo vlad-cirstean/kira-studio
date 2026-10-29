@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import SearchField from '@theme/components/SearchField.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldError } from '@theme/components/ui/field';
@@ -11,14 +10,14 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { refDebounced } from '@vueuse/core';
-import { matchesQuery } from '@workbench/behaviour/match';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
+import BranchPicker from '@workbench/components/pickers/BranchPicker.vue';
 import { computed, ref, watch } from 'vue';
 import { useRepos } from '../../repo/state/reposQueries';
-import AdeCandidateRow from './AdeCandidateRow.vue';
 import AdeLinkTarget from './AdeLinkTarget.vue';
 import { firstWork, offsetToIso } from './board/calendar';
+import { candidateOf, candidateOptions } from './branchOptions';
 import { parseJira } from './jira';
 import { usePlanModel } from './plan/usePlanModel';
 import {
@@ -30,7 +29,6 @@ import {
 } from './queries';
 import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
-import type { CandidateBranch } from './wire';
 
 // Add: a new task (lands Today, or the next work day; repos are added later) or an existing branch.
 const ui = useAdeBoardUiStore();
@@ -104,12 +102,9 @@ const candidates = useCandidates(
   () => open.value && tab.value === 'branch',
 );
 const addBranch = useAddExistingBranch();
-const shown = computed<CandidateBranch[]>(() => {
-  const all = candidates.data.value?.branches ?? [];
-  return all.filter((b) =>
-    matchesQuery(`${b.name} ${repoLabel(b.codeRepoId)} ${b.author}`, q.value),
-  );
-});
+const options = computed(() =>
+  candidateOptions(candidates.data.value?.branches ?? [], repoLabel, Date.now()),
+);
 
 const isLink = computed(() => /^https?:\/\//i.test(q.value.trim()));
 const linkUrl = refDebounced(
@@ -137,8 +132,9 @@ async function pickLink(): Promise<void> {
   }
 }
 
-async function pick(b: CandidateBranch): Promise<void> {
+async function pick(value: string): Promise<void> {
   error.value = '';
+  const b = candidateOf(value);
   try {
     const res = await addBranch.mutateAsync({
       codeRepoId: b.codeRepoId,
@@ -227,37 +223,30 @@ async function pick(b: CandidateBranch): Promise<void> {
             >
           </CatalogText>
         </FieldDescription>
-        <div class="border-b border-border p-1">
-          <SearchField
-            v-model="q"
-            size="kira-lg"
-            :placeholder="t('space.ade.add.searchBranches.placeholder')"
-            :aria-label="t('space.ade.add.searchBranches.placeholder')"
-            data-testid="ade-branch-search"
-          />
-        </div>
-        <AdeLinkTarget
-          v-if="isLink"
-          :target="link.data.value"
-          :repo="repoLabel(link.data.value?.codeRepoId ?? '')"
-          :pending="linkPending"
-          :error="link.error.value ? errorText(link.error.value) : ''"
-          :busy="addLink.isPending.value"
-          :attach="!!attachTo"
-          @add="pickLink"
-        />
-        <div v-else class="max-h-70 overflow-auto p-1">
-          <AdeCandidateRow
-            v-for="b in shown"
-            :key="`${b.codeRepoId}/${b.name}`"
-            :branch="b"
-            :repo="repoLabel(b.codeRepoId)"
-            @select="pick(b)"
-          />
-          <div v-if="shown.length === 0" class="p-2 text-kira-md text-muted-foreground">{{
-            t('common.picker.noBranches.empty')
-          }}</div>
-        </div>
+        <BranchPicker
+          v-model:search="q"
+          inline
+          testid="ade-branch"
+          :branches="options"
+          :placeholder="t('space.ade.add.searchBranches.placeholder')"
+          :search-placeholder="t('space.ade.add.searchBranches.placeholder')"
+          :empty-text="isLink ? '' : undefined"
+          :loading="candidates.isPending.value"
+          @select="(o) => pick(o.value)"
+        >
+          <template #top>
+            <AdeLinkTarget
+              v-if="isLink"
+              :target="link.data.value"
+              :repo="repoLabel(link.data.value?.codeRepoId ?? '')"
+              :pending="linkPending"
+              :error="link.error.value ? errorText(link.error.value) : ''"
+              :busy="addLink.isPending.value"
+              :attach="!!attachTo"
+              @add="pickLink"
+            />
+          </template>
+        </BranchPicker>
       </div>
       <FieldError v-if="error" class="px-3 pb-2" data-testid="ade-add-error">{{
         error

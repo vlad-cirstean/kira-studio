@@ -2503,8 +2503,14 @@
       "noProjects": {
         "empty": "No projects"
       },
+      "remote": {
+        "status": "Remote"
+      },
       "useValue": {
         "label": "Use {value}"
+      },
+      "you": {
+        "label": "You"
       }
     },
     "plainText": {
@@ -7026,6 +7032,12 @@
         }
       },
       "basePicker": {
+        "excludedSelf": {
+          "hint": "A branch can’t be its own base."
+        },
+        "excludedStacked": {
+          "hint": "Stacked on this branch."
+        },
         "main": {
           "label": "Main"
         },
@@ -7034,12 +7046,6 @@
         },
         "previous": {
           "label": "Previous base"
-        },
-        "remote": {
-          "status": "Remote"
-        },
-        "search": {
-          "placeholder": "Search branches"
         }
       },
       "board": {
@@ -8392,17 +8398,6 @@
           "option": "Add repository…",
           "tooltip": "Add a branch in this repository; created when work starts"
         },
-        "branchForm": {
-          "existing": {
-            "label": "Existing"
-          },
-          "new": {
-            "label": "New"
-          },
-          "repo": {
-            "aria": "Task repository"
-          }
-        },
         "branchMenu": {
           "addBranch": {
             "label": "Add branch…"
@@ -8639,8 +8634,14 @@
           "each": {
             "label": "Each repository"
           },
+          "missing": {
+            "hint": "No repository named {name}. Choose another."
+          },
           "once": {
             "label": "Once"
+          },
+          "oneRepo": {
+            "option": "One repository"
           },
           "only": {
             "label": "Only {name}"

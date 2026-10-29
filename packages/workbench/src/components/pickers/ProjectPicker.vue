@@ -18,8 +18,6 @@ withDefaults(
     size?: 'kira' | 'kira-lg';
     trigger?: 'field' | 'toolbar';
     testid: string;
-    id?: string;
-    ariaLabel?: string;
   }>(),
   {
     custom: false,
@@ -29,8 +27,6 @@ withDefaults(
     inline: false,
     size: 'kira-lg',
     trigger: 'field',
-    id: undefined,
-    ariaLabel: undefined,
   },
 );
 const emit = defineEmits<{ select: [option: PickerOption] }>();
@@ -54,8 +50,6 @@ const open = defineModel<boolean>('open', { default: false });
     :size="size"
     :trigger="trigger"
     :testid="testid"
-    :id="id"
-    :aria-label="ariaLabel"
     @select="emit('select', $event)"
     @custom="(text) => (model = text)"
   >

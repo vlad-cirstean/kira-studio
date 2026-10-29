@@ -22,7 +22,7 @@ import AdeStepRunFields from './inspector/AdeStepRunFields.vue';
 import AdeStepScriptFields from './inspector/AdeStepScriptFields.vue';
 
 // The selected step: kind and name on top, then what it does, where and when it runs, how it ends.
-const props = defineProps<{ step: WorkflowStep; steps: WorkflowStep[]; scopes: string[] }>();
+const props = defineProps<{ step: WorkflowStep; steps: WorkflowStep[] }>();
 const draft = useAdeWorkflowDraftStore();
 const confirm = useConfirmDialogStore();
 const patch = (p: Partial<WorkflowStep>): void => draft.patchStep(props.step.id, p);
@@ -108,7 +108,7 @@ const id = (k: string): string => `ade-wf-step-${k}-${props.step.id}`;
       name="where"
       :title="t('space.ade.workflows.stepInspector.where.title')"
     >
-      <AdeStepRunFields :step="step" :scopes="scopes" @patch="patch" />
+      <AdeStepRunFields :step="step" @patch="patch" />
     </AdeInspectorSection>
 
     <AdeInspectorSection name="end" :title="t('space.ade.workflows.stepInspector.end.title')">

@@ -10,6 +10,9 @@ const props = withDefaults(
     branches: readonly PickerOption[];
     groups?: readonly PickerGroup[];
     placeholder: string;
+    /** Search box text; default "Find a branch". */
+    searchPlaceholder?: string;
+    emptyText?: string;
     /** Error for a typed new name, or null when valid. */
     create?: { validate: (name: string) => string | null };
     custom?: boolean;
@@ -22,13 +25,13 @@ const props = withDefaults(
     size?: 'kira' | 'kira-lg';
     trigger?: 'field' | 'toolbar';
     testid: string;
-    id?: string;
-    ariaLabel?: string;
   }>(),
   {
     groups: () => [],
     create: undefined,
     custom: false,
+    searchPlaceholder: undefined,
+    emptyText: undefined,
     triggerLabel: undefined,
     triggerDetail: undefined,
     loading: false,
@@ -37,8 +40,6 @@ const props = withDefaults(
     inline: false,
     size: 'kira-lg',
     trigger: 'field',
-    id: undefined,
-    ariaLabel: undefined,
   },
 );
 const emit = defineEmits<{
@@ -47,6 +48,7 @@ const emit = defineEmits<{
 }>();
 const model = defineModel<string | null>({ default: null });
 const open = defineModel<boolean>('open', { default: false });
+const search = defineModel<string>('search', { default: '' });
 
 function onCustom(text: string): void {
   if (props.create) emit('create', text);
@@ -58,13 +60,14 @@ function onCustom(text: string): void {
   <PickerPopover
     v-model="model"
     v-model:open="open"
+    v-model:search="search"
     :options="branches"
     :groups="groups"
     :placeholder="placeholder"
     :trigger-label="triggerLabel"
     :trigger-detail="triggerDetail"
-    :search-placeholder="t('common.picker.findBranch.placeholder')"
-    :empty-text="t('common.picker.noBranches.empty')"
+    :search-placeholder="searchPlaceholder ?? t('common.picker.findBranch.placeholder')"
+    :empty-text="emptyText ?? t('common.picker.noBranches.empty')"
     :custom-label="
       create
         ? (q) => t('common.picker.createBranch.label', { name: q })
@@ -81,8 +84,6 @@ function onCustom(text: string): void {
     :trigger="trigger"
     icon="git-branch"
     :testid="testid"
-    :id="id"
-    :aria-label="ariaLabel"
     @select="emit('select', $event)"
     @custom="onCustom"
   >

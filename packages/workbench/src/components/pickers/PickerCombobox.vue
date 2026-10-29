@@ -80,12 +80,12 @@ const idOf = (o: PickerOption): string => o.testid ?? o.value;
 
 <template>
   <Command ignore-filter v-model:search="search">
-    <slot name="top" />
     <CommandInput
       :placeholder="searchPlaceholder"
       :aria-label="searchPlaceholder"
       :data-testid="`${testid}-search`"
     />
+    <slot name="top" />
     <FieldError v-if="customError" class="px-2 pt-1" :data-testid="`${testid}-error`">{{
       customError
     }}</FieldError>
@@ -140,7 +140,7 @@ const idOf = (o: PickerOption): string => o.testid ?? o.value;
         t('common.state.loading.loading')
       }}</InlineState>
       <InlineState v-else-if="error" kind="error">{{ error }}</InlineState>
-      <InlineState v-else-if="empty" kind="empty" :data-testid="`${testid}-empty`">{{
+      <InlineState v-else-if="empty && emptyText" kind="empty" :data-testid="`${testid}-empty`">{{
         emptyText
       }}</InlineState>
       <ShowMoreButton

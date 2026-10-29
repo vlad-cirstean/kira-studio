@@ -3,12 +3,12 @@ import KeyValueList from '@theme/components/KeyValueList.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
-import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import ProjectPicker from '@workbench/components/pickers/ProjectPicker.vue';
 import { computed, ref } from 'vue';
-import { useRepos } from '../../../repo/state/reposQueries';
+import { useProjectOptions } from '../../../repo/state/projectOptions';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
@@ -36,7 +36,6 @@ const ui = useAdeBoardUiStore();
 const addUi = useAdeAddUiStore();
 const update = useUpdateTask();
 const addRepo = useAddTaskRepo();
-const repos = useRepos();
 
 const task = computed(() => props.card.task);
 const review = computed(() => props.card.review);
@@ -81,15 +80,10 @@ const spanDays = computed(() => props.card.entry.span);
 
 // ---- branches
 const usedRepoIds = computed(() => props.card.rows.map((r) => r.branch.codeRepoId));
-const lackedRepos = computed(() => {
-  const used = new Set(usedRepoIds.value);
-  return (repos.data.value?.repos ?? []).filter((r) => !used.has(r.codeRepoId));
-});
-const addRepoValue = ref('');
-async function onAddRepo(value: unknown): Promise<void> {
-  const id = String(value ?? '');
-  addRepoValue.value = '';
-  if (!id) return;
+const addProjects = useProjectOptions(usedRepoIds);
+const addRepoValue = ref<string | null>(null);
+async function onAddRepo(id: string): Promise<void> {
+  addRepoValue.value = null;
   fieldError.value = '';
   try {
     await addRepo.mutateAsync({ taskId: task.value.id, codeRepoId: id, base: null });
@@ -179,24 +173,18 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         <span class="text-kira-sm text-subtle">{{ t('common.module.branches.label') }}</span>
         <span class="flex-1" />
         <template v-if="!review">
-          <Label for="ade-add-repo" class="sr-only">{{
-            t('space.ade.taskTab.addRepo.aria')
-          }}</Label>
-          <NativeSelect
-            id="ade-add-repo"
-            :model-value="addRepoValue"
-            variant="default"
-            class="max-w-50"
+          <ProjectPicker
+            v-if="addProjects.options.value.length > 0"
+            v-model="addRepoValue"
+            size="kira"
+            testid="ade-add-repo"
+            :projects="addProjects.options.value"
+            :placeholder="t('space.ade.taskTab.addRepo.option')"
+            :aria-label="t('space.ade.taskTab.addRepo.aria')"
             :title="t('space.ade.taskTab.addRepo.tooltip')"
-            data-testid="ade-add-repo"
-            @update:model-value="onAddRepo"
-          >
-            <option value="">{{ t('space.ade.taskTab.addRepo.option') }}</option>
-            <option v-for="r in lackedRepos" :key="r.codeRepoId" :value="r.codeRepoId">
-              {{ r.nickname || r.name }}
-              · {{ r.name }}
-            </option>
-          </NativeSelect>
+            class="max-w-50"
+            @select="(o) => onAddRepo(o.value)"
+          />
         </template>
         <Button
           variant="dialog"

@@ -3,12 +3,14 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { cn } from '@theme/lib/utils';
-import { computed, ref, watch } from 'vue';
+import { computed, watch } from 'vue';
 import type { PickerGroup, PickerOption } from '../../lib/pickerOptions';
 import PickerCombobox from './PickerCombobox.vue';
 
 // Internal to `pickers/`: trigger + popover (or the bare list when `inline`) around PickerCombobox.
 // ProjectPicker and BranchPicker differ only in the defaults they pass here.
+defineOptions({ inheritAttrs: false });
+
 const props = withDefaults(
   defineProps<{
     options: readonly PickerOption[];
@@ -31,8 +33,6 @@ const props = withDefaults(
     /** Codicon before the trigger text. */
     icon?: string;
     testid: string;
-    id?: string;
-    ariaLabel?: string;
     step?: number;
   }>(),
   {
@@ -48,15 +48,13 @@ const props = withDefaults(
     size: 'kira-lg',
     trigger: 'field',
     icon: undefined,
-    id: undefined,
-    ariaLabel: undefined,
     step: 50,
   },
 );
 const emit = defineEmits<{ select: [option: PickerOption]; custom: [text: string] }>();
 const model = defineModel<string | null>({ default: null });
 const open = defineModel<boolean>('open', { default: false });
-const search = ref('');
+const search = defineModel<string>('search', { default: '' });
 
 const chosen = computed(() => props.options.find((o) => o.value === model.value));
 const label = computed(
@@ -82,7 +80,7 @@ function onCustom(text: string): void {
 </script>
 
 <template>
-  <div v-if="inline" :data-testid="testid" class="min-w-0">
+  <div v-if="inline" v-bind="$attrs" class="min-w-0">
     <PickerCombobox
       v-model:search="search"
       :options="options"
@@ -106,10 +104,9 @@ function onCustom(text: string): void {
   <Popover v-else v-model:open="open">
     <PopoverTrigger as-child>
       <PickerTrigger
-        :id="id"
+        v-bind="$attrs"
         :size="size"
         :disabled="disabled"
-        :aria-label="ariaLabel"
         :data-testid="testid"
         :class="cn(trigger === 'toolbar' && 'border-transparent bg-transparent')"
       >

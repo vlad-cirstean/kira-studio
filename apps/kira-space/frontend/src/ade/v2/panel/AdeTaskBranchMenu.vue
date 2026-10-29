@@ -12,7 +12,6 @@ import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
-import { useRepos } from '../../../repo/state/reposQueries';
 import { atRisk } from '../dialog/compose';
 import { blockedReason } from '../dialog/flow';
 import type { BranchRowModel } from '../plan/usePlanModel';
@@ -31,17 +30,12 @@ const emit = defineEmits<{ error: [message: string] }>();
 
 const ui = useAdeBoardUiStore();
 const confirm = useConfirmDialogStore();
-const repos = useRepos();
 const riskM = useTaskBranchRisk();
 const removeBranch = useRemoveTaskBranch();
 const removeRepo = useRemoveTaskRepo();
 
 const formOpen = ref(false);
 const mode = ref<'branch' | 'repo'>('branch');
-const lacked = computed(() => {
-  const used = new Set(props.usedRepoIds);
-  return (repos.data.value?.repos ?? []).filter((r) => !used.has(r.codeRepoId));
-});
 const label = computed(() => props.row.name || props.row.repo);
 
 function openForm(next: 'branch' | 'repo'): void {
@@ -107,8 +101,7 @@ async function remove(what: 'branch' | 'repo'): Promise<void> {
     v-model:open="formOpen"
     :branch="row.branch"
     :mode="mode"
-    :repos="lacked"
-    :repo-label="row.repo"
+    :used-repo-ids="usedRepoIds"
   >
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
