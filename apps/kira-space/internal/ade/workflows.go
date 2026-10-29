@@ -149,7 +149,6 @@ func (b *TaskBoard) Start() {
 		}
 		b.goTracked(b.launchAutomationHeld)
 		b.goTracked(func() { b.RunAllEnvScripts(b.ctx) })
-		b.goTracked(b.runLogPurge)
 		folders, err := b.deps.RepoConfig.Folders()
 		if err != nil {
 			slog.Warn("ade folders: list", "scope", "ade", "err", err)

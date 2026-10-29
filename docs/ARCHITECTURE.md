@@ -2071,7 +2071,7 @@ and `docs/HISTORY.md (v2.0)`.
 - A deployment environment (ade_repo_envs) is a name plus a shell command that prints the deployed commit SHA; it runs in the repo root on board refresh and marks branches ▲name ✓/⚠/?.
 - In the deployment environments UI, a new row stays a local draft and is written only once both name and command are filled.
 - Run and setup logs keep a tail of 2 MiB per log in chunks of at most 8 KiB, set truncated once head chunks drop, and batch writes every 250 ms.
-- Log retention (P177): logs of tasks archived 90+ days ago are deleted by AdeLogsRepo.PurgeArchived (inclusive cutoff on ade_tasks.archived_at); task, branch, run, session and setup rows remain as history, and live tasks keep logs.
+- Archive keeps all task data (P399): logs, review sessions and comments are never purged; per-log size cap still bounds each log.
 - TaskBoard.Start runs the log purge once, then hourly, and runs PRAGMA incremental_vacuum after a purge that removed rows.
 - The per-repo prepare timeout is the GitRepoSettings leaf worktreePrepareTimeout (default 15m, max 2h), shared with git-ui worktree add; Spec.Timeout must be > 0.
 

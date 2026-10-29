@@ -173,7 +173,7 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 			return err
 		}
 	}
-	b.teardownReview(ctx, tc)
+	b.closeReviewWindows(tc)
 	if err := b.deps.Tasks.ArchiveTask(taskID, b.deps.Now().UnixMilli()); err != nil {
 		return err
 	}
