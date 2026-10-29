@@ -67,6 +67,7 @@ var names = []sqlitex.MigrationSource{
 	{Version: 49, Name: "p352_git_host_delta_floor", File: "0049_p352_git_host_delta_floor.sql"},
 	{Version: 50, Name: "p369_drop_viewed_sync", File: "0050_p369_drop_viewed_sync.sql"},
 	{Version: 51, Name: "p379_ade_task_statuses", File: "0051_p379_ade_task_statuses.sql"},
+	{Version: 52, Name: "p399_ade_branch_change_request", File: "0052_p399_ade_branch_change_request.sql"},
 }
 
 // All returns every migration in ascending version order.

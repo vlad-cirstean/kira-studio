@@ -103,6 +103,16 @@ type AdeTaskBranch struct {
 	MergedAt        *int64
 	ArchivedAt      *int64
 	Origin          string
+	// ChangeRequest is the PR recorded at archive; nil = none recorded.
+	ChangeRequest *AdeChangeRequest
+}
+
+// AdeChangeRequest is a pull or merge request stored on a branch row.
+type AdeChangeRequest struct {
+	Number int
+	Title  string
+	State  string
+	URL    string
 }
 
 // AdeBranchOriginAgent marks a branch an agent declared or named.
