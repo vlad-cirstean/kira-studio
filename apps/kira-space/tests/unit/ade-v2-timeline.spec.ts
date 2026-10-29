@@ -11,9 +11,7 @@ import { DEFAULT_STATUSES, mkBranch, mkPlan, mkTask } from './support/adeV2Fixtu
 // 2026-09-22 is a Tuesday: offsets 4 and 5 are Sat/Sun, 6 is Mon.
 const TODAY = '2026-09-22';
 const SETTINGS = {
-  horizonDays: 14,
   historyDays: 14,
-  extraDays: [] as string[],
   offDays: [] as string[],
   workWeekendDays: [] as string[],
   workdayHours: 6,
@@ -212,7 +210,10 @@ describe('capacity and overdue', () => {
 
 describe('first-10 cap', () => {
   const many = (n: number, extra: TaskSpec[] = []) =>
-    board([...Array.from({ length: n }, (_, i) => ({ id: `t${i}`, day: i, est: '1h' })), ...extra]);
+    board([
+      ...Array.from({ length: n }, (_, i) => ({ id: `t${i}`, day: Math.floor(i / 2), est: '1h' })),
+      ...extra,
+    ]);
 
   test('exactly 10 items show everything and no button', () => {
     const v = view(many(10));
@@ -227,8 +228,8 @@ describe('first-10 cap', () => {
     expect(v.moreButtonLabel).toBe('Load all items · 1 more');
     expect(v.shownTaskIds).not.toContain('t10');
     const keys = v.bands.map((x) => x.key);
-    expect(keys).toContain(9);
-    expect(keys).not.toContain(10);
+    expect(keys).toContain(4);
+    expect(keys).not.toContain(5);
     expect(keys).not.toContain(LATER);
   });
 
@@ -236,7 +237,7 @@ describe('first-10 cap', () => {
     const v = view(many(11), { showAllItems: true });
     expect(v.hiddenCount).toBe(0);
     expect(v.canCollapse).toBe(true);
-    expect(v.bands.map((x) => x.key)).toContain(10);
+    expect(v.bands.map((x) => x.key)).toContain(5);
   });
 
   test('a review item counts toward the cap: it can take the 10th slot', () => {
@@ -258,6 +259,51 @@ describe('first-10 cap', () => {
     const v = view(b, { hiddenRepoIds: new Set(['repo-hidden']) });
     expect(v.hiddenCount).toBe(0);
     expect(v.shownTaskIds).not.toContain('t0');
+  });
+});
+
+describe('7-day window', () => {
+  const keysOf = (v: ReturnType<typeof view>) => v.bands.map((x) => x.key);
+
+  test('an empty board has bands 0..6 then Later', () => {
+    expect(keysOf(view(board([])))).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+  });
+
+  test('work after the window sits in Later with its date, before unplanned work', () => {
+    const v = view(board([{ id: 'free' }, { id: 'far', day: 7, est: '1h' }]));
+    expect(v.entries.get('far')?.day).toBe(7);
+    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+    expect(v.bands.find((x) => x.isLater)?.taskIds).toEqual(['far', 'free']);
+  });
+
+  test('a span running past the window gets continuation rows in the window only', () => {
+    const v = view(board([{ id: 'a', day: 3, est: '3d' }]));
+    expect(v.entries.get('a')?.days).toEqual([3, 6, 7]);
+    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+    expect(v.bands.flatMap((x) => x.spans.map((s) => [x.key, s.dayNumber]))).toEqual([[6, 2]]);
+  });
+
+  test('Later hours include work past the window', () => {
+    const v = view(
+      board([
+        { id: 'far', day: 8, est: '3h' },
+        { id: 'free', est: '1h' },
+      ]),
+    );
+    expect(v.bands.find((x) => x.isLater)?.hours).toBe(4);
+  });
+
+  test('a day off past the window adds no band', () => {
+    const v = view(board([]), {}, { ...SETTINGS, offDays: [iso(9)] });
+    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+  });
+
+  test('the next day pulls the day-7 task from Later into band 6', () => {
+    const b = board([{ id: 'far', day: 7, est: '1h' }]);
+    expect(view(b).bands.find((x) => x.key === 6)?.taskIds).toEqual([]);
+    const next = view(b, { today: iso(1) });
+    expect(next.bands.find((x) => x.key === 6)?.taskIds).toEqual(['far']);
+    expect(next.bands.find((x) => x.isLater)?.taskIds).toEqual([]);
   });
 });
 

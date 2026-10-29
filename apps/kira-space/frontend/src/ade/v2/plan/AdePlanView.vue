@@ -13,16 +13,15 @@ import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu
 import { computed, nextTick, ref } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
-import { dayLabel, firstWork, isoToOffset, nextWork, offsetToIso } from '../board/calendar';
+import { dayLabel, firstWork, isoToOffset, LATER, nextWork } from '../board/calendar';
 import { dropVerdict, shiftPlanArgs } from '../board/dropPlan';
 import { dayMenuFor } from '../board/menu';
 import { refreshNote, remoteErrorText } from '../board/panelFacts';
-import { ITEM_LIMIT, type TimelineBand } from '../board/timeline';
+import { ITEM_LIMIT, type TimelineBand, WINDOW_DAYS } from '../board/timeline';
 import { useRefresh, useSetPlan } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useConfirmRun } from '../useConfirmRun';
 import AdeDayBand from './AdeDayBand.vue';
-import AdeDayControls from './AdeDayControls.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
 import AdePlanRepos, { type RepoChipModel } from './AdePlanRepos.vue';
 import { usePlanDrag } from './usePlanDrag';
@@ -233,7 +232,7 @@ const dayOffRun = useConfirmRun(
 );
 const planError = computed(() => (setPlan.isError.value ? errorText(setPlan.error.value) : ''));
 
-// ---- scroll and horizon
+// ---- scroll
 function scrollToDay(k: number): void {
   const el = scrollEl.value;
   const target = el?.querySelector<HTMLElement>(`[data-ade-day="${k}"]`);
@@ -271,26 +270,6 @@ const inHistory = computed(() => {
   return scrollY.value + headerHeight.value < todayTop - 30;
 });
 
-async function extendHorizon(iso: string): Promise<void> {
-  const ade = settingsStore.ade;
-  if (!ade.extraDays.includes(iso)) {
-    const kept = ade.extraDays.filter((d) => d >= today.value);
-    await settingsStore.patchSettings({ ade: { extraDays: [...kept, iso] } });
-  }
-  await nextTick();
-  scrollToDay(isoToOffset(today.value, iso));
-}
-
-function onMoreWeek(): void {
-  void settingsStore.patchSettings({
-    ade: { horizonDays: Math.min(365, settingsStore.ade.horizonDays + 7) },
-  });
-}
-
-async function onPickDate(iso: string): Promise<void> {
-  if (isoToOffset(today.value, iso) > 0) await extendHorizon(iso);
-}
-
 async function onGoToDate(iso: string): Promise<void> {
   const k = isoToOffset(today.value, iso);
   if (k < 0) {
@@ -299,15 +278,10 @@ async function onGoToDate(iso: string): Promise<void> {
     scrollToDay(k);
     return;
   }
-  if (k < settingsStore.ade.horizonDays) {
-    await nextTick();
-    scrollToDay(k);
-    return;
-  }
-  await extendHorizon(iso);
+  await nextTick();
+  scrollToDay(k < WINDOW_DAYS ? k : LATER);
 }
 
-const minExtraDate = computed(() => offsetToIso(today.value, 1));
 const forcePushTarget = ref<{ branchId: string; branchName: string; repo: string } | null>(null);
 
 function onForcePush(row: BranchRowModel): void {
@@ -367,12 +341,6 @@ function onForcePush(row: BranchRowModel): void {
             </Button>
           </div>
           <template v-for="band in model.view.bands" :key="band.key">
-            <AdeDayControls
-              v-if="band.isLater"
-              :min-date="minExtraDate"
-              @more-week="onMoreWeek"
-              @pick-date="onPickDate"
-            />
             <AdeDayBand
               :band="band"
               :cards="bandCards(band)"

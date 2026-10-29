@@ -7778,14 +7778,6 @@
             "aria": "Open {title}"
           }
         },
-        "dayControls": {
-          "addDay": {
-            "label": "Or choose a date"
-          },
-          "moreWeek": {
-            "label": "Add week"
-          }
-        },
         "header": {
           "onMerge": {
             "label": "On merge"
