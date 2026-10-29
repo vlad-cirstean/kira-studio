@@ -116,7 +116,7 @@ async function submitRepo(value: unknown): Promise<void> {
               @select="submitBranch(b.name, true)"
             />
             <div v-if="shown.length === 0" class="p-2 text-kira-md text-muted-foreground">{{
-              t('space.common.noBranches.empty')
+              t('common.picker.noBranches.empty')
             }}</div>
           </div>
         </div>

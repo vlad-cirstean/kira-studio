@@ -252,7 +252,7 @@ async function pick(b: CandidateBranch): Promise<void> {
             @select="pick(b)"
           />
           <div v-if="shown.length === 0" class="p-2 text-kira-md text-muted-foreground">{{
-            t('space.common.noBranches.empty')
+            t('common.picker.noBranches.empty')
           }}</div>
         </div>
       </div>

@@ -125,7 +125,7 @@ function pick(key: string): void {
                 :value="typed"
                 data-testid="memory-boost-project-custom"
               >
-                {{ t('memory.add.useProject.label', { project: typed }) }}
+                {{ t('common.picker.useValue.label', { value: typed }) }}
               </CommandItem>
               <CommandItem
                 v-for="key in known"

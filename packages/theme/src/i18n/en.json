@@ -2487,6 +2487,26 @@
     "path": {
       "label": "Path"
     },
+    "picker": {
+      "createBranch": {
+        "label": "Create branch {name}"
+      },
+      "findBranch": {
+        "placeholder": "Find a branch"
+      },
+      "findProject": {
+        "placeholder": "Find a project"
+      },
+      "noBranches": {
+        "empty": "No branches"
+      },
+      "noProjects": {
+        "empty": "No projects"
+      },
+      "useValue": {
+        "label": "Use {value}"
+      }
+    },
     "plainText": {
       "label": "Plain text"
     },
@@ -5893,9 +5913,6 @@
       "text": {
         "label": "What to remember",
         "placeholder": "Facts in your own words; {agent} splits and checks them"
-      },
-      "useProject": {
-        "label": "Use {project}"
       }
     },
     "checkHook": {
@@ -8849,9 +8866,6 @@
       },
       "needYou": {
         "label": "Need you"
-      },
-      "noBranches": {
-        "empty": "No branches"
       },
       "notes": {
         "label": "Notes"

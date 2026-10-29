@@ -75,7 +75,7 @@ const pickOf = (b: BasePick): BaseChoice =>
         />
         <CommandList class="max-h-72">
           <CommandEmpty>{{
-            branches.isPending.value ? t('common.state.loading.loading') : t('space.common.noBranches.empty')
+            branches.isPending.value ? t('common.state.loading.loading') : t('common.picker.noBranches.empty')
           }}</CommandEmpty>
           <CommandGroup v-if="data?.previous" :heading="t('space.ade.basePicker.previous.label')">
             <CommandItem
