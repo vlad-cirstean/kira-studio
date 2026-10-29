@@ -15,6 +15,8 @@ export const backlogKey = ['adetask', 'backlog'] as const;
 export const runSandboxKey = ['ade', 'runSandbox'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 export const repoNamesKey = ['adetask', 'repoNames'] as const;
+export const archivedKey = ['adetask', 'archived'] as const;
+export const archivedTaskKey = (taskId: string) => [...archivedKey, taskId] as const;
 const hostProvidersKey = ['adetask', 'hostProviders'] as const;
 
 export function useBoard() {
@@ -83,4 +85,17 @@ export function useLog(kind: MaybeRefOrGetter<LogKind>, id: MaybeRefOrGetter<str
     queryFn: () => reader.readLog({ kind: toValue(kind), id: toValue(id), afterSeq: 0 }),
     gcTime: 30_000,
   }));
+}
+
+/** An archived task with all it kept; a board push (archive, restore) refetches it. */
+export function useArchivedTask(taskId: MaybeRefOrGetter<string | null>) {
+  const reader = useAdeReader();
+  return useQuery(() => {
+    const id = toValue(taskId);
+    return {
+      queryKey: archivedTaskKey(id ?? ''),
+      queryFn: () => reader.archivedTask({ taskId: id ?? '' }),
+      enabled: id !== null,
+    };
+  });
 }

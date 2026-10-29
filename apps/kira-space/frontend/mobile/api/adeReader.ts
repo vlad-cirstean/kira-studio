@@ -1,5 +1,6 @@
 import type { AdeReader } from '@ade/reader';
 import type {
+  ArchivedTask,
   BacklogResult,
   Board,
   ChangeRequestsResult,
@@ -18,6 +19,7 @@ export const httpAdeReader: AdeReader = {
   backlog: () => getJson<BacklogResult>('/api/ade/backlog'),
   repos: () => getJson('/api/ade/repos'),
   hostProviders: () => getJson<HostProviders>('/api/ade/hosts'),
+  archivedTask: (args) => getJson<ArchivedTask>('/api/ade/archived-task', { taskId: args.taskId }),
   readLog: (args) =>
     getJson<LogPage>('/api/ade/log', { kind: args.kind, id: args.id, afterSeq: args.afterSeq }),
 };

@@ -6949,6 +6949,27 @@
         "body": "{title} leaves the board. Its running sessions stop and its worktrees are removed.",
         "title": "Archive task?"
       },
+      "archived": {
+        "comments": {
+          "label": "Review comments ({count})"
+        },
+        "filter": {
+          "placeholder": "Filter archived tasks"
+        },
+        "list": {
+          "aria": "Archived tasks",
+          "empty": "Nothing archived yet"
+        },
+        "restore": {
+          "hint": "Restore to edit."
+        },
+        "select": {
+          "emptyHint": "Select an archived task to see what it kept."
+        },
+        "snapshot": {
+          "hint": "Taken when the task was archived."
+        }
+      },
       "automation": {
         "chipBlocked": {
           "label": "{name} · needs you"
@@ -7696,9 +7717,6 @@
       "panel": {
         "archived": {
           "label": "Archived"
-        },
-        "archivedTitle": {
-          "title": "Archived task"
         },
         "empty": {
           "emptyHint": "Select a task to see its details."

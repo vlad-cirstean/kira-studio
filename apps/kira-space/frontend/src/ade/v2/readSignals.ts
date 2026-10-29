@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { appendChunks, mergeRuns } from './pushMerge';
 import {
+  archivedKey,
   backlogKey,
   boardKey,
   changeRequestsKey,
@@ -29,6 +30,7 @@ export function installAdeReadSignals(queryClient: QueryClient, source: AdeSigna
   source.onBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
     void queryClient.invalidateQueries({ queryKey: changeRequestsKey, exact: true });
+    void queryClient.invalidateQueries({ queryKey: archivedKey });
   });
   source.onBacklog(() => {
     void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });

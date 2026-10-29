@@ -2,6 +2,7 @@
 import InlineState from '@theme/components/InlineState.vue';
 import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
+import { useArchivedTask } from '../readQueries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeHeadlessPane from './AdeHeadlessPane.vue';
 import AdeSessionActions from './AdeSessionActions.vue';
@@ -17,7 +18,8 @@ import { useSessionViews } from './useSessionViews';
 const props = defineProps<{ taskId: string; branchId?: string; archived?: boolean }>();
 
 const ui = useAdeBoardUiStore();
-const { sessions, view } = useSessionViews();
+const archivedTask = useArchivedTask(() => (props.archived ? props.taskId : null));
+const { sessions, view } = useSessionViews(() => archivedTask.data.value);
 
 const scoped = computed(() =>
   sessions.value.filter(

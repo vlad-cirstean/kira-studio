@@ -7,9 +7,12 @@ import type { Branch, Run, Session, Task, Workflow } from '../wire';
 // the lookups come in as data, so a session of an archived task, which the board no longer lists,
 // degrades to its ids instead of failing.
 
+/** The branch fields a session label reads; an archived branch has no worktree. */
+export type LookupBranch = Pick<Branch, 'name' | 'codeRepoId'> & { worktree?: string };
+
 export interface SessionLookup {
   task: (id: string) => Task | undefined;
-  branch: (id: string) => Branch | undefined;
+  branch: (id: string) => LookupBranch | undefined;
   repoLabel: (codeRepoId: string) => string;
   workflow: (id: string) => Workflow | undefined;
   /** The background run's command line as the provider shows it (`claude -p`). */

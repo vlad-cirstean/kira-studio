@@ -436,6 +436,42 @@ interface RepoHost {
   kind: 'ok' | 'disabled' | 'unavailable';
   host: HostInfo | null;
 }
+/** An archived task with everything it kept; carries no worktree path. */
+export interface ArchivedTask {
+  task: Task;
+  archivedAt: number;
+  statuses: TaskStatusDef[];
+  branches: ArchivedBranch[];
+  repos: RepoHost[];
+}
+export interface ArchivedBranch {
+  id: string;
+  codeRepoId: string;
+  name: string /* '' = never created */;
+  kind: Branch['kind'];
+  base: string;
+  origin: string;
+  addedAt: number;
+  mergedAt: number | null;
+  archivedAt: number;
+  /** Detached from the task before the archive. */
+  removed: boolean;
+  changeRequest: ChangeRequest | null;
+  /** 'live' = the host answered, 'archived' = snapshot taken at archive, '' = none. */
+  prSource: 'live' | 'archived' | '';
+  branchUrl: string;
+  comments: ArchivedComment[];
+}
+export interface ArchivedComment {
+  path: string;
+  start: number;
+  end: number;
+  body: string;
+  kind: string;
+  state: string;
+  reply: string;
+  createdAt: number;
+}
 export interface ChangeRequestsResult {
   repos: RepoHost[];
   branches: Record<string, ChangeRequest> /* branchId */;

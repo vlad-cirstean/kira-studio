@@ -35,6 +35,7 @@ import AdePanelFrame from './AdePanelFrame.vue';
 import AdeRunOutcome from './AdeRunOutcome.vue';
 import AdeWorktreeSetup from './AdeWorktreeSetup.vue';
 import { type HeaderAction, headerActions } from './headerActions';
+import { PR_TONE, prStateLabel } from './prState';
 
 // Branch mode: header (back link, git status, name, facts, Force push), Details and Sessions tabs.
 const props = defineProps<{ card: CardModel; row: CardModel['rows'][number]; model: PlanModel }>();
@@ -142,20 +143,6 @@ const words = computed(() =>
   ),
 );
 const branchUrl = computed(() => changeRequests.data.value?.branchUrls[branch.value.id] ?? '');
-const PR_TONE: Record<string, Tone> = {
-  open: 'green',
-  merged: 'purple',
-  closed: 'red',
-  draft: 'grey',
-};
-const PR_STATE = {
-  open: 'common.action.open.label',
-  merged: 'common.merged.status',
-  closed: 'common.closed.status',
-  draft: 'common.draft.status',
-} as const satisfies Record<string, MessageKey>;
-const prStateLabel = (state: string): string =>
-  state in PR_STATE ? t(PR_STATE[state as keyof typeof PR_STATE]) : state;
 const FORCE_PUSH_CMD = 'git push --force-with-lease';
 
 function copyLink(key: string, text: string): void {

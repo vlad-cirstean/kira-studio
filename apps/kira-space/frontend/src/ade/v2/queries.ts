@@ -6,7 +6,14 @@ import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
 import { withMovedItem } from './backlogOrder';
-import { backlogKey, boardKey, runSandboxKey, useWorkflows } from './readQueries';
+import {
+  archivedKey,
+  backlogKey,
+  boardKey,
+  runSandboxKey,
+  sessionsKey,
+  useWorkflows,
+} from './readQueries';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
@@ -422,6 +429,19 @@ export function useArchiveRisk() {
 
 export function useArchiveTask() {
   return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveTask(args) });
+}
+
+/** Unarchives a task; the board, sessions and archived reads refetch. */
+export function useRestoreTask() {
+  return useMutation({
+    mutationFn: (args: TaskArgs) => control.adeTaskRestoreTask(args),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: boardKey, exact: true }),
+        queryClient.invalidateQueries({ queryKey: sessionsKey, exact: true }),
+        queryClient.invalidateQueries({ queryKey: archivedKey }),
+      ]),
+  });
 }
 
 export function useFocusSession() {

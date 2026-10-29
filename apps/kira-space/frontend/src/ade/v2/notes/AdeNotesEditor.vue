@@ -18,6 +18,8 @@ import { notesExtensions } from './notesExtensions';
 const props = defineProps<{
   notes: string;
   itemId: string;
+  /** Archived task: no toolbar, no edits, no save. */
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{ save: [itemId: string, value: string] }>();
@@ -28,7 +30,7 @@ let contentItemId = props.itemId;
 
 function flush(): void {
   const ed = editor.value;
-  if (!ed) return;
+  if (!ed || props.readonly) return;
   const md = ed.getMarkdown();
   if (md !== lastEmitted) {
     lastEmitted = md;
@@ -52,6 +54,7 @@ const editor = useEditor({
   content: props.notes,
   contentType: 'markdown',
   extensions: notesExtensions(),
+  editable: !props.readonly,
   editorProps: {
     attributes: { class: PROSE, 'aria-label': t('space.common.notes.label') },
     handleClick(_view, _pos, event) {
@@ -65,7 +68,9 @@ const editor = useEditor({
       return false;
     },
   },
-  onUpdate: () => debouncedFlush(),
+  onUpdate: () => {
+    if (!props.readonly) debouncedFlush();
+  },
   onBlur: () => flush(),
 });
 
@@ -214,6 +219,7 @@ function keepFocus(e: MouseEvent): void {
     class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-border-strong bg-bg"
   >
     <div
+      v-if="!readonly"
       role="toolbar"
       :aria-label="t('space.ade.notes.formatting.aria')"
       class="flex shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1.5 py-1"

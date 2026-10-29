@@ -482,6 +482,10 @@ const spaceControl = {
     unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
   adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>
     unwrap(AdeTaskService.ArchiveTask(args)),
+  adeTaskArchivedTask: (args: V2.TaskArgs): Promise<V2.ArchivedTask> =>
+    unwrap(AdeTaskService.ArchivedTask(args)).then((r) => trust<V2.ArchivedTask>(r)),
+  adeTaskRestoreTask: (args: V2.TaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.RestoreTask(args)).then((r) => trust<V2.Task>(r)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBoard, cb),
   onAdeTaskBacklog: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBacklog, cb),
   onAdeTaskWorkflows: (cb: () => void): (() => void) => on(CHANNEL.adeTaskWorkflows, cb),
