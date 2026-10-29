@@ -7,7 +7,7 @@ Source: user request. Phases run top to bottom.
 | Phase | Title | Status |
 |---|---|---|
 | P396 | Bug: three-finger swipe up moves focus to another space | Todo |
-| P397 | Task repos and branches: add, edit and delete independently | Todo |
+| P397 | Task repos and branches: add, edit and delete independently | Done |
 | P398 | One project picker and one branch picker across the app | Todo |
 | P399 | Archived work stays viewable with all data | Todo |
 | P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Todo |
@@ -24,6 +24,8 @@ Three-finger swipe up (macOS Mission Control, to see the apps on the space) move
 ### P397 Task repos and branches: add, edit and delete independently
 
 A task can add repos and branches. Add edit and delete for both. Today, a repo added without a branch cannot get a branch added later; fix that.
+
+**Result.** Row menu in the Task tab: add or change branch (existing or new name), change repo, remove branch, remove repo. Backend: `SetTaskBranch`, `UpdateTaskRepo`, `RemoveTaskBranch`, `RemoveTaskRepo`, `TaskBranchRisk`; store `DetachBranch` (hard delete if never created and run-less, else archive). Attach fills a not-created row, which fixes the bug. Refused while a session, launch or background run uses the row, and on review tasks. Git refs never change. Dirty or unmerged worktree asks confirm. Flow test `TestTaskReposAndBranches` plus UI spec `ade-v2-task-branches`. Branch form uses SecondaryTabs and a search list; P398 swaps in the shared pickers.
 
 ### P398 One project picker and one branch picker across the app
 
