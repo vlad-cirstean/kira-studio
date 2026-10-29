@@ -9,7 +9,7 @@ Source: user request. Phases run top to bottom.
 | P396 | Bug: three-finger swipe up moves focus to another space | Todo |
 | P397 | Task repos and branches: add, edit and delete independently | Done |
 | P398 | One project picker and one branch picker across the app | Done |
-| P399 | Archived work stays viewable with all data | Todo |
+| P399 | Archived work stays viewable with all data | Done |
 | P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Todo |
 | P401 | Task board: 7-day window, Later section, no date control | Todo |
 | P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Todo |
@@ -36,6 +36,8 @@ Several project and branch picker implementations exist, each flawed. Replace th
 ### P399 Archived work stays viewable with all data
 
 Archived work must be visible in the UI. Opening an archived task shows its session, notes, links, PRs and all other data, unchanged from before archiving. Archiving must not drop or hide any of it.
+
+**Result.** Archive keeps everything: review sessions stay pinned, log purge deleted, each branch's change request snapshotted (migration 0052). `ArchivedTask` read and `RestoreTask` (refuses when a branch name is live on another task), phone route `/api/ade/archived-task`. New Archived tab (searchable list plus full read-only panel: Task, Notes, Sessions; PR with "as of archive" hint, review comments, Restore). Plan history opens the same panel. Flow tests `TestArchivedTaskKeepsData`, `TestPhoneReadsArchivedTask`; UI spec `ade-v2-archived`. Not done: `TestArchiveRisk` pin assertion; phone UI stays out of scope.
 
 ### P400 Task board: no same-day delimiters, terminal-dark background, distinguishable task colors
 
