@@ -9,6 +9,11 @@ Source: user request. Phases run top to bottom.
 | P396 | Bug: three-finger swipe up moves focus to another space | Todo |
 | P397 | Task repos and branches: add, edit and delete independently | Todo |
 | P398 | One project picker and one branch picker across the app | Todo |
+| P399 | Archived work stays viewable with all data | Todo |
+| P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Todo |
+| P401 | Task board: 7-day window, Later section, no date control | Todo |
+| P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Todo |
+| P403 | Chapter close | Todo |
 
 ## Rows
 
@@ -24,3 +29,22 @@ A task can add repos and branches. Add edit and delete for both. Today, a repo a
 
 Several project and branch picker implementations exist, each flawed. Replace them with one shared project picker and one shared branch picker used everywhere. Remove the old implementations.
 
+### P399 Archived work stays viewable with all data
+
+Archived work must be visible in the UI. Opening an archived task shows its session, notes, links, PRs and all other data, unchanged from before archiving. Archiving must not drop or hide any of it.
+
+### P400 Task board: no same-day delimiters, terminal-dark background, distinguishable task colors
+
+Remove the delimiters between tasks in the same day. Change the board background to the darker grey terminals use. Keep the existing task colors; tasks are still hard to tell apart, so adjust contrast or spacing until they separate clearly.
+
+### P401 Task board: 7-day window, Later section, no date control
+
+Show only the next 7 days on the task board, unless work is scheduled later than that. Remove the date control that adds a new week. Work scheduled beyond the window sits in a Later section.
+
+### P402 Agents panel: drop tab delimiter, center action buttons, remove click border flash
+
+Remove the grey delimiter between the main tabs (Backlog, Plan) and the rest. Center-align the "type a thought" and "add task" buttons. Remove the white border that flashes on click of a task; it must not appear at all.
+
+### P403 Chapter close
+
+Run one code review round first (per CLAUDE.md "Code review"), fix findings, then close the chapter by hand and open the PR.
