@@ -16,11 +16,11 @@ const delegatedProps = reactiveOmit(props, 'class');
 const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
 const id = useId();
-const { filterState, allItems, allGroups } = useCommand();
+const { filterState, allItems, allGroups, ignoreFilter } = useCommand();
 const groupContext = useCommandGroup(null);
 
 const isRender = computed(() => {
-  if (!filterState.search) {
+  if (ignoreFilter.value || !filterState.search) {
     return true;
   } else {
     const filteredCurrentItem = filterState.filtered.items.get(id);

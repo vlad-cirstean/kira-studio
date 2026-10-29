@@ -4,17 +4,23 @@ import { reactiveOmit } from '@vueuse/core';
 import type { ListboxRootEmits, ListboxRootProps } from 'reka-ui';
 import { ListboxRoot, useFilter, useForwardPropsEmits } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
-import { reactive, ref, watch } from 'vue';
+import { reactive, ref, toRef, watch } from 'vue';
 import { provideCommandContext } from '.';
 
-const props = withDefaults(defineProps<ListboxRootProps & { class?: HTMLAttributes['class'] }>(), {
-  modelValue: '',
-  highlightOnHover: true,
-});
+const props = withDefaults(
+  defineProps<ListboxRootProps & { class?: HTMLAttributes['class']; ignoreFilter?: boolean }>(),
+  {
+    modelValue: '',
+    highlightOnHover: true,
+    ignoreFilter: false,
+  },
+);
 
 const emits = defineEmits<ListboxRootEmits>();
+// Lets a self-filtering list read the query; mirrors the built-in input state.
+const search = defineModel<string>('search', { default: '' });
 
-const delegatedProps = reactiveOmit(props, 'class');
+const delegatedProps = reactiveOmit(props, 'class', 'ignoreFilter');
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
@@ -67,15 +73,20 @@ function filterItems() {
 
 watch(
   () => filterState.search,
-  () => {
-    filterItems();
+  (value) => {
+    search.value = value;
+    if (!props.ignoreFilter) filterItems();
   },
 );
+watch(search, (value) => {
+  filterState.search = value;
+});
 
 provideCommandContext({
   allItems,
   allGroups,
   filterState,
+  ignoreFilter: toRef(props, 'ignoreFilter'),
 });
 </script>
 
