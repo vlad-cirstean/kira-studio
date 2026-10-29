@@ -5,9 +5,7 @@
  * those three already follow — no Vue, no bridge, so `pickerModel.spec.ts` exercises it directly
  * with plain fixtures.
  *
- * `refListModel.ts` is NOT modified: `buildRefListSections` has two other consumers
- * (`review/BaseSelector.vue`, `review/ReviewView.vue`) whose own sort must not silently change to
- * recency. This module reuses that file's `filterRefs`/`sortTags`/`capItems`/`REF_LIST_SECTION_CAP`
+ * This module reuses `refListModel.ts`'s `filterRefs`/`sortTags`/`capItems`/`REF_LIST_SECTION_CAP`
  * and owns the picker-specific ordering itself.
  *
  * P77 §18.1 commit 1: every list gained a real cap here (`REF_LIST_SECTION_CAP`), including the

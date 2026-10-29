@@ -4864,20 +4864,8 @@
         "tooltip": "Back to branch selection"
       },
       "base": {
-        "allBranches": {
-          "label": "All branches"
-        },
         "choose": {
           "label": "Choose a base…"
-        },
-        "hidden": {
-          "hint": "{count} more. Type to filter."
-        },
-        "loading": {
-          "loading": "Loading branches…"
-        },
-        "popover": {
-          "aria": "Choose a comparison base"
         },
         "reasonDefaultBranch": {
           "label": "Default branch"

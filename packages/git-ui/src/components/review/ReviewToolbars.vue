@@ -5,14 +5,22 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { type MessageKey, t } from '@theme/i18n';
 import { rowMeta } from '@theme/lib/rowVariants';
+import BranchPicker from '@workbench/components/pickers/BranchPicker.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import type { PickerOption } from '@workbench/lib/pickerOptions';
 import { computed, nextTick, useTemplateRef, watch } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
+import {
+  baseCandidateOptions,
+  branchGroups,
+  branchOptions,
+  reasonLabel,
+  SUGGESTED_PREFIX,
+} from '../../lib/refOptions.ts';
 import { useFieldFocus } from '../../lib/useFieldFocus.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { ReviewPane, ReviewSessionState } from '../../state/review.ts';
-import BaseSelector from './BaseSelector.vue';
 
 // The review view's two toolbars: the compared sides (branch, base, swap) and, once listing, the
 // panel-level pane toggle, file filter and Tree/Flat toggle that every pane shares.
@@ -35,6 +43,26 @@ const focusToolbarFilter = useFieldFocus(toolbarFilter);
 watch(filterVisible, (visible) => {
   if (visible) void nextTick(focusToolbarFilter);
 });
+
+// Suggested bases first, then every local and remote branch.
+const baseOptions = computed<PickerOption[]>(() => [
+  ...baseCandidateOptions(props.review.resolution.value),
+  ...branchOptions(props.refsState, { remote: true }),
+]);
+const baseReason = computed(() => {
+  const resolution = props.review.resolution.value;
+  return resolution && resolution.base !== null ? reasonLabel(resolution.reason) : undefined;
+});
+// `head` stays undefined until the first refs load lands, so an empty list then is not "no match".
+const refsLoading = computed(() => props.refsState.head.value === undefined);
+
+function pickBase(option: PickerOption): void {
+  props.review.setBase(
+    option.value.startsWith(SUGGESTED_PREFIX)
+      ? option.value.slice(SUGGESTED_PREFIX.length)
+      : option.value,
+  );
+}
 
 const commitsCount = computed(() => {
   const resolution = props.review.resolution.value;
@@ -131,11 +159,17 @@ const summaryLabel = computed(() => {
         review.resolution.value?.base
       }}</span
     >
-    <BaseSelector
+    <BranchPicker
       v-else
-      :resolution="review.resolution.value"
-      :refs-state="refsState"
-      @select="review.setBase($event)"
+      size="kira"
+      testid="base-selector"
+      :model-value="review.resolution.value?.base ?? null"
+      :branches="baseOptions"
+      :groups="branchGroups()"
+      :placeholder="t('git.review.base.choose.label')"
+      :trigger-detail="baseReason"
+      :loading="refsLoading"
+      @select="pickBase"
     />
     <TooltipIconButton
       v-if="!locked"
