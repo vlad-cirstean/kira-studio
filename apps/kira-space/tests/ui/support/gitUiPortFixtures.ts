@@ -465,7 +465,7 @@ export async function openReviewListing(
   await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')).toBeVisible();
   await page.locator('[data-testid="git-panel-tab-review"]').click();
   const host = page.locator('[data-testid="repo-review-host"]');
-  await host.getByRole('button', { name: REVIEW_BRANCH }).click();
+  await host.locator(`[data-testid="review-branch-option-${REVIEW_BRANCH}"]`).click();
   await expect(host.locator('[data-testid^="review-row-"]').first()).toBeVisible({
     timeout: 20_000,
   });

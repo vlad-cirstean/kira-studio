@@ -19,11 +19,18 @@ async function pick(page: Page, branchId: string, item: string): Promise<void> {
 const candidates = { channel: IPC.adeTaskCandidateBranches, response: adeFixture('candidates') };
 
 test('a repo without a branch gets an existing branch from its menu', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch, [candidates]);
+  const all = adeFixture<{ branches: { codeRepoId: string }[] }>('candidates');
+  const web = {
+    ...all,
+    branches: all.branches.filter((b) => b.codeRepoId === 'repo-web-app'),
+  };
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskCandidateBranches, response: web },
+  ]);
   await openTask(page, 'T_alerts');
   await pick(page, 'd_alerts_web', 'ade-task-branch-add');
   await expect(page.locator(t('ade-branch-form'))).toBeVisible();
-  const rows = page.locator(t('ade-candidate'));
+  const rows = page.locator('[data-testid^="ade-branch-form-option-"]');
   await expect(rows).toHaveCount(2);
   await rows.filter({ hasText: 'fix/invoice-rounding' }).click();
   await expect.poll(() => calls(control, IPC.adeTaskSetTaskBranch)).toHaveLength(1);
@@ -35,13 +42,38 @@ test('a repo without a branch gets an existing branch from its menu', async ({ r
   await expect(page.locator(t('ade-branch-form'))).toHaveCount(0);
 });
 
+test('the form asks for the candidates of the row repo, and Enter picks the first option', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openPlan(relaunch, [candidates]);
+  await openTask(page, 'T_alerts');
+  await pick(page, 'd_alerts_web', 'ade-task-branch-add');
+  await expect(page.locator('[data-testid^="ade-branch-form-option-"]').first()).toBeVisible();
+  expect(calls(control, IPC.adeTaskCandidateBranches).at(-1)?.args).toEqual({
+    codeRepoId: 'repo-web-app',
+  });
+  await page.locator(t('ade-branch-form-search')).press('ArrowDown');
+  await page.locator(t('ade-branch-form-search')).press('Enter');
+  await expect.poll(() => calls(control, IPC.adeTaskSetTaskBranch)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskSetTaskBranch)[0]?.args).toMatchObject({ existing: true });
+});
+
+test('an invalid new branch name shows its error and sends nothing', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await openTask(page, 'T_alerts');
+  await pick(page, 'd_alerts_api', 'ade-task-branch-add');
+  await page.locator(t('ade-branch-form-search')).fill('-bad');
+  await expect(page.locator(t('ade-branch-form-error'))).toBeVisible();
+  await page.locator(t('ade-branch-form-search')).press('Enter');
+  expect(calls(control, IPC.adeTaskSetTaskBranch)).toHaveLength(0);
+});
+
 test('a repo without a branch gets a new branch name', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_alerts');
   await pick(page, 'd_alerts_api', 'ade-task-branch-add');
-  await page.locator(t('ade-branch-form-new')).click();
-  await page.locator(t('ade-branch-form-name')).fill('feat/alerts-api');
-  await page.locator(t('ade-branch-form-create')).click();
+  await page.locator(t('ade-branch-form-search')).fill('feat/alerts-api');
+  await page.locator(t('ade-branch-form-custom')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSetTaskBranch)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskSetTaskBranch)[0]?.args).toEqual({
     branchId: 'd_alerts_api',
@@ -59,9 +91,8 @@ test('a refused name stays in the form', async ({ relaunch }) => {
   ]);
   await openTask(page, 'T_alerts');
   await pick(page, 'd_alerts_api', 'ade-task-branch-add');
-  await page.locator(t('ade-branch-form-new')).click();
-  await page.locator(t('ade-branch-form-name')).fill('feat/x');
-  await page.locator(t('ade-branch-form-create')).click();
+  await page.locator(t('ade-branch-form-search')).fill('feat/x');
+  await page.locator(t('ade-branch-form-custom')).click();
   await expect(page.locator(t('ade-branch-form-error'))).toContainText('already exists');
   await expect(page.locator(t('ade-branch-form'))).toBeVisible();
 });
@@ -70,7 +101,7 @@ test('Change repo swaps the repo of a row without a branch', async ({ relaunch }
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_alerts');
   await pick(page, 'd_alerts_api', 'ade-task-repo-change');
-  await page.locator(t('ade-branch-form-repo')).selectOption('repo-mobile');
+  await page.locator(t('ade-branch-form-repo-option-repo-mobile')).click();
   await expect.poll(() => calls(control, IPC.adeTaskUpdateTaskRepo)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskUpdateTaskRepo)[0]?.args).toEqual({
     branchId: 'd_alerts_api',
@@ -136,7 +167,7 @@ test('Add branch on the task still attaches an existing branch to a new row', as
   await page.locator(t('ade-add-branch')).click();
   await expect(page.locator(t('ade-add-popover'))).toBeVisible();
   await page.locator(t('ade-branch-search')).fill('invoice');
-  await page.locator(t('ade-candidate')).first().click();
+  await page.locator('[data-testid^="ade-branch-option-"]').first().click();
   await expect.poll(() => calls(control, IPC.adeTaskAddExistingBranch)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskAddExistingBranch)[0]?.args).toEqual({
     codeRepoId: 'repo-web-app',

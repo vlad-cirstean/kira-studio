@@ -149,7 +149,8 @@ test('a refused estimate shows the backend error', async ({ relaunch }) => {
 test('+ Add repo adds a draft branch in the chosen repo', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_bill');
-  await page.locator('[data-testid="ade-add-repo"]').selectOption('repo-mobile');
+  await page.locator('[data-testid="ade-add-repo"]').click();
+  await page.locator('[data-testid="ade-add-repo-option-repo-mobile"]').click();
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.adeTaskAddTaskRepo))
     .toHaveLength(1);
@@ -171,7 +172,7 @@ test('+ Add branch attaches an existing branch to this task', async ({ relaunch 
   await expect(page.locator('[data-testid="ade-add-attach"]')).toContainText('Adding to');
   await expect(page.locator('[data-testid="ade-add-tab-new"]')).toHaveCount(0);
   await page.locator('[data-testid="ade-branch-search"]').fill('invoice');
-  await page.locator('[data-testid="ade-candidate"]').first().click();
+  await page.locator('[data-testid^="ade-branch-option-"]').first().click();
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.adeTaskAddExistingBranch))
     .toHaveLength(1);

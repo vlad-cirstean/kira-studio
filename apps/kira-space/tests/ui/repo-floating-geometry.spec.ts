@@ -71,14 +71,14 @@ test('the base selector popover shifts back on-screen near the right edge', asyn
   relaunch,
 }) => {
   const page = await openReviewListing(relaunch);
-  const trigger = page.locator('[data-testid="base-selector-trigger"]');
+  const trigger = page.locator('[data-testid="base-selector"]');
   await expect(trigger).toBeVisible();
   const box = await trigger.boundingBox();
-  if (!box) throw new Error('base-selector-trigger has no box');
+  if (!box) throw new Error('base-selector has no box');
 
   await page.setViewportSize({ width: Math.ceil(box.x + box.width + 20), height: 700 });
   await trigger.click();
-  const panel = page.locator('[role="dialog"][aria-label="Choose a comparison base"]');
+  const panel = page.locator('[data-testid="base-selector-content"]');
   await expect(panel).toBeVisible();
   const panelBox = await panel.boundingBox();
   if (!panelBox) throw new Error('base selector panel has no box');

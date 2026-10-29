@@ -103,7 +103,7 @@ test('plain text still filters candidates', async ({ relaunch }) => {
   ]);
   await openLinkTab(page);
   await page.locator(t('ade-branch-search')).fill('invoice');
-  await expect(page.locator(t('ade-candidate'))).toHaveCount(1);
+  await expect(page.locator('[data-testid^="ade-branch-option-"]')).toHaveCount(1);
   expect(calls(control, IPC.adeTaskResolveHostLink)).toHaveLength(0);
 });
 

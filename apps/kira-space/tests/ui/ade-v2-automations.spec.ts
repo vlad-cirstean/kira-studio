@@ -144,11 +144,16 @@ test('the branch radio disables a branch without a worktree and says why', async
   await page.locator(t('menu-item-ade-task-automation')).click();
   await page.locator(t('menu-item-ade-automation-smart-1')).click();
   const dialog = page.locator(t('run-dialog'));
-  await expect(dialog.locator(t('run-branch-d_alerts_api'))).toBeEnabled();
-  await expect(dialog.locator(t('run-branch-d_alerts_web'))).toBeDisabled();
-  await expect(dialog.locator(t('run-branch-why-d_alerts_web'))).toContainText('no worktree');
+  await dialog.locator(t('run-branch')).click();
+  const options = page.locator(t('run-branch-content'));
+  await expect(options.locator(t('run-branch-option-d_alerts_api'))).not.toHaveAttribute(
+    'data-disabled',
+  );
+  const web = options.locator(t('run-branch-option-d_alerts_web'));
+  await expect(web).toHaveAttribute('data-disabled');
+  await expect(web).toContainText('no worktree');
 
-  await dialog.locator(t('run-branch-d_alerts_api')).click();
+  await options.locator(t('run-branch-option-d_alerts_api')).click();
   await expect
     .poll(
       () => (calls(control, IPC.scriptRunsPreview).at(-1)?.args as { branchId?: string })?.branchId,

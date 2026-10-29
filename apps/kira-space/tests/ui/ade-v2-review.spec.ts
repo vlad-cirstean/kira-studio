@@ -118,7 +118,7 @@ reviewTest("the left bar stays on the window's branch", async ({ relaunch }) => 
   const page = await openReview(relaunch);
   await expect(page.locator(t('review-branch-name'))).toHaveText('feat/billing-dashboard');
   await expect(page.locator(t('review-base-name'))).toHaveText('main');
-  for (const id of ['review-back-button', 'review-swap-button', 'base-selector-trigger']) {
+  for (const id of ['review-back-button', 'review-swap-button', 'base-selector']) {
     await expect(page.locator(t(id))).toHaveCount(0);
   }
   await page.locator(t('review-pane-commits')).click();
