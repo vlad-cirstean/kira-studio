@@ -19,16 +19,6 @@ mutation_ts() {
     cp -R "$ROOT_DIR/apps/$_app/frontend/bindings" "$SNAP/apps/$_app/frontend/bindings"
   done
 
-  # The runner eager-imports every mutated module before any spec, so modules that reach
-  # /wails/runtime.js (bridge/port.ts opens a Stream at module scope) fail before the specs'
-  # own mock.module registers. Preloading the helpers via the snapshot bunfig fixes the order.
-  cat >>"$SNAP/bunfig.toml" <<'TOML'
-
-# mutation runner only (P151): see docs/DEV_ENVIRONMENT.md
-[test]
-preload = ["./packages/workbench/src/testing/unit/window.ts", "./packages/workbench/src/testing/unit/wailsRuntime.ts"]
-TOML
-
   mkdir -p "$RUN_DIR/ts"
   _areas="$TARGETS"
   [ -n "$_areas" ] || _areas="$(jq -r '.areas | keys_unsorted[]' "$TOOLS_DIR/areas.json")"
