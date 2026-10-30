@@ -42,6 +42,12 @@ const { model } = usePlanModel();
 const start = useStartRun();
 const card = computed(() => (ui.runTaskId ? (model.value?.cardFor(ui.runTaskId) ?? null) : null));
 const open = computed(() => card.value !== null);
+// What the server adds to the prompt besides the editable message: the previous stage's handover and the task notes.
+const handoverIn = computed(() => {
+  const h = card.value?.task.handoverIn;
+  return h?.body && h.toStepId === card.value?.progress.step?.id ? h : null;
+});
+const taskNotes = computed(() => card.value?.task.notes ?? '');
 const close = (): void => {
   ui.runTaskId = null;
 };
@@ -202,6 +208,28 @@ const send = sending.run;
           :repo="r.repo"
           data-testid="ade-run-setup"
         />
+        <div
+          v-if="handoverIn || taskNotes"
+          class="flex flex-col gap-1.5"
+          data-testid="ade-run-context"
+        >
+          <div v-if="handoverIn" class="flex flex-col gap-1" data-testid="ade-run-handover">
+            <span class="text-muted-foreground">{{
+              t('space.ade.runDialog.handover.label', { stage: handoverIn.fromStepName })
+            }}</span>
+            <Card class="whitespace-pre-wrap break-words font-data text-kira-sm">{{
+              handoverIn.body
+            }}</Card>
+          </div>
+          <div v-if="taskNotes" class="flex flex-col gap-1" data-testid="ade-run-notes">
+            <span class="text-muted-foreground">{{
+              t('space.ade.runDialog.taskNotes.label')
+            }}</span>
+            <Card class="whitespace-pre-wrap break-words font-data text-kira-sm">{{
+              taskNotes
+            }}</Card>
+          </div>
+        </div>
         <div v-if="smartStep" class="flex flex-col gap-1" data-testid="ade-run-smart">
           <div class="flex items-center gap-2 text-muted-foreground">
             <SmartBadge />

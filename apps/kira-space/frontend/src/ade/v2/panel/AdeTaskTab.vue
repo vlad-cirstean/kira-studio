@@ -53,6 +53,18 @@ async function write(patch: Partial<TaskPatch>): Promise<boolean> {
   }
 }
 
+// ---- handover
+const currentStepId = computed(() =>
+  props.card.progress.finished ? 'done' : (props.card.progress.step?.id ?? ''),
+);
+/** The current stage's open draft, else what the last move left for it. */
+const handoverSnippet = computed(() => {
+  const draft = task.value.handoverDrafts.find((d) => d.fromStepId === currentStepId.value);
+  if (draft?.body) return draft.body;
+  const h = task.value.handoverIn;
+  return h && h.toStepId === currentStepId.value ? h.body : '';
+});
+
 // ---- status
 const why = computed(() =>
   statusWhy(task.value, props.card.status, props.card.blocked, props.card.progress),
@@ -146,6 +158,36 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
       <dd
         ><AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" /></dd
       >
+      <template v-if="!review && (task.notes || handoverSnippet)">
+        <template v-if="task.notes">
+          <dt>{{ t('space.common.notes.label') }}</dt>
+          <dd>
+            <button
+              type="button"
+              class="line-clamp-2 w-full text-left text-kira-md hover:underline"
+              data-testid="ade-task-notes-row"
+              @click="ui.taskTab = 'notes'"
+              >{{
+                task.notes
+              }}</button
+            >
+          </dd>
+        </template>
+        <template v-if="handoverSnippet">
+          <dt>{{ t('space.ade.taskTab.handover.label') }}</dt>
+          <dd>
+            <button
+              type="button"
+              class="line-clamp-2 w-full text-left text-kira-md hover:underline"
+              data-testid="ade-task-handover-row"
+              @click="ui.taskTab = 'notes'"
+              >{{
+                handoverSnippet
+              }}</button
+            >
+          </dd>
+        </template>
+      </template>
       <template v-if="!review">
         <dt />
         <dd class="flex min-h-row items-center gap-2">

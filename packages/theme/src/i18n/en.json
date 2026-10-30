@@ -7463,6 +7463,29 @@
         "body": "Replaces the remote branch “{branch}” in {repo} with your local one. Refused when someone else pushed since your last fetch.",
         "title": "Force push?"
       },
+      "handover": {
+        "draftFrom": {
+          "label": "{from} (open)"
+        },
+        "edit": {
+          "tooltip": "Edit handover"
+        },
+        "empty": {
+          "body": "No handovers yet. The notes a stage leaves for the next show here."
+        },
+        "finished": {
+          "status": "Ready to hand over"
+        },
+        "fromTo": {
+          "label": "{from} to {to}"
+        },
+        "moveOn": {
+          "label": "Move on…"
+        },
+        "title": {
+          "title": "Handovers"
+        }
+      },
       "header": {
         "created": {
           "label": "Created when the pipeline runs"
@@ -8164,8 +8187,14 @@
         }
       },
       "runDialog": {
+        "handover": {
+          "label": "Handover from {stage}"
+        },
         "smartMissing": {
           "error": "This smart script was not found."
+        },
+        "taskNotes": {
+          "label": "Task notes"
         },
         "title": {
           "title": "Run {step} in the background"
@@ -8459,6 +8488,9 @@
           "trigger": {
             "aria": "Repository and branch actions"
           }
+        },
+        "handover": {
+          "label": "Handover"
         },
         "issue": {
           "label": "Issue"

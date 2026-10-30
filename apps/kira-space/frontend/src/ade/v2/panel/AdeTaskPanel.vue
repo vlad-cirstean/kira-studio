@@ -16,6 +16,7 @@ import { archiveTip } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
 import { taskReviewTip } from '../board/reviewCode';
+import AdeHandoverList from '../notes/AdeHandoverList.vue';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
 import { useTaskMenu } from '../plan/useTaskMenu';
@@ -228,11 +229,16 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
     </template>
     <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />
     <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
-    <div v-else class="flex min-h-0 flex-1 flex-col p-3" data-testid="ade-notes-tab">
+    <div
+      v-else
+      class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"
+      data-testid="ade-notes-tab"
+    >
       <AdeNotesEditor :notes="card.task.notes" :item-id="card.task.id" @save="saveNotes" />
       <Alert v-if="notesError" variant="error" data-testid="ade-notes-error"
         ><AlertDescription>{{ notesError }}</AlertDescription></Alert
       >
+      <AdeHandoverList :task-id="card.task.id" />
     </div>
   </AdePanelFrame>
 </template>

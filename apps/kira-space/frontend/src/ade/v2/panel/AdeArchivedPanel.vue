@@ -14,6 +14,7 @@ import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
 import { useHostLabels } from '../hostLabels';
+import AdeHandoverList from '../notes/AdeHandoverList.vue';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useRestoreTask } from '../queries';
@@ -306,10 +307,11 @@ async function onRestore(): Promise<void> {
         </div>
         <div
           v-else-if="tab === 'notes'"
-          class="flex min-h-0 flex-1 flex-col p-3"
+          class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"
           data-testid="ade-archived-notes"
         >
           <AdeNotesEditor :notes="a.task.notes" :item-id="a.task.id" readonly />
+          <AdeHandoverList :task-id="a.task.id" readonly />
         </div>
         <AdeSessionsTab v-else :task-id="a.task.id" archived />
       </AdePanelFrame>
