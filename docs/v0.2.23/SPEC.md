@@ -9,7 +9,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P404 | Board: archived tasks inline, session indicator, weekend pattern, branch status colors | Done |
 | P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Done |
 | P406 | Nanoid branch names for agent-created worktrees | Done |
-| P407 | Stage handover: session context notes and stage-change dialogs | Todo |
+| P407 | Stage handover: session context notes and stage-change dialogs | Done |
 | P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Todo |
 | P409 | Finishing a task returns every artifact via MCP | Todo |
 | P410 | Task plus button: terminal or ad hoc Claude session in worktree | Todo |
@@ -59,6 +59,8 @@ Worktrees the agent creates use a nanoid as branch name. Agent-chosen names caus
 - If the session reports finished work, show a "move to next stage" dialog carrying that context.
 - Manual stage change shows the same dialog, with a place to add notes by hand.
 - No handover exists between stages today. Notes are visible only at task creation and never again: make notes transparent. Everything automatic, yet visible and editable manually later.
+
+**Result.** Migration 0057 adds `ade_task_handovers`: one handed row per stage move, one open draft per (task, stage). MCP tool `handover` (`notes`, `finished`) goes to every task session without a run (manual, branch Start, review agent); `Grant.StepID` makes a late call fail with "The task moved on". `StepDone` and `SetTaskStep` take `notes` and turn the draft into a handed row in one transaction; a finished run inserts a `run` row from its summaries. A finished draft raises routed prompt `handover` (reopens at start, closes on move, dismiss, delete, archive). Next stage gets task notes and handover in step, manual, review and start prompts (`ade.handoverBlock`, `ade.handoverLine`). Desktop: `AdeStageDialog` for every step move, `AdeHandoverPrompt`, `AdeHandoverList` in Notes tab and archived panel, Task tab rows, Run dialog block, session dialog mirror. Mobile Back/Next takes optional notes. Tests: flows/adeflow `TestStageHandover` (`ade-handover`), `ade-v2-handover.spec.ts`, mobile writes spec; ADE real `claude` row passes. Deviations: adewire and bridge landed with the engine commit; `UpdateHandover` returns only an error; the review agent now gets Space tools through the shared grant path.
 
 ### P408 Branch and worktree requests: approval dialog, multi-branch MCP tool
 
