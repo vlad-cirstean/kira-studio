@@ -97,7 +97,7 @@ Server name `kira-ade`. `finish_step` is available to every agent run. `fetch_re
 - `reply_review_comment`: answer one review comment. Only in a workflow review round. Call once per comment. Arguments: `id`, `reply`, `resolved`.
 - `task_info`: the task, its workflow, step, repositories and branches.
 - `declare_repos`: add registered repositories to the task. Argument: `repos`, 1 to 20.
-- `request_branch`: create a branch and its worktree. Arguments: `repo`, `name`.
+- `request_branch`: create a branch and its worktree. Kira Space names the branch (`kira/<id>`). Argument: `repo`.
 - `branch_status`: the worktree and setup state of a branch. Arguments: `repo`, `waitSeconds` (0 to 600).
 - `run_outcome`: how the latest runs of the task ended. Arguments: `runId`, `branch`, `kind`, `limit` (default 3, maximum 10).
 - `fetch_remote`: fetch one remote of the repository, in the app. Sandboxed runs only. Argument: `remote` (default `origin`).

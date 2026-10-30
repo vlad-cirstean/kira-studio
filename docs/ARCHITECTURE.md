@@ -2166,7 +2166,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Agent tools (P199) are implemented in ade/agenttools.go as agentmcp.SpaceTools on *ade.TaskBoard; the loopback MCP server issues scoped grants (run, task, Space) with one bearer token per launch.
 - A workflow with kira_space_mcp gives headless runs and the task's TUI sessions the Space grant: task_info, declare_repos, request_branch, branch_status.
 - declare_repos accepts registered repos only and is additive.
-- request_branch checks the name with git check-ref-format --branch, refuses main and integration branches, is idempotent, refuses rename and collisions, and sets up the worktree and prepare script through ensureWorktree/startSetup.
+- request_branch takes only repo. Kira Space names a new branch kira/<10-char nanoid> (claimBranchName generated mode, up to 5 tries on a taken name), never an agent-chosen name; a named row returns its existing worktree. Worktree and prepare script go through ensureWorktree/startSetup.
 - Agent tools act only on the token's task; repo refs resolve by nickname, then name, then id; errors return as actionable ToolError text.
 - Branches and repos added by an agent carry origin = 'agent' and show an agent chip.
 - Git refresh (P191): the UI sends the explicit repo ids it shows; refreshRepo runs env scripts beside the fetch, not before it.
@@ -3333,7 +3333,7 @@ Performance:
 - **Re-importing a changed document never retracts facts (P211).** New facts add or update; facts the edit removed stay as current memories. Delete if memories gain a delete or retract path.
 - **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
-- **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
+- **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` creates a branch only when the agent calls it; a branch the run already created keeps its derived name.
 - **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `agentmcp` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **Change request facts correct on the next request, not by push (P189).** No server-to-client change notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
