@@ -112,9 +112,6 @@ func (f *fakeReader) Sessions(context.Context) (adewire.SessionsResult, error) {
 func (f *fakeReader) Workflows(context.Context) (adewire.WorkflowsResult, error) {
 	return adewire.WorkflowsResult{}, nil
 }
-func (f *fakeReader) Backlog(context.Context) (adewire.BacklogResult, error) {
-	return adewire.BacklogResult{Items: []adewire.BacklogItem{{ID: "b1", Text: "first"}}}, nil
-}
 func (f *fakeReader) Repos(context.Context) (adewire.ReposResult, error) {
 	return adewire.ReposResult{Repos: []adewire.Repo{{CodeRepoID: "r1", Name: "api", PrepareScript: "secret"}}}, nil
 }

@@ -47,7 +47,6 @@ const (
 type TaskBoardDeps struct {
 	Tasks           *repos.AdeTaskRepo
 	Statuses        *repos.AdeStatusRepo
-	Backlog         *repos.AdeBacklogRepo
 	RepoConfig      *repos.AdeRepoConfigRepo
 	Facts           *repos.AdeFactsRepo
 	CodeRepos       *repos.CodeReposRepo
@@ -106,7 +105,6 @@ type TaskBoardDeps struct {
 	// uses, notification included, so git-ui sees a new prepare script.
 	SetRepoSettings func(repoID string, patch model.GitRepoSettingsPatch) error
 	OnBoard         func()
-	OnBacklog       func()
 	OnWorkflows     func()
 	OnRepos         func()
 	// Credentials receives the remote ops' credential prompts, shown in Kira Space's windows.
@@ -266,12 +264,6 @@ func (b *TaskBoard) scheduleBoard() {
 func (b *TaskBoard) notifyBoard() {
 	if b.deps.OnBoard != nil {
 		b.deps.OnBoard()
-	}
-}
-
-func (b *TaskBoard) notifyBacklog() {
-	if b.deps.OnBacklog != nil {
-		b.deps.OnBacklog()
 	}
 }
 

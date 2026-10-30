@@ -29,7 +29,6 @@ export function installAdeSignals(
   );
   installAdeReadSignals(queryClient, {
     onBoard: control.onAdeTaskBoard,
-    onBacklog: control.onAdeTaskBacklog,
     onWorkflows: control.onAdeTaskWorkflows,
     onSessions: control.onAdeTaskSessions,
     onRuns: control.onAdeTaskRuns,

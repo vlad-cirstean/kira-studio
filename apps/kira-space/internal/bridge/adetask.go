@@ -57,9 +57,6 @@ func AdeTaskOpenSession(e appcore.Emitter, windowKey string, payload adewire.Ope
 // AdeTaskBoardChanged is TaskBoard.OnBoard's target: payload-free, every window re-fetches Board.
 func AdeTaskBoardChanged(ev *Events) { ev.Broadcast(adewire.ChannelBoard) }
 
-// AdeTaskBacklogChanged is TaskBoard.OnBacklog's target: payload-free.
-func AdeTaskBacklogChanged(ev *Events) { ev.Broadcast(adewire.ChannelBacklog) }
-
 // AdeTaskRunsChanged is TaskBoard.OnRuns' target: the changed runs ride the event.
 func AdeTaskRunsChanged(ev *Events, payload adewire.RunsChangedEvent) {
 	ev.emit.Emit(adewire.ChannelRuns, payload)
@@ -104,7 +101,6 @@ var adeTaskCatalog = []struct {
 	{ade.ErrResumeCwdNotDir, ipcerr.CodeConflict, "backend.space.ade.resumeCwdNotDir.body"},
 	{repos.ErrTaskNotFound, ipcerr.CodeNotFound, "backend.space.ade.taskNotFound.body"},
 	{repos.ErrBranchMissing, ipcerr.CodeNotFound, "backend.space.ade.branchMissing.body"},
-	{repos.ErrBacklogGone, ipcerr.CodeNotFound, "backend.space.ade.backlogGone.body"},
 	{repos.ErrRunNotFound, ipcerr.CodeNotFound, "backend.space.ade.runNotFound.body"},
 	{ade.ErrSessionNotFound, ipcerr.CodeNotFound, "backend.space.ade.sessionNotFound.body"},
 	{harness.ErrProviderGone, ipcerr.CodeConflict, "backend.core.agent.providerGone.body"},
@@ -318,26 +314,6 @@ func validateSetPlan(a adewire.SetPlanArgs) error {
 	return nil
 }
 
-func validateBacklogPatch(p adewire.BacklogPatch) error {
-	if p.Text != nil {
-		if err := validateAdeName(*p.Text, "text"); err != nil {
-			return err
-		}
-	}
-	if err := validateAdeTaskJira(p.Jira); err != nil {
-		return err
-	}
-	if p.HostURL != nil {
-		if err := validateAdeURL(*p.HostURL, "hostUrl"); err != nil {
-			return err
-		}
-	}
-	if p.Notes != nil {
-		return validateAdeNotes(*p.Notes)
-	}
-	return nil
-}
-
 // --- reads -------------------------------------------------------------------------------------
 
 func (s *AdeTaskService) Board(ctx context.Context) (adewire.Board, error) {
@@ -373,11 +349,6 @@ func (s *AdeTaskService) CandidateBranches(ctx context.Context, args adewire.Can
 		}
 	}
 	r, err := s.Engine.CandidateBranches(ctx, args.CodeRepoID)
-	return r, adeTaskError(err)
-}
-
-func (s *AdeTaskService) Backlog(ctx context.Context) (adewire.BacklogResult, error) {
-	r, err := s.Engine.Backlog(ctx)
 	return r, adeTaskError(err)
 }
 
@@ -658,58 +629,6 @@ func (s *AdeTaskService) SetQueuedAfter(ctx context.Context, args adewire.SetQue
 		}
 	}
 	return adeTaskError(s.Engine.SetQueuedAfter(ctx, args))
-}
-
-func (s *AdeTaskService) AddBacklogItem(ctx context.Context, args adewire.AddBacklogItemArgs) (adewire.BacklogItem, error) {
-	if strings.TrimSpace(args.Text) == "" {
-		return adewire.BacklogItem{}, adeTaskInvalid("text is required")
-	}
-	if err := validateAdeName(args.Text, "text"); err != nil {
-		return adewire.BacklogItem{}, err
-	}
-	it, err := s.Engine.AddBacklogItem(ctx, args)
-	return it, adeTaskError(err)
-}
-
-func (s *AdeTaskService) UpdateBacklogItem(ctx context.Context, args adewire.UpdateBacklogItemArgs) (adewire.BacklogItem, error) {
-	if err := validateAdeTaskID(args.ID, "id"); err != nil {
-		return adewire.BacklogItem{}, err
-	}
-	if err := validateBacklogPatch(args.Patch); err != nil {
-		return adewire.BacklogItem{}, err
-	}
-	if args.Patch.HostURL != nil {
-		if err := s.validateHostLink(*args.Patch.HostURL); err != nil {
-			return adewire.BacklogItem{}, err
-		}
-	}
-	it, err := s.Engine.UpdateBacklogItem(ctx, args)
-	return it, adeTaskError(err)
-}
-
-func (s *AdeTaskService) MoveBacklogItem(ctx context.Context, args adewire.MoveBacklogItemArgs) error {
-	if err := validateAdeTaskID(args.ID, "id"); err != nil {
-		return err
-	}
-	if args.ToIndex < 0 {
-		return adeTaskInvalid("toIndex must not be negative")
-	}
-	return adeTaskError(s.Engine.MoveBacklogItem(ctx, args))
-}
-
-func (s *AdeTaskService) DeleteBacklogItem(ctx context.Context, args adewire.BacklogItemArgs) error {
-	if err := validateAdeTaskID(args.ID, "id"); err != nil {
-		return err
-	}
-	return adeTaskError(s.Engine.DeleteBacklogItem(ctx, args))
-}
-
-func (s *AdeTaskService) PromoteBacklogItem(ctx context.Context, args adewire.BacklogItemArgs) (adewire.Task, error) {
-	if err := validateAdeTaskID(args.ID, "id"); err != nil {
-		return adewire.Task{}, err
-	}
-	t, err := s.Engine.PromoteBacklogItem(ctx, args)
-	return t, adeTaskError(err)
 }
 
 // --- workflow files and repo config (P145) -------------------------------------------------------

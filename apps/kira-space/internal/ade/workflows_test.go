@@ -48,7 +48,7 @@ func TestWorkflows_writesAndExternalEdits(t *testing.T) {
 	b := NewTaskBoard(TaskBoardDeps{
 		Agent:       testAgents,
 		Credentials: gitcred.New(),
-		Tasks:       r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Tasks:       r.AdeTasks, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		Logs:   r.AdeLogs,
 		Runner: gitclient.NewExecRunner(), Registry: registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },

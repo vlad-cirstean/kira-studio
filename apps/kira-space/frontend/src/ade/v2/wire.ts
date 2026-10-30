@@ -479,20 +479,6 @@ export interface ChangeRequestsResult {
   branchUrls: Record<string, string> /* branchId -> web page; absent without a host */;
 }
 
-// ---- backlog (§11.1, O2)
-export interface BacklogItem {
-  id: string;
-  text: string;
-  addedAt: number;
-  jira: Jira | null;
-  hostUrl: string;
-  hostLink: HostLink | null;
-  notes: string;
-}
-export interface BacklogResult {
-  items: BacklogItem[] /* order = priority */;
-}
-
 // ---- add / refresh / archive results
 export interface CandidateBranch {
   codeRepoId: string;
@@ -828,27 +814,6 @@ export interface ShelveTaskArgs {
 }
 export interface CaptureTaskArgs {
   title: string;
-}
-export interface AddBacklogItemArgs {
-  text: string;
-}
-export interface BacklogPatch {
-  text: string | null;
-  jira: Jira | null;
-  clearJira: boolean;
-  hostUrl: string | null;
-  notes: string | null;
-}
-export interface UpdateBacklogItemArgs {
-  id: string;
-  patch: BacklogPatch;
-}
-export interface BacklogItemArgs {
-  id: string;
-}
-export interface MoveBacklogItemArgs {
-  id: string;
-  toIndex: number;
 }
 export interface FileNameArgs {
   fileName: string;

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 )
 
 func normalize(t *testing.T, v any) any {
@@ -69,7 +68,7 @@ func pairedPhone(t *testing.T, f *fixture) (*phone, string) {
 func TestPhoneReadsRealAde(t *testing.T) {
 	f := newFixture(t)
 	app := f.app
-	if _, err := app.W.AdeTask.AddBacklogItem(ctx, adewire.AddBacklogItemArgs{Text: "Write the docs"}); err != nil {
+	if _, err := app.W.AdeTask.CaptureTask(ctx, adewire.CaptureTaskArgs{Title: "Write the docs"}); err != nil {
 		t.Fatal(err)
 	}
 	f.startSession(t)
@@ -103,9 +102,6 @@ func TestPhoneReadsRealAde(t *testing.T) {
 		t.Fatalf("bound board has no worktree branch: %+v", board.Branches)
 	}
 	check("/api/ade/board", board)
-	backlog, _ := app.W.AdeTask.Backlog(ctx)
-	check("/api/ade/backlog", backlog)
-	app.Contract(t, "mobile-board", "http:GET /api/ade/backlog", p.get("/api/ade/backlog").raw(t), flowharness.Mask("addedAt"))
 	workflows, _ := app.W.AdeTask.Workflows(ctx)
 	check("/api/ade/workflows", workflows)
 	sessions, _ := app.W.AdeTask.Sessions(ctx)

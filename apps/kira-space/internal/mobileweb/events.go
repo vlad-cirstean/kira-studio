@@ -19,7 +19,6 @@ import (
 // it reaches a phone.
 var eventChannels = map[string]func(any) (any, error){
 	adewire.ChannelBoard:          nil,
-	adewire.ChannelBacklog:        nil,
 	adewire.ChannelWorkflows:      nil,
 	adewire.ChannelRepos:          nil,
 	adewire.ChannelRuns:           nil,

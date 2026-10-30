@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-// Sentinels AdeTaskRepo/AdeBacklogRepo return; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
+// Sentinels AdeTaskRepo returns; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
 var (
 	ErrTaskNotFound = errors.New("repos: task not found")
 	// ErrTaskNotArchived marks an archived-only call on a live task.
@@ -28,7 +28,6 @@ var (
 	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task only becomes a task")
 	ErrTaskUnnamed   = errors.New("a task needs a title or a Jira key")
 	ErrBranchMissing = errors.New("repos: branch not found")
-	ErrBacklogGone   = errors.New("repos: backlog item not found")
 	ErrRunNotFound   = errors.New("repos: run not found")
 	// ErrBranchNameTaken marks a created-branch name already used by a live branch of the repo.
 	ErrBranchNameTaken = errors.New("repos: a live branch in that repo already has that name")

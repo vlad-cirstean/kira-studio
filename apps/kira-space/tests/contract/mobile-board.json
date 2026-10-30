@@ -1,7 +1,4 @@
 {
-  "args:POST /api/ade/backlog/items": {
-    "text": "first"
-  },
   "args:POST /api/ade/later/items": {
     "title": "first"
   },
@@ -9,28 +6,6 @@
     "beforeId": "",
     "shelf": "backlog",
     "taskId": "<id:2>"
-  },
-  "http:GET /api/ade/backlog": {
-    "items": [
-      {
-        "addedAt": 0,
-        "hostLink": null,
-        "hostUrl": "",
-        "id": "<id:1>",
-        "jira": null,
-        "notes": "",
-        "text": "Write the docs"
-      }
-    ]
-  },
-  "http:POST /api/ade/backlog/items": {
-    "addedAt": 0,
-    "hostLink": null,
-    "hostUrl": "",
-    "id": "<id:1>",
-    "jira": null,
-    "notes": "",
-    "text": "first"
   },
   "http:POST /api/ade/later/items": {
     "branchIds": [],

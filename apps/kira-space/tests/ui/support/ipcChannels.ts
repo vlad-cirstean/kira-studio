@@ -245,7 +245,6 @@ export const IPC = {
   adeTaskRemoveTaskRepo: 'kira:adetask:removeTaskRepo',
   adeTaskTaskBranchRisk: 'kira:adetask:taskBranchRisk',
   adeTaskBoardChanged: 'kira:adetask:board',
-  adeTaskBacklogChanged: 'kira:adetask:backlog',
   adeTaskReposChanged: 'kira:adetask:repos',
   adeTaskWorkflowsChanged: 'kira:adetask:workflows',
   adeTaskRunsChanged: 'kira:adetask:runs',

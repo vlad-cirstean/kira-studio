@@ -1,6 +1,5 @@
 import { t } from '@theme/i18n';
 import type {
-  BacklogPatch,
   MergedInto,
   RemoteOpError,
   RepoRefresh,
@@ -82,8 +81,4 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
     statusId: null,
     ...over,
   };
-}
-
-export function backlogPatch(over: Partial<BacklogPatch>): BacklogPatch {
-  return { text: null, jira: null, clearJira: false, hostUrl: null, notes: null, ...over };
 }

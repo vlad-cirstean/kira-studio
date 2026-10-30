@@ -74,7 +74,7 @@ interface TimelineSpan {
   startDay: number;
 }
 
-export interface TimelineHistoryItem {
+interface TimelineHistoryItem {
   taskId: string;
   title: string;
   day: number;

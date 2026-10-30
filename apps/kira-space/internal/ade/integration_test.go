@@ -58,7 +58,7 @@ func newIntegFixture(t *testing.T) *integFixture {
 	h.board = NewTaskBoard(TaskBoardDeps{
 		Agent:       testAgents,
 		Credentials: gitcred.New(),
-		Tasks:       r.AdeTasks, Statuses: r.AdeStatuses, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Tasks:       r.AdeTasks, Statuses: r.AdeStatuses, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		Runner: cr, Registry: registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return h.status.Load().(gitclient.GitStatus) },
 		Workflows: &adeflow.Reader{Dir: t.TempDir(), Store: r.AdeTasks},

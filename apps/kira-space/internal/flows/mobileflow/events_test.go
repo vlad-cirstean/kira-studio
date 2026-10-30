@@ -33,23 +33,21 @@ func TestPhoneEventStream(t *testing.T) {
 	if _, err := app.W.Mobile.SetAgentInputEnabled(bridge.MobileSetAgentInputArgs{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := app.W.AdeTask.AddBacklogItem(ctx, adewire.AddBacklogItemArgs{Text: "Seen on the phone"}); err != nil {
+	if _, err := app.W.AdeTask.CaptureTask(ctx, adewire.CaptureTaskArgs{Title: "Seen on the phone"}); err != nil {
 		t.Fatal(err)
 	}
-	var backlog sseFrame
 	for {
 		fr := stream.next(t)
 		if strings.HasPrefix(fr.Event, "kira:mobile:") || fr.Event == "kira:settings:changed" {
 			t.Fatalf("desktop-only event %q reached the phone", fr.Event)
 		}
-		if fr.Event == adewire.ChannelBacklog {
-			backlog = fr
+		if fr.Event == adewire.ChannelBoard {
 			break
 		}
 	}
-	// The backlog event is a signal; the phone refetches.
-	if r := p.get("/api/ade/backlog"); !strings.Contains(string(r.Body), "Seen on the phone") {
-		t.Fatalf("backlog after the %q event = %s", backlog.Event, r.Body)
+	// The board event is a signal; the phone refetches.
+	if r := p.get("/api/ade/board"); !strings.Contains(string(r.Body), "Seen on the phone") {
+		t.Fatalf("board after the event = %s", r.Body)
 	}
 
 	if _, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {

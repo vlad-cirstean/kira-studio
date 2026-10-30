@@ -553,20 +553,6 @@ type ChangeRequestsResult struct {
 	BranchURLs map[string]string `json:"branchUrls"`
 }
 
-type BacklogItem struct {
-	ID       string        `json:"id"`
-	Text     string        `json:"text"`
-	AddedAt  int64         `json:"addedAt"`
-	Jira     *Jira         `json:"jira"`
-	HostURL  string        `json:"hostUrl"`
-	HostLink *githost.Link `json:"hostLink"`
-	Notes    string        `json:"notes"`
-}
-
-type BacklogResult struct {
-	Items []BacklogItem `json:"items"`
-}
-
 type CandidateBranch struct {
 	CodeRepoID   string `json:"codeRepoId"`
 	Name         string `json:"name"`
@@ -818,32 +804,6 @@ type ShelveTaskArgs struct {
 // CaptureTaskArgs adds a title-only task at the top of Later.
 type CaptureTaskArgs struct {
 	Title string `json:"title"`
-}
-
-type AddBacklogItemArgs struct {
-	Text string `json:"text"`
-}
-
-type BacklogPatch struct {
-	Text      *string `json:"text"`
-	Jira      *Jira   `json:"jira"`
-	ClearJira bool    `json:"clearJira"`
-	HostURL   *string `json:"hostUrl"`
-	Notes     *string `json:"notes"`
-}
-
-type UpdateBacklogItemArgs struct {
-	ID    string       `json:"id"`
-	Patch BacklogPatch `json:"patch"`
-}
-
-type BacklogItemArgs struct {
-	ID string `json:"id"`
-}
-
-type MoveBacklogItemArgs struct {
-	ID      string `json:"id"`
-	ToIndex int    `json:"toIndex"`
 }
 
 type FileNameArgs struct {

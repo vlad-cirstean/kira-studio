@@ -200,11 +200,11 @@ describe('capacity and overdue', () => {
     expect(band?.overdueTaskIds).toEqual(['a', 'r1']);
   });
 
-  test('unplanned tasks land in the Later band, which is always last', () => {
+  test('unplanned tasks leave the plan: no tail band, no band entry', () => {
     const v = view(board([{ id: 'a' }, { id: 'b', day: 0 }]));
-    const last = v.bands.at(-1);
-    expect(last?.isLater).toBe(true);
-    expect(last?.taskIds).toEqual(['a']);
+    expect(v.bands.some((b) => b.isLater)).toBe(false);
+    expect(v.bands.flatMap((b) => b.taskIds)).toEqual(['b']);
+    expect(v.entries.get('a')?.day).toBe(LATER);
   });
 });
 
@@ -265,45 +265,45 @@ describe('first-10 cap', () => {
 describe('7-day window', () => {
   const keysOf = (v: ReturnType<typeof view>) => v.bands.map((x) => x.key);
 
-  test('an empty board has bands 0..6 then Later', () => {
-    expect(keysOf(view(board([])))).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+  test('an empty board has bands 0..6 and no tail band', () => {
+    expect(keysOf(view(board([])))).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
-  test('work after the window sits in Later with its date, before unplanned work', () => {
+  test('work after the window sits in Further out with its date; unplanned work stays off', () => {
     const v = view(board([{ id: 'free' }, { id: 'far', day: 7, est: '1h' }]));
     expect(v.entries.get('far')?.day).toBe(7);
     expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
-    expect(v.bands.find((x) => x.isLater)?.taskIds).toEqual(['far', 'free']);
+    expect(v.bands.find((x) => x.isLater)?.taskIds).toEqual(['far']);
   });
 
   test('a span running past the window gets continuation rows in the window only', () => {
     const v = view(board([{ id: 'a', day: 3, est: '3d' }]));
     expect(v.entries.get('a')?.days).toEqual([3, 6, 7]);
-    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(v.bands.flatMap((x) => x.spans.map((s) => [x.key, s.dayNumber]))).toEqual([[6, 2]]);
   });
 
-  test('Later hours include work past the window', () => {
+  test('Further out hours count work past the window only', () => {
     const v = view(
       board([
         { id: 'far', day: 8, est: '3h' },
         { id: 'free', est: '1h' },
       ]),
     );
-    expect(v.bands.find((x) => x.isLater)?.hours).toBe(4);
+    expect(v.bands.find((x) => x.isLater)?.hours).toBe(3);
   });
 
   test('a day off past the window adds no band', () => {
     const v = view(board([]), {}, { ...SETTINGS, offDays: [iso(9)] });
-    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6, LATER]);
+    expect(keysOf(v)).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
-  test('the next day pulls the day-7 task from Later into band 6', () => {
+  test('the next day pulls the day-7 task from Further out into band 6', () => {
     const b = board([{ id: 'far', day: 7, est: '1h' }]);
     expect(view(b).bands.find((x) => x.key === 6)?.taskIds).toEqual([]);
     const next = view(b, { today: iso(1) });
     expect(next.bands.find((x) => x.key === 6)?.taskIds).toEqual(['far']);
-    expect(next.bands.find((x) => x.isLater)?.taskIds).toEqual([]);
+    expect(next.bands.find((x) => x.isLater)).toBeUndefined();
   });
 });
 

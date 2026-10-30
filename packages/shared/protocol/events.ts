@@ -98,7 +98,6 @@ export const CHANNEL = {
   // P143: ADE v2 channels (`apps/kira-space/internal/bridge/adewire/channels.go`, verbatim).
   // Payload types live in apps/kira-space/frontend/src/ade/v2/wire.ts.
   adeTaskBoard: 'kira:adetask:board',
-  adeTaskBacklog: 'kira:adetask:backlog',
   adeTaskWorkflows: 'kira:adetask:workflows',
   adeTaskRepos: 'kira:adetask:repos',
   adeTaskRuns: 'kira:adetask:runs',

@@ -1,7 +1,7 @@
 import { activityKind } from '../activity';
 import type { Session } from '../wire';
 
-export type TaskSessionState = 'input' | 'running' | 'finished';
+type TaskSessionState = 'input' | 'running' | 'finished';
 
 export interface TaskSessions {
   state: TaskSessionState;

@@ -34,9 +34,6 @@ func (idleReader) Sessions(context.Context) (adewire.SessionsResult, error) {
 func (idleReader) Workflows(context.Context) (adewire.WorkflowsResult, error) {
 	return adewire.WorkflowsResult{}, nil
 }
-func (idleReader) Backlog(context.Context) (adewire.BacklogResult, error) {
-	return adewire.BacklogResult{}, nil
-}
 func (idleReader) Repos(context.Context) (adewire.ReposResult, error) {
 	return adewire.ReposResult{}, nil
 }

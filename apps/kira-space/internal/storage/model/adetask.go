@@ -312,38 +312,6 @@ type AdeWorktreeSetup struct {
 	Note string
 }
 
-// AdeBacklogItem is one row of ade_backlog.
-type AdeBacklogItem struct {
-	ID       string
-	Text     string
-	Position int
-	JiraKey  string
-	JiraURL  string
-	HostURL  string
-	Notes    string
-	AddedAt  int64
-}
-
-// Validate asserts what the CHECK covers, earlier and with a message.
-func (i AdeBacklogItem) Validate() error {
-	if i.ID == "" {
-		return fmt.Errorf("model: ade backlog item: id is required")
-	}
-	if i.Text == "" {
-		return fmt.Errorf("model: ade backlog item %q: text is required", i.ID)
-	}
-	return nil
-}
-
-// AdeBacklogPatch holds only the leaves the caller changes; nil = unchanged.
-type AdeBacklogPatch struct {
-	Text    *string
-	JiraKey *string
-	JiraURL *string
-	HostURL *string
-	Notes   *string
-}
-
 // AdeRepoEnv is one row of ade_repo_envs.
 type AdeRepoEnv struct {
 	Name              string

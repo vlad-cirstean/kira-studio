@@ -371,18 +371,6 @@ const spaceControl = {
     unwrap(AdeTaskService.CaptureTask(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSetQueuedAfter: (args: V2.SetQueuedAfterArgs): Promise<void> =>
     unwrap(AdeTaskService.SetQueuedAfter(args)),
-  adeTaskBacklog: (): Promise<V2.BacklogResult> =>
-    unwrap(AdeTaskService.Backlog()).then((r) => trust<V2.BacklogResult>(r)),
-  adeTaskAddBacklogItem: (args: V2.AddBacklogItemArgs): Promise<V2.BacklogItem> =>
-    unwrap(AdeTaskService.AddBacklogItem(args)).then((r) => trust<V2.BacklogItem>(r)),
-  adeTaskUpdateBacklogItem: (args: V2.UpdateBacklogItemArgs): Promise<V2.BacklogItem> =>
-    unwrap(AdeTaskService.UpdateBacklogItem(args)).then((r) => trust<V2.BacklogItem>(r)),
-  adeTaskMoveBacklogItem: (args: V2.MoveBacklogItemArgs): Promise<void> =>
-    unwrap(AdeTaskService.MoveBacklogItem(args)),
-  adeTaskDeleteBacklogItem: (args: V2.BacklogItemArgs): Promise<void> =>
-    unwrap(AdeTaskService.DeleteBacklogItem(args)),
-  adeTaskPromoteBacklogItem: (args: V2.BacklogItemArgs): Promise<V2.Task> =>
-    unwrap(AdeTaskService.PromoteBacklogItem(args)).then((r) => trust<V2.Task>(r)),
   adeTaskWorkflows: (): Promise<V2.WorkflowsResult> =>
     unwrap(AdeTaskService.Workflows()).then((r) => trust<V2.WorkflowsResult>(r)),
   adeTaskRepos: (): Promise<V2.ReposResult> =>
@@ -491,7 +479,6 @@ const spaceControl = {
   adeTaskRestoreTask: (args: V2.TaskArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.RestoreTask(args)).then((r) => trust<V2.Task>(r)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBoard, cb),
-  onAdeTaskBacklog: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBacklog, cb),
   onAdeTaskWorkflows: (cb: () => void): (() => void) => on(CHANNEL.adeTaskWorkflows, cb),
   onAdeTaskRepos: (cb: () => void): (() => void) => on(CHANNEL.adeTaskRepos, cb),
   onAdeTaskRuns: (cb: (event: V2.RunsChangedEvent) => void): (() => void) =>

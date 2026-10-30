@@ -5,22 +5,11 @@ import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
-import { withMovedItem } from './backlogOrder';
 import { withShelved } from './board/shelf';
-import {
-  archivedTaskKey,
-  backlogKey,
-  boardKey,
-  runSandboxKey,
-  sessionsKey,
-  useWorkflows,
-} from './readQueries';
+import { archivedTaskKey, boardKey, runSandboxKey, sessionsKey, useWorkflows } from './readQueries';
 import type {
-  AddBacklogItemArgs,
   AddExistingBranchArgs,
   AddTaskRepoArgs,
-  BacklogItemArgs,
-  BacklogResult,
   Board,
   BranchArgs,
   CaptureTaskArgs,
@@ -31,7 +20,6 @@ import type {
   HostLinkArgs,
   ImportWorkflowArgs,
   LaunchStepArgs,
-  MoveBacklogItemArgs,
   NewWorkflowArgs,
   OntoArgs,
   RebaseArgs,
@@ -64,7 +52,6 @@ import type {
   TakeOverArgs,
   Task,
   TaskArgs,
-  UpdateBacklogItemArgs,
   UpdateTaskArgs,
   UpdateTaskRepoArgs,
   ValidateWorkflowYamlArgs,
@@ -72,7 +59,6 @@ import type {
 
 export {
   logKey,
-  useBacklog,
   useBoard,
   useChangeRequests,
   useSessions,
@@ -149,12 +135,6 @@ export function useResolveHostLink(url: MaybeRefOrGetter<string>) {
 
 export function useAddHostLink() {
   return useMutation({ mutationFn: (args: HostLinkArgs) => control.adeTaskAddHostLink(args) });
-}
-
-export function useAddBacklogItem() {
-  return useMutation({
-    mutationFn: (args: AddBacklogItemArgs) => control.adeTaskAddBacklogItem(args),
-  });
 }
 
 export function useAddTaskRepo() {
@@ -256,31 +236,6 @@ function withSavedIds(board: Board, args: SaveStatusesArgs, result: SaveStatuses
       args.statuses[i]?.id === '' ? { ...s, id: result.statuses[i]?.id ?? s.id } : s,
     ),
   };
-}
-
-export function useUpdateBacklogItem() {
-  return useMutation({
-    mutationFn: (args: UpdateBacklogItemArgs) => control.adeTaskUpdateBacklogItem(args),
-  });
-}
-
-export function useMoveBacklogItem() {
-  return useMutation({
-    mutationFn: (args: MoveBacklogItemArgs) => control.adeTaskMoveBacklogItem(args),
-    ...optimisticUpdate<BacklogResult, MoveBacklogItemArgs>(queryClient, backlogKey, withMovedItem),
-  });
-}
-
-export function useDeleteBacklogItem() {
-  return useMutation({
-    mutationFn: (args: BacklogItemArgs) => control.adeTaskDeleteBacklogItem(args),
-  });
-}
-
-export function usePromoteBacklogItem() {
-  return useMutation({
-    mutationFn: (args: BacklogItemArgs) => control.adeTaskPromoteBacklogItem(args),
-  });
 }
 
 /** Applies a plan write to a board snapshot the way the backend does: `order` replaces, a `null`
