@@ -25,7 +25,7 @@ const props = defineProps<{
     merges: boolean;
     tip: string;
   }[];
-  history: { key: string; how: string; repos: string; title: string }[];
+  history: { key: string; merged: boolean; meta: string; title: string }[];
   overdueNote: string;
   overflowNote: string;
   overflowLabel: string;
@@ -138,17 +138,19 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         variant="toolbar"
         class="ml-54.5 h-row w-auto justify-start gap-2 px-2 font-normal data-[selected]:bg-select"
         :data-selected="ui.selectedTaskId === h.key || undefined"
+        :data-task-id="h.key"
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
       >
-        <CodiconIcon name="check" :size="12" class="shrink-0 text-muted-foreground" />
+        <CodiconIcon
+          :name="h.merged ? 'check' : 'archive'"
+          :size="12"
+          class="shrink-0 text-muted-foreground"
+        />
+        <span class="min-w-0 flex-1 truncate text-left font-medium text-fg">{{ h.title }}</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{
-          h.how
+          h.meta
         }}</span>
-        <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{
-          h.repos
-        }}</span>
-        <span class="min-w-0 truncate font-medium text-fg">{{ h.title }}</span>
       </Button>
       <div v-if="overdue" class="flex items-center gap-2 pl-54.5 text-kira-sm text-tone-amber">
         <span>{{ overdueNote }}</span>

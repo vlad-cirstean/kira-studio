@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeFixture, bandOf, FIXED_NOW, openPlan } from './support/adeV2';
+import { adeBoard, adeFixture, bandOf, FIXED_NOW, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
@@ -36,6 +36,27 @@ test('loads the archived history into the day bands', async ({ relaunch }) => {
   await load.click();
   await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(5);
   await expect(load).toHaveCount(0);
+});
+
+test('a task archived today lists in the Today band without Load history, name first', async ({
+  relaunch,
+}) => {
+  const board = adeBoard((b) => {
+    const h = (b.history as { taskId: string; archivedAt: number }[]).find(
+      (e) => e.taskId === 'H_1',
+    );
+    if (h) h.archivedAt = FIXED_NOW - 36e5;
+  });
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
+  const row = page.locator('[data-testid="ade-history-row"][data-task-id="H_1"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Audit log for admin actions');
+  await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(1);
+  expect(await bandOf(page, 0).locator('[data-testid="ade-history-row"]').count()).toBe(1);
+  const box = await row.locator('span.font-medium').boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(80);
 });
 
 test('a card shows its step, progress, span and clamped title', async ({ relaunch }) => {

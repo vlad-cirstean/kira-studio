@@ -116,10 +116,15 @@ function bandSpans(band: TimelineBand) {
 function bandHistory(band: TimelineBand) {
   return band.history.map((h) => ({
     key: h.taskId,
-    how: h.mergedAt
-      ? t('space.ade.plan.view.mergedArchived.status')
-      : t('space.ade.panel.archived.label'),
-    repos: h.codeRepoIds.map(repoLabel).join(' · '),
+    merged: !!h.mergedAt,
+    meta: [
+      h.mergedAt
+        ? t('space.ade.plan.view.mergedArchived.status')
+        : t('space.ade.panel.archived.label'),
+      h.codeRepoIds.map(repoLabel).join(' · '),
+    ]
+      .filter(Boolean)
+      .join(' · '),
     title: h.title,
   }));
 }
