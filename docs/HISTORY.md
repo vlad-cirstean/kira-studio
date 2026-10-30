@@ -7196,3 +7196,32 @@ Code review, round 1, base `6bd97b9a2`. 4 findings (1 medium, 3 low), all fixed.
 ### v0.2.21 P395 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.21/` removed. PR opened to `main`; `docs/v0.2.22/` kept.
 <!-- /chapter v0.2.21 -->
+
+<!-- chapter v0.2.22 -->
+## v0.2.22
+Source: docs/v0.2.22/ at 912d15b5346b. 8 phases.
+
+### v0.2.22 P396 (Done)
+Three-finger swipe up moves focus to another Space. Closed trace only, by user decision. Stage A activation tracing shipped (`967bdb7`): debug log of app and window events, info log of window and prompt raises. Fix needs Mac logs; tracked in `docs/ARCHITECTURE.md` Known open items. No follow-up row.
+
+### v0.2.22 P397 (Done)
+Task repos and branches edit independently. Row menu in the Task tab: add or change branch, change repo, remove branch, remove repo. Backend `SetTaskBranch`, `UpdateTaskRepo`, `RemoveTaskBranch`, `RemoveTaskRepo`, `TaskBranchRisk`; store `DetachBranch` (hard delete if never created and run-less, else archive). Attach fills a not-created row, which fixes the late-branch bug. Refused while a session, launch or background run uses the row, and on review tasks. Git refs never change. Dirty or unmerged worktree asks confirm. Flow test `TestTaskReposAndBranches`, UI spec `ade-v2-task-branches`.
+
+### v0.2.22 P398 (Done)
+One `ProjectPicker` and one `BranchPicker` in `packages/workbench/src/components/pickers/` (shadcn-vue Command, self-filtered, cap 50 with Show more, inline reasons for disabled options, create and custom entry). Replaced 14 old implementations at 16 call sites across ADE, memory, automations and git-ui; old components and `buildRefListSections` deleted. Backend: candidate branches per repo, base exclusions as codes (`self`, `stacked`), flow tests for both. git-ui toolbar popover renamed `RefsPopover`. Workflow step "Runs on" is tabs plus project picker. UI specs updated; four workflow-graph snapshots regenerated.
+
+### v0.2.22 P399 (Done)
+Archived work stays viewable with all data. Archive keeps review sessions pinned, deletes no logs, snapshots each branch's change request (migration 0052). `ArchivedTask` read and `RestoreTask` (refuses when a branch name is live on another task), phone route `/api/ade/archived-task`. New Archived tab: searchable list plus read-only panel (Task, Notes, Sessions; PR with "as of archive" hint, review comments, Restore). Plan history opens the same panel. Flow tests `TestArchivedTaskKeepsData`, `TestPhoneReadsArchivedTask`; UI spec `ade-v2-archived`. Not done: `TestArchiveRisk` pin assertion; phone UI out of scope.
+
+### v0.2.22 P400 (Done)
+Task board: same-day separators out, later cards get a 16px gap. Plan pane, sticky header and ruler dots use `bg-chrome`; weekend tint dropped. Cards get a 3px `border-l` in task colour; parked fill `bg-chrome`. Palette unchanged. UI spec rewritten, 3 plan baselines re-recorded.
+
+### v0.2.22 P401 (Done)
+Task board 7-day window. `WINDOW_DAYS = 7` in `timeline.ts`; work from day 7 on joins Later (true date kept, hours summed, date prefix on card meta). `AdeDayControls`, `ade.horizonDays` and `ade.extraDays` removed (TS schema, Go model and repo; migration 0053 deletes stored rows). History-bar Go-to-date scrolls to Later past the window. Unit specs and UI spec for the window; no baseline changes.
+
+### v0.2.22 P402 (Done)
+Agents panel. `AdeShell` bar loses `border-b` and becomes a `1fr auto 1fr` grid: capture box and Add sit on the bar's centre; capture note is absolute. Click flash was Sortable's `chosenClass` (`ring-2`) on pointer down, not focus: `SORTABLE_CHOSEN_CLASS` removed, keyboard `:focus-visible` ring kept. New `ade-v2-shell.spec.ts` and press/keyboard-ring test in `ade-v2-plan.spec.ts`.
+
+### v0.2.22 P403 (Done)
+Code review round 1 ran, findings fixed; migration 0054 snapshots review comments per row. Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.22/` removed. PR opened to `main`.
+<!-- /chapter v0.2.22 -->

@@ -90,6 +90,7 @@ func (s *Server) routes() []route {
 		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),
 		read("/api/ade/hosts", readJSON(s, "hosts", false, s.cfg.Reader.HostProviders)),
 		read("/api/ade/log", s.handleLog),
+		read("/api/ade/archived-task", s.handleArchivedTask),
 		read("/api/agent/sessions", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
 			v, err := withoutCwd(s.cfg.AgentSessions())
 			if err != nil {
@@ -244,4 +245,13 @@ func (s *Server) handleLog(w http.ResponseWriter, r *http.Request, _ repos.Mobil
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) handleArchivedTask(w http.ResponseWriter, r *http.Request, _ repos.MobileDeviceRow) {
+	v, err := s.cfg.Reader.ArchivedTask(r.Context(), adewire.TaskArgs{TaskID: r.URL.Query().Get("taskId")})
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }

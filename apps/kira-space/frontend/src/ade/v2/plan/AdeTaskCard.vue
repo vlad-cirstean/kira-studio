@@ -88,7 +88,7 @@ const segClass = (state: string): string => {
 const boxClass = computed(() => {
   const c = props.card;
   return [
-    c.parked ? 'bg-bg' : '',
+    c.parked ? 'bg-chrome' : '',
     'cursor-grab',
     c.selected ? 'border-focus ring-1 ring-focus' : 'border-badge',
     c.ripple && !c.selected ? 'outline-dashed outline-1 outline-border-strong' : '',
@@ -122,8 +122,9 @@ const boxClass = computed(() => {
     <Card
       variant="section"
       :data-task-id="card.task.id"
-      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden"
+      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden border-l-3"
       :class="boxClass"
+      :style="{ borderLeftColor: card.color }"
       :aria-current="card.selected || undefined"
       data-testid="ade-card"
       @contextmenu="taskMenu.open"

@@ -1,0 +1,379 @@
+{
+  "AdeTaskService.ArchivedTask#live": {
+    "archivedAt": 0,
+    "branches": [
+      {
+        "addedAt": 0,
+        "archivedAt": 0,
+        "base": "",
+        "branchUrl": "https://forge.test/acme/api/-/tree/feat/api-keep",
+        "changeRequest": {
+          "number": 7,
+          "state": "open",
+          "title": "Fix login",
+          "url": "https://forge.test/acme/api/-/merge_requests/7"
+        },
+        "codeRepoId": "<masked>",
+        "comments": [
+          {
+            "body": "rename this",
+            "createdAt": 0,
+            "end": 2,
+            "kind": "change",
+            "path": "r.txt",
+            "reply": "",
+            "start": 2,
+            "state": "open"
+          }
+        ],
+        "id": "<masked>",
+        "kind": "mine",
+        "mergedAt": null,
+        "name": "feat/api-keep",
+        "origin": "",
+        "prSource": "live",
+        "removed": false
+      }
+    ],
+    "repos": [
+      {
+        "codeRepoId": "<masked>",
+        "host": {
+          "changeRequest": "Merge request",
+          "changeRequestNoun": "merge request",
+          "changeRequestShort": "MR",
+          "cli": "Forge CLI",
+          "id": "<masked>",
+          "label": "Forge"
+        },
+        "kind": "ok"
+      }
+    ],
+    "statuses": [
+      {
+        "category": "todo",
+        "id": "<masked>",
+        "name": "To do",
+        "tone": "grey"
+      },
+      {
+        "category": "active",
+        "id": "<masked>",
+        "name": "In progress",
+        "tone": "amber"
+      },
+      {
+        "category": "review",
+        "id": "<masked>",
+        "name": "In review",
+        "tone": "blue"
+      },
+      {
+        "category": "done",
+        "id": "<masked>",
+        "name": "Done",
+        "tone": "green"
+      }
+    ],
+    "task": {
+      "branchIds": [
+        "<id:2>"
+      ],
+      "color": 0,
+      "createdAt": 0,
+      "entryStepId": "done",
+      "est": "3h",
+      "hostLink": {
+        "kind": "changeRequest",
+        "provider": "forge",
+        "ref": "api!9"
+      },
+      "hostUrl": "https://forge.test/acme/api/-/merge_requests/9",
+      "id": "<masked>",
+      "jira": {
+        "key": "KIRA-12",
+        "url": "https://jira.test/browse/KIRA-12"
+      },
+      "kind": "task",
+      "notes": "<p>remember the cache</p>",
+      "owner": "",
+      "runs": [
+        {
+          "attempt": 1,
+          "branchId": "<masked>",
+          "exitCode": 0,
+          "finishedAt": 0,
+          "id": "<masked>",
+          "loops": 0,
+          "note": "",
+          "outcome": {
+            "exitCode": 0,
+            "reason": "",
+            "reported": true,
+            "result": "done",
+            "route": "next",
+            "source": "agent",
+            "status": "done",
+            "summary": "summary-done"
+          },
+          "purpose": "",
+          "resumable": false,
+          "returns": 0,
+          "review": null,
+          "sandbox": null,
+          "sessionId": "<masked>",
+          "startedAt": 0,
+          "state": "done",
+          "stepId": "one",
+          "summary": "summary-done",
+          "taskId": "<masked>"
+        }
+      ],
+      "since": {},
+      "statusBy": "auto",
+      "statusId": "done",
+      "title": "Fix login",
+      "workflow": {
+        "id": "<masked>",
+        "kiraSpaceMcp": false,
+        "name": "Flow",
+        "steps": [
+          {
+            "allowedTools": [],
+            "before": "auto",
+            "command": "",
+            "id": "<masked>",
+            "kind": "agent",
+            "maxReturns": 3,
+            "name": "one",
+            "params": {},
+            "prompt": "work on {branch} in {repo}",
+            "results": [
+              {
+                "description": "",
+                "id": "<masked>",
+                "loop": false,
+                "next": "next",
+                "ok": true
+              },
+              {
+                "description": "",
+                "id": "<masked>",
+                "loop": false,
+                "next": "stop",
+                "ok": false
+              }
+            ],
+            "review": null,
+            "runsOn": "each repo",
+            "sandbox": {
+              "access": "write",
+              "allow": [],
+              "network": true,
+              "read": []
+            },
+            "session": false,
+            "skip": false,
+            "smartScript": "",
+            "status": "in-progress",
+            "timeout": "1m"
+          }
+        ]
+      },
+      "workflowId": "flow",
+      "workflowOutdated": false
+    }
+  },
+  "AdeTaskService.ArchivedTask#snapshot": {
+    "archivedAt": 0,
+    "branches": [
+      {
+        "addedAt": 0,
+        "archivedAt": 0,
+        "base": "",
+        "branchUrl": "https://forge.test/acme/api/-/tree/feat/api-keep",
+        "changeRequest": {
+          "number": 7,
+          "state": "open",
+          "title": "Fix login",
+          "url": "https://forge.test/acme/api/-/merge_requests/7"
+        },
+        "codeRepoId": "<masked>",
+        "comments": [
+          {
+            "body": "rename this",
+            "createdAt": 0,
+            "end": 2,
+            "kind": "change",
+            "path": "r.txt",
+            "reply": "",
+            "start": 2,
+            "state": "open"
+          }
+        ],
+        "id": "<masked>",
+        "kind": "mine",
+        "mergedAt": null,
+        "name": "feat/api-keep",
+        "origin": "",
+        "prSource": "archived",
+        "removed": false
+      }
+    ],
+    "repos": [
+      {
+        "codeRepoId": "<masked>",
+        "host": {
+          "changeRequest": "Merge request",
+          "changeRequestNoun": "merge request",
+          "changeRequestShort": "MR",
+          "cli": "Forge CLI",
+          "id": "<masked>",
+          "label": "Forge"
+        },
+        "kind": "unavailable"
+      }
+    ],
+    "statuses": [
+      {
+        "category": "todo",
+        "id": "<masked>",
+        "name": "To do",
+        "tone": "grey"
+      },
+      {
+        "category": "active",
+        "id": "<masked>",
+        "name": "In progress",
+        "tone": "amber"
+      },
+      {
+        "category": "review",
+        "id": "<masked>",
+        "name": "In review",
+        "tone": "blue"
+      },
+      {
+        "category": "done",
+        "id": "<masked>",
+        "name": "Done",
+        "tone": "green"
+      }
+    ],
+    "task": {
+      "branchIds": [
+        "<id:2>"
+      ],
+      "color": 0,
+      "createdAt": 0,
+      "entryStepId": "done",
+      "est": "3h",
+      "hostLink": {
+        "kind": "changeRequest",
+        "provider": "forge",
+        "ref": "api!9"
+      },
+      "hostUrl": "https://forge.test/acme/api/-/merge_requests/9",
+      "id": "<masked>",
+      "jira": {
+        "key": "KIRA-12",
+        "url": "https://jira.test/browse/KIRA-12"
+      },
+      "kind": "task",
+      "notes": "<p>remember the cache</p>",
+      "owner": "",
+      "runs": [
+        {
+          "attempt": 1,
+          "branchId": "<masked>",
+          "exitCode": 0,
+          "finishedAt": 0,
+          "id": "<masked>",
+          "loops": 0,
+          "note": "",
+          "outcome": {
+            "exitCode": 0,
+            "reason": "",
+            "reported": true,
+            "result": "done",
+            "route": "next",
+            "source": "agent",
+            "status": "done",
+            "summary": "summary-done"
+          },
+          "purpose": "",
+          "resumable": false,
+          "returns": 0,
+          "review": null,
+          "sandbox": null,
+          "sessionId": "<masked>",
+          "startedAt": 0,
+          "state": "done",
+          "stepId": "one",
+          "summary": "summary-done",
+          "taskId": "<masked>"
+        }
+      ],
+      "since": {},
+      "statusBy": "auto",
+      "statusId": "done",
+      "title": "Fix login",
+      "workflow": {
+        "id": "<masked>",
+        "kiraSpaceMcp": false,
+        "name": "Flow",
+        "steps": [
+          {
+            "allowedTools": [],
+            "before": "auto",
+            "command": "",
+            "id": "<masked>",
+            "kind": "agent",
+            "maxReturns": 3,
+            "name": "one",
+            "params": {},
+            "prompt": "work on {branch} in {repo}",
+            "results": [
+              {
+                "description": "",
+                "id": "<masked>",
+                "loop": false,
+                "next": "next",
+                "ok": true
+              },
+              {
+                "description": "",
+                "id": "<masked>",
+                "loop": false,
+                "next": "stop",
+                "ok": false
+              }
+            ],
+            "review": null,
+            "runsOn": "each repo",
+            "sandbox": {
+              "access": "write",
+              "allow": [],
+              "network": true,
+              "read": []
+            },
+            "session": false,
+            "skip": false,
+            "smartScript": "",
+            "status": "in-progress",
+            "timeout": "1m"
+          }
+        ]
+      },
+      "workflowId": "flow",
+      "workflowOutdated": false
+    }
+  },
+  "args:AdeTaskService.ArchivedTask": {
+    "taskId": "<id:1>"
+  },
+  "args:AdeTaskService.RestoreTask": {
+    "taskId": "<id:1>"
+  },
+  "error:AdeTaskService.RestoreTask#branch-live": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"cannot restore: branch feat/api-keep is on task \\\"Other\\\"\"}"
+}

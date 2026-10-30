@@ -23,7 +23,6 @@ import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue
 import { useElementSize } from '@vueuse/core';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
-import { useRepos } from '../../../repo/state/reposQueries';
 import AdeTip from '../AdeTip.vue';
 import { kindLabel, PLACEHOLDER_TOKENS, STEP_KINDS } from '../board/workflowForm';
 import {
@@ -51,7 +50,6 @@ import { useStepRemoval } from './useStepRemoval';
 const props = defineProps<{ entry: WorkflowEntry }>();
 const wfUi = useAdeWorkflowsUiStore();
 const draft = useAdeWorkflowDraftStore();
-const repos = useRepos();
 const save = useSaveWorkflow();
 const { confirmRemoveStep } = useStepRemoval();
 const { setViewport } = useVueFlow();
@@ -67,12 +65,6 @@ watch(
     wfUi.dirty = v;
   },
 );
-
-const scopes = computed(() => [
-  'once',
-  'each repo',
-  ...(repos.data.value?.repos ?? []).map((r) => `only ${r.nickname || r.name}`),
-]);
 
 async function saveNow(): Promise<void> {
   const current = draft.draft;
@@ -374,7 +366,6 @@ onBeforeUnmount(() => {
             :key="draft.step.id"
             :step="draft.step"
             :steps="draft.draft.steps"
-            :scopes="scopes"
           />
           <FieldDescription v-else data-testid="ade-wf-inspector-empty">
             <CatalogText k="space.ade.workflows.graph.inspectorEmpty.emptyHint">

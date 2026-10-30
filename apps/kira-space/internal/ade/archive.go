@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
@@ -15,6 +16,9 @@ import (
 // archive.go archives a whole task (SPEC2 section 10, R18): its live work stops, its worktrees go
 // and the task moves to history. The caller shows ArchiveRisk first; ArchiveTask is the confirmed
 // delete, uncommitted changes included.
+
+// archiveSnapshotTimeout bounds the host lookups of the archive-time change request snapshot.
+const archiveSnapshotTimeout = 5 * time.Second
 
 // linkedBranch is a task branch with a linked worktree (not the repo root).
 type linkedBranch struct {
@@ -27,26 +31,35 @@ type linkedBranch struct {
 func (b *TaskBoard) linkedBranches(ctx context.Context, tc *taskCtx) ([]linkedBranch, error) {
 	var out []linkedBranch
 	for _, sb := range tc.branches {
-		if sb.Name == "" {
-			continue
-		}
-		path, err := b.worktreeOf(ctx, sb)
+		lb, ok, err := b.linkedBranchOf(ctx, sb)
 		if err != nil {
 			return nil, err
 		}
-		if path == "" {
-			continue
+		if ok {
+			out = append(out, lb)
 		}
-		entry, err := b.openRepo(ctx, sb.CodeRepoID)
-		if err != nil {
-			return nil, err
-		}
-		if filepath.Clean(path) == filepath.Clean(entry.Summary.Root) {
-			continue
-		}
-		out = append(out, linkedBranch{sb: sb, path: path, entry: entry})
 	}
 	return out, nil
+}
+
+// linkedBranchOf reports the branch's linked worktree; false for a not-created branch or one checked
+// out at the repo root.
+func (b *TaskBoard) linkedBranchOf(ctx context.Context, sb model.AdeTaskBranch) (linkedBranch, bool, error) {
+	if sb.Name == "" {
+		return linkedBranch{}, false, nil
+	}
+	path, err := b.worktreeOf(ctx, sb)
+	if err != nil || path == "" {
+		return linkedBranch{}, false, err
+	}
+	entry, err := b.openRepo(ctx, sb.CodeRepoID)
+	if err != nil {
+		return linkedBranch{}, false, err
+	}
+	if filepath.Clean(path) == filepath.Clean(entry.Summary.Root) {
+		return linkedBranch{}, false, nil
+	}
+	return linkedBranch{sb: sb, path: path, entry: entry}, true, nil
 }
 
 // ArchiveRisk reports what archiving the task would discard.
@@ -164,13 +177,43 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 			return err
 		}
 	}
-	b.teardownReview(ctx, tc)
+	b.closeReviewWindows(tc)
+	b.snapshotChangeRequests(ctx, taskID, tc.branches)
 	if err := b.deps.Tasks.ArchiveTask(taskID, b.deps.Now().UnixMilli()); err != nil {
 		return err
 	}
+	b.snapshotReviewComments(ctx, tc.branches)
 	b.notifyBoard()
 	b.notifySessions()
 	return nil
+}
+
+// snapshotChangeRequests stores each row's change request, so the archived view shows it when the host
+// is later unreachable or the ref is gone. A row the host no longer answers for loses its old snapshot.
+// Best effort: failures log and the caller goes on.
+func (b *TaskBoard) snapshotChangeRequests(ctx context.Context, taskID string, rows []model.AdeTaskBranch) {
+	ctx, cancel := context.WithTimeout(ctx, archiveSnapshotTimeout)
+	defer cancel()
+	repoIDs, byRepo := branchesByRepo(rows)
+	crs := map[string]model.AdeChangeRequest{}
+	for _, id := range repoIDs {
+		entry, err := b.openRepo(ctx, id)
+		if err != nil {
+			slog.Warn("ade: archive snapshot: open repo", "scope", "ade", "repo", id, "err", err)
+			continue
+		}
+		_, _, found, _ := resolveRepoHost(ctx, entry, byRepo[id])
+		for branchID, cr := range found {
+			crs[branchID] = model.AdeChangeRequest{Number: cr.Number, Title: cr.Title, State: cr.State, URL: cr.URL}
+		}
+	}
+	ids := make([]string, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.ID)
+	}
+	if err := b.deps.Tasks.SetBranchChangeRequests(ids, crs); err != nil {
+		slog.Warn("ade: archive snapshot: store", "scope", "ade", "task", taskID, "err", err)
+	}
 }
 
 // stopTaskWork cancels the task's running processes and prepare scripts and waits for them to end.

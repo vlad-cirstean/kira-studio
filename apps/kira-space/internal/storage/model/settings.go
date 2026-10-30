@@ -56,11 +56,9 @@ type GitSettings struct {
 }
 
 // AdeSettings is P129 Part 2 §7's own UiPrefs-as-settings-leaves: Part 3's queue-board layout and
-// planning-horizon preferences, persisted so they survive a relaunch. No UI reads them yet.
+// history-window preferences, persisted so they survive a relaunch. The Plan reads them.
 type AdeSettings struct {
-	HorizonDays     int      `json:"horizonDays"`
 	HistoryDays     int      `json:"historyDays"`
-	ExtraDays       []string `json:"extraDays"`
 	OffDays         []string `json:"offDays"`
 	WorkWeekendDays []string `json:"workWeekendDays"`
 	WorkdayHours    float64  `json:"workdayHours"`
@@ -145,9 +143,7 @@ func DefaultGitSettings() GitSettings {
 // DefaultAdeSettings mirrors settingsDomain.ts's own adeSettingsSchema defaults (P129 Part 2 §7).
 func DefaultAdeSettings() AdeSettings {
 	return AdeSettings{
-		HorizonDays:     14,
 		HistoryDays:     14,
-		ExtraDays:       []string{},
 		OffDays:         []string{},
 		WorkWeekendDays: []string{},
 		WorkdayHours:    6,
@@ -205,9 +201,7 @@ type GitPatch struct {
 
 // AdePatch mirrors AdeSettings' own `.partial()` shape (§7).
 type AdePatch struct {
-	HorizonDays     *int      `json:"horizonDays,omitempty"`
 	HistoryDays     *int      `json:"historyDays,omitempty"`
-	ExtraDays       *[]string `json:"extraDays,omitempty"`
 	OffDays         *[]string `json:"offDays,omitempty"`
 	WorkWeekendDays *[]string `json:"workWeekendDays,omitempty"`
 	WorkdayHours    *float64  `json:"workdayHours,omitempty"`
@@ -309,7 +303,6 @@ func floatInRange(lo, hi float64) func(float64) bool {
 }
 
 var (
-	ValidAdeHorizonDays  = appsettings.InRange(1, 365)
 	ValidAdeHistoryDays  = appsettings.InRange(1, 365)
 	ValidAdeWorkdayHours = floatInRange(1, 24)
 	ValidAdeSpanDayShare = floatInRange(0.05, 1)
@@ -318,7 +311,7 @@ var (
 var adeISODateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 // ValidAdeDateList mirrors settingsDomain.ts's adeDateListSchema: at most 1000 entries, each an ISO
-// (YYYY-MM-DD) date — extraDays/offDays/workWeekendDays all share this one shape.
+// (YYYY-MM-DD) date — offDays/workWeekendDays share this one shape.
 func ValidAdeDateList(vs []string) bool {
 	if len(vs) > 1000 {
 		return false
@@ -336,14 +329,8 @@ func validateAdeSection(a *AdePatch) error {
 	if a == nil {
 		return nil
 	}
-	if a.HorizonDays != nil && !ValidAdeHorizonDays(*a.HorizonDays) {
-		return fmt.Errorf("model: ade.horizonDays: out of range value %d", *a.HorizonDays)
-	}
 	if a.HistoryDays != nil && !ValidAdeHistoryDays(*a.HistoryDays) {
 		return fmt.Errorf("model: ade.historyDays: out of range value %d", *a.HistoryDays)
-	}
-	if a.ExtraDays != nil && !ValidAdeDateList(*a.ExtraDays) {
-		return fmt.Errorf("model: ade.extraDays: invalid date list")
 	}
 	if a.OffDays != nil && !ValidAdeDateList(*a.OffDays) {
 		return fmt.Errorf("model: ade.offDays: invalid date list")

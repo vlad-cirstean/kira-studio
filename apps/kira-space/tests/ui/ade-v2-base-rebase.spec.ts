@@ -99,7 +99,7 @@ test('the picker disables a branch and its descendants and shows Previous base o
         taskId: 'T_bill',
         taskTitle: 'Billing',
         draft: false,
-        excluded: 'its own branch',
+        excluded: 'self',
       },
       {
         name: 'feat/billing-dashboard',
@@ -109,7 +109,7 @@ test('the picker disables a branch and its descendants and shows Previous base o
         taskId: 'T_bill',
         taskTitle: 'Billing',
         draft: false,
-        excluded: 'sits on top of this branch',
+        excluded: 'stacked',
       },
     ],
   };
@@ -123,12 +123,18 @@ test('the picker disables a branch and its descendants and shows Previous base o
   await page.locator(row('b_auth')).click();
   await page.locator(t('ade-panel-action-change-base')).click();
   await page.locator(t('ade-base-picker')).click();
-  await expect(page.locator(t('ade-base-option-previous'))).toBeVisible();
-  await expect(page.locator(t('ade-base-option-feat/usage-billing'))).toHaveAttribute(
+  await expect(page.locator(t('ade-base-picker-option-previous'))).toBeVisible();
+  await expect(page.locator(t('ade-base-picker-option-feat/usage-billing'))).toHaveAttribute(
     'data-disabled',
   );
-  await expect(page.locator(t('ade-base-option-feat/billing-dashboard'))).toHaveAttribute(
+  await expect(page.locator(t('ade-base-picker-option-feat/billing-dashboard'))).toHaveAttribute(
     'data-disabled',
+  );
+  await expect(page.locator(t('ade-base-picker-option-feat/usage-billing'))).toContainText(
+    'its own base',
+  );
+  await expect(page.locator(t('ade-base-picker-option-feat/billing-dashboard'))).toContainText(
+    'Stacked on this branch',
   );
 });
 
@@ -208,7 +214,7 @@ test('Change base on a created branch refetches the preview with onto and runs R
     .locator(t('ade-card-change-base'))
     .click();
   await page.locator(t('ade-base-picker')).click();
-  await page.locator(t('ade-base-option-develop')).click();
+  await page.locator(t('ade-base-picker-option-develop')).click();
   await expect
     .poll(() => calls(control, IPC.adeTaskRebasePreview).at(-1)?.args)
     .toMatchObject({ onto: { ref: 'develop', branchId: '' } });
@@ -232,7 +238,7 @@ test('Change base on a draft stores the base with no prompt', async ({ relaunch 
   await page.keyboard.press('Enter');
   await expect(page.locator(t('ade-dialog-message'))).toHaveCount(0);
   await page.locator(t('ade-base-picker')).click();
-  await page.locator(t('ade-base-option-develop')).click();
+  await page.locator(t('ade-base-picker-option-develop')).click();
   await expect(page.locator(t('ade-dialog-send'))).toHaveText('Save base');
   await page.locator(t('ade-dialog-send')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSetBranchBase)).toHaveLength(1);

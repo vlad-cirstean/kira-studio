@@ -172,11 +172,32 @@ func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach fu
 		slog.Info("did-finish-load", "scope", "startup", "uptimeMs", ms)
 	})
 
+	// P396 trace. WindowDidChangeSpace may never fire (AppKit has no such window notification).
+	traced := []struct {
+		t    events.WindowEventType
+		name string
+	}{
+		{events.Mac.WindowDidBecomeKey, "WindowDidBecomeKey"},
+		{events.Mac.WindowDidResignKey, "WindowDidResignKey"},
+		{events.Mac.WindowDidChangeOcclusionState, "WindowDidChangeOcclusionState"},
+		{events.Mac.WindowDidChangeScreen, "WindowDidChangeScreen"},
+		{events.Mac.WindowDidChangeSpace, "WindowDidChangeSpace"},
+	}
+	traceOffs := make([]func(), 0, len(traced))
+	for _, e := range traced {
+		traceOffs = append(traceOffs, win.OnWindowEvent(e.t, func(*application.WindowEvent) {
+			slog.Debug("window event", "scope", "window", "key", key, "event", e.name)
+		}))
+	}
+
 	return func() {
 		offResize()
 		offMove()
 		offClosing()
 		offReady()
+		for _, off := range traceOffs {
+			off()
+		}
 		db.cancel()
 	}
 }

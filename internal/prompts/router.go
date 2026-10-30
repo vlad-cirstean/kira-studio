@@ -1,6 +1,7 @@
 package prompts
 
 import (
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -207,7 +208,8 @@ func (r *Router) Open(p Prompt) {
 	e := &entry{Prompt: p}
 	r.entries[p.ID] = e
 	var n note
-	focused := r.d.Windows.Focused(r.target(e))
+	target := r.target(e)
+	focused := r.d.Windows.Focused(target)
 	if r.sink != nil && r.enabled() && !focused {
 		count, _ := r.kindLocked(p.Kind)
 		n.send = r.noteFor(p.Kind, p.Title, count)
@@ -220,6 +222,7 @@ func (r *Router) Open(p Prompt) {
 	}
 	r.commit(n)
 	if raise {
+		slog.Info("prompt raise", "scope", "prompt", "kind", p.Kind, "target", target)
 		// Focus blocks on the main thread; callers of Open may hold their own locks.
 		go r.RevealKind(p.Kind)
 	}

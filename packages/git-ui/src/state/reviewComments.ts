@@ -26,7 +26,7 @@ export class ReviewCommentsState {
   /** A remove/clear request in flight — the pane's delete/clear-all buttons disable themselves
    *  while true rather than let a double-click race two writes against the same session. */
   readonly pending: ShallowRef<boolean> = shallowRef(false);
-  /** D10's inline two-step clear-all confirmation (`BranchPicker.vue`'s own `confirmForceDelete`
+  /** D10's inline two-step clear-all confirmation (`RefsPopover.vue`'s own `confirmForceDelete`
    *  pattern) — never a modal, never a single unconfirmed destructive click. */
   readonly confirmingClear: ShallowRef<boolean> = shallowRef(false);
   /** Fed into the shared live region for "Cleared 3 comments" / a copy or remove failure. */

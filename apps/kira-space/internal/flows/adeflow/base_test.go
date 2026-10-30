@@ -90,8 +90,24 @@ func TestTaskBase(t *testing.T) {
 		shown := got
 		shown.Branches = []adewire.BasePick{picks["develop"]}
 		f.app.Contract(t, "ade-base", "AdeTaskService.RepoBranches", shown)
-		if p, ok := picks[br.Name]; ok && p.Excluded == "" {
-			t.Fatalf("picker offers %+v for task %s: a branch cannot be its own base", p, task.ID)
+		codes := map[string]string{}
+		for _, p := range got.Branches {
+			if p.BranchID != "" {
+				codes[p.BranchID] = p.Excluded
+			}
+		}
+		if codes[br.ID] != "self" {
+			t.Fatalf("picker excluded %q for the branch of task %s, want self", codes[br.ID], task.ID)
+		}
+		_, child := f.task(t, "Stacked fix", adewire.BaseChoice{BranchID: br.ID})
+		got, err = f.app.W.AdeTask.RepoBranches(ctx, adewire.RepoBranchesArgs{CodeRepoID: f.repoID, BranchID: br.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range got.Branches {
+			if p.BranchID == child.ID && p.Excluded != "stacked" {
+				t.Fatalf("picker excluded %q for a branch stacked on it, want stacked", p.Excluded)
+			}
 		}
 	})
 

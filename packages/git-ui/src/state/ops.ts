@@ -398,7 +398,7 @@ export class OpsState {
   }
 
   /** "Review branch changes", from either menu `buildRefMenu` puts it on
-   *  (`BranchPicker.vue`'s own row menu, and `App.vue`'s ref-badge menu). This is a read, not an
+   *  (`RefsPopover.vue`'s own row menu, and `App.vue`'s ref-badge menu). This is a read, not an
    *  operation — no pre-flight, no hazard, no `canRunOp` gate, no `op.run` envelope, so it does
    *  not go through `#runSimple` below; it is the one method on this class that is a
    *  named `bridge.request` (the `review.open` reveals the sidebar view and either seeds a

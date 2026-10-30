@@ -68,7 +68,7 @@ interface RepoFacts {
  * One that doesn't falls through to the server's own per-branch `PullsForBranch` lookup, a real
  * host call. `ensureSnapshot`'s caller is therefore NOT free to warm "every known
  * branch" the way this class's own D10 name suggests — every call site is responsible for scoping
- * `branchNames` to what actually needs it (e.g. `BranchPicker.vue`'s own rendered/capped sections,
+ * `branchNames` to what actually needs it (e.g. `RefsPopover.vue`'s own rendered/capped sections,
  * not its full branch list), not handed here as a blanket guarantee.
  */
 export class ChangeRequestState {
@@ -80,7 +80,7 @@ export class ChangeRequestState {
   readonly bySha: ShallowRef<ReadonlyMap<string, readonly ChangeRequestRecord[]>> = shallowRef(
     new Map(),
   );
-  /** Per-branch PR record — `BranchPicker.vue`'s own `#123` badge and `matchRef`'s own `pr` arm
+  /** Per-branch PR record — `RefsPopover.vue`'s own `#123` badge and `matchRef`'s own `pr` arm
    *  (via `state/search.ts`) both read this by branch short name. Absent means "no known PR (yet,
    *  or at all)" — same "render nothing" rule as `bySha`. */
   readonly byBranch: ShallowRef<ReadonlyMap<string, ChangeRequestRecord>> = shallowRef(new Map());
@@ -120,7 +120,7 @@ export class ChangeRequestState {
   /** Branches whose `branch.resolveChangeRequest` answer came back `"ok"` with no PR at all.
    *  `byBranch` only ever holds an actual `ChangeRequestRecord`, so a no-PR branch never appeared
    *  in it — `ensureSnapshot`'s own dedup filter (`!byBranch.has(name) &&
-   *  !#branchRequests.has(name)`) then failed both checks forever, and every `BranchPicker.vue`
+   *  !#branchRequests.has(name)`) then failed both checks forever, and every `RefsPopover.vue`
    *  open / search-scope change / stack reload re-issued `branch.resolveChangeRequest` for every
    *  PR-less branch, indefinitely. Tracked separately (rather than widening `byBranch`'s value
    *  type) so every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR,
@@ -410,7 +410,7 @@ export class ChangeRequestState {
 
   /** Warms `byBranch` for every branch in `branchNames` not already cached — see this class's own
    *  doc comment for why this takes an explicit list rather than the literal zero-argument
-   *  signature. Safe to call repeatedly (e.g. on every `BranchPicker.vue` open): a branch already
+   *  signature. Safe to call repeatedly (e.g. on every `RefsPopover.vue` open): a branch already
    *  in `byBranch`, or already in flight, is skipped.
    *
    *  This used to `Promise.all` every branch at once — a repo with hundreds of branches fired
@@ -446,7 +446,7 @@ export class ChangeRequestState {
     await Promise.all(Array.from({ length: workerCount }, worker));
   }
 
-  /** Resolves one branch's own PR record — `BranchPicker.vue`'s `#123` badge and search's Refs
+  /** Resolves one branch's own PR record — `RefsPopover.vue`'s `#123` badge and search's Refs
    *  scope arm call this (via `ensureSnapshot` or directly) for a branch not yet cached. A no-op
    *  when already cached or already in flight — safe to call from a render-adjacent path without
    *  its own dedup logic at the call site. */

@@ -6,6 +6,7 @@ import { computed, onMounted, onScopeDispose } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
+import AdeArchivedPage from '../archived/AdeArchivedPage.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdeAgentDialog from '../dialog/AdeAgentDialog.vue';
 import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
@@ -32,6 +33,7 @@ async function onView(view: unknown): Promise<void> {
 const backlog = useBacklog();
 const count = computed(() => backlog.data.value?.items.length ?? 0);
 const { model } = usePlanModel();
+const archivedCount = computed(() => model.value?.board.history.length ?? 0);
 const needsCount = computed(() => model.value?.needs.badge ?? 0);
 
 // Review code on the focused branch or card, else the selected one.
@@ -91,8 +93,11 @@ onScopeDispose(() => offReviewCode?.());
     data-testid="ade-shell"
     @update:model-value="onView"
   >
-    <nav class="flex h-tabbar shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1">
-      <TabsList>
+    <nav
+      class="grid h-tabbar shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-0.5 bg-chrome px-1"
+      data-testid="ade-shell-bar"
+    >
+      <TabsList class="justify-self-start">
         <TabsTrigger
           value="backlog"
           :class="tabChipVariants({ active: ui.view === 'backlog', size: 'wide' })"
@@ -124,13 +129,26 @@ onScopeDispose(() => offReviewCode?.());
         >
           {{ t('space.common.plan.label') }}
         </TabsTrigger>
+        <TabsTrigger
+          value="archived"
+          :class="tabChipVariants({ active: ui.view === 'archived', size: 'wide' })"
+          data-testid="ade-tab-archived"
+        >
+          {{ t('space.ade.panel.archived.label') }}
+          <span
+            class="text-kira-sm tabular-nums text-muted-foreground"
+            data-testid="ade-archived-count"
+            >{{
+              archivedCount
+            }}</span
+          >
+        </TabsTrigger>
       </TabsList>
-      <span class="flex-1" />
       <div class="mx-2 flex items-center gap-2">
         <AdeCaptureBox />
         <AdeAddPopover />
       </div>
-      <TabsList>
+      <TabsList class="justify-self-end">
         <TabsTrigger
           value="workflows"
           :class="tabChipVariants({ active: ui.view === 'workflows', size: 'wide' })"
@@ -143,6 +161,7 @@ onScopeDispose(() => offReviewCode?.());
     <div class="flex min-h-0 flex-1 gap-0.5">
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
+      <AdeArchivedPage v-else-if="ui.view === 'archived'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
       <template v-else>
         <AdePlanView />

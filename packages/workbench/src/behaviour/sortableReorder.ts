@@ -5,8 +5,6 @@ import { shortcutFor } from '../shortcuts/keys';
 
 /** The one drag-ghost class; Sortable toggles a single class name. */
 export const SORTABLE_GHOST_CLASS = 'opacity-50';
-/** The one class on the item being dragged, for a drag that needs more than the ghost. */
-export const SORTABLE_CHOSEN_CLASS = 'ring-2';
 
 /** Pointer travel before a press becomes a drag; shared by Sortable and the virtualized tree. */
 export const DRAG_TOLERANCE_PX = 4;

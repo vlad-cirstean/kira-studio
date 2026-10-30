@@ -27,7 +27,7 @@ const UNTRACKED_FLAG = '-u';
 
 export interface StashRowModel {
   /** `data-row-id`/roving-tabindex key — `stash:<sha>` or `global:<sha>`, distinguishing the two
-   *  buckets in the shared `focusedRowId` sequence `BranchPicker.vue` owns. */
+   *  buckets in the shared `focusedRowId` sequence `RefsPopover.vue` owns. */
   readonly id: string;
   /** The row's own tooltip (`StashList.vue`'s base-commit fact) — absent for a global entry, which
    *  has no stack position to report. */

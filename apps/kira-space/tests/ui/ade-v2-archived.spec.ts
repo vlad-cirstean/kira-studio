@@ -1,0 +1,129 @@
+import { expect, test } from './fixtures';
+import { adeFixture, archivedTaskFx, openPlan } from './support/adeV2';
+import { contract } from './support/contract';
+import { calls } from './support/ipcCalls';
+import { IPC } from './support/ipcChannels';
+
+// Archived work stays viewable with everything it kept, read-only, and Restore brings it back.
+// Contract ade-archived. Backend half: adeflow TestArchivedTaskKeepsData.
+
+const t = (id: string) => `[data-testid="${id}"]`;
+
+function sessionsWith(branchId: string) {
+  const fx = adeFixture<{ sessions: Record<string, unknown>[] }>('sessions');
+  const stopped = {
+    ...fx.sessions.find((s) => s.id === 'sp11'),
+    id: 'h1s1',
+    taskId: 'H_1',
+    branchId,
+  };
+  return { channel: IPC.adeTaskSessions, response: { ...fx, sessions: [...fx.sessions, stopped] } };
+}
+
+test('the Archived tab lists archived tasks and filters them', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await expect(page.locator(t('ade-archived-count'))).toHaveText('5');
+  await page.locator(t('ade-tab-archived')).click();
+  await expect(page.locator(t('ade-archived-row'))).toHaveCount(5);
+  await expect(page.locator(t('ade-panel-empty'))).toBeVisible();
+  await page.locator(t('ade-archived-filter')).fill('login');
+  await expect(page.locator(t('ade-archived-row'))).toHaveCount(1);
+  await expect(page.locator(t('ade-archived-row'))).toContainText('Fix login redirect loop');
+  await page.locator(t('ade-archived-filter')).fill('zzz');
+  await expect(page.locator(t('ade-archived-filter-empty'))).toBeVisible();
+});
+
+test('a selected archived task shows all it kept, read-only', async ({ relaunch }) => {
+  const fx = archivedTaskFx();
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskArchivedTask, response: fx },
+    sessionsWith(fx.branches[0].id),
+  ]);
+  await page.locator(t('ade-tab-archived')).click();
+  await page.locator(`${t('ade-archived-row')}[data-task-id="H_1"]`).click();
+  await expect.poll(() => calls(control, IPC.adeTaskArchivedTask)).toHaveLength(1);
+  const sent = calls(control, IPC.adeTaskArchivedTask)[0]?.args as Record<string, unknown>;
+  expect(sent).toEqual({ taskId: 'H_1' });
+  expect(Object.keys(sent)).toEqual(
+    Object.keys(
+      contract<Record<string, unknown>>('ade-archived', 'args:AdeTaskService.ArchivedTask'),
+    ),
+  );
+
+  await expect(page.locator(t('ade-panel-title'))).toHaveText('Fix login');
+  await expect(page.locator(t('ade-archived-status'))).toHaveText('Done');
+  await expect(page.locator(t('ade-archived-jira-link'))).toHaveText('KIRA-12');
+  await expect(page.locator(t('ade-archived-host-link'))).toHaveText('api!9');
+  const branch = page.locator(t('ade-archived-branch'));
+  await expect(branch).toContainText('feat/api-keep');
+  await expect(page.locator(t('ade-archived-pr'))).toContainText('#7');
+  await expect(page.locator(t('ade-archived-pr'))).toContainText('Fix login');
+  await expect(page.locator(t('ade-archived-snapshot'))).toHaveCount(0);
+  await expect(page.locator(t('ade-archived-comments'))).toContainText('Review comments (1)');
+  await page.locator(t('ade-archived-comments')).getByRole('button').click();
+  await expect(page.locator(t('ade-archived-comment'))).toContainText('rename this');
+
+  await page.locator(t('ade-panel-tab-notes')).click();
+  const editor = page.locator(`${t('ade-archived-notes')} .ProseMirror`);
+  await expect(editor).toContainText('remember the cache');
+  await expect(editor).toHaveAttribute('contenteditable', 'false');
+  await expect(page.locator(t('ade-notes-toolbar-btn'))).toHaveCount(0);
+
+  await page.locator(t('ade-panel-tab-sessions')).click();
+  await expect(page.locator(t('ade-stopped-row')).first()).toContainText('feat/api-keep');
+});
+
+test('a stored change request is marked as of archive', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskArchivedTask, response: archivedTaskFx('H_1', 'snapshot') },
+  ]);
+  await page.locator(t('ade-tab-archived')).click();
+  await page.locator(`${t('ade-archived-row')}[data-task-id="H_1"]`).click();
+  await expect(page.locator(t('ade-archived-pr'))).toContainText('#7');
+  await expect(page.locator(t('ade-archived-snapshot'))).toBeVisible();
+});
+
+test('Restore sends the task id and opens it in the Plan', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await page.locator(t('ade-tab-archived')).click();
+  await page.locator(`${t('ade-archived-row')}[data-task-id="H_1"]`).click();
+  await page.locator(t('ade-archived-restore')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskRestoreTask)).toHaveLength(1);
+  const sent = calls(control, IPC.adeTaskRestoreTask)[0]?.args as Record<string, unknown>;
+  expect(sent).toEqual({ taskId: 'H_1' });
+  expect(Object.keys(sent)).toEqual(
+    Object.keys(
+      contract<Record<string, unknown>>('ade-archived', 'args:AdeTaskService.RestoreTask'),
+    ),
+  );
+  await expect(page.locator(t('ade-plan'))).toBeVisible();
+  await expect(page.locator(t('ade-panel'))).toBeVisible();
+  await page.locator(t('ade-tab-archived')).click();
+  await expect(page.locator(t('ade-panel-empty'))).toBeVisible();
+});
+
+test('a refused Restore shows the error and stays on the archived view', async ({ relaunch }) => {
+  const refusal = JSON.parse(
+    contract<string>('ade-archived', 'error:AdeTaskService.RestoreTask#branch-live'),
+  ) as { code: string; message: string };
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskRestoreTask, error: refusal },
+  ]);
+  await page.locator(t('ade-tab-archived')).click();
+  await page.locator(`${t('ade-archived-row')}[data-task-id="H_1"]`).click();
+  await page.locator(t('ade-archived-restore')).click();
+  await expect(page.locator(t('ade-archived-restore-error'))).toContainText(
+    'branch feat/api-keep is on task',
+  );
+  await expect(page.locator(t('ade-archived'))).toBeVisible();
+});
+
+test('a Plan history item opens the same full panel beside the Plan', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator(t('ade-load-history')).click();
+  await page.locator(t('ade-history-row')).first().click();
+  await expect(page.locator(t('ade-plan'))).toBeVisible();
+  await expect(page.locator(t('ade-panel-title'))).toHaveText('Fix login');
+  await expect(page.locator(t('ade-archived-restore'))).toBeVisible();
+  await expect(page.locator(t('ade-archived-task-tab'))).toBeVisible();
+});

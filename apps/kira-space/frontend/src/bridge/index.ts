@@ -342,8 +342,20 @@ const spaceControl = {
     unwrap(AdeTaskService.UpdateTask(args)).then((r) => trust<V2.Task>(r)),
   adeTaskAddTaskRepo: (args: V2.AddTaskRepoArgs): Promise<V2.Branch> =>
     unwrap(AdeTaskService.AddTaskRepo(args)).then((r) => trust<V2.Branch>(r)),
-  adeTaskCandidateBranches: (): Promise<V2.CandidateBranchesResult> =>
-    unwrap(AdeTaskService.CandidateBranches()).then((r) => trust<V2.CandidateBranchesResult>(r)),
+  adeTaskSetTaskBranch: (args: V2.SetTaskBranchArgs): Promise<V2.Branch> =>
+    unwrap(AdeTaskService.SetTaskBranch(args)).then((r) => trust<V2.Branch>(r)),
+  adeTaskUpdateTaskRepo: (args: V2.UpdateTaskRepoArgs): Promise<V2.Branch> =>
+    unwrap(AdeTaskService.UpdateTaskRepo(args)).then((r) => trust<V2.Branch>(r)),
+  adeTaskRemoveTaskBranch: (args: V2.RemoveTaskRowArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveTaskBranch(args)),
+  adeTaskRemoveTaskRepo: (args: V2.RemoveTaskRowArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveTaskRepo(args)),
+  adeTaskTaskBranchRisk: (args: V2.BranchArgs): Promise<V2.BranchRisk> =>
+    unwrap(AdeTaskService.TaskBranchRisk(args)).then((r) => trust<V2.BranchRisk>(r)),
+  adeTaskCandidateBranches: (args: V2.CandidateBranchesArgs): Promise<V2.CandidateBranchesResult> =>
+    unwrap(AdeTaskService.CandidateBranches(args)).then((r) =>
+      trust<V2.CandidateBranchesResult>(r),
+    ),
   adeTaskAddExistingBranch: (args: V2.AddExistingBranchArgs): Promise<V2.AddExistingBranchResult> =>
     unwrap(AdeTaskService.AddExistingBranch(args)).then((r) =>
       trust<V2.AddExistingBranchResult>(r),
@@ -470,6 +482,10 @@ const spaceControl = {
     unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
   adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>
     unwrap(AdeTaskService.ArchiveTask(args)),
+  adeTaskArchivedTask: (args: V2.TaskArgs): Promise<V2.ArchivedTask> =>
+    unwrap(AdeTaskService.ArchivedTask(args)).then((r) => trust<V2.ArchivedTask>(r)),
+  adeTaskRestoreTask: (args: V2.TaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.RestoreTask(args)).then((r) => trust<V2.Task>(r)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBoard, cb),
   onAdeTaskBacklog: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBacklog, cb),
   onAdeTaskWorkflows: (cb: () => void): (() => void) => on(CHANNEL.adeTaskWorkflows, cb),

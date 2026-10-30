@@ -3,12 +3,12 @@ import KeyValueList from '@theme/components/KeyValueList.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
-import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import ProjectPicker from '@workbench/components/pickers/ProjectPicker.vue';
 import { computed, ref } from 'vue';
-import { useRepos } from '../../../repo/state/reposQueries';
+import { useProjectOptions } from '../../../repo/state/projectOptions';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
@@ -24,6 +24,7 @@ import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
 import AdeStatusPicker from './AdeStatusPicker.vue';
+import AdeTaskBranchMenu from './AdeTaskBranchMenu.vue';
 import AdeWorkflowBlock from './AdeWorkflowBlock.vue';
 import { useLinkFields } from './useLinkFields';
 
@@ -35,7 +36,6 @@ const ui = useAdeBoardUiStore();
 const addUi = useAdeAddUiStore();
 const update = useUpdateTask();
 const addRepo = useAddTaskRepo();
-const repos = useRepos();
 
 const task = computed(() => props.card.task);
 const review = computed(() => props.card.review);
@@ -79,15 +79,11 @@ async function saveEst(value: string): Promise<void> {
 const spanDays = computed(() => props.card.entry.span);
 
 // ---- branches
-const lackedRepos = computed(() => {
-  const used = new Set(props.card.rows.map((r) => r.branch.codeRepoId));
-  return (repos.data.value?.repos ?? []).filter((r) => !used.has(r.codeRepoId));
-});
-const addRepoValue = ref('');
-async function onAddRepo(value: unknown): Promise<void> {
-  const id = String(value ?? '');
-  addRepoValue.value = '';
-  if (!id) return;
+const usedRepoIds = computed(() => props.card.rows.map((r) => r.branch.codeRepoId));
+const addProjects = useProjectOptions(usedRepoIds);
+const addRepoValue = ref<string | null>(null);
+async function onAddRepo(id: string): Promise<void> {
+  addRepoValue.value = null;
   fieldError.value = '';
   try {
     await addRepo.mutateAsync({ taskId: task.value.id, codeRepoId: id, base: null });
@@ -177,24 +173,18 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         <span class="text-kira-sm text-subtle">{{ t('common.module.branches.label') }}</span>
         <span class="flex-1" />
         <template v-if="!review">
-          <Label for="ade-add-repo" class="sr-only">{{
-            t('space.ade.taskTab.addRepo.aria')
-          }}</Label>
-          <NativeSelect
-            id="ade-add-repo"
-            :model-value="addRepoValue"
-            variant="default"
-            class="max-w-50"
+          <ProjectPicker
+            v-if="addProjects.options.value.length > 0"
+            v-model="addRepoValue"
+            size="kira"
+            testid="ade-add-repo"
+            :projects="addProjects.options.value"
+            :placeholder="t('space.ade.taskTab.addRepo.option')"
+            :aria-label="t('space.ade.taskTab.addRepo.aria')"
             :title="t('space.ade.taskTab.addRepo.tooltip')"
-            data-testid="ade-add-repo"
-            @update:model-value="onAddRepo"
-          >
-            <option value="">{{ t('space.ade.taskTab.addRepo.option') }}</option>
-            <option v-for="r in lackedRepos" :key="r.codeRepoId" :value="r.codeRepoId">
-              {{ r.nickname || r.name }}
-              · {{ r.name }}
-            </option>
-          </NativeSelect>
+            class="max-w-50"
+            @select="(o) => onAddRepo(o.value)"
+          />
         </template>
         <Button
           variant="dialog"
@@ -205,31 +195,37 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
           {{ t('space.ade.taskTab.addBranch.label') }}
         </Button>
       </div>
-      <Button
-        size="kira"
-        v-for="row in card.rows"
-        :key="row.id"
-        variant="toolbar"
-        class="min-h-row w-full justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
-        data-testid="ade-task-branch"
-        :data-branch-id="row.id"
-        @click="ui.selectBranch(task.id, row.id)"
-      >
-        <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
-        <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
-        <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
-          <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
-            c.label
-          }}</span>
-        </AdeTip>
-        <span
-          class="min-w-0 flex-1 truncate font-data text-kira-md"
-          :class="row.draft ? 'text-muted-foreground' : ''"
-          >{{
-            branchLabel(row)
-          }}</span
+      <div v-for="row in card.rows" :key="row.id" class="flex items-center gap-1 bg-elevated">
+        <Button
+          size="kira"
+          variant="toolbar"
+          class="min-h-row min-w-0 flex-1 justify-start gap-2 bg-elevated px-1.5 text-left text-fg"
+          data-testid="ade-task-branch"
+          :data-branch-id="row.id"
+          @click="ui.selectBranch(task.id, row.id)"
         >
-      </Button>
+          <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
+          <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
+          <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
+            <span class="shrink-0 text-kira-sm font-medium" :class="chipClass(c.tone)">{{
+              c.label
+            }}</span>
+          </AdeTip>
+          <span
+            class="min-w-0 flex-1 truncate font-data text-kira-md"
+            :class="row.draft ? 'text-muted-foreground' : ''"
+            >{{
+              branchLabel(row)
+            }}</span
+          >
+        </Button>
+        <AdeTaskBranchMenu
+          v-if="!review"
+          :row="row"
+          :used-repo-ids="usedRepoIds"
+          @error="(m: string) => (fieldError = m)"
+        />
+      </div>
     </div>
   </div>
 </template>

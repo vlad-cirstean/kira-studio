@@ -1,7 +1,7 @@
 /**
  * The pure half of `SearchResults.vue` — grouping (local branches / remote branches / tags /
  * commits), per-section caps and the two honesty footers, kept out of the template exactly as
- * `refListModel.ts` keeps `BranchPicker.vue`'s own fold out of *its* template. Nothing here is
+ * `refListModel.ts` keeps `RefsPopover.vue`'s own fold out of *its* template. Nothing here is
  * Vue-reactive: every input is already-unwrapped data.
  */
 import type { SearchField, SearchScope } from '@kira/git-core';

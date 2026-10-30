@@ -657,7 +657,7 @@ describe('ChangeRequestState — F9: a stale resolveBranch across a same-repo re
     // changes, only #clearGeneration, so a guard keyed on repoId alone would miss this entirely.
     transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
 
-    // B: a fresh resolveBranch for the SAME branch, issued after the clear (e.g. BranchPicker
+    // B: a fresh resolveBranch for the SAME branch, issued after the clear (e.g. RefsPopover
     // reopening) — #branchRequests was cleared, so this is a real new request, not a no-op.
     const requestB = pr.resolveBranch('feature');
     await sleep();

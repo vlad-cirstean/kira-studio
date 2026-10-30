@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
+import type { ContractJson } from '@workbench/testing/ui/contract';
 import type { KiraApp, RelaunchOptions } from '../fixtures';
+import { contract } from './contract';
 import { IPC } from './ipcChannels';
 import { emitWailsEvent } from './mockRuntime';
 import type { ControlSnapshot } from './types';
@@ -62,6 +64,33 @@ const REPO_RECORDS = [
 
 function firstWorkflow(): unknown {
   return adeFixture<{ workflows: unknown[] }>('workflows').workflows[0];
+}
+
+/** `ade-archived` contract answer of `ArchivedTask` ('live' = host answered, 'snapshot' = stored PR),
+ *  placed on the board's archived task `taskId`/`codeRepoId` and given real ids and times. */
+export function archivedTaskFx(
+  taskId = 'H_1',
+  source: 'live' | 'snapshot' = 'live',
+  codeRepoId = 'repo-api',
+): ContractJson {
+  const fx = contract<ContractJson>('ade-archived', `AdeTaskService.ArchivedTask#${source}`);
+  fx.task.id = taskId;
+  fx.task.createdAt = FIXED_NOW - 864e5;
+  fx.archivedAt = FIXED_NOW - 36e5;
+  fx.statuses = fx.statuses.map((s: ContractJson, i: number) => ({
+    ...s,
+    id: ['todo', 'in-progress', 'in-review', 'done'][i],
+  }));
+  fx.repos = fx.repos.map((r: ContractJson) => ({ ...r, codeRepoId }));
+  fx.branches = fx.branches.map((b: ContractJson, i: number) => ({
+    ...b,
+    id: `${taskId}_b${i}`,
+    codeRepoId,
+    addedAt: FIXED_NOW - 864e5,
+    archivedAt: FIXED_NOW - 36e5,
+  }));
+  fx.task.branchIds = fx.branches.map((b: ContractJson) => b.id);
+  return fx;
 }
 
 /** The committed board with `edit` applied to a copy, for a spec that needs another task state. */
@@ -144,12 +173,19 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskFocusSession, response: true },
     { channel: IPC.adeTaskArchiveRisk, response: adeFixture('archive-risk') },
     { channel: IPC.adeTaskArchiveTask },
+    { channel: IPC.adeTaskArchivedTask, response: archivedTaskFx() },
+    { channel: IPC.adeTaskRestoreTask, response: adeFixture('task') },
     { channel: IPC.adeTaskRecordMerge },
     { channel: IPC.adeTaskSetQueuedAfter },
     { channel: IPC.adeTaskRebasePreview, response: REBASE_PREVIEW },
     { channel: IPC.adeTaskRebase, response: { runId: 'run-rebase', noOp: false } },
     { channel: IPC.adeTaskAbortRebase },
     { channel: IPC.adeTaskSetBranchBase },
+    { channel: IPC.adeTaskSetTaskBranch, response: adeFixture('branch') },
+    { channel: IPC.adeTaskUpdateTaskRepo, response: adeFixture('branch') },
+    { channel: IPC.adeTaskRemoveTaskBranch },
+    { channel: IPC.adeTaskRemoveTaskRepo },
+    { channel: IPC.adeTaskTaskBranchRisk, response: adeFixture('branch-risk-clean') },
     { channel: IPC.adeTaskRepoBranches, response: REPO_BRANCHES },
     { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
   ];
@@ -277,3 +313,11 @@ export const SCRIPTS: ControlSnapshot = {
   channel: IPC.customScriptsList,
   response: { collections: [], scripts: [PLAIN, SMART] },
 };
+
+/** Selects the card of `id` and waits for its Task tab. */
+export async function openTask(page: Page, id: string): Promise<void> {
+  await page
+    .locator(`[data-testid="ade-card"][data-task-id="${id}"] [data-testid="ade-card-head"]`)
+    .click();
+  await page.locator('[data-testid="ade-task-tab"]').waitFor();
+}

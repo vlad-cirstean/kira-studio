@@ -43,6 +43,9 @@ func (idleReader) Repos(context.Context) (adewire.ReposResult, error) {
 func (idleReader) HostProviders(context.Context) (githost.Providers, error) {
 	return githost.Providers{}, nil
 }
+func (idleReader) ArchivedTask(context.Context, adewire.TaskArgs) (adewire.ArchivedTask, error) {
+	return adewire.ArchivedTask{}, nil
+}
 func (idleReader) ReadLog(context.Context, adewire.ReadLogArgs) (adewire.LogPage, error) {
 	return adewire.LogPage{}, nil
 }

@@ -13,7 +13,7 @@
  *   here in words — resolving it is the `ConflictBanner.vue`, not a second UI here.
  *
  * The modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
- * `DialogTitle`'s default slot, and the parent picker is `NativeSelect`.
+ * `DialogTitle`'s default slot, and the parent picker is the shared `BranchPicker` (workbench).
  */
 import type { RestackPreflight } from '@kira/git-ipc';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
@@ -27,11 +27,12 @@ import {
   DialogTitle,
 } from '@theme/components/ui/dialog';
 import { Field, FieldLabel } from '@theme/components/ui/field';
-import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import Identifier from '@workbench/components/Identifier.vue';
+import BranchPicker from '@workbench/components/pickers/BranchPicker.vue';
 import { computed, ref, useId, watch } from 'vue';
+import { branchOptions } from '../../lib/refOptions.ts';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { StackState } from '../../state/stack.ts';
@@ -54,9 +55,6 @@ const open = computed(() => props.target !== undefined);
 // ---------------------------------------------------------------------------------------
 
 const selectedParent = ref('');
-// P131 Part 1 §6.2: biome's noLabelWithoutControl can't see through NativeSelect's
-// `inheritAttrs: false` to the native select element it renders -- an explicit for/id pair keeps the
-// same association, verifiably (same fix as ForcePushDialog.vue's/TagDialog.vue's Input labels).
 const parentId = useId();
 
 watch(
@@ -68,9 +66,7 @@ watch(
 );
 
 const parentCandidates = computed(() =>
-  props.refs.branches.value
-    .map((row) => row.shortName)
-    .filter((name) => name !== props.target?.branch),
+  branchOptions(props.refs, { remote: false, exclude: props.target?.branch }),
 );
 
 async function submitSetParent(): Promise<void> {
@@ -169,16 +165,25 @@ function closeDialog(): void {
         <template v-if="target?.mode === 'setParent'">
           <Field>
             <FieldLabel :for="parentId">{{ t('git.dialog.stack.parent.label') }}</FieldLabel>
-            <NativeSelect
-              :id="parentId"
-              v-model="selectedParent"
-              variant="bordered"
-              size="kira-lg"
-              class="w-full"
-            >
-              <option value="">{{ t('git.dialog.stack.noParent.option') }}</option>
-              <option v-for="name in parentCandidates" :key="name" :value="name">{{ name }}</option>
-            </NativeSelect>
+            <div class="flex items-center gap-2">
+              <BranchPicker
+                :id="parentId"
+                v-model="selectedParent"
+                class="min-w-0 flex-1"
+                testid="stack-parent"
+                :branches="parentCandidates"
+                :placeholder="t('git.dialog.stack.noParent.option')"
+              />
+              <Button
+                v-if="selectedParent"
+                variant="dialog"
+                size="kira-lg"
+                data-testid="stack-parent-clear"
+                @click="selectedParent = ''"
+              >
+                {{ t('common.action.clear.label') }}
+              </Button>
+            </div>
           </Field>
         </template>
 

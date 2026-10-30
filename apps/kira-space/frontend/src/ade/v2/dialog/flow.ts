@@ -58,7 +58,7 @@ const BLOCKED_REASON = {
   openInAnotherWindow: 'common.openElsewhere.tooltip',
   locked: 'space.ade.flow.locked.status',
 } as const satisfies Record<string, MessageKey>;
-const blockedReason = (reason: string): string =>
+export const blockedReason = (reason: string): string =>
   reason in BLOCKED_REASON ? t(BLOCKED_REASON[reason as keyof typeof BLOCKED_REASON]) : reason;
 
 const errMessage = (err: unknown): string => errorText(err);

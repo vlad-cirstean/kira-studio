@@ -23,6 +23,11 @@ import {
 
 /** SPEC2 §4: only the first 10 work items are shown until the user loads the rest. */
 export const ITEM_LIMIT = 10;
+/** P401: day bands shown from today; later work sits in Later. */
+export const WINDOW_DAYS = 7;
+
+const bandKey = (e: TimelineEntry): number =>
+  e.day === LATER || e.day >= WINDOW_DAYS ? LATER : e.day;
 
 type TimelineBoard = Pick<Board, 'tasks' | 'branches' | 'plan' | 'pairs' | 'history'>;
 
@@ -335,7 +340,10 @@ function spansOn(ctx: BandCtx, dk: number): TimelineSpan[] {
 function buildBand(ctx: BandCtx, dk: number, label: string): TimelineBand {
   const { cal, cap } = ctx;
   const isLater = dk === LATER;
-  const hours = Math.round((ctx.hours.on.get(dk) ?? 0) * 10) / 10;
+  let rawHours = ctx.hours.on.get(dk) ?? 0;
+  if (isLater)
+    for (const [k, h] of ctx.hours.on) if (k >= WINDOW_DAYS && k !== LATER) rawHours += h;
+  const hours = Math.round(rawHours * 10) / 10;
   const isPast = dk < 0 && !isLater;
   const weekend = !isLater && isWeekend(cal, dk) && !cal.workWeekend.has(dk);
   const dayOff = !isLater && isDayOff(cal, dk);
@@ -348,7 +356,7 @@ function buildBand(ctx: BandCtx, dk: number, label: string): TimelineBand {
     isLater,
     label,
     hours,
-    taskIds: ctx.shownTaskIds.filter((id) => (ctx.entries.get(id) as TimelineEntry).day === dk),
+    taskIds: ctx.shownTaskIds.filter((id) => bandKey(ctx.entries.get(id) as TimelineEntry) === dk),
     spans: spansOn(ctx, dk),
     history: ctx.showHistory ? ctx.history.filter((h) => h.day === dk) : [],
     isToday: dk === 0,
@@ -389,19 +397,20 @@ function collectDayKeys(
   const { settings, today } = input;
   const keys = new Set<number>();
   if (input.showHistory) for (let h = -settings.historyDays; h < 0; h++) keys.add(h);
-  for (let k = 0; k < settings.horizonDays; k++) {
+  for (let k = 0; k < WINDOW_DAYS; k++) {
     if (input.showAllItems || !hiddenCount || k <= lastShownDay) keys.add(k);
   }
   for (const e of seq) {
     if (!shown.has(e.taskId)) continue;
-    for (const d of e.days) if (d !== LATER) keys.add(d);
+    for (const d of e.days) if (d < WINDOW_DAYS) keys.add(d);
   }
-  for (const iso of [...settings.extraDays, ...settings.offDays]) {
+  for (const iso of settings.offDays) {
     const k = isoToOffset(today, iso);
-    if (k >= 0) keys.add(k);
+    if (k >= 0 && k < WINDOW_DAYS) keys.add(k);
   }
   const dayKeys = [...keys].sort((a, b) => a - b);
-  if (!hiddenCount || seq.some((e) => shown.has(e.taskId) && e.day === LATER)) dayKeys.push(LATER);
+  if (!hiddenCount || seq.some((e) => shown.has(e.taskId) && bandKey(e) === LATER))
+    dayKeys.push(LATER);
   return dayKeys;
 }
 

@@ -10,4 +10,5 @@ export const controlAdeReader: AdeReader = {
   repos: () => control.adeTaskRepos(),
   readLog: (args) => control.adeTaskReadLog(args),
   hostProviders: () => control.gitHostProviders(),
+  archivedTask: (args) => control.adeTaskArchivedTask(args),
 };

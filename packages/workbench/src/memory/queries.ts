@@ -1,8 +1,9 @@
 import type { MemoryClarification, MemoryItem, MemoryScope } from '@shared/domain/memory';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { tryOnScopeDispose } from '@vueuse/core';
+import type { PickerOption } from '@workbench/lib/pickerOptions';
 import { queryClient } from '@workbench/state/queryClient';
-import { type MaybeRefOrGetter, toValue } from 'vue';
+import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { type MemorySearchFilters, useMemoryModule } from './module';
 
 // P201: server state for the Memory module. Keys are flat [domain, ...ids] tuples.
@@ -69,6 +70,15 @@ export function useMemoryProjects() {
     },
     queryClient,
   );
+}
+
+/** `useMemoryProjects` as project picker options. */
+export function useMemoryProjectOptions() {
+  const projects = useMemoryProjects();
+  const options = computed<PickerOption[]>(() =>
+    (projects.data.value ?? []).map((key) => ({ value: key, label: key, dataFont: true })),
+  );
+  return { options, isPending: projects.isPending };
 }
 
 export interface StoreMemoryVars {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import type { LayoutChunk } from '@kira/git-core';
 import { buildPackedChunk } from '@kira/git-core/testing/packedChunk';
 import type {
@@ -268,6 +268,7 @@ describe('GraphViewState — corrupted chunk recovery is bounded', () => {
   }
 
   test('re-opens once, then stops and announces', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => {});
     const transport = new RaceTransport();
     const graphView = new GraphViewState(new BridgeClient(transport), fakeLayoutClient());
     const open = graphView.openStream(REPO_A);
@@ -281,6 +282,7 @@ describe('GraphViewState — corrupted chunk recovery is bounded', () => {
     expect(graphView.announcement.value).toContain('corrupted');
     transport.streamOpens[1]?.end();
     await open;
+    logged.mockRestore();
   });
 });
 

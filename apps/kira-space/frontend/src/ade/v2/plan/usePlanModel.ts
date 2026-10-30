@@ -11,7 +11,14 @@ import { withTuiActivity } from '../activity';
 import { type BranchTag, branchTag, type TaskAction, taskCell } from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
-import { buildCalendar, type Calendar, dayLabel } from '../board/calendar';
+import {
+  buildCalendar,
+  type Calendar,
+  dateParts,
+  dayLabel,
+  LATER,
+  monthLabel,
+} from '../board/calendar';
 import { type BranchLine2, branchLine2, taskTitle } from '../board/labels';
 import { buildNeedsYou, type NeedsItem, type NeedsKind } from '../board/needsYou';
 import {
@@ -29,6 +36,7 @@ import {
   rippleOf,
   type TimelineEntry,
   type TimelineView,
+  WINDOW_DAYS,
 } from '../board/timeline';
 import { localIso, localIsoOfMs } from '../localDay';
 import { taskColor } from '../palette';
@@ -161,7 +169,11 @@ function cardMeta(c: Ctx, entry: TimelineEntry, task: Task, branches: Branch[]):
     if (!repoNames.includes(label)) repoNames.push(label);
   }
   const jira = task.jira?.key;
+  const dated = entry.day !== LATER && entry.day >= WINDOW_DAYS;
   return (
+    (dated
+      ? `${dayLabel(c.cal, entry.day)} ${monthLabel(dateParts(c.cal, entry.day).month)} · `
+      : '') +
     (entry.days.length > 1 ? `${entry.span}d → ${dayLabel(c.cal, entry.end)} · ` : '') +
     (jira ? `${jira} · ` : '') +
     repoNames.join(' · ')

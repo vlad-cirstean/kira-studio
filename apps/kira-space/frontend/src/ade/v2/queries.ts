@@ -6,7 +6,14 @@ import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
 import { withMovedItem } from './backlogOrder';
-import { backlogKey, boardKey, runSandboxKey, useWorkflows } from './readQueries';
+import {
+  archivedTaskKey,
+  backlogKey,
+  boardKey,
+  runSandboxKey,
+  sessionsKey,
+  useWorkflows,
+} from './readQueries';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
@@ -30,6 +37,7 @@ import type {
   RebaseStart,
   RecordMergeArgs,
   RefreshArgs,
+  RemoveTaskRowArgs,
   RepoBranches,
   RepoBranchesArgs,
   RestartSessionArgs,
@@ -44,6 +52,7 @@ import type {
   SendReviewArgs,
   SetBranchBaseArgs,
   SetPlanArgs,
+  SetTaskBranchArgs,
   SetTaskStepArgs,
   SetTaskWorkflowArgs,
   StartBranchArgs,
@@ -54,6 +63,7 @@ import type {
   TaskArgs,
   UpdateBacklogItemArgs,
   UpdateTaskArgs,
+  UpdateTaskRepoArgs,
   ValidateWorkflowYamlArgs,
 } from './wire';
 
@@ -72,7 +82,7 @@ export {
 // popover opens on demand) and a failed optimistic write.
 
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
-const candidatesKey = ['adetask', 'candidates'] as const;
+const candidatesKey = (codeRepoId: string) => ['adetask', 'candidates', codeRepoId] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
@@ -87,11 +97,14 @@ export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
   );
 }
 
-/** Branches that can join the plan; refetched on every open so a just-pushed branch shows. */
-export function useCandidates(enabled: () => boolean) {
+/**
+ * Branches that can join the plan, of one repo or ('' ) every repo; refetched on every open so a
+ * just-pushed branch shows.
+ */
+export function useCandidates(codeRepoId: () => string, enabled: () => boolean) {
   return useQuery(() => ({
-    queryKey: candidatesKey,
-    queryFn: () => control.adeTaskCandidateBranches(),
+    queryKey: candidatesKey(codeRepoId()),
+    queryFn: () => control.adeTaskCandidateBranches({ codeRepoId: codeRepoId() }),
     staleTime: 0,
     enabled: enabled(),
   }));
@@ -143,6 +156,35 @@ export function useAddBacklogItem() {
 
 export function useAddTaskRepo() {
   return useMutation({ mutationFn: (args: AddTaskRepoArgs) => control.adeTaskAddTaskRepo(args) });
+}
+
+export function useSetTaskBranch() {
+  return useMutation({
+    mutationFn: (args: SetTaskBranchArgs) => control.adeTaskSetTaskBranch(args),
+  });
+}
+
+export function useUpdateTaskRepo() {
+  return useMutation({
+    mutationFn: (args: UpdateTaskRepoArgs) => control.adeTaskUpdateTaskRepo(args),
+  });
+}
+
+export function useRemoveTaskBranch() {
+  return useMutation({
+    mutationFn: (args: RemoveTaskRowArgs) => control.adeTaskRemoveTaskBranch(args),
+  });
+}
+
+export function useRemoveTaskRepo() {
+  return useMutation({
+    mutationFn: (args: RemoveTaskRowArgs) => control.adeTaskRemoveTaskRepo(args),
+  });
+}
+
+/** What removing a row's branch would discard; read fresh at click time, like the archive risk. */
+export function useTaskBranchRisk() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskTaskBranchRisk(args) });
 }
 
 /** Applies a task patch to a board snapshot: a `null` field is unchanged, `clearJira` drops Jira. */
@@ -392,6 +434,21 @@ export function useArchiveRisk() {
 
 export function useArchiveTask() {
   return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveTask(args) });
+}
+
+/** Unarchives a task; the board and sessions refetch and its archived read is dropped (the task
+ *  is live, so the read would fail). */
+export function useRestoreTask() {
+  return useMutation({
+    mutationFn: (args: TaskArgs) => control.adeTaskRestoreTask(args),
+    onSuccess: (_task, args) => {
+      queryClient.removeQueries({ queryKey: archivedTaskKey(args.taskId), exact: true });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: boardKey, exact: true }),
+        queryClient.invalidateQueries({ queryKey: sessionsKey, exact: true }),
+      ]);
+    },
+  });
 }
 
 export function useFocusSession() {

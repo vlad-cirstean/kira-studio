@@ -436,6 +436,42 @@ interface RepoHost {
   kind: 'ok' | 'disabled' | 'unavailable';
   host: HostInfo | null;
 }
+/** An archived task with everything it kept; carries no worktree path. */
+export interface ArchivedTask {
+  task: Task;
+  archivedAt: number;
+  statuses: TaskStatusDef[];
+  branches: ArchivedBranch[];
+  repos: RepoHost[];
+}
+export interface ArchivedBranch {
+  id: string;
+  codeRepoId: string;
+  name: string /* '' = never created */;
+  kind: Branch['kind'];
+  base: string;
+  origin: string;
+  addedAt: number;
+  mergedAt: number | null;
+  archivedAt: number;
+  /** Detached from the task before the archive. */
+  removed: boolean;
+  changeRequest: ChangeRequest | null;
+  /** 'live' = the host answered, 'archived' = snapshot taken at archive, '' = none. */
+  prSource: 'live' | 'archived' | '';
+  branchUrl: string;
+  comments: ArchivedComment[];
+}
+export interface ArchivedComment {
+  path: string;
+  start: number;
+  end: number;
+  body: string;
+  kind: string;
+  state: string;
+  reply: string;
+  createdAt: number;
+}
 export interface ChangeRequestsResult {
   repos: RepoHost[];
   branches: Record<string, ChangeRequest> /* branchId */;
@@ -464,6 +500,10 @@ export interface CandidateBranch {
   lastCommitAt: number;
   remoteOnly: boolean;
   mine: boolean;
+}
+export interface CandidateBranchesArgs {
+  /** '' = every repo. */
+  codeRepoId: string;
 }
 export interface CandidateBranchesResult {
   branches: CandidateBranch[] /* newest first */;
@@ -683,7 +723,8 @@ export interface RepoBranchesArgs {
   codeRepoId: string;
   branchId: string;
 }
-export interface BasePick {
+export type BaseExclusion = '' | 'self' | 'stacked';
+interface BasePick {
   name: string;
   local: boolean;
   remote: boolean;
@@ -692,7 +733,7 @@ export interface BasePick {
   taskTitle: string;
   draft: boolean;
   /** Why it cannot be chosen; '' = choosable. */
-  excluded: string;
+  excluded: BaseExclusion;
 }
 export interface RepoBranches {
   mainName: string;
@@ -726,6 +767,23 @@ export interface AddTaskRepoArgs {
   taskId: string;
   codeRepoId: string;
   base: BaseChoice | null;
+}
+export interface SetTaskBranchArgs {
+  branchId: string;
+  name: string;
+  /** true = attach the git branch `name`; false = create a branch of that name. */
+  existing: boolean;
+  /** true = delete uncommitted changes in the row's current worktree. */
+  discardChanges: boolean;
+}
+export interface RemoveTaskRowArgs {
+  branchId: string;
+  /** true = delete uncommitted changes in the row's worktree. */
+  discardChanges: boolean;
+}
+export interface UpdateTaskRepoArgs {
+  branchId: string;
+  codeRepoId: string;
 }
 export interface AddExistingBranchArgs {
   codeRepoId: string;

@@ -22,6 +22,7 @@ interface SavedStep {
   allowedTools: string[];
   review: { sendTo: string; implementer: string } | null;
   maxReturns: number;
+  runsOn: string;
   results: { id: string; ok: boolean; next: string; loop: boolean; description: string }[];
 }
 interface SavedWorkflow {
@@ -108,6 +109,34 @@ test('the graph saves on Save, never on its own, with ids unchanged', async ({ r
     'review',
     'release',
   ]);
+});
+
+test('Runs on one repo picks a repo from the project picker and saves only <nick>', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openWorkflows(relaunch);
+  await node(page, 'plan').click();
+  await page.locator(t('ade-wf-step-scope-one')).click();
+  await page.locator(t('ade-wf-step-scope-repo')).click();
+  await page.locator(t('ade-wf-step-scope-repo-option-repo-mobile')).click();
+  const out = await saved(page, control, 1);
+  expect(stepOf(out, 'plan')?.runsOn).toBe('only mobile');
+});
+
+test('a stored repo nickname that no repo has shows the missing hint', async ({ relaunch }) => {
+  const fx = adeFixture<WorkflowsFx>('workflows');
+  const first = fx.workflows[0];
+  const workflow = structuredClone(first?.workflow) as { steps: { id: string; runsOn: string }[] };
+  const plan = workflow.steps.find((x) => x.id === 'plan');
+  if (plan) plan.runsOn = 'only ghost';
+  const { window: page } = await openWorkflows(relaunch, [
+    {
+      channel: IPC.adeTaskWorkflows,
+      response: { ...fx, workflows: [{ ...first, workflow }, ...fx.workflows.slice(1)] },
+    },
+  ]);
+  await node(page, 'plan').click();
+  await expect(page.locator(t('ade-wf-step-scope-missing'))).toContainText('ghost');
 });
 
 test('a new step gets a fresh id and Allowed tools becomes allowedTools', async ({ relaunch }) => {

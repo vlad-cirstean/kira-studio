@@ -2487,6 +2487,32 @@
     "path": {
       "label": "Path"
     },
+    "picker": {
+      "createBranch": {
+        "label": "Create branch {name}"
+      },
+      "findBranch": {
+        "placeholder": "Find a branch"
+      },
+      "findProject": {
+        "placeholder": "Find a project"
+      },
+      "noBranches": {
+        "empty": "No branches"
+      },
+      "noProjects": {
+        "empty": "No projects"
+      },
+      "remote": {
+        "status": "Remote"
+      },
+      "useValue": {
+        "label": "Use {value}"
+      },
+      "you": {
+        "label": "You"
+      }
+    },
     "plainText": {
       "label": "Plain text"
     },
@@ -4838,20 +4864,8 @@
         "tooltip": "Back to branch selection"
       },
       "base": {
-        "allBranches": {
-          "label": "All branches"
-        },
         "choose": {
           "label": "Choose a base…"
-        },
-        "hidden": {
-          "hint": "{count} more. Type to filter."
-        },
-        "loading": {
-          "loading": "Loading branches…"
-        },
-        "popover": {
-          "aria": "Choose a comparison base"
         },
         "reasonDefaultBranch": {
           "label": "Default branch"
@@ -5869,9 +5883,6 @@
       "checking": {
         "loading": "Checking with {agent}…"
       },
-      "findProject": {
-        "placeholder": "Find or enter a project key"
-      },
       "label": "Add memory",
       "outcome": {
         "failed": {
@@ -5893,9 +5904,6 @@
       "text": {
         "label": "What to remember",
         "placeholder": "Facts in your own words; {agent} splits and checks them"
-      },
-      "useProject": {
-        "label": "Use {project}"
       }
     },
     "checkHook": {
@@ -6941,6 +6949,27 @@
         "body": "{title} leaves the board. Its running sessions stop and its worktrees are removed.",
         "title": "Archive task?"
       },
+      "archived": {
+        "comments": {
+          "label": "Review comments ({count})"
+        },
+        "filter": {
+          "placeholder": "Filter archived tasks"
+        },
+        "list": {
+          "aria": "Archived tasks",
+          "empty": "Nothing archived yet"
+        },
+        "restore": {
+          "hint": "Restore to edit."
+        },
+        "select": {
+          "emptyHint": "Select an archived task to see what it kept."
+        },
+        "snapshot": {
+          "hint": "Taken when the task was archived."
+        }
+      },
       "automation": {
         "chipBlocked": {
           "label": "{name} · needs you"
@@ -7009,6 +7038,12 @@
         }
       },
       "basePicker": {
+        "excludedSelf": {
+          "hint": "A branch can’t be its own base."
+        },
+        "excludedStacked": {
+          "hint": "Stacked on this branch."
+        },
         "main": {
           "label": "Main"
         },
@@ -7017,12 +7052,6 @@
         },
         "previous": {
           "label": "Previous base"
-        },
-        "remote": {
-          "status": "Remote"
-        },
-        "search": {
-          "placeholder": "Search branches"
         }
       },
       "board": {
@@ -7689,9 +7718,6 @@
         "archived": {
           "label": "Archived"
         },
-        "archivedTitle": {
-          "title": "Archived task"
-        },
         "empty": {
           "emptyHint": "Select a task to see its details."
         },
@@ -7750,14 +7776,6 @@
           },
           "open": {
             "aria": "Open {title}"
-          }
-        },
-        "dayControls": {
-          "addDay": {
-            "label": "Or choose a date"
-          },
-          "moreWeek": {
-            "label": "Add week"
           }
         },
         "header": {
@@ -8375,6 +8393,42 @@
           "option": "Add repository…",
           "tooltip": "Add a branch in this repository; created when work starts"
         },
+        "branchMenu": {
+          "addBranch": {
+            "label": "Add branch…"
+          },
+          "blocked": {
+            "error": "Can’t change {name}: {reason}"
+          },
+          "changeBranch": {
+            "label": "Change branch…"
+          },
+          "changeBranchConfirm": {
+            "confirm": "Change branch",
+            "title": "Change branch?"
+          },
+          "changeRepo": {
+            "label": "Change repository…"
+          },
+          "leaveConfirm": {
+            "body": "{name} leaves the task and its worktree goes. The git branch stays. Lost with the worktree: {risk}."
+          },
+          "removeBranch": {
+            "label": "Remove branch"
+          },
+          "removeBranchConfirm": {
+            "title": "Remove branch from task?"
+          },
+          "removeRepo": {
+            "label": "Remove repository"
+          },
+          "removeRepoConfirm": {
+            "title": "Remove repository from task?"
+          },
+          "trigger": {
+            "aria": "Repository and branch actions"
+          }
+        },
         "issue": {
           "label": "Issue"
         },
@@ -8579,8 +8633,14 @@
           "each": {
             "label": "Each repository"
           },
+          "missing": {
+            "hint": "No repository named {name}. Choose another."
+          },
           "once": {
             "label": "Once"
+          },
+          "oneRepo": {
+            "option": "One repository"
           },
           "only": {
             "label": "Only {name}"
@@ -8806,9 +8866,6 @@
       },
       "needYou": {
         "label": "Need you"
-      },
-      "noBranches": {
-        "empty": "No branches"
       },
       "notes": {
         "label": "Notes"

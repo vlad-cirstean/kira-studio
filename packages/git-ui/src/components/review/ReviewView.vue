@@ -37,10 +37,10 @@ import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
-import ReviewBranchPicker from './ReviewBranchPicker.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
 import ReviewCommitList from './ReviewCommitList.vue';
 import ReviewFilesPane from './ReviewFilesPane.vue';
+import ReviewNoBranch from './ReviewNoBranch.vue';
 import ReviewToolbars from './ReviewToolbars.vue';
 
 const props = defineProps<{
@@ -484,7 +484,7 @@ useReviewAnnouncements(review, announce);
     </template>
 
     <template v-else-if="!review.branch.value">
-      <ReviewBranchPicker :refs-state="refsState" @pick="pickBranch" />
+      <ReviewNoBranch :refs-state="refsState" @pick="pickBranch" />
     </template>
 
     <template v-else>

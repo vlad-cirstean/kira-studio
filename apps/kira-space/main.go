@@ -175,6 +175,7 @@ func main() {
 		wired.OpenedFiles.Add(e.Context().Filename())
 	})
 	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
+	shell.AttachActivationTrace(app)
 	wired.SetReopen(func() { shell.ReopenWindows(winDeps) })
 	// P116 G5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
 	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(wired.KeepAwake) })

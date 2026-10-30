@@ -259,39 +259,16 @@ func (b *TaskBoard) ReviewWorkingDiff(ctx context.Context, branchID, path string
 	return codeworkspace.ReadDiffAt(ctx, cf, worktree, head, path)
 }
 
-// teardownReview unpins and purges the task's review sessions, and closes its review
-// windows (Archive).
-func (b *TaskBoard) teardownReview(ctx context.Context, tc *taskCtx) {
-	if b.deps.Registry != nil && b.deps.Registry.Review != nil {
-		for _, sb := range tc.branches {
-			if sb.Name == "" {
-				continue
-			}
-			entry, err := b.openRepo(ctx, sb.CodeRepoID)
-			if err != nil {
-				slog.Warn("ade: review teardown: open repo", "scope", "ade", "branch", sb.ID, "err", err)
-				continue
-			}
-			branch, _, err := b.reviewSpellings(ctx, entry, sb)
-			if err != nil {
-				branch = sb.Name
-			}
-			id := entry.Summary.RepoID
-			if err := b.deps.Registry.Review.SetPinned(ctx, id, branch, false); err != nil {
-				slog.Warn("ade: review teardown: unpin", "scope", "ade", "branch", sb.ID, "err", err)
-				continue
-			}
-			if err := b.deps.Registry.Review.Purge(ctx, id, branch); err != nil {
-				slog.Warn("ade: review teardown: purge", "scope", "ade", "branch", sb.ID, "err", err)
-			}
-		}
+// closeReviewWindows closes the task's review windows and drops their records (Archive). Review
+// sessions stay pinned: archived work keeps its review comments.
+func (b *TaskBoard) closeReviewWindows(tc *taskCtx) {
+	if b.deps.ReviewWindows == nil {
+		return
 	}
-	if b.deps.ReviewWindows != nil {
-		if b.deps.CloseReviewWindows != nil {
-			b.deps.CloseReviewWindows(tc.task.ID)
-		}
-		if err := b.deps.ReviewWindows.DeleteByTask(tc.task.ID); err != nil {
-			slog.Warn("ade: review teardown: windows", "scope", "ade", "task", tc.task.ID, "err", err)
-		}
+	if b.deps.CloseReviewWindows != nil {
+		b.deps.CloseReviewWindows(tc.task.ID)
+	}
+	if err := b.deps.ReviewWindows.DeleteByTask(tc.task.ID); err != nil {
+		slog.Warn("ade: close review windows", "scope", "ade", "task", tc.task.ID, "err", err)
 	}
 }

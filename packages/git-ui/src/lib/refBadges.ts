@@ -253,7 +253,7 @@ export function pickBestChangeRequest(
  *  never noisy" rule): the caller never has to branch on which of those five it got.
  *  Never a real `<a href>` — under Wails an anchor click navigates the app's own window
  *  itself rather than opening a browser tab (there is no separate tab to open one in), the same
- *  defect class `CommitMeta.vue`/`BranchPicker.vue`/`StackList.vue`'s own PR links carried before
+ *  defect class `CommitMeta.vue`/`RefsPopover.vue`/`StackList.vue`'s own PR links carried before
  *  the fix. A `<button data-change-request-number>` (click routed through
  *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openChangeRequest`, which composes
  *  and opens the URL host-side). The PR's state is carried as a border colour class, never as text

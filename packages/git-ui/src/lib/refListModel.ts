@@ -1,6 +1,5 @@
 /**
- * The pure half of `BranchPicker.vue`/`TagList.vue` — the filter (one box,
- * matching across all three sections), the per-section sort, the "N more" cap, and the small
+ * The pure half of `TagList.vue` — the filter, the per-section sort, the "N more" cap, and the small
  * per-row facts (`formatTrack`, the remote-checkout label) neither component should recompute on
  * its own. Follows `fileTreeModel.ts`/`columns.ts`'s precedent of splitting the pure fold from the
  * DOM-touching renderer.
@@ -35,43 +34,13 @@ export interface RefListSection {
   readonly hiddenCount: number;
 }
 
-/** The generic half of `capSection` below — split out so `StashList.vue` gets the same
- *  "N more" cap over `StashEntry[]` (an already-ordered stack, never filtered or re-sorted) without
- *  a second list implementation. `capSection` itself is kept as the thin `RefRow`-typed wrapper
- *  every existing caller (`BranchPicker.vue`,
- *  `TagList.vue`) already uses, unchanged. */
+/** The "N more" cap, generic so `StashList.vue` shares it over an already-ordered `StashEntry[]`. */
 export function capItems<T>(
   items: readonly T[],
   cap: number = REF_LIST_SECTION_CAP,
 ): { readonly visible: readonly T[]; readonly hiddenCount: number } {
   if (items.length <= cap) return { visible: items, hiddenCount: 0 };
   return { visible: items.slice(0, cap), hiddenCount: items.length - cap };
-}
-
-function capSection(rows: readonly RefRow[], cap: number = REF_LIST_SECTION_CAP): RefListSection {
-  return capItems(rows, cap);
-}
-
-export interface RefListSections {
-  readonly branches: RefListSection;
-  readonly remoteBranches: RefListSection;
-  readonly tags: RefListSection;
-}
-
-export interface RefListInput {
-  readonly branches: readonly RefRow[];
-  readonly remoteBranches: readonly RefRow[];
-  readonly tags: readonly RefRow[];
-}
-
-/** The whole fold: filter (one box, all three sections), sort (name for branches/remotes,
- *  version-aware for tags), cap. `BranchPicker.vue`/`TagList.vue` render this and nothing else. */
-export function buildRefListSections(refs: RefListInput, filter: string): RefListSections {
-  return {
-    branches: capSection(sortByName(filterRefs(refs.branches, filter))),
-    remoteBranches: capSection(sortByName(filterRefs(refs.remoteBranches, filter))),
-    tags: capSection(sortTags(filterRefs(refs.tags, filter))),
-  };
 }
 
 /** A branch row's ahead/behind badge text, or `undefined` when there is nothing worth a badge

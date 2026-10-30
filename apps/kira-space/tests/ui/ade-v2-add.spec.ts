@@ -68,9 +68,9 @@ test('Existing branch searches every repo and adds the picked one', async ({ rel
   await page.locator('[data-testid="ade-add"]').click();
   await page.locator('[data-testid="ade-add-tab-branch"]').click();
   await page.locator('[data-testid="ade-branch-search"]').fill('invoice');
-  const rows = page.locator('[data-testid="ade-candidate"]');
+  const rows = page.locator('[data-testid^="ade-branch-option-"]');
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('you');
+  await expect(rows.first()).toContainText('You');
   await expect(rows.first()).toContainText('web-app');
   await rows.first().click();
   await expect
@@ -81,4 +81,22 @@ test('Existing branch searches every repo and adds the picked one', async ({ rel
     name: 'fix/invoice-rounding',
     taskId: '',
   });
+});
+
+test('the branch list shows 50 candidates and Show more reveals the rest', async ({ relaunch }) => {
+  const base = adeFixture<{ branches: Record<string, unknown>[] }>('candidates');
+  const template = base.branches[0] ?? {};
+  const branches = Array.from({ length: 60 }, (_, i) => ({
+    ...template,
+    name: `feat/bulk-${String(i).padStart(2, '0')}`,
+  }));
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskCandidateBranches, response: { ...base, branches } },
+  ]);
+  await page.locator('[data-testid="ade-add"]').click();
+  await page.locator('[data-testid="ade-add-tab-branch"]').click();
+  const rows = page.locator('[data-testid^="ade-branch-option-"]');
+  await expect(rows).toHaveCount(50);
+  await page.locator('[data-testid="ade-branch-more"]').click();
+  await expect(rows).toHaveCount(60);
 });

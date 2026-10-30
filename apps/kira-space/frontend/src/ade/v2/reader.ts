@@ -1,6 +1,7 @@
 import type { InjectionKey } from 'vue';
 import { inject } from 'vue';
 import type {
+  ArchivedTask,
   BacklogResult,
   Board,
   ChangeRequestsResult,
@@ -9,6 +10,7 @@ import type {
   ReadLogArgs,
   Repo,
   SessionsResult,
+  TaskArgs,
   WorkflowsResult,
 } from './wire';
 
@@ -26,6 +28,7 @@ export interface AdeReader {
   repos(): Promise<{ repos: RepoName[] }>;
   readLog(args: ReadLogArgs): Promise<LogPage>;
   hostProviders(): Promise<HostProviders>;
+  archivedTask(args: TaskArgs): Promise<ArchivedTask>;
 }
 
 export const adeReaderKey: InjectionKey<AdeReader> = Symbol('adeReader');

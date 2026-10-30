@@ -15,7 +15,9 @@ import { Button } from '@theme/components/ui/button';
 import { EmptyDescription } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
-import { onMounted, ref } from 'vue';
+import ProjectPicker from '@workbench/components/pickers/ProjectPicker.vue';
+import type { PickerOption } from '@workbench/lib/pickerOptions';
+import { computed, onMounted, ref } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
 
@@ -41,10 +43,18 @@ onMounted(refreshCandidates);
 // never reached the user either.
 const pickError = ref<string | undefined>(undefined);
 
-async function openCandidate(candidate: RepoCandidate): Promise<void> {
+const candidateOptions = computed<PickerOption[]>(() =>
+  props.repoState.candidates.value.map((c: RepoCandidate) => ({
+    value: c.path,
+    label: c.label,
+    detail: c.path,
+  })),
+);
+
+async function openCandidate(option: PickerOption): Promise<void> {
   pickError.value = undefined;
   try {
-    const result = await props.repoState.open(candidate.path);
+    const result = await props.repoState.open(option.value);
     if (result.kind === 'ok') emit('repoOpened', result.repo.repoId);
   } catch (err) {
     // `transport-closed` (the host disconnecting mid-request) is ignored outright — this panel
@@ -62,26 +72,16 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     :icon="STATE_ICONS.repo"
     :title="t('git.noRepository.open.title')"
   >
-    <ul
+    <ProjectPicker
       v-if="repoState.candidates.value.length > 0"
-      class="flex flex-col gap-0.5 m-0 p-0 list-none max-w-105 w-full"
-    >
-      <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
-        <!-- Disabled while any open (this candidate, another candidate, the bootstrap
-             loop, a worktree switch elsewhere) is in flight — `RepoState.open`'s own sequence
-             token already discards whichever one loses the race, but a second click before that
-             is wasted work and a confusing "which one did I pick" moment. -->
-        <Button
-          variant="toolbar"
-          size="kira"
-          class="w-full justify-start truncate"
-          :disabled="repoState.opening.value"
-          @click="openCandidate(candidate)"
-        >
-          {{ candidate.label }}
-        </Button>
-      </li>
-    </ul>
+      inline
+      class="max-w-105 w-full"
+      testid="no-repository"
+      :projects="candidateOptions"
+      :disabled="repoState.opening.value"
+      :placeholder="t('git.noRepository.open.title')"
+      @select="openCandidate"
+    />
     <template v-else>
       <EmptyDescription
         v-if="refreshError"

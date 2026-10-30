@@ -17,14 +17,15 @@ import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import BranchPicker from '@workbench/components/pickers/BranchPicker.vue';
 import { computed, ref } from 'vue';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import AdeBasePicker from '../AdeBasePicker.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
 import { baseOf } from '../board/rebaseActions';
+import { baseChoiceOf, baseGroups, baseOptions, baseValue } from '../branchOptions';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
-import { useRebasePreview } from '../queries';
+import { useRebasePreview, useRepoBranches } from '../queries';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS } from '../tones';
 import { composeDialog, isRebaseKind } from './compose';
@@ -74,6 +75,21 @@ const currentBase = computed(() => {
   const c = dialogs.ctx;
   const b = baseBranch.value;
   return c && b ? baseOf(b, c.graph, c.repoState(b.codeRepoId).mainName) : '';
+});
+
+const baseOpen = ref(false);
+const baseChoice = computed(() => dialogs.spec?.onto ?? null);
+const baseData = useRepoBranches(() =>
+  baseBranch.value && (baseOpen.value || baseChoice.value !== null)
+    ? { codeRepoId: baseBranch.value.codeRepoId, branchId: baseBranch.value.id }
+    : null,
+);
+const baseOpts = computed(() => (baseData.data.value ? baseOptions(baseData.data.value) : []));
+const baseShown = computed(() => {
+  const c = baseChoice.value;
+  if (c === null) return currentBase.value;
+  const v = baseValue(c);
+  return baseOpts.value.find((o) => o.value === v)?.label ?? (c.ref || c.branchId);
 });
 
 // The launch waits behind a prepare script: show each branch's, and why it is held or refused.
@@ -183,12 +199,17 @@ async function discard(): Promise<void> {
 
         <div v-if="baseBranch" class="flex items-center gap-2" data-testid="ade-dialog-base">
           <span class="text-muted-foreground">{{ t('space.common.base.label') }}</span>
-          <AdeBasePicker
-            :code-repo-id="baseBranch.codeRepoId"
-            :branch-id="baseBranch.id"
-            :model-value="dialogs.spec?.onto ?? null"
-            :current="currentBase"
-            @update:model-value="(c) => c && dialogs.pickBase(c)"
+          <BranchPicker
+            v-model:open="baseOpen"
+            size="kira"
+            testid="ade-base-picker"
+            :model-value="baseValue(baseChoice)"
+            :branches="baseOpts"
+            :groups="baseGroups()"
+            :placeholder="currentBase"
+            :trigger-label="baseShown"
+            :loading="baseData.isPending.value"
+            @select="(o) => dialogs.pickBase(baseChoiceOf(o.value))"
           />
         </div>
 

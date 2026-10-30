@@ -75,11 +75,10 @@ const appSpaceAppearanceSettingsSchema = /*#__PURE__*/ appearanceSettingsSchema.
   dateFormat: z.enum(['relative', 'absolute']).default('relative'),
 });
 
-// The queue-board UI prefs (panel width, planning-horizon window, calendar overrides), persisted as
-// settings leaves rather than component state so they survive a relaunch. No UI reads these yet.
+// The queue-board UI prefs (panel width, history window, calendar overrides), persisted as
+// settings leaves rather than component state so they survive a relaunch.
 // Not exported — nothing outside this file references the raw schema object; `Settings['ade']`
 // covers real consumers.
-const ADE_HORIZON_DAYS_RANGE = { min: 1, max: 365 } as const;
 const ADE_HISTORY_DAYS_RANGE = { min: 1, max: 365 } as const;
 const ADE_WORKDAY_HOURS_RANGE = { min: 1, max: 24 } as const;
 const ADE_SPAN_DAY_SHARE_RANGE = { min: 0.05, max: 1 } as const;
@@ -93,19 +92,12 @@ const adeIsoDateSchema = /*#__PURE__*/ z
 const adeDateListSchema = /*#__PURE__*/ z.array(adeIsoDateSchema).max(ADE_DATE_LIST_MAX);
 
 const adeSettingsSchema = /*#__PURE__*/ z.object({
-  horizonDays: z
-    .number()
-    .int()
-    .min(ADE_HORIZON_DAYS_RANGE.min)
-    .max(ADE_HORIZON_DAYS_RANGE.max)
-    .default(14),
   historyDays: z
     .number()
     .int()
     .min(ADE_HISTORY_DAYS_RANGE.min)
     .max(ADE_HISTORY_DAYS_RANGE.max)
     .default(14),
-  extraDays: adeDateListSchema.default([]),
   offDays: adeDateListSchema.default([]),
   workWeekendDays: adeDateListSchema.default([]),
   workdayHours: z
@@ -163,9 +155,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     graphFontSize: 0,
   }),
   ade: adeSettingsSchema.default({
-    horizonDays: 14,
     historyDays: 14,
-    extraDays: [],
     offDays: [],
     workWeekendDays: [],
     workdayHours: 6,
@@ -223,9 +213,7 @@ export const defaultSettings: Settings = {
     graphFontSize: 0,
   },
   ade: {
-    horizonDays: 14,
     historyDays: 14,
-    extraDays: [],
     offDays: [],
     workWeekendDays: [],
     workdayHours: 6,

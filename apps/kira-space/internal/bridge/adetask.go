@@ -366,8 +366,13 @@ func (s *AdeTaskService) ForcePush(ctx context.Context, args adewire.BranchArgs)
 	return r, adeTaskError(err)
 }
 
-func (s *AdeTaskService) CandidateBranches(ctx context.Context) (adewire.CandidateBranchesResult, error) {
-	r, err := s.Engine.CandidateBranches(ctx)
+func (s *AdeTaskService) CandidateBranches(ctx context.Context, args adewire.CandidateBranchesArgs) (adewire.CandidateBranchesResult, error) {
+	if args.CodeRepoID != "" {
+		if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
+			return adewire.CandidateBranchesResult{}, err
+		}
+	}
+	r, err := s.Engine.CandidateBranches(ctx, args.CodeRepoID)
 	return r, adeTaskError(err)
 }
 
@@ -492,6 +497,55 @@ func (s *AdeTaskService) SetBranchBase(ctx context.Context, args adewire.SetBran
 		return err
 	}
 	return adeTaskError(s.Engine.SetBranchBase(ctx, args))
+}
+
+// SetTaskBranch gives a task row an existing git branch or creates a new one for it.
+func (s *AdeTaskService) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranchArgs) (adewire.Branch, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.Branch{}, err
+	}
+	if err := validateAdeBranchName(args.Name, "name"); err != nil {
+		return adewire.Branch{}, err
+	}
+	br, err := s.Engine.SetTaskBranch(ctx, args)
+	return br, adeTaskError(err)
+}
+
+// UpdateTaskRepo swaps the repo of a row whose branch is not created.
+func (s *AdeTaskService) UpdateTaskRepo(ctx context.Context, args adewire.UpdateTaskRepoArgs) (adewire.Branch, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.Branch{}, err
+	}
+	if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
+		return adewire.Branch{}, err
+	}
+	br, err := s.Engine.UpdateTaskRepo(ctx, args)
+	return br, adeTaskError(err)
+}
+
+// RemoveTaskBranch detaches a row's branch; the repo stays on the task.
+func (s *AdeTaskService) RemoveTaskBranch(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RemoveTaskBranch(ctx, args))
+}
+
+// RemoveTaskRepo detaches a row, its branch included.
+func (s *AdeTaskService) RemoveTaskRepo(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RemoveTaskRepo(ctx, args))
+}
+
+// TaskBranchRisk reports what removing a row's branch would discard.
+func (s *AdeTaskService) TaskBranchRisk(ctx context.Context, args adewire.BranchArgs) (adewire.BranchRisk, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.BranchRisk{}, err
+	}
+	r, err := s.Engine.TaskBranchRisk(ctx, args.BranchID)
+	return r, adeTaskError(err)
 }
 
 // RepoBranches lists the bases the picker offers for a repo.
@@ -1056,6 +1110,24 @@ func (s *AdeTaskService) ArchiveTask(ctx context.Context, args adewire.TaskArgs)
 		return err
 	}
 	return adeTaskError(s.Engine.ArchiveTask(ctx, args.TaskID))
+}
+
+// ArchivedTask reads an archived task with everything it kept.
+func (s *AdeTaskService) ArchivedTask(ctx context.Context, args adewire.TaskArgs) (adewire.ArchivedTask, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.ArchivedTask{}, err
+	}
+	r, err := s.Engine.ArchivedTask(ctx, args.TaskID)
+	return r, adeTaskError(err)
+}
+
+// RestoreTask unarchives a task into Later.
+func (s *AdeTaskService) RestoreTask(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.RestoreTask(ctx, args.TaskID)
+	return t, adeTaskError(err)
 }
 
 // OpenReviewWindow opens the branch's review window, or focuses it when already open. true = opened.

@@ -1,6 +1,7 @@
 package repos
 
 import (
+	"cmp"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,8 @@ import (
 // Sentinels AdeTaskRepo/AdeBacklogRepo return; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
 var (
 	ErrTaskNotFound = errors.New("repos: task not found")
+	// ErrTaskNotArchived marks an archived-only call on a live task.
+	ErrTaskNotArchived = errors.New("repos: task is not archived")
 	// ErrStatusUnknown marks a status id missing from the status set.
 	ErrStatusUnknown = errors.New("repos: unknown task status")
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
@@ -28,6 +31,19 @@ var (
 	// ErrBranchNameTaken marks a created-branch name already used by a live branch of the repo.
 	ErrBranchNameTaken = errors.New("repos: a live branch in that repo already has that name")
 )
+
+// BranchHeldError is RestoreTask's refusal: a named branch of the task is live on another task. It
+// wraps ErrBranchOnTask.
+type BranchHeldError struct {
+	Branch    string
+	TaskTitle string
+}
+
+func (e *BranchHeldError) Error() string {
+	return fmt.Sprintf("repos: branch %s is live on task %q", e.Branch, e.TaskTitle)
+}
+
+func (e *BranchHeldError) Unwrap() error { return ErrBranchOnTask }
 
 // maxColorSlots is the task colour slot count (0-19).
 const maxColorSlots = 20
@@ -54,7 +70,8 @@ func EstOverCap(est string) bool {
 }
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at, status_id, status_by, status_step`
-const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
+const adeTaskBranchInsertColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
+const adeTaskBranchColumns = adeTaskBranchInsertColumns + `, cr_number, cr_title, cr_state, cr_url, review_comments`
 const adeRunColumns = `id, task_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
@@ -96,11 +113,16 @@ func scanAdeTask(row rowScanner) (model.AdeTask, error) {
 func scanAdeTaskBranch(row rowScanner) (model.AdeTaskBranch, error) {
 	var b model.AdeTaskBranch
 	var had int
-	var merged, archived sql.NullInt64
+	var merged, archived, crNumber sql.NullInt64
+	var crTitle, crState, crURL, comments sql.NullString
 	if err := row.Scan(&b.ID, &b.TaskID, &b.CodeRepoID, &b.Name, &b.Kind, &b.Base, &b.BaseBranchID, &b.BasePendingFrom, &b.QueuedAfter, &b.Position,
-		&had, &b.AddedAt, &merged, &archived, &b.Origin); err != nil {
+		&had, &b.AddedAt, &merged, &archived, &b.Origin, &crNumber, &crTitle, &crState, &crURL, &comments); err != nil {
 		return model.AdeTaskBranch{}, err
 	}
+	if crNumber.Valid {
+		b.ChangeRequest = &model.AdeChangeRequest{Number: int(crNumber.Int64), Title: crTitle.String, State: crState.String, URL: crURL.String}
+	}
+	b.ReviewCommentsJSON = comments.String
 	b.HadCommits = had != 0
 	b.MergedAt = nullInt64Ptr(merged)
 	b.ArchivedAt = nullInt64Ptr(archived)
@@ -237,7 +259,7 @@ func insertTaskBranch(tx *sql.Tx, b model.AdeTaskBranch) error {
 	if err := b.Validate(); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+	if _, err := tx.Exec(`INSERT INTO ade_task_branches (`+adeTaskBranchInsertColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
 		b.ID, b.TaskID, b.CodeRepoID, b.Name, b.Kind, b.Base, b.BaseBranchID, b.BasePendingFrom, b.QueuedAfter, b.Position, boolInt(b.HadCommits), b.AddedAt, b.Origin); err != nil {
 		if isUniqueViolation(err) {
 			return ErrBranchOnTask
@@ -433,10 +455,73 @@ func (r *AdeTaskRepo) AddBranch(b model.AdeTaskBranch) (model.AdeTaskBranch, err
 	return b, nil
 }
 
-func (r *AdeTaskRepo) queryBranches(where string) ([]model.AdeTaskBranch, error) {
+// DetachBranch takes a live branch off its live task in one transaction. A branch never created and
+// without runs is deleted; any other is archived, so its runs, reviews and marks stay as history.
+// Without a replacement, live branches stacked on it fall back to its name (its ref stays in git) or,
+// while it is not created, to its own base, and branches queued after it are freed. A non-nil
+// replacement takes the old position (ErrBranchOnTask on a taken name); one filling a not-created row
+// of the same repo also takes the dependents.
+func (r *AdeTaskRepo) DetachBranch(id string, replacement *model.AdeTaskBranch, now int64) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin detach ade branch %s: %w", id, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	old, err := scanAdeTaskBranch(tx.QueryRow(`SELECT `+adeTaskBranchColumns+` FROM ade_task_branches
+		WHERE id = ? AND archived_at IS NULL AND task_id IN (SELECT id FROM ade_tasks WHERE archived_at IS NULL)`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrBranchMissing
+	}
+	if err != nil {
+		return fmt.Errorf("repos: load ade branch %s: %w", id, err)
+	}
+	var runs int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE branch_id = ?`, id).Scan(&runs); err != nil {
+		return fmt.Errorf("repos: count ade runs of branch %s: %w", id, err)
+	}
+	if old.Name == "" && runs == 0 {
+		_, err = tx.Exec(`DELETE FROM ade_task_branches WHERE id = ?`, id)
+	} else {
+		_, err = tx.Exec(`UPDATE ade_task_branches SET archived_at = ? WHERE id = ?`, now, id)
+	}
+	if err != nil {
+		return fmt.Errorf("repos: detach ade branch %s: %w", id, err)
+	}
+	fill := replacement != nil && old.Name == "" && replacement.CodeRepoID == old.CodeRepoID
+	if replacement != nil {
+		replacement.Position = old.Position
+		if err := insertTaskBranch(tx, *replacement); err != nil {
+			return err
+		}
+	}
+	if fill {
+		// The replacement fills the same not-created row, so what depended on the row keeps depending on it.
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET base_branch_id = ? WHERE base_branch_id = ? AND archived_at IS NULL`, replacement.ID, id); err != nil {
+			return fmt.Errorf("repos: repoint ade branches stacked on %s: %w", id, err)
+		}
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET queued_after = ? WHERE queued_after = ?`, replacement.ID, id); err != nil {
+			return fmt.Errorf("repos: repoint ade branches queued after %s: %w", id, err)
+		}
+	} else {
+		newBase := cmp.Or(old.Name, old.Base)
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET base_branch_id = '', base = ?, base_pending_from = ''
+			WHERE base_branch_id = ? AND archived_at IS NULL`, newBase, id); err != nil {
+			return fmt.Errorf("repos: free ade branches stacked on %s: %w", id, err)
+		}
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET queued_after = '' WHERE queued_after = ?`, id); err != nil {
+			return fmt.Errorf("repos: free ade branches queued after %s: %w", id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit detach ade branch %s: %w", id, err)
+	}
+	return nil
+}
+
+func (r *AdeTaskRepo) queryBranches(where string, args ...any) ([]model.AdeTaskBranch, error) {
 	rows, err := r.DB.Query(`SELECT b.id, b.task_id, b.code_repo_id, b.name, b.kind, b.base, b.base_branch_id, b.base_pending_from, b.queued_after, b.position,
-		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin
-		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE ` + where + ` ORDER BY b.task_id, b.position, b.id`)
+		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin, b.cr_number, b.cr_title, b.cr_state, b.cr_url, b.review_comments
+		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE `+where+` ORDER BY b.task_id, b.position, b.id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade task branches: %w", err)
 	}
@@ -463,6 +548,11 @@ func (r *AdeTaskRepo) BranchesLive() ([]model.AdeTaskBranch, error) {
 // BranchesArchived returns the branches of archived tasks (history).
 func (r *AdeTaskRepo) BranchesArchived() ([]model.AdeTaskBranch, error) {
 	return r.queryBranches(`t.archived_at IS NOT NULL`)
+}
+
+// BranchesOfTask returns every branch row of one task, archived or not, in position order.
+func (r *AdeTaskRepo) BranchesOfTask(taskID string) ([]model.AdeTaskBranch, error) {
+	return r.queryBranches(`b.task_id = ?`, taskID)
 }
 
 // GetBranch returns one branch by id; ErrBranchMissing if absent.
@@ -1229,6 +1319,93 @@ func (r *AdeTaskRepo) CountRebaseRuns(branchID string) (int, error) {
 		return 0, fmt.Errorf("repos: count ade rebase runs %s: %w", branchID, err)
 	}
 	return n, nil
+}
+
+// SetBranchChangeRequests replaces the stored change request of each listed branch with crs (key =
+// branch id) in one transaction; a listed branch missing from crs ends with none.
+func (r *AdeTaskRepo) SetBranchChangeRequests(ids []string, crs map[string]model.AdeChangeRequest) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin set ade branch change requests: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	for _, id := range ids {
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET cr_number = NULL, cr_title = NULL, cr_state = NULL, cr_url = NULL WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("repos: clear ade branch %s change request: %w", id, err)
+		}
+	}
+	for id, cr := range crs {
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET cr_number = ?, cr_title = ?, cr_state = ?, cr_url = ? WHERE id = ?`,
+			cr.Number, cr.Title, cr.State, cr.URL, id); err != nil {
+			return fmt.Errorf("repos: set ade branch %s change request: %w", id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit set ade branch change requests: %w", err)
+	}
+	return nil
+}
+
+// SetBranchReviewComments stores (json) or clears ("") the review comment snapshot of one branch.
+func (r *AdeTaskRepo) SetBranchReviewComments(id, json string) error {
+	var v any
+	if json != "" {
+		v = json
+	}
+	if _, err := r.DB.Exec(`UPDATE ade_task_branches SET review_comments = ? WHERE id = ?`, v, id); err != nil {
+		return fmt.Errorf("repos: set ade branch %s review comments: %w", id, err)
+	}
+	return nil
+}
+
+// RestoreTask unarchives the task in one transaction: the task and the branch rows archived with
+// it (same archived_at) go live and the task takes a plan row at the end of Later. Rows detached
+// earlier stay detached. A named branch live on another task refuses with *BranchHeldError.
+func (r *AdeTaskRepo) RestoreTask(taskID string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin restore ade task %s: %w", taskID, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	t, err := scanAdeTask(tx.QueryRow(`SELECT `+adeTaskColumns+` FROM ade_tasks WHERE id = ?`, taskID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrTaskNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("repos: load ade task %s: %w", taskID, err)
+	}
+	if t.ArchivedAt == nil {
+		return ErrTaskNotArchived
+	}
+	var held, holder string
+	err = tx.QueryRow(`SELECT mine.name, COALESCE(NULLIF(other_t.title, ''), other_t.jira_key, '')
+		FROM ade_task_branches mine
+		JOIN ade_task_branches other ON other.code_repo_id = mine.code_repo_id AND other.name = mine.name AND other.archived_at IS NULL
+		JOIN ade_tasks other_t ON other_t.id = other.task_id
+		WHERE mine.task_id = ? AND mine.archived_at = ? AND mine.name <> '' LIMIT 1`, taskID, *t.ArchivedAt).Scan(&held, &holder)
+	if err == nil {
+		return &BranchHeldError{Branch: held, TaskTitle: holder}
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("repos: check ade task %s branch names: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`UPDATE ade_task_branches SET archived_at = NULL WHERE task_id = ? AND archived_at = ?`, taskID, *t.ArchivedAt); err != nil {
+		return fmt.Errorf("repos: restore ade task branches %s: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`UPDATE ade_tasks SET archived_at = NULL WHERE id = ?`, taskID); err != nil {
+		return fmt.Errorf("repos: restore ade task %s: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`INSERT INTO ade_task_plan (task_id, day, position)
+		SELECT ?, NULL, COALESCE(MAX(position) + 1, 0) FROM ade_task_plan`, taskID); err != nil {
+		return fmt.Errorf("repos: insert ade task plan row %s: %w", taskID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit restore ade task %s: %w", taskID, err)
+	}
+	return nil
 }
 
 // ArchiveTask archives the task and its branches and drops its plan row in one transaction.

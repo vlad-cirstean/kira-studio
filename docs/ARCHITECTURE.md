@@ -1284,7 +1284,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - prefers-reduced-motion: reduce zeroes transitions and animations in base.css, except Spinner.
 - Native scrollbars (base.css, pointer: fine only) keep a 12px classic gutter; the thumb is transparent until the pointer is inside that scroller. Thumb colour rides --kira-scrollbar-thumb, set by :where(:hover) on the scroller and reset on every element, because WebKit never repaints a :hover::-webkit-scrollbar-thumb rule and scrollbar-color/scrollbar-width drop the custom styling. Thumb :active keeps a dragged bar shown. Monaco and xterm keep their own hover-reveal scrollbars.
 - QueryState shows its default loading state after TIMING.spinnerDelay (300ms), while Button pending shows its spinner at once.
-- The drag ghost class is SORTABLE_GHOST_CLASS (U76).
+- The drag ghost class is SORTABLE_GHOST_CLASS (U76). No list sets a chosen class: Sortable's unstyled default keeps a press from flashing a ring.
 - Mobile code never hard-codes h-11 (U82).
 - EmptyState (theme) is the only Empty composition (U74), with props/slots icon?, title, description?, default slot for actions, and media slot for a custom glyph.
 - A side panel empty state gets icon, title and a one-line description with no button (U78); its action lives on the module front door.
@@ -1340,6 +1340,18 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - check-conventions.ts N8-N12 check duplicate spec helpers, .ts files under components/, .vue files over 600 lines, printed shortcuts without binding, and state/ dir and menu file naming.
 - check-ui-primitives.sh keeps 38 named PERMANENT lines, each with a reason; its built-in exempt column fails when an entry exempts nothing (suffix ! opts a blanket directory out).
 - vue-tsc checkUnknownComponents, inside typecheck, catches unresolved components.
+
+### Shared pickers (P398)
+
+- One ProjectPicker and one BranchPicker, in packages/workbench/src/components/pickers/, serve every project or branch choice in Studio, Space and git-ui. Callers feed PickerOption[]; no caller builds its own list, combobox or select.
+- Both wrap PickerPopover (trigger, Popover, inline mode) over PickerCombobox (shadcn-vue Command with ignoreFilter). foldOptions in lib/pickerOptions.ts filters, groups and orders; useCappedList plus ShowMoreButton cap a section at 50.
+- Test ids derive from the caller's testid: the trigger is testid, then testid-search, testid-option-<id>, testid-custom, testid-error, testid-more, testid-content. A PickerOption.testid overrides the option id.
+- Reka single-select toggles on reselect, so pickers act on the select event, never on the model change.
+- BranchPicker create offers "Create branch <name>" for a validated new name; custom offers "Use <value>" for any ref or sha. ProjectPicker custom offers free entry for keys outside the list.
+- A disabled option shows its reason inline, never hover-only.
+- ADE base exclusions ship as codes (self, stacked) in adewire.BasePick.Excluded; the frontend owns the text. Candidate branches load per repo (adeTaskCandidateBranches takes codeRepoId).
+- git-ui option builders live in lib/refOptions.ts. Suggested base options use the s: value prefix so the same ref in the branch list keeps a unique value.
+- The git-ui toolbar popover (tabs for branches, tags, stashes, worktrees, stacks) is RefsPopover.vue, separate from the shared picker.
 
 ## Process model
 
@@ -1735,12 +1747,12 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 | `packages/git-ui` | The UI itself — the graph panel, the review panel, the dialogs, the file tree — Vue, mounted by Kira Space |
 | `packages/kira-ui` | Deleted (P267). Was `floatingPosition.ts` only; `AutocompleteField` and `PointPopover` position through reka `Popover` |
 
-- BranchPicker.vue's tab fold (branches, tags, stashes, worktrees, stacks in one tabbed picker) is a pure-fold module, pickerModel.ts in packages/git-ui/src/components/, with no Vue and no bridge, so pickerModel.test.ts exercises it directly with plain fixtures.
+- RefsPopover.vue's tab fold (branches, tags, stashes, worktrees, stacks in one tabbed popover) is a pure-fold module, pickerModel.ts in packages/git-ui/src/lib/, with no Vue and no bridge, so pickerModel.spec.ts exercises it directly with plain fixtures.
 - The convention of keeping a pure fold out of the template is also followed by refListModel.ts, stashListModel.ts and stackListModel.ts.
 - filterPickerInput scopes the single filter box to the active tab while still computing every tab's own live match count, so a query typed on one tab hints a match on another.
 - orderAndCapTab ranks local branches HEAD-first, then worktree-checked-out rows, then committerDate descending, while tags, the stash stack and stacks keep their own existing order (version sequence, stack-position addressing, and a forest whose order is its structure).
 - capWithPins and capStackGroups never cap a pinned row out and never split a stack group mid-order; capSteps lets a caller raise one list's own cap for the current panel-open without touching any other list's.
-- refListModel.ts is deliberately not modified for the picker, because its buildRefListSections has two other consumers (review/BaseSelector.vue, review/ReviewView.vue) whose sort must not silently change to recency.
+- refListModel.ts keeps no branch-list fold; the review and dialog branch pickers use the shared BranchPicker.
 - Every viewport-anchored floating surface in both frontends goes through Floating UI's collision-aware middleware (flip/shift/size), rendered teleported so no overflow: hidden ancestor can clip it.
 - The floating-surface audit is stated per mechanism, not per module, because a first pass judged one frontend clear based on its most common mechanism and missed a second; a native title attribute, a Monaco hover/suggest widget, and any bespoke click-point popup are each their own path, and a module is not clear because one mechanism is.
 - A Monaco hover/suggest widget's container defaults to the editor's own DOM node unless explicitly reparented to document.body (P60a fixed this, 789fc4c7).
@@ -2029,6 +2041,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Backlog items are not on the plan until promoted.
 - The Plan uses flat token surfaces only: no textures, shadows, dashed borders or tint washes. State shows as rail, border, outline or chip colour. Each branch row has one `surface` tooltip (`AdeBranchTip`) in the plan colour coding.
 - CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
+- A task holds one row per repo; `name = ""` means branch not created. SetTaskBranch, UpdateTaskRepo, RemoveTaskBranch, RemoveTaskRepo edit rows independently, refused while a session, launch or background run uses the row, and on review tasks. Detach hard-deletes a never-created, run-less row, else archives it and hides its runs from the task wire. Dependents fall back to the old branch name as base. Git refs never change; detach removes the task link and ADE linked worktree only.
 - A review item with no plan day sits above the first task that builds on or conflicts with it, else in Later. Moving it to a day pins that day; moving it to Later clears the day and returns it to that placement (P368).
 - A repoless task refuses Start (no branch to run on) until a repo is added. This is designed behavior.
 - An estimate is free text h or d, settable, changeable and clearable at any time; only the cap (480h, 60d) applies.
@@ -2058,8 +2071,11 @@ and `docs/HISTORY.md (v2.0)`.
 - A deployment environment (ade_repo_envs) is a name plus a shell command that prints the deployed commit SHA; it runs in the repo root on board refresh and marks branches ▲name ✓/⚠/?.
 - In the deployment environments UI, a new row stays a local draft and is written only once both name and command are filled.
 - Run and setup logs keep a tail of 2 MiB per log in chunks of at most 8 KiB, set truncated once head chunks drop, and batch writes every 250 ms.
-- Log retention (P177): logs of tasks archived 90+ days ago are deleted by AdeLogsRepo.PurgeArchived (inclusive cutoff on ade_tasks.archived_at); task, branch, run, session and setup rows remain as history, and live tasks keep logs.
-- TaskBoard.Start runs the log purge once, then hourly, and runs PRAGMA incremental_vacuum after a purge that removed rows.
+- Archive keeps all task data (P399): logs, review sessions and comments are never purged; per-log size cap still bounds each log. Archive closes review windows only; review sessions stay pinned.
+- Migration 0052 (P399) adds cr_* columns to ade_task_branches. Archive snapshots each branch's change request there (best effort, 5 s) so the archived view shows it when the host is unreachable.
+- AdeTaskService.ArchivedTask returns an archived task read-only: task, statuses, branches (live PR when the host answers, else the snapshot; prSource says which), stored review comments, no worktree paths. Phone reads it at /api/ade/archived-task.
+- AdeTaskService.RestoreTask revives the task and the branch rows archived with it (same archived_at), adds a Later plan row, and returns the task. It refuses when a branch name is live on another task; nothing changes then. Worktrees come back on next launch via ensureWorktree.
+- The Archived tab (ade/v2/archived) lists board.history; the panel is read-only, with Restore to edit. The Plan's history items open the same panel.
 - The per-repo prepare timeout is the GitRepoSettings leaf worktreePrepareTimeout (default 15m, max 2h), shared with git-ui worktree add; Spec.Timeout must be > 0.
 
 ### Git facts
@@ -2308,6 +2324,7 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 - Clicking a prompt notification calls RevealKind: reopen a window when none is open, focus the target, push reveal. Answering in the app removes the note. Notifications have no action buttons.
 - Deps.RaiseOnOpen (per kind; nil means never) brings a prompt's window forward on open: Open starts RevealKind in a goroutine after releasing its locks, because Focus blocks on the main thread. Studio raises only `dbmcp`, gated by dbMcp.focusOnApproval. Space passes none.
 - A raise is skipped when the target window already has focus, fires at most once per kind per 2 s (the macOS Space-switch animation, when IsFocused may still read false), and never fires on Close, Claim or Reroute. A request resolved before the goroutine runs makes RevealKind a no-op.
+- Activation trace (P396): internal/shell.AttachActivationTrace and Attach log app and window activation events at Debug (scope=window); WindowRegistry.Focus logs "window raise" and Router.Open logs "prompt raise" at Info.
 - shell.WindowRegistry.Focus calls App.Show first on darwin only (unhide after Cmd+H); on Windows and Linux App.Show re-shows every window, so it is skipped there. A window Studio hid on last close comes back through Show.
 - Platform behaviour of a raise. macOS: unhide, un-minimise, show, activate; macOS switches to the window's Space under the default Mission Control setting "When switching to an application, switch to a Space with open windows". Windows: best effort; foreground lock usually refuses SetForegroundWindow from a background app and the taskbar button flashes; a window on another virtual desktop is not switched to. Linux: best effort; gtk_window_present, Wayland compositors usually show "is ready" instead of focusing, workspace switch depends on the window manager.
 - The notification sink is internal/desknotify (Sink, WailsSink), shared with internal/agentnotify; it is Darwin only, like P238.
@@ -2382,7 +2399,8 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Plan drag and drop (plan/usePlanDrag.ts, board/dropPlan.ts) writes the day and position directly with no dialog.
 - ADE notes use TipTap (notes/), and the fix menu uses the shared context-menu primitive (R20).
 - ade/v2/tones.ts and palette.ts are dark-only; scripts/check-ade-colours.sh (part of bun run lint) fails any other colour literal under ade/.
-- Plan board colour: tone colour only on the task status tag, red failures and amber needs-you/stale; branch tags other than red/amber render grey; task colour only as the head dot; the branch row repo badge wears the repo colour (repoTint). Task cards have a 1px border-badge edge. The task open in the panel wears a focus frame (border-focus ring-1) and aria-current; its head, branch row, span and history rows use bg-select.
+- Plan board colour: tone colour only on the task status tag, red failures and amber needs-you/stale; branch tags other than red/amber render grey; task colour is the head dot and a 3px left card edge; the branch row repo badge wears the repo colour (repoTint). Plan pane ground is bg-chrome (terminal ground); cards of one day have no line between, 16px apart; weekend and day-off bands carry no tint. Task cards have a 1px border-badge edge. The task open in the panel wears a focus frame (border-focus ring-1) and aria-current; its head, branch row, span and history rows use bg-select.
+- Plan window: shows today plus 6 days (`WINDOW_DAYS` in `timeline.ts`). Work scheduled later sits in Later, in date order before unscheduled and parked items; its card meta starts with the date. No horizon setting, no add-day control. Past bands come only from history or overdue work.
 
 ### Review code (P150)
 
@@ -2848,7 +2866,7 @@ the git UI is its only caller (`repo/git/hostHandlers.ts:433`), binding Space's 
 **The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
 Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
-anchor: the PR surfaces (`CommitMeta.vue`, `BranchPicker.vue`/`StackList.vue` stack badges,
+anchor: the PR surfaces (`CommitMeta.vue`, `RefsPopover.vue`/`StackList.vue` stack badges,
 `refBadges.ts`'s SlickGrid formatter) go through `changeRequest.browserUrl`/`GitHostService.OpenChangeRequestURL`,
 and a URL found inside a commit message body (`linkify.ts`) goes through a new generic
 `link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
@@ -3045,6 +3063,8 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
+- **Archived ADE data grows without bound (P399).** Archive keeps run and step logs (2 MiB tail each), pinned review sessions and history rows forever; nothing purges them. Every board read and push carries the whole history. No user action deletes an archived task yet and the Archived tab reads all history at once. Delete this item once a delete action (cascading its logs) and a paged history read land.
 - **The macOS default-app switch is unverified on a real Mac (P332).** No Mac was available: the cgo registry, the document types in LaunchServices, whether a system prompt appears when setting a content-type default, and the UTI of each imported row are untested. Check: install the DMG, run it once from `/Applications`, then `lsregister -dump` lists both document types, Open With lists Kira Space, and the pane's switch changes `mdls -name kMDItemContentType` output.
 - **MCP `run_query` read verdicts run under `READ ONLY` wrap, which does not stop every side effect (P329).** A statement classified read runs in `BEGIN READ ONLY` (Postgres) or `START TRANSACTION READ ONLY` (MySQL/MariaDB) unless writes are allowed. Postgres still permits `pg_terminate_backend`, `pg_cancel_backend` and `dblink_exec`; MySQL/MariaDB still permits `GET_LOCK` and writes to temporary tables. SQLite and ClickHouse get no per-request wrap: no write-capable function is reachable from a read there.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels

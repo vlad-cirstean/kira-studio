@@ -38,14 +38,12 @@ import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 //      review item (the mockup's file-overlap rule; the backend uses git merge-tree);
 //   3. `now` is 3m 40s after the `preparing` worktree setup started;
 //   4. the fixture's `tk01` session (a take-over the mockup only creates on click) is dropped.
-// Deliberate divergences (asserted in DIVERGENCE, never skipped): CI failing is dropped (D9).
+// Deliberate divergences (asserted in DIVERGENCE, never skipped): CI failing is dropped (D9); the 7-day window folds later day bands into Later (P401).
 
 const NOW = 1790067000000 + 220_000;
 const TODAY = '2026-09-22';
 const SETTINGS = {
-  horizonDays: 14,
   historyDays: 14,
-  extraDays: [] as string[],
   offDays: [] as string[],
   workWeekendDays: [] as string[],
   workdayHours: 6,
@@ -76,6 +74,9 @@ const lcAll = (v: readonly string[]) => v.map((x) => plain(x).toLowerCase());
 const DIVERGENCE: Record<string, { mockup: string; ours: string; why: string }> = {
   b_deps: { mockup: 'CI failing', ours: 'Clean', why: 'D9: no CI badge' },
 };
+
+/** P401: 7-day window; the mockup's 14-day bands after day 6 fold into its Later band. */
+const WINDOW_DIVERGENCE = { windowDays: 7, why: 'P401: 7-day window; later days fold into Later' };
 
 let board: Board;
 let sessions: SessionsResult;
@@ -157,13 +158,36 @@ beforeAll(() => {
 });
 
 const nick = (id: string) => nicks.get(id) ?? id;
+const hoursOf = (sub: string): number => Number.parseFloat(sub) || 0;
+
+/** The oracle bands with every day band past the window folded into Later (see WINDOW_DIVERGENCE). */
+function windowedBands(): MockupComponent[] {
+  const dayOf = (b: MockupComponent): number | null => {
+    const m = /^aq-day-(\d+)$/.exec(b.domId);
+    return m ? Number(m[1]) : null;
+  };
+  const isFolded = (b: MockupComponent) => (dayOf(b) ?? -1) >= WINDOW_DIVERGENCE.windowDays;
+  const folded = oracle.bands.filter(isFolded);
+  expect(folded.length).toBeGreaterThan(0);
+  const kept = oracle.bands.filter((b: MockupComponent) => !isFolded(b));
+  return kept.map((b: MockupComponent) => {
+    if (!b.isLater) return b;
+    const hours = [...folded, b].reduce((n, x) => n + hoursOf(x.sub), 0);
+    return {
+      ...b,
+      tasks: [...folded.flatMap((x: MockupComponent) => x.tasks), ...b.tasks],
+      sub: hours ? `${hours}h` : '',
+    };
+  });
+}
+
 const boxes = (): MockupComponent[] => oracle.bands.flatMap((b: MockupComponent) => b.tasks);
 const boxOf = (id: string): MockupComponent => boxes().find((b) => b.id === id);
 
 describe('timeline', () => {
   test('bands list the same days, labels and hours', () => {
     const ours = timeline.bands.map((b) => [b.label, b.hours ? `${b.hours}h` : '']);
-    const theirs = oracle.bands.map((b: MockupComponent) => [
+    const theirs = windowedBands().map((b: MockupComponent) => [
       b.label,
       b.sub === 'off' ? '' : b.sub,
     ]);
@@ -171,7 +195,11 @@ describe('timeline', () => {
   });
 
   test('tasks fall in the same order within every band', () => {
-    expect(timeline.bands.flatMap((b) => b.taskIds)).toEqual(boxes().map((b) => b.id));
+    expect(timeline.bands.flatMap((b) => b.taskIds)).toEqual(
+      windowedBands()
+        .flatMap((b: MockupComponent) => b.tasks)
+        .map((b: MockupComponent) => b.id),
+    );
   });
 
   test('overflow and overdue flags agree', () => {
@@ -179,7 +207,7 @@ describe('timeline', () => {
       b.overflowTaskIds.length > 0,
       b.overdueTaskIds.length > 0,
     ]);
-    const theirs = oracle.bands.map((b: MockupComponent) => [b.isOver, b.isOverdue]);
+    const theirs = windowedBands().map((b: MockupComponent) => [b.isOver, b.isOverdue]);
     expect(ours).toEqual(theirs);
   });
 });

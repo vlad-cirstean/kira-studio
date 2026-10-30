@@ -12,7 +12,7 @@
 // bug needs.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -33,6 +33,7 @@ function flush(): Promise<void> {
 
 describe('state/tabs.ts saveIfChanged retries a snapshot a failed save never actually persisted', () => {
   test('a save that fails does not permanently block a later, identical-looking save', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => {});
     let calls = 0;
     let shouldFail = true;
     (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => {
@@ -53,5 +54,6 @@ describe('state/tabs.ts saveIfChanged retries a snapshot a failed save never act
     await flush();
 
     expect(calls).toBe(2);
+    logged.mockRestore();
   });
 });

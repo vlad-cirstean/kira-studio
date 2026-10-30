@@ -32,7 +32,9 @@ import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { useFormErrors } from '@workbench/behaviour/formErrors';
 import Identifier from '@workbench/components/Identifier.vue';
+import BranchPicker from '@workbench/components/pickers/BranchPicker.vue';
 import { computed, nextTick, ref, useId, watch } from 'vue';
+import { branchGroups, branchOptions } from '../../lib/refOptions.ts';
 import { renderText } from '../../lib/text.ts';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -53,6 +55,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<(e: 'close') => void>();
+
+const branches = computed(() => branchOptions(props.refs, { remote: true }));
+const groups = branchGroups();
 
 const active = computed(() => props.createRequest !== undefined);
 
@@ -239,22 +244,14 @@ function onClose(): void {
 
           <Field v-if="mode === 'existingBranch'">
             <FieldLabel :for="branchId">{{ t('common.field.branch.label') }}</FieldLabel>
-            <Input
+            <BranchPicker
               :id="branchId"
               v-model="branch"
-              type="text"
-              size="kira-lg"
-              class="w-full"
-              list=""
+              testid="worktree-branch"
+              :branches="branches"
+              :groups="groups"
               :placeholder="t('git.dialog.worktree.existingBranch.placeholder')"
             />
-            <datalist id="">
-              <option
-                v-for="row in refs.branches.value"
-                :key="row.refname"
-                :value="row.shortName"
-              />
-            </datalist>
           </Field>
           <template v-else-if="mode === 'newBranch'">
             <Field>
@@ -278,12 +275,14 @@ function onClose(): void {
               <FieldLabel :for="startPointId">{{
                 t('git.dialog.worktree.startPoint.label')
               }}</FieldLabel>
-              <Input
+              <BranchPicker
                 :id="startPointId"
                 v-model="startPoint"
-                type="text"
-                size="kira-lg"
-                class="w-full"
+                custom
+                testid="worktree-start-point"
+                :branches="branches"
+                :groups="groups"
+                :trigger-label="startPoint || undefined"
                 :placeholder="t('git.dialog.worktree.startPoint.example')"
               />
             </Field>
@@ -292,12 +291,14 @@ function onClose(): void {
             <FieldLabel :for="startPointId">{{
               t('git.dialog.worktree.commitish.label')
             }}</FieldLabel>
-            <Input
+            <BranchPicker
               :id="startPointId"
               v-model="startPoint"
-              type="text"
-              size="kira-lg"
-              class="w-full"
+              custom
+              testid="worktree-commitish"
+              :branches="branches"
+              :groups="groups"
+              :trigger-label="startPoint || undefined"
               :placeholder="t('git.dialog.worktree.commitish.placeholder')"
             />
           </Field>

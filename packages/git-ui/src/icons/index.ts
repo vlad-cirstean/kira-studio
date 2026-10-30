@@ -32,7 +32,7 @@ export const BADGE_ICONS = {
   stash: 'archive',
 } as const;
 
-/** Icons for `NoRepositoryPanel.vue`, `BranchPicker.vue` and the P4 W10 "no graph" panels — kept
+/** Icons for `NoRepositoryPanel.vue`, `RefsPopover.vue` and the P4 W10 "no graph" panels — kept
  *  separate from `ACTION_ICONS` for the same reason `BADGE_ICONS` is: these decorate a surface,
  *  not an action a click performs. */
 export const STATE_ICONS = {
@@ -44,7 +44,7 @@ export const STATE_ICONS = {
 } as const;
 
 /** P77 §4's tab strip — kept separate from `ACTION_ICONS` for the same reason `BADGE_ICONS`/
- *  `STATE_ICONS` are: these decorate a `BranchPicker.vue` tab, not an action a click performs. */
+ *  `STATE_ICONS` are: these decorate a `RefsPopover.vue` tab, not an action a click performs. */
 export const PICKER_TAB_ICONS = {
   branches: 'git-branch',
   tags: 'tag',

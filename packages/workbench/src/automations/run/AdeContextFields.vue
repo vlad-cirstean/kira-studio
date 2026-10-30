@@ -10,14 +10,14 @@ import {
   CommandItem,
   CommandList,
 } from '@theme/components/ui/command';
-import { Field, FieldDescription, FieldLabel } from '@theme/components/ui/field';
-import { Label } from '@theme/components/ui/label';
+import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
-import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, useId } from 'vue';
+import BranchPicker from '../../components/pickers/BranchPicker.vue';
+import type { PickerOption } from '../../lib/pickerOptions';
 
 const props = defineProps<{ needs: ScriptRunPreview['needs']; ade: ScriptRunAde | null }>();
 const taskId = defineModel<string>('taskId', { required: true });
@@ -28,6 +28,15 @@ const taskOpen = ref(false);
 const taskTitle = computed(
   () =>
     props.needs.tasks.find((task) => task.id === taskId.value)?.title ?? props.ade?.taskTitle ?? '',
+);
+
+const branches = computed<PickerOption[]>(() =>
+  props.needs.branches.map((b) => ({
+    value: b.id,
+    label: b.label,
+    disabled: b.disabled,
+    reason: b.disabled ? b.why : undefined,
+  })),
 );
 
 function pickTask(id: string): void {
@@ -81,37 +90,17 @@ function pickTask(id: string): void {
     </Field>
 
     <Field v-if="needs.branches.length > 0">
-      <FieldLabel
+      <FieldLabel :for="`${idBase}-branch`"
         >{{ t('common.field.branch.label') }} <span class="text-error">*</span></FieldLabel
       >
-      <RadioGroup
-        :model-value="branchId"
-        class="gap-1.5"
-        data-testid="run-branch"
-        @update:model-value="(v) => (branchId = String(v))"
-      >
-        <div v-for="b in needs.branches" :key="b.id" class="flex flex-col gap-0.5">
-          <div class="flex items-center gap-2">
-            <RadioGroupItem
-              :id="`${idBase}-${b.id}`"
-              :value="b.id"
-              :disabled="b.disabled"
-              :data-testid="`run-branch-${b.id}`"
-            />
-            <Label :for="`${idBase}-${b.id}`" :class="b.disabled && 'text-muted-foreground'">{{
-              b.label
-            }}</Label>
-          </div>
-          <FieldDescription
-            v-if="b.disabled"
-            class="pl-6"
-            :data-testid="`run-branch-why-${b.id}`"
-            >{{
-              b.why
-            }}</FieldDescription
-          >
-        </div>
-      </RadioGroup>
+      <BranchPicker
+        :id="`${idBase}-branch`"
+        :model-value="branchId || null"
+        testid="run-branch"
+        :branches="branches"
+        :placeholder="t('common.action.choose.label')"
+        @update:model-value="(v) => (branchId = v ?? '')"
+      />
     </Field>
 
     <div v-if="ade" class="text-kira-sm text-muted-foreground" data-testid="run-ade-context">
