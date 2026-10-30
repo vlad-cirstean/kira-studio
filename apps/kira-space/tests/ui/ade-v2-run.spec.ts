@@ -219,9 +219,11 @@ test('Done and Finish call StepDone', async ({ relaunch }) => {
     }),
   ]);
   await page.locator(cellAction('T_hooks', 'done')).click();
+  await page.locator(t('ade-stage-move')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskStepDone)[0]?.args).toEqual({ taskId: 'T_hooks' });
   await page.locator(cellAction('T_cart', 'finish')).click();
+  await page.locator(t('ade-stage-move')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(2);
   expect(calls(control, IPC.adeTaskStepDone)[1]?.args).toEqual({ taskId: 'T_cart' });
 });

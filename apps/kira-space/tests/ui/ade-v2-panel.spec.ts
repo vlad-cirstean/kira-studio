@@ -446,13 +446,15 @@ test('the step mover goes back, picks any step and is off while a run is live', 
 
   await openTask(page, 'T_auth');
   await page.locator('[data-testid="ade-step-back"]').click();
+  await page.locator('[data-testid="ade-stage-move"]').click();
   await expect.poll(moves).toHaveLength(1);
-  expect(moves()[0]?.args).toEqual({ taskId: 'T_auth', stepId: 'pr' });
+  expect(moves()[0]?.args).toMatchObject({ taskId: 'T_auth', stepId: 'pr' });
 
   await page.locator('[data-testid="ade-step-pick"]').click();
   await page.locator('[data-testid="ade-step-option-done"]').click();
+  await page.locator('[data-testid="ade-stage-move"]').click();
   await expect.poll(moves).toHaveLength(2);
-  expect(moves()[1]?.args).toEqual({ taskId: 'T_auth', stepId: 'done' });
+  expect(moves()[1]?.args).toMatchObject({ taskId: 'T_auth', stepId: 'done' });
 
   await openTask(page, 'T_alerts');
   await expect(page.locator('[data-testid="ade-step-back"]')).toBeDisabled();
@@ -511,8 +513,12 @@ test('a skipped step is dimmed, cannot be entered, and Skip this step jumps past
     )
     .click({ button: 'right', position: { x: 200, y: 8 } });
   await page.locator('[data-testid="menu-item-ade-step-skip-this"]').click();
-  await expect.poll(moves).toHaveLength(1);
-  expect(moves()[0]?.args).toEqual({ taskId: 'T_alerts', stepId: 'impl' });
+  await page.locator('[data-testid="ade-stage-move"]').click();
+  // Skipping past the skipped step is the natural next stage of a manual step: StepDone.
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.adeTaskStepDone))
+    .toHaveLength(1);
+  expect(moves()).toHaveLength(0);
 });
 
 test('agent-made branches carry a sparkle and the workflow shows its Kira Space tools', async ({

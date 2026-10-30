@@ -24,8 +24,9 @@ test('right-click moves the task to another step', async ({ relaunch }) => {
   await page.locator(item('ade-task-step')).click();
   await expect(page.locator(item('ade-task-step-spec'))).toBeVisible();
   await page.locator(item('ade-task-step-review')).click();
+  await page.locator(t('ade-stage-move')).click();
   await expect.poll(() => calls(control, IPC.adeTaskSetTaskStep)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskSetTaskStep)[0]?.args).toEqual({
+  expect(calls(control, IPC.adeTaskSetTaskStep)[0]?.args).toMatchObject({
     taskId: 'T_alerts',
     stepId: 'review',
   });

@@ -1,6 +1,6 @@
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { stepMoves } from '../board/stepMoves';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useDismissHandover, useSetTaskStep, useStepDone } from '../queries';
@@ -19,8 +19,9 @@ export const useAdeStageDialogStore = defineStore('adeStageDialog', () => {
   const routed = ref(false);
   /** The stage the dialog was asked to move to; '' = the natural next one. */
   const asked = ref('');
-  const toStepId = ref('');
-  const notes = ref('');
+  /** What the user picked or typed; null until then, so the defaults follow the board as it loads. */
+  const picked = ref<string | null>(null);
+  const typed = ref<string | null>(null);
 
   const card = computed(() => (taskId.value ? (model.value?.cardFor(taskId.value) ?? null) : null));
   const fromStepId = computed(() => {
@@ -36,23 +37,27 @@ export const useAdeStageDialogStore = defineStore('adeStageDialog', () => {
     () => card.value?.task.handoverDrafts.find((d) => d.fromStepId === fromStepId.value) ?? null,
   );
   const prefill = computed(() => draft.value?.body ?? '');
+  const toStepId = computed({
+    get: () => picked.value ?? (asked.value || (moves.value?.next?.id ?? '')),
+    set: (v: string) => {
+      picked.value = v;
+    },
+  });
+  const notes = computed({
+    get: () => typed.value ?? prefill.value,
+    set: (v: string) => {
+      typed.value = v;
+    },
+  });
   const isOpen = computed(() => taskId.value !== null && card.value !== null);
 
   function open(args: { taskId: string; toStepId?: string; routed?: boolean }): void {
     taskId.value = args.taskId;
     routed.value = args.routed ?? false;
     asked.value = args.toStepId ?? '';
-    seed();
+    picked.value = null;
+    typed.value = null;
   }
-
-  /** Fills the target and notes once the card is known (it may arrive after the open). */
-  function seed(): void {
-    toStepId.value = asked.value || (moves.value?.next?.id ?? '');
-    notes.value = prefill.value;
-  }
-  watch(card, (c, was) => {
-    if (c && !was && taskId.value) seed();
-  });
 
   function close(): void {
     taskId.value = null;
