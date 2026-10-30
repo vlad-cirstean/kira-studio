@@ -209,7 +209,7 @@ U72@@vt@@@@@lucide/vue import outside the theme ui primitives (use CodiconIcon, 
 U73@@vt@@/theme/src/icons.ts@@retired icon name gear/settings/kebab-vertical, or a 'codicon-' string literal (use ICON)@@(?<!<slot )\b(?:name|icon)(?:=|:\s*)["']{1,2}(?:gear|settings|kebab-vertical)["']|['"\x60]codicon-
 U74@@v@@EmptyState.vue@@<Empty outside EmptyState.vue (use EmptyState)@@<Empty\b
 U75@@vt@@@@duration-, ease-, animate-in, animate-out outside theme (motion tokens own them)@@${TOK}(?:duration|ease)-[\w\[]|${TOK}animate-(?:in|out)(?![\w-])
-U76@@vt@@sortableReorder.ts@@ghostClass/chosenClass outside sortableReorder.ts (use SORTABLE_GHOST_CLASS, SORTABLE_CHOSEN_CLASS)@@\b(?:ghost|chosen)Class:
+U76@@vt@@sortableReorder.ts@@ghostClass/chosenClass outside sortableReorder.ts (use SORTABLE_GHOST_CLASS; no chosen class)@@\b(?:ghost|chosen)Class:
 U77@@vt@@@@bare void on a bridge call (use fireAndForget)@@\bvoid\s+(?:(?:ctx|props)\.)?(?:control|bridge)\.\w+\(
 U78@@s@@@@Button inside EmptyState in a side panel (the front door has no action button)@@(?s)<EmptyState\b(?&t)(?<!/)>(?:(?!</EmptyState>).)*?<Button\b
 U79@@vt@@apps/kira-space/frontend/src/bridge/index.ts|apps/kira-studio/frontend/src/bridge/index.ts@@direct linkOpenExternal or LinkService.OpenExternal (use createOpenExternal)@@linkOpenExternal\(|LinkService\.OpenExternal\(

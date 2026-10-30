@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
-import { SORTABLE_CHOSEN_CLASS, SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
+import { SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
@@ -46,7 +46,6 @@ const emit = defineEmits<{
 // drop target from the pointer instead.
 const dropEl = ref<HTMLElement | null>(null);
 const ghostClass = SORTABLE_GHOST_CLASS;
-const chosenClass = SORTABLE_CHOSEN_CLASS;
 useDraggable(dropEl, {
   draggable: '[data-ade-task]',
   sort: false,
@@ -55,7 +54,6 @@ useDraggable(dropEl, {
   fallbackOnBody: true,
   fallbackTolerance: 4,
   ghostClass,
-  chosenClass,
   onStart: (evt) => emit('dragStart', evt.item.dataset.taskId ?? ''),
   onEnd: () => emit('dragEnd'),
 });
