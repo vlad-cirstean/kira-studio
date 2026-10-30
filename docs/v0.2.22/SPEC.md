@@ -6,20 +6,22 @@ Source: user request. Phases run top to bottom.
 
 | Phase | Title | Status |
 |---|---|---|
-| P396 | Bug: three-finger swipe up moves focus to another space | Todo |
+| P396 | Bug: three-finger swipe up moves focus to another space | Done |
 | P397 | Task repos and branches: add, edit and delete independently | Done |
 | P398 | One project picker and one branch picker across the app | Done |
 | P399 | Archived work stays viewable with all data | Done |
 | P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Done |
 | P401 | Task board: 7-day window, Later section, no date control | Done |
 | P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Done |
-| P403 | Chapter close | Todo |
+| P403 | Chapter close | Done |
 
 ## Rows
 
 ### P396 Bug: three-finger swipe up moves focus to another space
 
 Three-finger swipe up (macOS Mission Control, to see the apps on the space) moves focus to another space. Find the cause (likely window focus/activation handling) and fix.
+
+**Result.** Trace only, user decided close, drop. Stage A activation tracing shipped (`967bdb7`): debug log of app and window events, info log of window and prompt raises. Fix needs Mac logs; tracked by the Known open items entry in `docs/ARCHITECTURE.md`. No follow-up row.
 
 ### P397 Task repos and branches: add, edit and delete independently
 
@@ -60,3 +62,5 @@ Remove the grey delimiter between the main tabs (Backlog, Plan) and the rest. Ce
 ### P403 Chapter close
 
 Run one code review round first (per CLAUDE.md "Code review"), fix findings, then close the chapter by hand and open the PR.
+
+**Result.** Code review round 1 ran, findings fixed (migration 0054 snapshots review comments per row). Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.22/` removed. PR opened to `main`.
