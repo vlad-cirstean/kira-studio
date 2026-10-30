@@ -76,6 +76,8 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     createdAt: 0,
     statusId: 'todo',
     statusBy: 'auto',
+    handoverIn: null,
+    handoverDrafts: [],
     ...over,
   };
 }

@@ -129,7 +129,9 @@
       ],
       "createdAt": 1789808400000,
       "statusId": "in-review",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_bill",
@@ -239,7 +241,9 @@
       ],
       "createdAt": 1789722000000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_auth",
@@ -538,7 +542,9 @@
       ],
       "createdAt": 1789635600000,
       "statusId": "in-review",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_hooks",
@@ -753,7 +759,9 @@
       ],
       "createdAt": 1789549200000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_search",
@@ -905,7 +913,9 @@
       ],
       "createdAt": 1789462800000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_notif",
@@ -970,7 +980,9 @@
       ],
       "createdAt": 1789376400000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_deps",
@@ -1035,7 +1047,9 @@
       ],
       "createdAt": 1789290000000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_push",
@@ -1166,7 +1180,9 @@
       ],
       "createdAt": 1789203600000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_alerts",
@@ -1191,7 +1207,9 @@
       "runs": [],
       "createdAt": 1789117200000,
       "statusId": "in-progress",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_csv",
@@ -1216,7 +1234,9 @@
       "runs": [],
       "createdAt": 1789030800000,
       "statusId": "todo",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "R_sara",
@@ -1238,7 +1258,9 @@
       "runs": [],
       "createdAt": 1788944400000,
       "statusId": "in-review",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "R_li",
@@ -1260,7 +1282,9 @@
       "runs": [],
       "createdAt": 1788858000000,
       "statusId": "in-review",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     },
     {
       "id": "T_spike",
@@ -1282,7 +1306,9 @@
       "runs": [],
       "createdAt": 1788771600000,
       "statusId": "todo",
-      "statusBy": "auto"
+      "statusBy": "auto",
+      "handoverIn": null,
+      "handoverDrafts": []
     }
   ],
   "statuses": [

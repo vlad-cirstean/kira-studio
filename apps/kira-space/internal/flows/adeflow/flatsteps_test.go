@@ -12,7 +12,7 @@ import (
 
 const flatSpec = "  - id: spec\n    name: Spec\n    kind: manual\n    status: To do\n    session: true\n    prompt: Write the spec for {task}\n"
 
-var taskMask = flowharness.Mask("id", "createdAt", "branchIds", "taskId", "branchId", "startedAt", "finishedAt", "sessionId", "exitCode")
+var taskMask = flowharness.Mask("id", "createdAt", "branchIds", "taskId", "branchId", "startedAt", "finishedAt", "sessionId", "exitCode", "updatedAt")
 
 // flatFlow is a manual spec, an agent, a review and a script: one step of each kind.
 func flatFlow() string {

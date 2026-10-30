@@ -1,0 +1,573 @@
+{
+  "AdeTaskService.Board#draft": {
+    "autofetchMinutes": 0,
+    "branches": [
+      {
+        "addedAt": 0,
+        "ahead": 0,
+        "base": "main",
+        "baseBranchId": "",
+        "baseMissing": false,
+        "baseOwner": "",
+        "basePendingFrom": "",
+        "behind": 0,
+        "codeRepoId": "<id:1>",
+        "conflictCheck": "done",
+        "conflictCheckReason": "",
+        "conflictsIfRebased": [],
+        "deployments": [],
+        "dirty": [],
+        "id": "<masked>",
+        "integration": [],
+        "kind": "mine",
+        "lastCommitAt": 1700000060000,
+        "mergedAt": null,
+        "mergedIntoMain": false,
+        "name": "feat/api-work",
+        "origin": "",
+        "owner": "",
+        "rebaseInProgress": false,
+        "setup": {
+          "exitCode": 0,
+          "finishedAt": 0,
+          "note": "",
+          "startedAt": 0,
+          "state": "ready"
+        },
+        "taskId": "<masked>",
+        "tip": "830d8e73920f72affd2a107f3089df1478bd539f",
+        "upstream": "refs/remotes/origin/main",
+        "upstreamAhead": 0,
+        "upstreamBehind": 0,
+        "worktree": "<home>/wt/api/api-work"
+      }
+    ],
+    "history": [],
+    "pairs": [],
+    "plan": {
+      "backlog": [],
+      "day": {},
+      "order": [
+        "<id:2>"
+      ],
+      "queuedAfter": {},
+      "unpushed": {}
+    },
+    "repos": [
+      {
+        "codeRepoId": "<id:1>",
+        "lastFetchAt": null,
+        "mainName": "main",
+        "remote": "origin"
+      }
+    ],
+    "statuses": [
+      {
+        "category": "todo",
+        "id": "<masked>",
+        "name": "To do",
+        "tone": "grey"
+      },
+      {
+        "category": "active",
+        "id": "<masked>",
+        "name": "In progress",
+        "tone": "amber"
+      },
+      {
+        "category": "review",
+        "id": "<masked>",
+        "name": "In review",
+        "tone": "blue"
+      },
+      {
+        "category": "done",
+        "id": "<masked>",
+        "name": "Done",
+        "tone": "green"
+      }
+    ],
+    "tasks": [
+      {
+        "branchIds": [
+          "<id:3>"
+        ],
+        "color": 0,
+        "createdAt": 0,
+        "entryStepId": "one",
+        "est": "",
+        "handoverDrafts": [
+          {
+            "body": "Form wired; validation missing.",
+            "createdAt": 0,
+            "dismissed": false,
+            "edited": false,
+            "finished": true,
+            "fromStepId": "work",
+            "fromStepName": "Work",
+            "id": "<masked>",
+            "source": "agent",
+            "state": "draft",
+            "taskId": "<masked>",
+            "toStepId": "",
+            "toStepName": "",
+            "updatedAt": 0
+          }
+        ],
+        "handoverIn": {
+          "body": "summary-done",
+          "createdAt": 0,
+          "dismissed": false,
+          "edited": false,
+          "finished": false,
+          "fromStepId": "one",
+          "fromStepName": "one",
+          "id": "<masked>",
+          "source": "run",
+          "state": "handed",
+          "taskId": "<masked>",
+          "toStepId": "work",
+          "toStepName": "Work",
+          "updatedAt": 0
+        },
+        "hostLink": null,
+        "hostUrl": "",
+        "id": "<masked>",
+        "jira": null,
+        "kind": "task",
+        "notes": "",
+        "owner": "",
+        "runs": [
+          {
+            "attempt": 0,
+            "branchId": "<masked>",
+            "exitCode": 0,
+            "finishedAt": 0,
+            "id": "<masked>",
+            "loops": 0,
+            "note": "",
+            "outcome": {
+              "exitCode": 0,
+              "reason": "",
+              "reported": true,
+              "result": "done",
+              "route": "next",
+              "source": "agent",
+              "status": "done",
+              "summary": "summary-done"
+            },
+            "purpose": "",
+            "resumable": false,
+            "returns": 0,
+            "review": null,
+            "sandbox": {
+              "access": "write",
+              "denials": 0,
+              "enforced": false,
+              "last": ""
+            },
+            "sessionId": "<masked>",
+            "startedAt": 0,
+            "state": "done",
+            "stepId": "one",
+            "summary": "summary-done",
+            "taskId": "<masked>"
+          }
+        ],
+        "since": {},
+        "statusBy": "auto",
+        "statusId": "in-progress",
+        "title": "Fix login",
+        "workflow": {
+          "id": "<masked>",
+          "kiraSpaceMcp": false,
+          "name": "Flow",
+          "steps": [
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "command": "",
+              "id": "<masked>",
+              "kind": "agent",
+              "maxReturns": 3,
+              "name": "one",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "<masked>",
+                  "loop": false,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "",
+                  "id": "<masked>",
+                  "loop": false,
+                  "next": "stop",
+                  "ok": false
+                }
+              ],
+              "review": null,
+              "runsOn": "each repo",
+              "sandbox": {
+                "access": "write",
+                "allow": [],
+                "network": true,
+                "read": []
+              },
+              "session": false,
+              "skip": false,
+              "smartScript": "",
+              "status": "in-progress",
+              "timeout": "1m"
+            },
+            {
+              "allowedTools": [],
+              "before": "",
+              "command": "",
+              "id": "<masked>",
+              "kind": "manual",
+              "maxReturns": 0,
+              "name": "Work",
+              "params": {},
+              "prompt": "",
+              "results": [],
+              "review": null,
+              "runsOn": "",
+              "sandbox": {
+                "access": "write",
+                "allow": [],
+                "network": true,
+                "read": []
+              },
+              "session": true,
+              "skip": false,
+              "smartScript": "",
+              "status": "in-progress",
+              "timeout": ""
+            },
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "command": "",
+              "id": "<masked>",
+              "kind": "agent",
+              "maxReturns": 3,
+              "name": "two",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "<masked>",
+                  "loop": false,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "",
+                  "id": "<masked>",
+                  "loop": false,
+                  "next": "stop",
+                  "ok": false
+                }
+              ],
+              "review": null,
+              "runsOn": "each repo",
+              "sandbox": {
+                "access": "write",
+                "allow": [],
+                "network": true,
+                "read": []
+              },
+              "session": false,
+              "skip": false,
+              "smartScript": "",
+              "status": "in-progress",
+              "timeout": "1m"
+            },
+            {
+              "allowedTools": [],
+              "before": "",
+              "command": "",
+              "id": "<masked>",
+              "kind": "manual",
+              "maxReturns": 0,
+              "name": "Ship",
+              "params": {},
+              "prompt": "",
+              "results": [],
+              "review": null,
+              "runsOn": "",
+              "sandbox": {
+                "access": "write",
+                "allow": [],
+                "network": true,
+                "read": []
+              },
+              "session": false,
+              "skip": false,
+              "smartScript": "",
+              "status": "in-progress",
+              "timeout": ""
+            }
+          ]
+        },
+        "workflowId": "flow",
+        "workflowOutdated": false
+      }
+    ],
+    "worktreeBasePath": "<home>/wt"
+  },
+  "AdeTaskService.Handovers": {
+    "handovers": [
+      {
+        "body": "Validation still missing; start with the error states.",
+        "createdAt": 0,
+        "dismissed": false,
+        "edited": false,
+        "finished": false,
+        "fromStepId": "work",
+        "fromStepName": "Work",
+        "id": "<masked>",
+        "source": "user",
+        "state": "handed",
+        "taskId": "<masked>",
+        "toStepId": "two",
+        "toStepName": "two",
+        "updatedAt": 0
+      },
+      {
+        "body": "summary-done",
+        "createdAt": 0,
+        "dismissed": false,
+        "edited": false,
+        "finished": false,
+        "fromStepId": "one",
+        "fromStepName": "one",
+        "id": "<masked>",
+        "source": "run",
+        "state": "handed",
+        "taskId": "<masked>",
+        "toStepId": "work",
+        "toStepName": "Work",
+        "updatedAt": 0
+      }
+    ]
+  },
+  "AdeTaskService.StepDone": {
+    "branchIds": [
+      "<id:3>"
+    ],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "two",
+    "est": "",
+    "handoverDrafts": [],
+    "handoverIn": {
+      "body": "Validation still missing; start with the error states.",
+      "createdAt": 0,
+      "dismissed": false,
+      "edited": false,
+      "finished": false,
+      "fromStepId": "work",
+      "fromStepName": "Work",
+      "id": "<masked>",
+      "source": "user",
+      "state": "handed",
+      "taskId": "<masked>",
+      "toStepId": "two",
+      "toStepName": "two",
+      "updatedAt": 0
+    },
+    "hostLink": null,
+    "hostUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [
+      {
+        "attempt": 0,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "route": "next",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": {
+          "access": "write",
+          "denials": 0,
+          "enforced": false,
+          "last": ""
+        },
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "one",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      }
+    ],
+    "since": {},
+    "statusBy": "auto",
+    "statusId": "in-progress",
+    "title": "Fix login",
+    "workflow": {
+      "id": "<masked>",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "one",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "in-progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "<masked>",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Work",
+          "params": {},
+          "prompt": "",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "in-progress",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "two",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "in-progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "<masked>",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Ship",
+          "params": {},
+          "prompt": "",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "in-progress",
+          "timeout": ""
+        }
+      ]
+    },
+    "workflowId": "flow",
+    "workflowOutdated": false
+  }
+}

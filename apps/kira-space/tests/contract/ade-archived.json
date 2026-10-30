@@ -83,6 +83,8 @@
       "createdAt": 0,
       "entryStepId": "done",
       "est": "3h",
+      "handoverDrafts": [],
+      "handoverIn": null,
       "hostLink": {
         "kind": "changeRequest",
         "provider": "forge",
@@ -268,6 +270,8 @@
       "createdAt": 0,
       "entryStepId": "done",
       "est": "3h",
+      "handoverDrafts": [],
+      "handoverIn": null,
       "hostLink": {
         "kind": "changeRequest",
         "provider": "forge",

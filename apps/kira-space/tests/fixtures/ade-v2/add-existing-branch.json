@@ -19,7 +19,9 @@
     "runs": [],
     "createdAt": 1790067540000,
     "statusId": "todo",
-    "statusBy": "auto"
+    "statusBy": "auto",
+    "handoverIn": null,
+    "handoverDrafts": []
   },
   "branch": {
     "id": "p_rate",

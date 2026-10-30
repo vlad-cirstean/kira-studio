@@ -408,8 +408,14 @@ const spaceControl = {
   adeTaskApprove: (args: V2.StepArgs): Promise<void> => unwrap(AdeTaskService.Approve(args)),
   adeTaskRetryRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.RetryRun(args)),
   adeTaskResumeRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.ResumeRun(args)),
-  adeTaskStepDone: (args: V2.TaskArgs): Promise<V2.Task> =>
+  adeTaskStepDone: (args: V2.StepDoneArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.StepDone(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskHandovers: (args: V2.TaskArgs): Promise<V2.HandoversResult> =>
+    unwrap(AdeTaskService.Handovers(args)).then((r) => trust<V2.HandoversResult>(r)),
+  adeTaskUpdateHandover: (args: V2.UpdateHandoverArgs): Promise<void> =>
+    unwrap(AdeTaskService.UpdateHandover(args)),
+  adeTaskDismissHandover: (args: V2.TaskArgs): Promise<void> =>
+    unwrap(AdeTaskService.DismissHandover(args)),
   adeTaskSetTaskStep: (args: V2.SetTaskStepArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.SetTaskStep(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSaveStatuses: (args: V2.SaveStatusesArgs): Promise<V2.SaveStatusesResult> =>

@@ -151,6 +151,9 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskRetryRun },
     { channel: IPC.adeTaskStepDone, response: adeFixture('task') },
     { channel: IPC.adeTaskSetTaskStep, response: adeFixture('task') },
+    { channel: IPC.adeTaskHandovers, response: { handovers: [] } },
+    { channel: IPC.adeTaskUpdateHandover },
+    { channel: IPC.adeTaskDismissHandover },
     {
       channel: IPC.adeTaskSaveStatuses,
       response: { statuses: adeFixture<{ statuses: unknown[] }>('board').statuses },

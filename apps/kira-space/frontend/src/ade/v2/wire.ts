@@ -393,6 +393,40 @@ export interface Task {
   statusId: TaskStatus;
   /** Who set the status last: a step change ('auto') or the user. */
   statusBy: 'auto' | 'user';
+  /** The newest handed handover: what the last stage move left for this stage. */
+  handoverIn: Handover | null;
+  /** Open drafts sessions wrote; they become handed on the next stage move. */
+  handoverDrafts: Handover[];
+}
+/** The text one stage leaves for the next. A draft has `state: 'draft'` and an empty `toStepId`. */
+export interface Handover {
+  id: string;
+  taskId: string;
+  fromStepId: string;
+  fromStepName: string;
+  toStepId: string /* 'done' = past the last step */;
+  toStepName: string;
+  body: string;
+  source: 'agent' | 'run' | 'user';
+  state: 'draft' | 'handed';
+  finished: boolean;
+  dismissed: boolean;
+  edited: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface HandoversResult {
+  handovers: Handover[];
+}
+export interface UpdateHandoverArgs {
+  id: string;
+  /** '' deletes the row. */
+  body: string;
+}
+/** `notes` replaces the stage's draft handover; '' drops it; absent keeps it. */
+export interface StepDoneArgs {
+  taskId: string;
+  notes?: string | null;
 }
 /** One status of the user's set. `category` decides which status automation picks. */
 export interface TaskStatusDef {
@@ -909,6 +943,7 @@ export interface SetTaskStepArgs {
   taskId: string;
   stepId: string;
   fromStepId?: string;
+  notes?: string | null;
 }
 export interface SendArgs {
   sessionId: string;

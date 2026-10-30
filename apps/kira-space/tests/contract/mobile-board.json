@@ -13,6 +13,8 @@
     "createdAt": 0,
     "entryStepId": "",
     "est": "",
+    "handoverDrafts": [],
+    "handoverIn": null,
     "hostLink": null,
     "hostUrl": "",
     "id": "<id:1>",
