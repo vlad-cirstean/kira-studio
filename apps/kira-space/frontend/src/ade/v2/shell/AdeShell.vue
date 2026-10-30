@@ -93,8 +93,11 @@ onScopeDispose(() => offReviewCode?.());
     data-testid="ade-shell"
     @update:model-value="onView"
   >
-    <nav class="flex h-tabbar shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1">
-      <TabsList>
+    <nav
+      class="grid h-tabbar shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-0.5 bg-chrome px-1"
+      data-testid="ade-shell-bar"
+    >
+      <TabsList class="justify-self-start">
         <TabsTrigger
           value="backlog"
           :class="tabChipVariants({ active: ui.view === 'backlog', size: 'wide' })"
@@ -141,12 +144,11 @@ onScopeDispose(() => offReviewCode?.());
           >
         </TabsTrigger>
       </TabsList>
-      <span class="flex-1" />
       <div class="mx-2 flex items-center gap-2">
         <AdeCaptureBox />
         <AdeAddPopover />
       </div>
-      <TabsList>
+      <TabsList class="justify-self-end">
         <TabsTrigger
           value="workflows"
           :class="tabChipVariants({ active: ui.view === 'workflows', size: 'wide' })"

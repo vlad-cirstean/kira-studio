@@ -35,7 +35,7 @@ async function onEnter(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex items-center gap-2">
+  <div class="relative flex items-center gap-2">
     <Label for="ade-capture" class="sr-only">{{ t('space.ade.backlog.add.label') }}</Label>
     <Input
       id="ade-capture"
@@ -46,8 +46,13 @@ async function onEnter(): Promise<void> {
       data-testid="ade-capture"
       @keydown.enter="onEnter"
     />
-    <span v-if="note" class="text-kira-sm text-muted-foreground" data-testid="ade-capture-note">{{
-      note
-    }}</span>
+    <span
+      v-if="note"
+      class="absolute inset-y-0 right-full mr-2 flex items-center whitespace-nowrap bg-chrome text-kira-sm text-muted-foreground"
+      data-testid="ade-capture-note"
+      >{{
+        note
+      }}</span
+    >
   </div>
 </template>
