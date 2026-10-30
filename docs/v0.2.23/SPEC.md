@@ -1,0 +1,111 @@
+# v0.2.23
+
+Branch `chapter/v0.2.23`. First `P` is 404 (highest in v0.2.22 is P403).
+
+Source: user request. Phases run top to bottom. Ends with one code review round, then close, then PR.
+
+| Phase | Title | Status |
+|---|---|---|
+| P404 | Board: archived tasks inline, session indicator, weekend pattern, branch status colors | Todo |
+| P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Todo |
+| P406 | Nanoid branch names for agent-created worktrees | Todo |
+| P407 | Stage handover: session context notes and stage-change dialogs | Todo |
+| P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Todo |
+| P409 | Finishing a task returns every artifact via MCP | Todo |
+| P410 | Task plus button: terminal or ad hoc Claude session in worktree | Todo |
+| P411 | Task statuses: move to Workflow page, fully customizable | Todo |
+| P412 | Review: stale-changes indicator, PR link in review agent prompt | Todo |
+| P413 | Review comment dialog: fix overflow and editing, compact gutter | Todo |
+| P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
+| P415 | Operations panel: shared git primitives, all git ops, session and MCP ops | Todo |
+| P416 | Move automation runs into Operations panel | Todo |
+| P417 | Code review (1 round) | Todo |
+| P418 | Close chapter v0.2.23 | Todo |
+
+## Rows
+
+### P404 Board: archived tasks inline, session indicator, weekend pattern, branch status colors
+
+- Archived tasks show their name on the board. User can resume the agent session of an archived task.
+- Drop the Archived tab entirely. Keep archived tasks reachable some more efficient way.
+- "Load history" button takes too much vertical space and shows distracting detail. Make it compact.
+- Mark weekend days with a pattern or similar.
+- Restore colors for branch statuses (merged etc.).
+- Each task shows an indicator of its running sessions. Today no way to tell whether the agent finished.
+
+### P405 Later and Backlog: move tasks between Plan, Later, Backlog
+
+- Alongside archive, a task can move to backlog. Plan and backlog move tasks back and forth.
+- Backlog tab: reorder by drag and drop. Remove the reorder arrows at the start of a task.
+- Split into 2 sections: Later and Backlog. Plan to Later is a direct move. Backlog holds things that may never be picked up.
+- Rename the Backlog tab to Later. Remove the item count from the tab.
+- Quick add goes to Later.
+- Reorder tabs: Needs you, then Plan, then Later (Later after Plan). Planner confirms against current order.
+
+### P406 Nanoid branch names for agent-created worktrees
+
+Worktrees the agent creates use a nanoid as branch name. Agent-chosen names cause many issues.
+
+### P407 Stage handover: session context notes and stage-change dialogs
+
+- Every agent session, interactive ones included, can record context about what it did for the next stage.
+- If the session reports finished work, show a "move to next stage" dialog carrying that context.
+- Manual stage change shows the same dialog, with a place to add notes by hand.
+- No handover exists between stages today. Notes are visible only at task creation and never again: make notes transparent. Everything automatic, yet visible and editable manually later.
+
+### P408 Branch and worktree requests: approval dialog, multi-branch MCP tool
+
+- Agent branch/worktree request triggers an approval dialog for the user.
+- MCP tool accepts multiple branches in one call, so the user usually sees one prompt.
+- Remove the "Kira space tools" check; always on.
+- Agent prompt states branches are created only via this MCP tool.
+
+### P409 Finishing a task returns every artifact via MCP
+
+Finish returns all artifacts created: PRs, Jira, docs, deployments, everything.
+
+### P410 Task plus button: terminal or ad hoc Claude session in worktree
+
+Task gets a plus button. It starts a terminal or an ad hoc Claude session in that task's worktree.
+
+### P411 Task statuses: move to Workflow page, fully customizable
+
+- Task statuses live on the Workflow page, not Settings.
+- Remove the unclear mapping and hardcoding. Defaults ship with the app but are fully customizable, with more color options.
+- Changing a status leaves existing work items as they are.
+
+### P412 Review: stale-changes indicator, PR link in review agent prompt
+
+- Review window shows whether changes are stale. The check runs today before approving a PR; show the indicator up front.
+- Review agent prompt includes the PR link.
+
+### P413 Review comment dialog: fix overflow and editing, compact gutter
+
+- Comment dialog is taller than the viewport. Fix.
+- Messages cannot be edited. Fix.
+- Gutter columns eat space. Proposal: plus icon replaces the line number; hunk checkmark becomes its own empty row (line 1, then checkmark row, then empty line, then line 2). If not feasible, report back.
+
+### P414 Status bar: running ADE agents, interface font, tooltips
+
+- Status bar shows running agents from the ADE module, next to running processes.
+- Status bar widgets use the interface font and look better.
+- Review tooltips: they look odd and the text is hard to follow.
+
+### P415 Operations panel: shared git primitives, all git ops, session and MCP ops
+
+- Operations panel lists every git op, whatever the module.
+- Git and ADE modules share one git implementation: same primitives, same abstractions.
+- Also list other ops, e.g. opening an agent session.
+- Also list ops done over MCP.
+
+### P416 Move automation runs into Operations panel
+
+Historical runs, success or failed, live in the Operations panel. Automation panel keeps only running ones. Persist errors; keep copy.
+
+### P417 Code review (1 round)
+
+One Opus review over the full diff since `main` (base: the chapter's branch point). Findings file under `plans/`, then one Sonnet fixer.
+
+### P418 Close chapter v0.2.23
+
+Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
