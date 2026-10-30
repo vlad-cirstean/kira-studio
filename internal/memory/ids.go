@@ -4,15 +4,12 @@ import (
 	"regexp"
 	"strconv"
 
-	gonanoid "github.com/matoous/go-nanoid/v2"
-
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
+	"github.com/kirathecat/kira-studio/internal/shortid"
 )
 
 const (
-	// idAlphabet is Crockford base32 lowercase: no i, l, o, u look-alikes.
-	idAlphabet = "0123456789abcdefghjkmnpqrstvwxyz"
-	idLen      = 12
+	idLen = 12
 
 	factIDPrefix  = "km_"
 	groupIDPrefix = "kg_"
@@ -24,7 +21,7 @@ var FactIDPattern = regexp.MustCompile(`\b` + memfmt.FactID + `\b`)
 var factIDExact = regexp.MustCompile(`^` + memfmt.FactID + `$`)
 
 func newID(prefix string) (string, error) {
-	n, err := gonanoid.Generate(idAlphabet, idLen)
+	n, err := shortid.New(idLen)
 	if err != nil {
 		return "", err
 	}
