@@ -6,6 +6,7 @@ import type { MaybeRefOrGetter } from 'vue';
 import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
 import { withMovedItem } from './backlogOrder';
+import { withShelved } from './board/shelf';
 import {
   archivedTaskKey,
   backlogKey,
@@ -22,6 +23,7 @@ import type {
   BacklogResult,
   Board,
   BranchArgs,
+  CaptureTaskArgs,
   CreateTaskArgs,
   FinishReviewArgs,
   FocusSessionArgs,
@@ -55,6 +57,7 @@ import type {
   SetTaskBranchArgs,
   SetTaskStepArgs,
   SetTaskWorkflowArgs,
+  ShelveTaskArgs,
   StartBranchArgs,
   StartRunArgs,
   StepArgs,
@@ -288,7 +291,8 @@ function withPlan(board: Board, args: SetPlanArgs): Board {
     if (iso === null) delete day[id];
     else day[id] = iso;
   }
-  return { ...board, plan: { ...board.plan, order: args.order, day } };
+  const backlog = board.plan.backlog.filter((id) => !(id in args.days));
+  return { ...board, plan: { ...board.plan, order: args.order, day, backlog } };
 }
 
 export function useSetPlan() {
@@ -296,6 +300,18 @@ export function useSetPlan() {
     mutationFn: (args: SetPlanArgs) => control.adeTaskSetPlan(args),
     ...optimisticUpdate<Board, SetPlanArgs>(queryClient, boardKey, withPlan),
   });
+}
+
+export function useShelveTask() {
+  return useMutation({
+    mutationFn: (args: ShelveTaskArgs) => control.adeTaskShelveTask(args),
+    ...optimisticUpdate<Board, ShelveTaskArgs>(queryClient, boardKey, withShelved),
+  });
+}
+
+/** Adds a title-only task at the top of Later. */
+export function useCaptureTask() {
+  return useMutation({ mutationFn: (args: CaptureTaskArgs) => control.adeTaskCaptureTask(args) });
 }
 
 /** The stored sandbox of a run; the badge popover and profile dialog read it. */

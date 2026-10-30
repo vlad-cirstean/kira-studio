@@ -14,8 +14,9 @@ import {
 } from '../board/menu';
 import { taskPatch } from '../board/panelFacts';
 import { reviewChoices } from '../board/reviewCode';
+import { shelfIds } from '../board/shelf';
 import { useHostLabels } from '../hostLabels';
-import { useSetPlan, useSetTaskStep, useStopRun, useUpdateTask } from '../queries';
+import { useSetPlan, useSetTaskStep, useShelveTask, useStopRun, useUpdateTask } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useTaskAction } from '../run/useTaskAction';
 import { useSessionViews } from '../sessions/useSessionViews';
@@ -39,6 +40,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const { perform } = useTaskAction(card);
   const setStep = useSetTaskStep();
   const setPlan = useSetPlan();
+  const shelve = useShelveTask();
   const stopRun = useStopRun();
   const update = useUpdateTask();
   const { copy } = useCopy();
@@ -91,6 +93,16 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
             await setPlan.mutateAsync(
               movePlanArgs(m.board.plan, today.value, taskId, null, cmd.day),
             );
+          return;
+        }
+        case 'shelve': {
+          const m = model.value;
+          if (m)
+            await shelve.mutateAsync({
+              taskId,
+              shelf: cmd.shelf,
+              beforeId: shelfIds(m.board, cmd.shelf)[0] ?? '',
+            });
           return;
         }
         case 'park':

@@ -20,12 +20,12 @@ test('shows the first 10 items, loads all and collapses back', async ({ relaunch
   const tasks = page.locator('[data-testid="ade-task"]');
   await expect(tasks).toHaveCount(10);
   await page.locator('[data-testid="ade-load-all"]').click();
-  await expect(tasks).toHaveCount(13);
+  await expect(tasks).toHaveCount(12);
   await expect(page.locator('[data-testid="ade-load-all"]')).toHaveCount(0);
   await page.locator('[data-testid="ade-collapse"]').click();
   await expect(tasks).toHaveCount(10);
   await expect(page.locator('[data-testid="ade-load-all"]')).toContainText(
-    'Load all items · 3 more',
+    'Load all items · 2 more',
   );
 });
 

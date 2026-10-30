@@ -119,6 +119,8 @@ test('contract: a converted review renders as a normal task', async ({ relaunch 
         if (!tk || !br) throw new Error('fixture review missing');
         Object.assign(tk, { kind: task.kind, owner: task.owner });
         Object.assign(br, { kind: branch.kind });
+        // An undated task sits on the Later tab, so date the converted one to keep it on the Plan.
+        (b.plan as { day: Record<string, string> }).day.R_sara = '2026-09-25';
       }),
     },
   ]);

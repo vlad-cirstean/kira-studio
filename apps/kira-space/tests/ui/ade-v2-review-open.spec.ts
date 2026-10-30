@@ -94,7 +94,14 @@ test('an uncreated branch is disabled in the button and the menu', async ({ rela
 });
 
 test('a parked task has no Review code', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch, [OPEN]);
+  // A parked task with no day sits on the Later tab, so date it to keep it on the Plan.
+  const board = adeBoard((b) => {
+    (b.plan as { day: Record<string, string> }).day.T_spike = '2026-09-28';
+  });
+  const { window: page } = await openPlan(relaunch, [
+    OPEN,
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
   await page.locator(t('ade-load-all')).click();
   await page.locator(card('T_spike')).scrollIntoViewIfNeeded();
   await expect(page.locator(`${card('T_spike')} ${t('ade-card-review')}`)).toHaveCount(0);

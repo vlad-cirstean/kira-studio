@@ -6971,48 +6971,6 @@
           "empty": "No automations yet"
         }
       },
-      "backlog": {
-        "add": {
-          "label": "Add to backlog",
-          "placeholder": "Type a thought and press Enter"
-        },
-        "added": {
-          "announce": "Added to backlog"
-        },
-        "captured": {
-          "label": "Captured {ago}"
-        },
-        "deleteConfirm": {
-          "body": "Deletes “{text}” from the backlog. This can’t be undone.",
-          "title": "Delete backlog item?"
-        },
-        "intro": {
-          "hint": "Get it out of your head and order it later, most important first. Nothing here is on the plan yet."
-        },
-        "item": {
-          "label": "Backlog item"
-        },
-        "jira": {
-          "placeholder": "Paste a Jira link or key"
-        },
-        "link": {
-          "placeholder": "Paste a {labels} {shorts} or issue link"
-        },
-        "notPlanned": {
-          "label": "Backlog · not planned"
-        },
-        "promotePanel": {
-          "label": "→ Plan as task",
-          "tooltip": "Turn into a task in the spec phase, unscheduled"
-        },
-        "promoteRow": {
-          "label": "→ Task",
-          "tooltip": "Turn into a task, unscheduled"
-        },
-        "selectHint": {
-          "hint": "Select an item to add links and notes."
-        }
-      },
       "baseMarker": {
         "draft": {
           "label": "No branch yet · from {base}"
@@ -7309,6 +7267,9 @@
           "markNotMerging": {
             "label": "Mark as not merging"
           },
+          "moveBacklog": {
+            "label": "Move to backlog"
+          },
           "moveLater": {
             "label": "Move to later"
           },
@@ -7496,6 +7457,21 @@
         },
         "takeOver": {
           "tooltip": "Continue this run yourself in an interactive {product} session"
+        }
+      },
+      "later": {
+        "add": {
+          "label": "Add to later",
+          "placeholder": "Type a task and press Enter"
+        },
+        "added": {
+          "announce": "Added to later"
+        },
+        "intro": {
+          "hint": "Tasks taken off the plan wait here. Later is next in line; backlog holds work that may never be picked up. Drag a task between the lists or reorder it."
+        },
+        "laterEmpty": {
+          "empty": "Nothing in later yet. Drag tasks here"
         }
       },
       "link": {
@@ -7750,6 +7726,11 @@
         }
       },
       "plan": {
+        "band": {
+          "further": {
+            "label": "Further out"
+          }
+        },
         "branchRow": {
           "menuTitle": {
             "label": "{name} in {repo}"
@@ -8838,7 +8819,7 @@
         "label": "Backlog"
       },
       "backlogEmpty": {
-        "empty": "No backlog items yet"
+        "empty": "Nothing on the backlog yet. Drag tasks here"
       },
       "base": {
         "label": "Base"

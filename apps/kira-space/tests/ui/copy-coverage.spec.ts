@@ -69,12 +69,12 @@ test('plan board, task card menu and day menu', async ({ relaunch }) => {
   await expectCatalogText(page.locator(t('context-menu')), { allow });
 });
 
-test('backlog and needs pages', async ({ relaunch }) => {
+test('later and needs pages', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await setPseudoLocale(page);
   const allow = fixtureData();
-  await page.locator(t('ade-tab-backlog')).click();
-  await expectCatalogText(page.locator(t('ade-backlog')), { allow });
+  await page.locator(t('ade-tab-later')).click();
+  await expectCatalogText(page.locator(t('ade-later')), { allow });
   await page.locator(t('ade-tab-needs')).click();
   await expectCatalogText(page.locator(t('ade-needs-page')), { allow });
 });

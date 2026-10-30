@@ -6,12 +6,12 @@ import { useTimeoutFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { ref } from 'vue';
-import { useAddBacklogItem } from '../queries';
+import { useCaptureTask } from '../queries';
 
-// Enter files the text as a backlog item; the note confirms briefly.
+// Enter adds the text as a task at the top of Later; the note confirms briefly.
 const text = ref('');
 const note = ref('');
-const add = useAddBacklogItem();
+const add = useCaptureTask();
 const { start: hideNote } = useTimeoutFn(
   () => {
     note.value = '';
@@ -24,9 +24,9 @@ async function onEnter(): Promise<void> {
   const value = text.value.trim();
   if (!value || add.isPending.value) return;
   try {
-    await add.mutateAsync({ text: value });
+    await add.mutateAsync({ title: value });
     text.value = '';
-    note.value = t('space.ade.backlog.added.announce');
+    note.value = t('space.ade.later.added.announce');
   } catch (err) {
     note.value = errorText(err);
   }
@@ -36,11 +36,11 @@ async function onEnter(): Promise<void> {
 
 <template>
   <div class="relative flex items-center gap-2">
-    <Label for="ade-capture" class="sr-only">{{ t('space.ade.backlog.add.label') }}</Label>
+    <Label for="ade-capture" class="sr-only">{{ t('space.ade.later.add.label') }}</Label>
     <Input
       id="ade-capture"
       v-model="text"
-      :placeholder="t('space.ade.backlog.add.placeholder')"
+      :placeholder="t('space.ade.later.add.placeholder')"
       size="kira-lg"
       class="w-72"
       data-testid="ade-capture"

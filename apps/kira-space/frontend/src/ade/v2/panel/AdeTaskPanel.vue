@@ -19,7 +19,7 @@ import { taskReviewTip } from '../board/reviewCode';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
 import { useTaskMenu } from '../plan/useTaskMenu';
-import { useUpdateTask } from '../queries';
+import { useShelveTask, useUpdateTask } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
@@ -40,6 +40,7 @@ const sessionCount = computed(
     sessions.value.filter((x) => x.taskId === props.card.task.id && x.state === 'running').length,
 );
 const update = useUpdateTask();
+const shelve = useShelveTask();
 const taskMenu = useTaskMenu(() => props.card);
 function openMore(ev: MouseEvent): void {
   if (ev.currentTarget instanceof Element) taskMenu.openAt(ev.currentTarget);
@@ -68,6 +69,22 @@ const quietArchive = computed(
   () => props.card.task.kind !== 'review' && props.card.action?.kind !== 'archive',
 );
 
+/** Backlog tasks go back to Later and any other task to Backlog; a review item stays on the Plan. */
+const shelfTarget = computed(() => {
+  if (props.card.review) return null;
+  return props.card.shelf === 'backlog' ? 'later' : 'backlog';
+});
+async function moveShelf(): Promise<void> {
+  const to = shelfTarget.value;
+  if (!to) return;
+  delete ui.actionError[props.card.task.id];
+  try {
+    await shelve.mutateAsync({ taskId: props.card.task.id, shelf: to, beforeId: '' });
+  } catch (err) {
+    ui.actionError[props.card.task.id] = errorText(err);
+  }
+}
+
 const tone = computed(() => (props.card.parked ? 'grey' : props.card.status.tone));
 const label = computed(() =>
   props.card.parked ? t('space.ade.board.notMerging.label') : props.card.status.name,
@@ -76,10 +93,13 @@ const label = computed(() =>
 const facts = computed(() => {
   const e = props.card.entry;
   const cal = props.model.cal;
+  const shelf = props.card.shelf;
   const span =
-    e.day === LATER
-      ? t('common.later.label')
-      : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
+    shelf === 'backlog'
+      ? t('space.common.backlog.label')
+      : e.day === LATER
+        ? t('common.later.label')
+        : dayLabel(cal, e.day) + (e.days.length > 1 ? `–${dayLabel(cal, e.end)}` : '');
   const repos: string[] = [];
   for (const row of props.card.rows) if (!repos.includes(row.repo)) repos.push(row.repo);
   const p = props.card.progress;
@@ -124,6 +144,20 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           {{ t('space.common.archive.label') }}
         </Button>
       </AdeTip>
+      <Button
+        v-if="shelfTarget"
+        variant="dialog"
+        size="kira-lg"
+        :pending="shelve.isPending.value"
+        data-testid="ade-panel-shelve"
+        @click="moveShelf"
+      >
+        {{
+          shelfTarget === 'backlog'
+            ? t('space.common.backlog.label')
+            : t('common.later.label')
+        }}
+      </Button>
       <AdeTip v-if="choices.length" :parts="reviewTip">
         <TooltipDisabledTrigger :disabled="reviewDisabled">
           <Button

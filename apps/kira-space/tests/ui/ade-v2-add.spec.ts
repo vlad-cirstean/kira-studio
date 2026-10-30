@@ -13,18 +13,17 @@ function visibleTask(): TaskFx {
   return { ...adeFixture<TaskFx>('task'), id: 'T_deps' };
 }
 
-test('Enter in the capture box files a backlog item and confirms it', async ({ relaunch }) => {
-  const item = adeFixture<{ items: unknown[] }>('backlog').items[0];
+test('Enter in the capture box adds a task to Later and confirms it', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskAddBacklogItem, response: item },
+    { channel: IPC.adeTaskCaptureTask, response: visibleTask() },
   ]);
   const input = page.locator('[data-testid="ade-capture"]');
   await input.fill('Rate limit exports');
   await input.press('Enter');
-  await expect(page.locator('[data-testid="ade-capture-note"]')).toHaveText('Added to backlog');
+  await expect(page.locator('[data-testid="ade-capture-note"]')).toHaveText('Added to later');
   await expect(input).toHaveValue('');
-  expect(control.log().find((e) => e.channel === IPC.adeTaskAddBacklogItem)?.args).toEqual({
-    text: 'Rate limit exports',
+  expect(control.log().find((e) => e.channel === IPC.adeTaskCaptureTask)?.args).toEqual({
+    title: 'Rate limit exports',
   });
 });
 

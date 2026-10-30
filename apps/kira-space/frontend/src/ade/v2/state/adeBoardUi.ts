@@ -7,7 +7,7 @@ import type { OpenSessionEvent } from '../wire';
 // popover keep their own state in `adeWorkflowsUi` and `adeAddUi`. The three Plan toggles persist
 // per window profile; selection and the last refresh summaries are in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
-  const view = ref<'plan' | 'backlog' | 'needs' | 'workflows'>('plan');
+  const view = ref<'plan' | 'later' | 'needs' | 'workflows'>('plan');
   const selectedTaskId = ref<string | null>(null);
   const selectedBranchId = ref<string | null>(null);
   /** Active tab of the task panel and of the branch panel; Sessions is reachable from anywhere. */
@@ -62,7 +62,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
 
   /** Opens the Plan on the task's Sessions tab. */
   function openSessions(taskId: string): void {
-    view.value = 'plan';
+    if (view.value !== 'later') view.value = 'plan';
     select(taskId);
     taskTab.value = 'sessions';
   }

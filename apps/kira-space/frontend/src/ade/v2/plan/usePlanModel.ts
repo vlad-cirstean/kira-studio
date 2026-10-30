@@ -28,6 +28,7 @@ import {
   buildTaskProgress,
   type TaskProgress,
 } from '../board/progress';
+import { shelfOf, type TaskShelf } from '../board/shelf';
 import { blocked as isBlocked, statusOf } from '../board/status';
 import { buildStepBlocks, type StepBlock } from '../board/stepBlocks';
 import { type TaskSessions, taskSessionsOf } from '../board/taskSessions';
@@ -99,6 +100,8 @@ export interface CardModel {
   rows: BranchRowModel[];
   review: boolean;
   parked: boolean;
+  /** Plan timeline, or the Later or Backlog shelf. */
+  shelf: TaskShelf;
   allMerged: boolean;
   selected: boolean;
   ripple: boolean;
@@ -219,6 +222,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     rows: c.view.branchRows(id).map(({ id: bid, depth }) => buildRow(c, task, bid, depth)),
     review: task.kind === 'review',
     parked: task.kind === 'parked',
+    shelf: shelfOf(c.board, id),
     allMerged: mine.length > 0 && mine.every((br) => br.mergedIntoMain),
     selected: c.selectedId === id,
     ripple: c.ripple?.taskIds.includes(id) ?? false,

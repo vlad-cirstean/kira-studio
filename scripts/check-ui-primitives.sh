@@ -73,9 +73,9 @@ apps/kira-space/frontend/src/ade/v2/panel/AdePanelFrame.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeTaskPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeArchivedPanel.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPage.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPanel.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue
+apps/kira-space/frontend/src/ade/v2/later/AdeLaterPage.vue
+apps/kira-space/frontend/src/ade/v2/later/AdeShelfSection.vue
+apps/kira-space/frontend/src/ade/v2/later/AdeShelfRow.vue
 apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedList.vue
 apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedRow.vue
 apps/kira-space/frontend/src/repo/ReposDialog.vue

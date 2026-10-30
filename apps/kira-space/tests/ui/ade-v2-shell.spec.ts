@@ -15,9 +15,8 @@ test('the tab bar has no bottom delimiter', async ({ relaunch }) => {
 });
 
 test('capture box and Add sit in the middle of the tab bar', async ({ relaunch }) => {
-  const item = adeFixture<{ items: unknown[] }>('backlog').items[0];
   const { window: page } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskAddBacklogItem, response: item },
+    { channel: IPC.adeTaskCaptureTask, response: adeFixture('task') },
   ]);
   const box = async (id: string) => {
     const b = await page.locator(`[data-testid="${id}"]`).boundingBox();
