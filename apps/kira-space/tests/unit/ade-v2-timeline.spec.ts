@@ -320,7 +320,7 @@ describe('history', () => {
       { showHistory: true },
     );
     expect(v.historyCount).toBe(1);
-    expect(v.historyButtonLabel).toBe('Load history · 1 archived task in the last 2 weeks');
+    expect(v.historyTip).toBe('1 archived task in the last 2 weeks');
     expect(v.bands.find((x) => x.key === -1)?.history.map((h) => h.taskId)).toEqual(['h1']);
   });
 });

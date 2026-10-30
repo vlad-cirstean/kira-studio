@@ -23,6 +23,7 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useConfirmRun } from '../useConfirmRun';
 import AdeDayBand from './AdeDayBand.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
+import AdeHistoryControl from './AdeHistoryControl.vue';
 import AdePlanRepos, { type RepoChipModel } from './AdePlanRepos.vue';
 import { usePlanDrag } from './usePlanDrag';
 import type { BranchRowModel } from './usePlanModel';
@@ -275,8 +276,7 @@ const inHistory = computed(() => {
   return scrollY.value + headerHeight.value < todayTop - 30;
 });
 
-async function onGoToDate(iso: string): Promise<void> {
-  const k = isoToOffset(today.value, iso);
+async function revealDay(k: number): Promise<void> {
   if (k < 0) {
     ui.historyReach = Math.max(ui.historyReach ?? settingsStore.ade.historyDays, -k + 2);
     await nextTick();
@@ -285,6 +285,18 @@ async function onGoToDate(iso: string): Promise<void> {
   }
   await nextTick();
   scrollToDay(k < WINDOW_DAYS ? k : LATER);
+}
+
+async function onGoToDate(iso: string): Promise<void> {
+  await revealDay(isoToOffset(today.value, iso));
+}
+
+async function onFindArchived(taskId: string): Promise<void> {
+  ui.select(taskId);
+  const item = model.value?.view.history.find((h) => h.taskId === taskId);
+  if (!item || item.day >= 0) return;
+  ui.showHistory = true;
+  await revealDay(item.day);
 }
 
 const forcePushTarget = ref<{ branchId: string; branchName: string; repo: string } | null>(null);
@@ -333,18 +345,14 @@ function onForcePush(row: BranchRowModel): void {
               </AlertAction>
             </Alert>
           </div>
-          <div v-if="!ui.showHistory" class="mb-2 ml-15">
-            <Button
-              variant="toolbar"
-              size="kira-lg"
-              class="w-full justify-center text-muted-foreground"
-              data-testid="ade-load-history"
-              @click="openHistory"
-            >
-              <CodiconIcon name="arrow-up" :size="12" />
-              <span>{{ model.view.historyButtonLabel }}</span>
-            </Button>
-          </div>
+          <AdeHistoryControl
+            :count="model.view.historyCount"
+            :tip="model.view.historyTip"
+            :open="ui.showHistory"
+            @load="openHistory"
+            @hide="hideHistory"
+            @pick="onFindArchived"
+          />
           <template v-for="band in model.view.bands" :key="band.key">
             <AdeDayBand
               :band="band"

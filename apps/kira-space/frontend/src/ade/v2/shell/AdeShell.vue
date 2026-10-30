@@ -6,7 +6,6 @@ import { computed, onMounted, onScopeDispose } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
-import AdeArchivedPage from '../archived/AdeArchivedPage.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdeAgentDialog from '../dialog/AdeAgentDialog.vue';
 import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
@@ -33,7 +32,6 @@ async function onView(view: unknown): Promise<void> {
 const backlog = useBacklog();
 const count = computed(() => backlog.data.value?.items.length ?? 0);
 const { model } = usePlanModel();
-const archivedCount = computed(() => model.value?.board.history.length ?? 0);
 const needsCount = computed(() => model.value?.needs.badge ?? 0);
 
 // Review code on the focused branch or card, else the selected one.
@@ -129,20 +127,6 @@ onScopeDispose(() => offReviewCode?.());
         >
           {{ t('space.common.plan.label') }}
         </TabsTrigger>
-        <TabsTrigger
-          value="archived"
-          :class="tabChipVariants({ active: ui.view === 'archived', size: 'wide' })"
-          data-testid="ade-tab-archived"
-        >
-          {{ t('space.ade.panel.archived.label') }}
-          <span
-            class="text-kira-sm tabular-nums text-muted-foreground"
-            data-testid="ade-archived-count"
-            >{{
-              archivedCount
-            }}</span
-          >
-        </TabsTrigger>
       </TabsList>
       <div class="mx-2 flex items-center gap-2">
         <AdeCaptureBox />
@@ -161,7 +145,6 @@ onScopeDispose(() => offReviewCode?.());
     <div class="flex min-h-0 flex-1 gap-0.5">
       <AdeBacklogPage v-if="ui.view === 'backlog'" />
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
-      <AdeArchivedPage v-else-if="ui.view === 'archived'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
       <template v-else>
         <AdePlanView />

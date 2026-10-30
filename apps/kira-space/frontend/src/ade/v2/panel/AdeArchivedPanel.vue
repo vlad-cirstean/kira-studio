@@ -19,7 +19,6 @@ import { usePlanModel } from '../plan/usePlanModel';
 import { useRestoreTask } from '../queries';
 import { useArchivedTask } from '../readQueries';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
-import { useAdeArchiveUiStore } from '../state/adeArchiveUi';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { ArchivedBranch, ArchivedComment, ArchivedTask } from '../wire';
 import AdePanelFrame from './AdePanelFrame.vue';
@@ -29,26 +28,22 @@ import { PR_TONE, prStateLabel } from './prState';
 // need that first.
 const props = defineProps<{ taskId: string }>();
 
-const archive = useAdeArchiveUiStore();
 const boardUi = useAdeBoardUiStore();
 const { sessions, repoLabel } = usePlanModel();
 const hostLabels = useHostLabels();
 const query = useArchivedTask(() => props.taskId);
 const restore = useRestoreTask();
 const restoreError = ref('');
+const tab = ref('task');
 
 watch(
   () => props.taskId,
   () => {
-    archive.tab = 'task';
+    tab.value = 'task';
     restoreError.value = '';
   },
 );
 
-const tab = computed({
-  get: () => archive.tab,
-  set: (v: string) => (archive.tab = v as typeof archive.tab),
-});
 const count = computed(() => sessions.value.filter((s) => s.taskId === props.taskId).length);
 const tabs = computed(() => [
   { value: 'task', label: t('common.task.label') },
@@ -106,7 +101,6 @@ async function onRestore(): Promise<void> {
   restoreError.value = '';
   try {
     await restore.mutateAsync({ taskId: props.taskId });
-    if (archive.selectedTaskId === props.taskId) archive.select(null);
     boardUi.openTask(props.taskId);
   } catch (err) {
     restoreError.value = errorText(err);

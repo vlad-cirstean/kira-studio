@@ -73,7 +73,7 @@ interface TimelineSpan {
   startDay: number;
 }
 
-interface TimelineHistoryItem {
+export interface TimelineHistoryItem {
   taskId: string;
   title: string;
   day: number;
@@ -118,8 +118,10 @@ export interface TimelineView {
   /** Branch rows of a task in display order: repo, then stacked children indented. */
   branchRows(taskId: string): { id: string; depth: number }[];
   bands: TimelineBand[];
+  /** Every archived task, newest first, with its day offset (`< 0` = before today). */
+  history: TimelineHistoryItem[];
   historyCount: number;
-  historyButtonLabel: string;
+  historyTip: string;
   moreButtonLabel: string;
   graph: BranchGraph;
 }
@@ -477,8 +479,9 @@ export function buildTimeline(input: TimelineInput): TimelineView {
     after,
     branchRows,
     bands,
+    history,
     historyCount,
-    historyButtonLabel: historyLabel(historyCount, settings.historyDays),
+    historyTip: historyLabel(historyCount, settings.historyDays),
     moreButtonLabel: t('space.ade.plan.view.loadAll.label', { count: hiddenCount }),
     graph,
   };
@@ -487,8 +490,8 @@ export function buildTimeline(input: TimelineInput): TimelineView {
 function historyLabel(count: number, days: number): string {
   const tasks = t('space.ade.plan.view.archivedTasks.label', { count });
   return days % 7 === 0
-    ? t('space.ade.plan.view.loadHistoryWeeks.label', { tasks, count: days / 7 })
-    : t('space.ade.plan.view.loadHistoryDays.label', { tasks, count: days });
+    ? t('space.ade.plan.view.historyWeeks.tooltip', { tasks, count: days / 7 })
+    : t('space.ade.plan.view.historyDays.tooltip', { tasks, count: days });
 }
 
 function historyItems(

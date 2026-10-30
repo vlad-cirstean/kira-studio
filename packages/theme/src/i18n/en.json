@@ -6953,18 +6953,8 @@
         "comments": {
           "label": "Review comments ({count})"
         },
-        "filter": {
-          "placeholder": "Filter archived tasks"
-        },
-        "list": {
-          "aria": "Archived tasks",
-          "empty": "Nothing archived yet"
-        },
         "restore": {
           "hint": "Restore to edit."
-        },
-        "select": {
-          "emptyHint": "Select an archived task to see what it kept."
         },
         "snapshot": {
           "hint": "Taken when the task was archived."
@@ -7790,6 +7780,9 @@
           "current": {
             "label": "Current work"
           },
+          "find": {
+            "label": "Find archived task"
+          },
           "goTo": {
             "label": "Go to"
           },
@@ -7821,14 +7814,14 @@
           "collapse": {
             "label": "Show only the first {count} again"
           },
+          "historyDays": {
+            "tooltip": "{tasks} in the last day | {tasks} in the last {count} days"
+          },
+          "historyWeeks": {
+            "tooltip": "{tasks} in the last week | {tasks} in the last {count} weeks"
+          },
           "loadAll": {
             "label": "Load all items · {count} more"
-          },
-          "loadHistoryDays": {
-            "label": "Load history · {tasks} in the last day | Load history · {tasks} in the last {count} days"
-          },
-          "loadHistoryWeeks": {
-            "label": "Load history · {tasks} in the last week | Load history · {tasks} in the last {count} weeks"
           },
           "loading": {
             "loading": "Loading board…"

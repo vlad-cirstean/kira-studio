@@ -32,10 +32,16 @@ test('shows the first 10 items, loads all and collapses back', async ({ relaunch
 test('loads the archived history into the day bands', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const load = page.locator('[data-testid="ade-load-history"]');
-  await expect(load).toContainText('Load history · 5 archived tasks in the last 2 weeks');
+  await expect(load).toContainText('History');
+  await load.hover();
+  await expect(page.getByRole('tooltip').first()).toContainText(
+    '5 archived tasks in the last 2 weeks',
+  );
   await load.click();
   await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(5);
-  await expect(load).toHaveCount(0);
+  await expect(load).toContainText('Hide history');
+  await load.click();
+  await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(0);
 });
 
 test('a task archived today lists in the Today band without Load history, name first', async ({
