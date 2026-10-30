@@ -575,11 +575,7 @@ func toWireHistory(tasks []model.AdeTask, branches []model.AdeTaskBranch) []adew
 	}
 	out := make([]adewire.HistoryEntry, 0, len(tasks))
 	for _, t := range tasks {
-		title := t.Title
-		if title == "" {
-			title = t.JiraKey
-		}
-		e := adewire.HistoryEntry{TaskID: t.ID, Title: title, CodeRepoIDs: []string{}, ArchivedAt: *t.ArchivedAt}
+		e := adewire.HistoryEntry{TaskID: t.ID, Title: taskTitle(t, byTask[t.ID]), CodeRepoIDs: []string{}, ArchivedAt: *t.ArchivedAt}
 		seen := map[string]bool{}
 		var latest int64
 		allMerged := len(byTask[t.ID]) > 0
