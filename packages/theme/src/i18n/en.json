@@ -6956,6 +6956,9 @@
         "restore": {
           "hint": "Restore to edit."
         },
+        "resume": {
+          "tooltip": "Restores the task, then continues this session"
+        },
         "snapshot": {
           "hint": "Taken when the task was archived."
         }

@@ -137,3 +137,46 @@ test('a Plan history item opens the same full panel beside the Plan', async ({ r
   await expect(page.locator(t('ade-archived-restore'))).toBeVisible();
   await expect(page.locator(t('ade-archived-task-tab'))).toBeVisible();
 });
+
+async function openArchivedSessions(page: Page): Promise<void> {
+  await pickArchived(page, 'H_1');
+  await page.locator(t('ade-panel-tab-sessions')).click();
+}
+
+test('Resume restores the task, then takes the session over', async ({ relaunch }) => {
+  const fx = archivedTaskFx();
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskArchivedTask, response: fx },
+    sessionsWith(fx.branches[0].id),
+  ]);
+  await openArchivedSessions(page);
+  await expect(page.locator(t('ade-stopped-takeover'))).toHaveCount(0);
+  await page.locator(t('ade-stopped-resume')).first().click();
+  await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
+  const restore = calls(control, IPC.adeTaskRestoreTask);
+  expect(restore).toHaveLength(1);
+  expect(restore[0]?.args).toEqual({ taskId: 'H_1' });
+  const sent = calls(control, IPC.adeTaskTakeOver)[0]?.args as Record<string, unknown>;
+  expect(sent).toEqual({ sessionId: 'h1s1', stopIfRunning: true });
+  expect(Object.keys(sent)).toEqual(
+    Object.keys(contract<Record<string, unknown>>('ade-archived', 'args:AdeTaskService.TakeOver')),
+  );
+});
+
+test('a refused Resume shows the error and launches nothing', async ({ relaunch }) => {
+  const refusal = JSON.parse(
+    contract<string>('ade-archived', 'error:AdeTaskService.RestoreTask#branch-live'),
+  ) as { code: string; message: string };
+  const fx = archivedTaskFx();
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskArchivedTask, response: fx },
+    sessionsWith(fx.branches[0].id),
+    { channel: IPC.adeTaskRestoreTask, error: refusal },
+  ]);
+  await openArchivedSessions(page);
+  await page.locator(t('ade-stopped-resume')).first().click();
+  await expect(page.locator(t('ade-archived-resume-error'))).toContainText(
+    'branch feat/api-keep is on task',
+  );
+  expect(calls(control, IPC.adeTaskTakeOver)).toHaveLength(0);
+});

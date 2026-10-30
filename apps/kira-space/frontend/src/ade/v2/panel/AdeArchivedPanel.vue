@@ -156,6 +156,12 @@ async function onRestore(): Promise<void> {
           <Alert v-if="restoreError" variant="error" data-testid="ade-archived-restore-error"
             ><AlertDescription>{{ restoreError }}</AlertDescription></Alert
           >
+          <Alert
+            v-if="boardUi.actionError[taskId]"
+            variant="error"
+            data-testid="ade-archived-resume-error"
+            ><AlertDescription>{{ boardUi.actionError[taskId] }}</AlertDescription></Alert
+          >
         </template>
 
         <div

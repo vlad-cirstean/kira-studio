@@ -369,11 +369,21 @@
       "workflowOutdated": false
     }
   },
+  "AdeTaskService.TakeOver#archived-resume": {
+    "command": "<masked>",
+    "cwd": "<masked>",
+    "sessionId": "<masked>",
+    "terminalId": "<masked>"
+  },
   "args:AdeTaskService.ArchivedTask": {
     "taskId": "<id:1>"
   },
   "args:AdeTaskService.RestoreTask": {
     "taskId": "<id:1>"
+  },
+  "args:AdeTaskService.TakeOver": {
+    "sessionId": "<id:1>",
+    "stopIfRunning": true
   },
   "error:AdeTaskService.RestoreTask#branch-live": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"cannot restore: branch feat/api-keep is on task \\\"Other\\\"\"}"
 }
