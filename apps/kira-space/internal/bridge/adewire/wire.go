@@ -456,6 +456,46 @@ type Task struct {
 	// HandoverDrafts are the open drafts sessions wrote, never nil. Full history comes from Handovers.
 	HandoverIn     *Handover  `json:"handoverIn"`
 	HandoverDrafts []Handover `json:"handoverDrafts"`
+	// BranchRequestID is the open request an agent waits on for this task; '' when none.
+	BranchRequestID string `json:"branchRequestId"`
+}
+
+// BranchRequestItem is one repo an agent asks branch work for. Kind 'branch': a new branch from Base (” =
+// the repo's main branch). Kind 'worktree': a worktree for the named, not yet checked out Branch.
+type BranchRequestItem struct {
+	CodeRepoID string `json:"codeRepoId"`
+	Repo       string `json:"repo"`
+	Kind       string `json:"kind"`
+	Branch     string `json:"branch"`
+	Base       string `json:"base"`
+}
+
+// BranchRequest is an agent's open request for branches and worktrees. Source is 'run' (a headless step run),
+// 'session' (an interactive session) or 'automation' (a smart script); StepName names the stage, ” when unknown.
+// ExpiresAt is unix millis.
+type BranchRequest struct {
+	ID        string              `json:"id"`
+	TaskID    string              `json:"taskId"`
+	TaskTitle string              `json:"taskTitle"`
+	Source    string              `json:"source"`
+	StepName  string              `json:"stepName"`
+	Items     []BranchRequestItem `json:"items"`
+	CreatedAt int64               `json:"createdAt"`
+	ExpiresAt int64               `json:"expiresAt"`
+}
+
+type BranchRequestArgs struct {
+	ID string `json:"id"`
+}
+
+type ApproveBranchRequestArgs struct {
+	ID          string   `json:"id"`
+	CodeRepoIDs []string `json:"codeRepoIds"`
+}
+
+// BranchRequestAnswer says whether an approve or deny reached a request still open.
+type BranchRequestAnswer struct {
+	Resolved bool `json:"resolved"`
 }
 
 // Handover is the text one stage leaves for the next. A draft (State 'draft', ToStepID empty) is open until

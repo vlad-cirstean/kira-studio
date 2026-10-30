@@ -56,16 +56,39 @@ func TestSpaceTools_declareIsAdditiveAndIdempotent(t *testing.T) {
 	}
 }
 
-// requestBranch asks for one repo's branch and returns its single result.
+// requestBranch asks for one repo's branch, approves the request when one opens, and returns the result.
 func requestBranch(ctx context.Context, b *TaskBoard, taskID, repo string) (agentmcp.BranchInfo, error) {
-	res, err := b.RequestBranches(ctx, agentmcp.SpaceCall{TaskID: taskID}, []string{repo})
-	if err != nil {
-		return agentmcp.BranchInfo{}, err
+	type answer struct {
+		res agentmcp.RequestBranchesResult
+		err error
 	}
-	if len(res.Branches) != 1 || res.Branches[0].Outcome == agentmcp.BranchFailed {
-		return agentmcp.BranchInfo{}, errors.New("request failed: " + res.Branches[0].Next)
+	done := make(chan answer, 1)
+	go func() {
+		res, err := b.RequestBranches(ctx, agentmcp.SpaceCall{TaskID: taskID}, []string{repo})
+		done <- answer{res, err}
+	}()
+	for {
+		select {
+		case a := <-done:
+			if a.err != nil {
+				return agentmcp.BranchInfo{}, a.err
+			}
+			if len(a.res.Branches) != 1 || a.res.Branches[0].Outcome == agentmcp.BranchFailed {
+				return agentmcp.BranchInfo{}, errors.New("request failed: " + a.res.Branches[0].Next)
+			}
+			return a.res.Branches[0].BranchInfo, nil
+		case <-time.After(10 * time.Millisecond):
+			if id := b.branchRequestOf(taskID); id != "" {
+				if req, err := b.BranchRequest(id); err == nil {
+					ids := make([]string, len(req.Items))
+					for i, it := range req.Items {
+						ids[i] = it.CodeRepoID
+					}
+					_, _ = b.ApproveBranchRequest(id, ids)
+				}
+			}
+		}
 	}
-	return res.Branches[0].BranchInfo, nil
 }
 
 var generatedBranch = regexp.MustCompile(`^kira/[0-9a-hjkmnp-tv-z]{10}$`)

@@ -8,6 +8,7 @@ type Kind string
 
 const (
 	KindSchedule      Kind = "schedule"
+	KindBranchRequest Kind = "branch-request"
 	KindDbMcp         Kind = "dbmcp"
 	KindGitCredential Kind = "git-credential"
 	KindHandover      Kind = "handover"

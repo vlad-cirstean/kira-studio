@@ -256,24 +256,41 @@ func branchNameErr(err error, name string) error {
 	return err
 }
 
-// startPoint is the ref a new branch starts from: its resolved base (remote-first), else the repo's
-// main. A base that is not created yet or no longer exists refuses the start.
-func (b *TaskBoard) startPoint(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (string, error) {
+// newBranchBase resolves where a new branch of sb starts. full is the ref git takes ("" = the repo's
+// default start), display the base's name for the user ("" when it is the repo's main branch). A base that
+// is not created yet or no longer exists comes back as refusal text.
+func (b *TaskBoard) newBranchBase(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (full, display, refusal string, err error) {
 	sc, err := b.baseCtxFor(ctx, entry, sb.CodeRepoID)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 	br := sc.resolveBase(sb)
 	switch br.reason {
 	case baseParentDraft:
-		return "", invalid("base %s is not created yet: start its task first", cmpNonEmpty(sc.byID[sb.BaseBranchID].Name, "branch"))
+		return "", "", fmt.Sprintf("base %s is not created yet: start its task first", cmpNonEmpty(sc.byID[sb.BaseBranchID].Name, "branch")), nil
 	case baseMissing:
-		return "", invalid("base %s no longer exists", br.name)
+		return "", "", fmt.Sprintf("base %s no longer exists", br.name), nil
 	}
 	if !br.ok {
-		return "", nil
+		return "", "", "", nil
 	}
-	return br.full, nil
+	if br.name != sc.mainName {
+		display = br.name
+	}
+	return br.full, display, "", nil
+}
+
+// startPoint is the ref a new branch starts from: its resolved base (remote-first), else the repo's
+// main. A base that is not created yet or no longer exists refuses the start.
+func (b *TaskBoard) startPoint(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (string, error) {
+	full, _, refusal, err := b.newBranchBase(ctx, entry, sb)
+	if err != nil {
+		return "", err
+	}
+	if refusal != "" {
+		return "", invalid("%s", refusal)
+	}
+	return full, nil
 }
 
 func (b *TaskBoard) addWorktree(ctx context.Context, entry *gitsession.RepoEntry, req gitsession.OpRequest) error {

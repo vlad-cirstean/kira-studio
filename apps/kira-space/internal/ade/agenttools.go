@@ -281,55 +281,6 @@ func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, 
 	return "", nil
 }
 
-// RequestBranches implements agentmcp.SpaceTools: per repo it creates the branch and worktree under a
-// generated name, or returns the ones the task already has.
-func (b *TaskBoard) RequestBranches(ctx context.Context, call agentmcp.SpaceCall, refs []string) (agentmcp.RequestBranchesResult, error) {
-	mu := b.taskMu(call.TaskID)
-	mu.Lock()
-	defer mu.Unlock()
-	tc, err := b.spaceCtx(call.TaskID)
-	if err != nil {
-		return agentmcp.RequestBranchesResult{}, err
-	}
-	if err := b.spaceWritable(tc); err != nil {
-		return agentmcp.RequestBranchesResult{}, err
-	}
-	_, cfgs, err := b.registeredCandidates()
-	if err != nil {
-		return agentmcp.RequestBranchesResult{}, err
-	}
-	cands := b.taskCandidates(tc, cfgs)
-	ids := make([]string, 0, len(refs))
-	for _, ref := range refs {
-		id, err := resolveRepoRef(ref, cands, "task")
-		if err != nil {
-			return agentmcp.RequestBranchesResult{}, err
-		}
-		ids = append(ids, id)
-	}
-	out := agentmcp.RequestBranchesResult{Branches: make([]agentmcp.RequestedBranch, 0, len(ids))}
-	for _, id := range ids {
-		var sb model.AdeTaskBranch
-		for _, br := range tc.branches {
-			if br.CodeRepoID == id {
-				sb = br
-			}
-		}
-		nick := tc.nick[id]
-		rb, err := b.createBranch(ctx, sb, nick)
-		if err != nil {
-			var te agentmcp.ToolError
-			if !errors.As(err, &te) {
-				return agentmcp.RequestBranchesResult{}, err
-			}
-			rb = agentmcp.RequestedBranch{BranchInfo: agentmcp.BranchInfo{Repo: nick, Next: te.Error()}, Outcome: agentmcp.BranchFailed}
-		}
-		out.Branches = append(out.Branches, rb)
-	}
-	b.notifyBoard()
-	return out, nil
-}
-
 // createBranch makes one repo's branch and worktree under a generated name. A ToolError is a failure
 // of this repo alone.
 func (b *TaskBoard) createBranch(ctx context.Context, sb model.AdeTaskBranch, nick string) (agentmcp.RequestedBranch, error) {

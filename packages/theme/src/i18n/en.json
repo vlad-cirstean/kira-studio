@@ -997,7 +997,13 @@
       }
     },
     "prompt": {
+      "branchRequest": {
+        "title": "Approve branches · {task}"
+      },
       "count": {
+        "branchRequest": {
+          "title": "{count} branch requests wait for approval"
+        },
         "dbMcp": {
           "title": "{count} queries wait for approval"
         },

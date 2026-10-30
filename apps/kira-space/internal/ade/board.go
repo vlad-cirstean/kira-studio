@@ -102,6 +102,8 @@ type TaskBoardDeps struct {
 	// policy and denials.
 	Sandbox    agentsandbox.Enforcer
 	RunSandbox *repos.AdeRunSandboxRepo
+	// BranchRequestWait is how long an agent's branch request waits for the user; 0 = defaultBranchRequestWait.
+	BranchRequestWait time.Duration
 	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.
 	RebaseTimeout time.Duration
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
@@ -156,6 +158,7 @@ type TaskBoard struct {
 	recoveredRebases []model.AdeRun             // rebase runs Recover interrupted; Start re-reads git for them
 	stepMsgs         map[string]string          // task|step -> the Run dialog's edited message
 	agent            *agentmcp.Server
+	branchReqs       branchRequests // open agent branch requests (P408)
 	wg               sync.WaitGroup // background setups and runs; Close waits
 	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
 	closed           bool
@@ -227,6 +230,7 @@ func (b *TaskBoard) Close() {
 	b.closeMu.Lock()
 	b.closed = true
 	b.closeMu.Unlock()
+	b.abandonAllBranchRequests()
 	// Stop the MCP server first: a late finish_step must not start work after wg.Wait returns.
 	if err := b.agent.Close(); err != nil {
 		slog.Warn("ade: close agent server", "scope", "ade", "err", err)
@@ -527,7 +531,7 @@ func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
 		StatusID: t.StatusID, StatusBy: t.StatusBy,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
-		HandoverDrafts: []adewire.Handover{},
+		HandoverDrafts: []adewire.Handover{}, BranchRequestID: b.branchRequestOf(t.ID),
 	}
 	out.BranchIDs = append(out.BranchIDs, branchIDs...)
 	if t.JiraKey != "" || t.JiraURL != "" {
