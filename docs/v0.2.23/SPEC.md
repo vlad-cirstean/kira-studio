@@ -6,7 +6,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 
 | Phase | Title | Status |
 |---|---|---|
-| P404 | Board: archived tasks inline, session indicator, weekend pattern, branch status colors | Todo |
+| P404 | Board: archived tasks inline, session indicator, weekend pattern, branch status colors | Done |
 | P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Todo |
 | P406 | Nanoid branch names for agent-created worktrees | Todo |
 | P407 | Stage handover: session context notes and stage-change dialogs | Todo |
@@ -32,6 +32,8 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 - Mark weekend days with a pattern or similar.
 - Restore colors for branch statuses (merged etc.).
 - Each task shows an indicator of its running sessions. Today no way to tell whether the agent finished.
+
+**Result.** History entries use `taskTitle` (derived name). Today's archive rows always show, name first. Archived tab, page and store removed; compact History toggle (tooltip carries count) plus `AdeArchivedFinder` search popover. Resume on stopped archived sessions: Restore, then Take over (`resumeArchived`). Weekend bands hatched (U105 exempts `AdeDayBand.vue`). Branch tags keep tone again (`AdeChip` has `data-tone`). Card shows session state (`input`, `running`, `finished`) via `taskSessionsOf`; click opens Sessions tab. Tests: Go `TestArchiveRisk`, `TestResumeArchivedSession` (contract keys added), adeflow and ade packages pass; `bun test` timeline 26 pass; full `ui` project 789 pass; visual 20 pass after re-recording `plan-branches-stacked`; hooks pass.
 
 ### P405 Later and Backlog: move tasks between Plan, Later, Backlog
 
