@@ -937,23 +937,36 @@ func (r *AdeTaskRepo) SetBranchOrigin(id, origin string) error {
 }
 
 // SetEntryStep sets the step the task last entered ("done" when finished). since, when not nil, replaces the
-// pass watermark ({"<stepId>/<branchId>": attempt}); nil keeps it.
-func (r *AdeTaskRepo) SetEntryStep(taskID, stepID string, since map[string]int) error {
+// pass watermark ({"<stepId>/<branchId>": attempt}); nil keeps it. handoff, when not nil, is applied in the
+// same transaction, so a move and its handover never land apart.
+func (r *AdeTaskRepo) SetEntryStep(taskID, stepID string, since map[string]int, handoff *model.AdeHandoff) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin set ade task entry step %s: %w", taskID, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
 	var res sql.Result
-	var err error
 	if since == nil {
-		res, err = r.DB.Exec(`UPDATE ade_tasks SET entry_step_id = ? WHERE id = ?`, stepID, taskID)
+		res, err = tx.Exec(`UPDATE ade_tasks SET entry_step_id = ? WHERE id = ?`, stepID, taskID)
 	} else {
 		var js []byte
 		if js, err = json.Marshal(since); err != nil {
 			return fmt.Errorf("repos: encode ade task since %s: %w", taskID, err)
 		}
-		res, err = r.DB.Exec(`UPDATE ade_tasks SET entry_step_id = ?, since_json = ? WHERE id = ?`, stepID, string(js), taskID)
+		res, err = tx.Exec(`UPDATE ade_tasks SET entry_step_id = ?, since_json = ? WHERE id = ?`, stepID, string(js), taskID)
 	}
 	if err != nil {
 		return fmt.Errorf("repos: set ade task entry step %s: %w", taskID, err)
 	}
-	return sqlitex.RequireOneRow(res, "ade task "+taskID)
+	if err := sqlitex.RequireOneRow(res, "ade task "+taskID); err != nil {
+		return err
+	}
+	if handoff != nil {
+		if err := applyHandoff(tx, taskID, *handoff); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ResetWorkflow switches the task's workflow and restarts it: the task's runs and run logs are

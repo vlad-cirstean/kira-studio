@@ -1069,7 +1069,7 @@ func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 			slog.Warn("ade: start step", "scope", "ade", "task", taskID, "err", err)
 		}
 	case actComplete:
-		if err := b.deps.Tasks.SetEntryStep(taskID, entryDone, nil); err != nil {
+		if err := b.deps.Tasks.SetEntryStep(taskID, entryDone, nil, nil); err != nil {
 			slog.Warn("ade: finish workflow", "scope", "ade", "task", taskID, "err", err)
 			return
 		}
@@ -1281,7 +1281,7 @@ func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, er
 	if i, more := nextStep(*tc.wf, cur); more {
 		next = tc.wf.Steps[i].ID
 	}
-	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil); err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil, nil); err != nil {
 		return adewire.Task{}, err
 	}
 	b.syncStatus(taskID)
@@ -1348,7 +1348,7 @@ func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID st
 			}
 		}
 	}
-	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since); err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since, nil); err != nil {
 		return adewire.Task{}, err
 	}
 	b.syncStatus(taskID)
