@@ -102,6 +102,7 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
     :class="solidBorder ? 'border-t-border-strong' : 'border-t-border'"
     data-testid="ade-day-band"
     data-ade-band
+    :data-weekend="band.weekend || undefined"
     :data-ade-day="band.key"
     @contextmenu.prevent="emit('dayMenu', $event)"
   >
@@ -127,6 +128,9 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
       :class="[
         empty ? (greyed ? 'min-h-4' : 'min-h-control') : 'pb-2 pl-2 pt-2',
         highlight ? 'outline outline-1 outline-focus' : '',
+        band.weekend
+          ? 'bg-[repeating-linear-gradient(135deg,var(--color-border)_0_1px,transparent_1px_6px)]'
+          : '',
       ]"
       ref="dropEl"
       data-testid="ade-band-drop"

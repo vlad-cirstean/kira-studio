@@ -65,6 +65,18 @@ test('a task archived today lists in the Today band without Load history, name f
   expect(box?.width ?? 0).toBeGreaterThan(80);
 });
 
+test('weekend bands carry the hatched pattern; workdays do not', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const weekend = page.locator('[data-testid="ade-day-band"][data-weekend]');
+  expect(await weekend.count()).toBeGreaterThan(0);
+  const image = (band: ReturnType<Page['locator']>) =>
+    band
+      .locator('[data-testid="ade-band-drop"]')
+      .evaluate((el) => getComputedStyle(el).backgroundImage);
+  expect(await image(weekend.first())).toContain('repeating-linear-gradient');
+  expect(await image(bandOf(page, 0))).toBe('none');
+});
+
 test('a card shows its step, progress, span and clamped title', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const search = card(page, 'T_search');
