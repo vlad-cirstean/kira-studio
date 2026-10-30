@@ -339,7 +339,7 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
 		return
 	}
-	res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
+	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{})
 	if err != nil {
 		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
 		b.recordSetupFailure(sb, "could not create the worktree: "+trimInvalid(err))

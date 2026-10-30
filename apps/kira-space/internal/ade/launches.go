@@ -55,7 +55,7 @@ func (b *TaskBoard) launchGate(ctx context.Context, tc *taskCtx, sb model.AdeTas
 	if rec == nil {
 		return "", invalid("code repo %s not found", sb.CodeRepoID)
 	}
-	res, err := b.ensureWorktree(ctx, taskTitle(tc.task, tc.branches), *rec, sb, "")
+	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{title: taskTitle(tc.task, tc.branches)})
 	if err != nil {
 		return "", err
 	}

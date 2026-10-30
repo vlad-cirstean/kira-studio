@@ -69,7 +69,7 @@ type BranchInfo struct {
 type SpaceTools interface {
 	TaskInfo(ctx context.Context, taskID string) (TaskInfo, error)
 	DeclareRepos(ctx context.Context, taskID string, repos []string) (TaskInfo, error)
-	RequestBranch(ctx context.Context, taskID, repo, name string) (BranchInfo, error)
+	RequestBranch(ctx context.Context, taskID, repo string) (BranchInfo, error)
 	BranchStatus(ctx context.Context, taskID, repo string, wait time.Duration) (BranchInfo, error)
 }
 
@@ -79,7 +79,6 @@ type declareArgs struct {
 
 type requestBranchArgs struct {
 	Repo string `json:"repo"`
-	Name string `json:"name"`
 }
 
 type branchStatusArgs struct {
@@ -150,13 +149,13 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "request_branch",
 		Description: llmprompts.HeadlessToolRequestBranch.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[requestBranchArgs](s.prompts, llmprompts.HeadlessToolRequestBranch.ID(), nil), "repo", "name"),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[requestBranchArgs](s.prompts, llmprompts.HeadlessToolRequestBranch.ID(), nil), "repo"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args requestBranchArgs) (*mcp.CallToolResult, BranchInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {
 			return bad, BranchInfo{}, nil
 		}
-		info, err := s.space.RequestBranch(ctx, task, args.Repo, args.Name)
+		info, err := s.space.RequestBranch(ctx, task, args.Repo)
 		if err != nil {
 			return fail("request_branch", err), BranchInfo{}, nil
 		}

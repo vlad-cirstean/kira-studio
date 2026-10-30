@@ -76,7 +76,7 @@ export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
 
-/** Whether the workflow turns the Kira Space tools on; the agent then names its own branches. */
+/** Whether the workflow turns the Kira Space tools on; the agent then creates its branches through request_branch. */
 export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
   const workflows = useWorkflows();
   return computed(

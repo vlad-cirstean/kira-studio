@@ -349,7 +349,7 @@ func (b *TaskBoard) checkBranchNames(tc *taskCtx, names map[string]string) error
 
 // prepareWorktrees makes every mine branch's worktree exist and starts a setup in each new one. With
 // the Kira Space tools on, an unnamed branch gets none: the run starts in the repo root and the agent
-// creates the branch through request_branch.
+// creates the branch through request_branch; Kira Space names it.
 func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map[string]string) (map[string]string, error) {
 	paths := map[string]string{}
 	title := taskTitle(tc.task, tc.branches)
@@ -366,10 +366,10 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 			return nil, invalid("code repo %s not found", sb.CodeRepoID)
 		}
 		if space && sb.Name == "" && names[sb.ID] == "" {
-			paths[sb.ID] = rec.Root // the agent names the branch itself via request_branch
+			paths[sb.ID] = rec.Root // the agent creates the branch via request_branch
 			continue
 		}
-		res, err := b.ensureWorktree(ctx, title, *rec, sb, names[sb.ID])
+		res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{title: title, wanted: names[sb.ID]})
 		if err != nil {
 			return nil, err
 		}
@@ -1392,7 +1392,7 @@ func (b *TaskBoard) RetrySetup(ctx context.Context, branchID string) error {
 		return err
 	}
 	if path == "" {
-		res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
+		res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{})
 		if err != nil {
 			return err
 		}

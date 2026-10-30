@@ -82,7 +82,6 @@ headless.tool.declare_repos	169
 headless.tool.declare_repos.arg.repos	91
 headless.tool.request_branch	151
 headless.tool.request_branch.arg.repo	42
-headless.tool.request_branch.arg.name	47
 headless.tool.branch_status	93
 headless.tool.branch_status.arg.repo	42
 headless.tool.branch_status.arg.waitSeconds	56

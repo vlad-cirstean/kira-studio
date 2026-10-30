@@ -101,7 +101,7 @@ const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
 const pending = computed(
   () => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? [],
 );
-// With the Kira Space tools on the agent names its branches (request_branch), so no name is asked.
+// With the Kira Space tools on the agent creates its branches (request_branch; Kira Space names them), so no name is asked.
 const named = computed(() => (spaceTools.value ? [] : pending.value));
 const slug = computed(() => `feat/${branchSlug(card.value?.title ?? '')}`);
 

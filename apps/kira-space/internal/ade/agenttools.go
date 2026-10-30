@@ -281,21 +281,9 @@ func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, 
 	return "", nil
 }
 
-// validateAgentBranch refuses a name git rejects and the names an agent must never take.
-func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo, name string) error {
-	msg, err := b.checkNewBranchName(ctx, rec, name)
-	if err != nil {
-		return err
-	}
-	if msg != "" {
-		return agentmcp.ToolError(msg)
-	}
-	return nil
-}
-
-// RequestBranch implements agentmcp.SpaceTools: it creates the branch and its worktree, or confirms
-// the one the task already has under that name.
-func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string) (agentmcp.BranchInfo, error) {
+// RequestBranch implements agentmcp.SpaceTools: it creates the repo's branch and worktree under a
+// generated name, or returns the ones the task already has.
+func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref string) (agentmcp.BranchInfo, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -324,9 +312,6 @@ func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string)
 	if sb.Kind != model.AdeBranchKindMine {
 		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
 	}
-	if sb.Name != "" && sb.Name != name {
-		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("%s already has branch %q on this task. Branches cannot be renamed; use that one.", nick, sb.Name))
-	}
 	rec, err := b.deps.CodeRepos.Get(id)
 	if err != nil {
 		return agentmcp.BranchInfo{}, err
@@ -335,12 +320,7 @@ func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string)
 		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
 	}
 	fresh := sb.Name == ""
-	if fresh {
-		if err := b.validateAgentBranch(ctx, *rec, name); err != nil {
-			return agentmcp.BranchInfo{}, err
-		}
-	}
-	res, err := b.ensureWorktree(ctx, taskTitle(tc.task, tc.branches), *rec, sb, name)
+	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{generated: true})
 	if err != nil {
 		return agentmcp.BranchInfo{}, toolErr(err)
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
+	"github.com/kirathecat/kira-studio/internal/shortid"
 )
 
 // setup.go creates the worktrees a run needs and runs each repo's prepare script in a new one. The
@@ -131,9 +132,8 @@ type worktreeResult struct {
 // ensureWorktree makes the branch's worktree exist: a branch checked out anywhere, the repo root
 // included, runs there as is; a created branch without one gets an existingBranch worktree (a
 // remote-only one a newBranch tracking it); a not-created branch gets its name, then a newBranch
-// worktree from its base. wanted is the caller's name for a not-created branch ("" = derived from
-// the task title).
-func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.CodeRepo, sb model.AdeTaskBranch, wanted string) (worktreeResult, error) {
+// worktree from its base. naming says how a not-created branch gets its name.
+func (b *TaskBoard) ensureWorktree(ctx context.Context, rec model.CodeRepo, sb model.AdeTaskBranch, naming newBranchName) (worktreeResult, error) {
 	if err := b.checkNotArchiving(sb.TaskID); err != nil {
 		return worktreeResult{}, err
 	}
@@ -170,7 +170,7 @@ func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.
 	if err != nil {
 		return worktreeResult{}, err
 	}
-	name, err := b.claimBranchName(sb, title, wanted, inv)
+	name, err := b.claimBranchName(sb, naming, inv)
 	if err != nil {
 		return worktreeResult{}, err
 	}
@@ -185,23 +185,56 @@ func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.
 	return worktreeResult{Path: path, Name: name, Fresh: true}, nil
 }
 
+const (
+	agentBranchPrefix     = "kira/"
+	agentBranchIDLen      = 10
+	maxGeneratedNameTries = 5
+)
+
+// newBranchName is how a not-created branch gets its name: wanted as given, generated, else derived from title.
+type newBranchName struct {
+	title, wanted string
+	generated     bool
+}
+
 // claimBranchName stores the branch's name before git runs, so the board shows it. An explicit name
-// that already exists is refused; a derived one gets -2, -3... until free.
-func (b *TaskBoard) claimBranchName(sb model.AdeTaskBranch, title, wanted string, inv []porcelain.InventoryRef) (string, error) {
-	if wanted != "" {
-		if branchExists(inv, wanted) {
-			return "", invalid("branch %s already exists", wanted)
+// that already exists is refused; a generated one is kira/<nanoid>; a derived one gets -2, -3...
+// until free.
+func (b *TaskBoard) claimBranchName(sb model.AdeTaskBranch, n newBranchName, inv []porcelain.InventoryRef) (string, error) {
+	if n.wanted != "" {
+		if branchExists(inv, n.wanted) {
+			return "", invalid("branch %s already exists", n.wanted)
 		}
-		if err := b.deps.Tasks.SetBranchName(sb.ID, wanted); err != nil {
-			return "", branchNameErr(err, wanted)
+		if err := b.deps.Tasks.SetBranchName(sb.ID, n.wanted); err != nil {
+			return "", branchNameErr(err, n.wanted)
 		}
-		return wanted, nil
+		return n.wanted, nil
 	}
-	base := "feat/" + slug(title)
-	for n := 1; ; n++ {
+	if n.generated {
+		for range maxGeneratedNameTries {
+			id, err := shortid.New(agentBranchIDLen)
+			if err != nil {
+				return "", err
+			}
+			name := agentBranchPrefix + id
+			if branchExists(inv, name) {
+				continue
+			}
+			err = b.deps.Tasks.SetBranchName(sb.ID, name)
+			if err == nil {
+				return name, nil
+			}
+			if !errors.Is(err, repos.ErrBranchNameTaken) {
+				return "", err
+			}
+		}
+		return "", fmt.Errorf("ade: no free generated branch name after %d tries", maxGeneratedNameTries)
+	}
+	base := "feat/" + slug(n.title)
+	for i := 1; ; i++ {
 		name := base
-		if n > 1 {
-			name = fmt.Sprintf("%s-%d", base, n)
+		if i > 1 {
+			name = fmt.Sprintf("%s-%d", base, i)
 		}
 		if branchExists(inv, name) {
 			continue

@@ -771,7 +771,7 @@ var HeadlessSpaceSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceSuffix.usedBy.body",
-	Default:    `Kira Space tools: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.`,
+	Default:    `Kira Space tools: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only through request_branch, then work in the returned worktree.`,
 }, NoVars{})
 
 // HeadlessSandboxNote tells a sandboxed agent what it may write and what to do on a denial.
@@ -881,12 +881,11 @@ var _ = arg(HeadlessToolDeclareRepos.id, "repos", spaceApp, NextCall,
 // HeadlessToolRequestBranch describes the request_branch tool.
 var HeadlessToolRequestBranch = define(Entry{
 	ID: "headless.tool.request_branch", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "request_branch",
-	Default: `Create a branch and its worktree for a repo of the task. Returns at once; the prepare script may still run, so call branch_status before working there.`,
+	Default: `Create a task repo's branch and worktree; Kira Space names the branch. Returns at once; the prepare script may still run, so call branch_status first.`,
 }, NoVars{})
 
 var (
 	_ = arg(HeadlessToolRequestBranch.id, "repo", spaceApp, NextCall, `Task repo: nickname, name or code repo id.`, NoVars{})
-	_ = arg(HeadlessToolRequestBranch.id, "name", spaceApp, NextCall, `Branch name to create, such as feat/login-form.`, NoVars{})
 )
 
 // HeadlessToolBranchStatus describes the branch_status tool.

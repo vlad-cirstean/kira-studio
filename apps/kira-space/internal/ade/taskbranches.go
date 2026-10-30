@@ -223,7 +223,7 @@ func (b *TaskBoard) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranc
 
 // createNamed creates the row's new branch and worktree. A git failure leaves the row not created.
 func (b *TaskBoard) createNamed(ctx context.Context, tc *taskCtx, rec model.CodeRepo, row *model.AdeTaskBranch, name string) error {
-	res, err := b.ensureWorktree(ctx, taskTitle(tc.task, tc.branches), rec, *row, name)
+	res, err := b.ensureWorktree(ctx, rec, *row, newBranchName{title: taskTitle(tc.task, tc.branches), wanted: name})
 	if err != nil {
 		b.notifyBoard()
 		return err
