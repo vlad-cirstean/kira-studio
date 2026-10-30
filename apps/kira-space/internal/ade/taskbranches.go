@@ -95,6 +95,7 @@ func (b *TaskBoard) detachRow(ctx context.Context, old model.AdeTaskBranch, repl
 	}
 	if old.Name != "" {
 		b.snapshotChangeRequests(ctx, old.TaskID, []model.AdeTaskBranch{old})
+		b.snapshotReviewComments(ctx, []model.AdeTaskBranch{old})
 	}
 	if linked {
 		if err := b.removeWorktree(ctx, lb); err != nil {

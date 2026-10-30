@@ -68,6 +68,19 @@ func TestArchivedTaskKeepsData(t *testing.T) {
 	if err := app.W.AdeTask.ArchiveTask(ctx, adewire.TaskArgs{TaskID: f.taskID}); err != nil {
 		t.Fatalf("ArchiveTask: %v", err)
 	}
+	// Review sessions are keyed by repo and branch name: archive moves the comments onto the row.
+	liveComments := func() int {
+		var res struct {
+			Comments []struct{ Body string } `json:"comments"`
+		}
+		stream := app.OpenGitStream()
+		stream.MustRequest("repo.open", gitrpc.RepoOpenParams{Path: filepath.Join(app.Work, "api")}, &opened)
+		stream.MustRequest("review.comment.list", gitrpc.ReviewCommentListParams{RepoID: tgt.GitRepoID, Branch: tgt.Branch}, &res)
+		return len(res.Comments)
+	}
+	if n := liveComments(); n != 0 {
+		t.Fatalf("live comments after archive = %d, want 0", n)
+	}
 	args := adewire.TaskArgs{TaskID: f.taskID}
 	app.Contract(t, "ade-archived", "args:AdeTaskService.ArchivedTask", args)
 	app.Contract(t, "ade-archived", "args:AdeTaskService.RestoreTask", args)
@@ -132,6 +145,10 @@ func TestArchivedTaskKeepsData(t *testing.T) {
 		t.Fatalf("ArchivedTask of a live task = %v, want E_BAD_REQUEST", err)
 	}
 
+	if n := liveComments(); n != 1 {
+		t.Fatalf("live comments after restore = %d, want the 1 archived comment back", n)
+	}
+
 	// Refusal: the branch name is live on another task.
 	if err := app.W.AdeTask.ArchiveTask(ctx, args); err != nil {
 		t.Fatalf("second archive: %v", err)
@@ -140,6 +157,13 @@ func TestArchivedTaskKeepsData(t *testing.T) {
 	row := branchOf(t, board(t, app), other.ID, f.repoID)
 	if _, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: row.ID, Name: archivedBranch, Existing: true}); err != nil {
 		t.Fatalf("SetTaskBranch: %v", err)
+	}
+	// The other task reuses the name: it starts a fresh session and the archived view keeps its own comment.
+	if n := liveComments(); n != 0 {
+		t.Fatalf("live comments on the reused name = %d, want 0", n)
+	}
+	if again, err := app.W.AdeTask.ArchivedTask(ctx, args); err != nil || len(again.Branches[0].Comments) != 1 {
+		t.Fatalf("archived comments after reuse = %+v, %v, want the 1 snapshot", again.Branches, err)
 	}
 	_, err = app.W.AdeTask.RestoreTask(ctx, args)
 	if errCode(err) != "E_BAD_REQUEST" || !strings.Contains(err.Error(), archivedBranch) {

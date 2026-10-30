@@ -71,7 +71,7 @@ func EstOverCap(est string) bool {
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at, status_id, status_by, status_step`
 const adeTaskBranchInsertColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
-const adeTaskBranchColumns = adeTaskBranchInsertColumns + `, cr_number, cr_title, cr_state, cr_url`
+const adeTaskBranchColumns = adeTaskBranchInsertColumns + `, cr_number, cr_title, cr_state, cr_url, review_comments`
 const adeRunColumns = `id, task_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
@@ -114,14 +114,15 @@ func scanAdeTaskBranch(row rowScanner) (model.AdeTaskBranch, error) {
 	var b model.AdeTaskBranch
 	var had int
 	var merged, archived, crNumber sql.NullInt64
-	var crTitle, crState, crURL sql.NullString
+	var crTitle, crState, crURL, comments sql.NullString
 	if err := row.Scan(&b.ID, &b.TaskID, &b.CodeRepoID, &b.Name, &b.Kind, &b.Base, &b.BaseBranchID, &b.BasePendingFrom, &b.QueuedAfter, &b.Position,
-		&had, &b.AddedAt, &merged, &archived, &b.Origin, &crNumber, &crTitle, &crState, &crURL); err != nil {
+		&had, &b.AddedAt, &merged, &archived, &b.Origin, &crNumber, &crTitle, &crState, &crURL, &comments); err != nil {
 		return model.AdeTaskBranch{}, err
 	}
 	if crNumber.Valid {
 		b.ChangeRequest = &model.AdeChangeRequest{Number: int(crNumber.Int64), Title: crTitle.String, State: crState.String, URL: crURL.String}
 	}
+	b.ReviewCommentsJSON = comments.String
 	b.HadCommits = had != 0
 	b.MergedAt = nullInt64Ptr(merged)
 	b.ArchivedAt = nullInt64Ptr(archived)
@@ -519,7 +520,7 @@ func (r *AdeTaskRepo) DetachBranch(id string, replacement *model.AdeTaskBranch, 
 
 func (r *AdeTaskRepo) queryBranches(where string, args ...any) ([]model.AdeTaskBranch, error) {
 	rows, err := r.DB.Query(`SELECT b.id, b.task_id, b.code_repo_id, b.name, b.kind, b.base, b.base_branch_id, b.base_pending_from, b.queued_after, b.position,
-		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin, b.cr_number, b.cr_title, b.cr_state, b.cr_url
+		b.had_commits, b.added_at, b.merged_at, b.archived_at, b.origin, b.cr_number, b.cr_title, b.cr_state, b.cr_url, b.review_comments
 		FROM ade_task_branches b JOIN ade_tasks t ON t.id = b.task_id WHERE `+where+` ORDER BY b.task_id, b.position, b.id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade task branches: %w", err)
@@ -1344,6 +1345,18 @@ func (r *AdeTaskRepo) SetBranchChangeRequests(ids []string, crs map[string]model
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos: commit set ade branch change requests: %w", err)
+	}
+	return nil
+}
+
+// SetBranchReviewComments stores (json) or clears ("") the review comment snapshot of one branch.
+func (r *AdeTaskRepo) SetBranchReviewComments(id, json string) error {
+	var v any
+	if json != "" {
+		v = json
+	}
+	if _, err := r.DB.Exec(`UPDATE ade_task_branches SET review_comments = ? WHERE id = ?`, v, id); err != nil {
+		return fmt.Errorf("repos: set ade branch %s review comments: %w", id, err)
 	}
 	return nil
 }

@@ -182,6 +182,7 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 	if err := b.deps.Tasks.ArchiveTask(taskID, b.deps.Now().UnixMilli()); err != nil {
 		return err
 	}
+	b.snapshotReviewComments(ctx, tc.branches)
 	b.notifyBoard()
 	b.notifySessions()
 	return nil

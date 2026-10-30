@@ -123,16 +123,31 @@ func (b *TaskBoard) archivedRepo(ctx context.Context, id string, rows []model.Ad
 	res.host = adewire.RepoHost{CodeRepoID: id, Kind: kind, Host: host}
 	res.found, res.urls = found, urls
 	for _, r := range rows {
-		if r.Name != "" {
-			res.comments[r.ID] = b.archivedComments(ctx, entry, r)
+		if r.Name == "" {
+			continue
 		}
+		if cs, ok := storedComments(r); ok {
+			res.comments[r.ID] = archivedCommentsOf(cs)
+			continue
+		}
+		res.comments[r.ID] = b.archivedComments(ctx, entry, r)
 	}
 	return res
 }
 
-// archivedComments reads the branch's stored review comments, unanchored: the branch tip may be gone.
-// Sessions are keyed by repo and branch name, so a later task reusing the name shares the session;
-// comments made after the row was archived belong to that task.
+func archivedCommentsOf(cs []storedComment) []adewire.ArchivedComment {
+	out := make([]adewire.ArchivedComment, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, adewire.ArchivedComment{
+			Path: c.Path, Start: c.Start, End: c.End, Body: c.Body, Kind: c.Kind, State: c.State, Reply: c.Reply, CreatedAt: c.CreatedAt,
+		})
+	}
+	return out
+}
+
+// archivedComments reads the live review comments of a row archived before snapshots existed,
+// unanchored: the branch tip may be gone. A later task reusing the name shares that session, so
+// comments made after the row was archived are left out.
 func (b *TaskBoard) archivedComments(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) []adewire.ArchivedComment {
 	if b.deps.Registry == nil || b.deps.Registry.Review == nil {
 		return nil
@@ -160,7 +175,7 @@ func (b *TaskBoard) archivedComments(ctx context.Context, entry *gitsession.Repo
 }
 
 // RestoreTask unarchives the task into Later. Worktrees come back on next launch (ensureWorktree).
-func (b *TaskBoard) RestoreTask(_ context.Context, taskID string) (adewire.Task, error) {
+func (b *TaskBoard) RestoreTask(ctx context.Context, taskID string) (adewire.Task, error) {
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -180,6 +195,7 @@ func (b *TaskBoard) RestoreTask(_ context.Context, taskID string) (adewire.Task,
 	if err != nil {
 		return adewire.Task{}, err
 	}
+	b.restoreReviewComments(ctx, tc.branches)
 	runs, err := b.deps.Tasks.RunsOfTask(taskID)
 	if err != nil {
 		return adewire.Task{}, err

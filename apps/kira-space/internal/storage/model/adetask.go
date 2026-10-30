@@ -105,6 +105,9 @@ type AdeTaskBranch struct {
 	Origin          string
 	// ChangeRequest is the PR recorded at archive; nil = none recorded.
 	ChangeRequest *AdeChangeRequest
+	// ReviewCommentsJSON holds the review comments moved off the branch at archive or detach; ""
+	// = no snapshot.
+	ReviewCommentsJSON string
 }
 
 // AdeChangeRequest is a pull or merge request stored on a branch row.
