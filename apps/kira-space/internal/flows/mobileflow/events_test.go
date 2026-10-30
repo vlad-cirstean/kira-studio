@@ -50,7 +50,7 @@ func TestPhoneEventStream(t *testing.T) {
 		t.Fatalf("board after the event = %s", r.Body)
 	}
 
-	if _, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.task.ID}); err != nil {
+	if _, err := app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: f.task.ID}); err != nil {
 		t.Fatal(err)
 	}
 	stream.wait(t, adewire.ChannelBoard, waitFor)

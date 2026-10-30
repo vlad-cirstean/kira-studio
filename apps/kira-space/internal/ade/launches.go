@@ -178,7 +178,7 @@ func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.
 	if rec.Mode == model.AdeSessionModeHeadless {
 		runID = b.finishableRun(tc, rec)
 	}
-	return b.prepareWithGrant(tr, tc, pa, runID)
+	return b.prepareWithGrant(tr, tc, pa, runID, rec.StepID)
 }
 
 // RestartSession closes a running interactive session and resumes its conversation, as Take over
@@ -341,48 +341,43 @@ func (b *TaskBoard) spaceEnabled(task model.AdeTask) bool {
 	return ok && wf.KiraSpaceMcp
 }
 
-// prepareWithGrant registers the agent MCP grant a TUI launch needs (finish_step for a taken-over run,
-// the Space tools when the workflow enables them) and prepares the launch with its flags. The grant
+// prepareWithGrant registers the agent MCP grant every task TUI launch carries (handover, run_outcome;
+// finish_step for a taken-over run; the Space tools when the workflow enables them) and prepares the
+// launch with its flags. grantStep is the stage the session opens for, "" when it has none. The grant
 // lives until the record stops or its launch expires.
-func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, runID string) (adewire.Launch, error) {
+func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, runID, grantStep string) (adewire.Launch, error) {
 	space := b.spaceEnabled(tc.task)
-	var release func()
-	if runID != "" || space {
-		agent, err := b.agentFor(pa.Provider)
-		if err != nil {
-			return adewire.Launch{}, err
-		}
-		pa.Provider = agent.ID()
-		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
-		if runID != "" {
-			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
-		}
-		cfg, rel, err := b.agent.Register(grant)
-		if err != nil {
-			return adewire.Launch{}, err
-		}
-		release = rel
-		var ids []harness.MCPTool
-		if runID != "" {
-			ids = append(ids, agentmcp.FinishStep)
-		}
-		ids = append(ids, agentmcp.RunOutcome)
-		if space {
-			ids = append(ids, agentmcp.SpaceToolIDs...)
-		}
-		tools := harness.ToolNames(agent, ids...)
-		pa.MCPConfig, pa.AllowedTools = cfg, tools
-	}
-	res, err := tr.Prepare(pa)
+	agent, err := b.agentFor(pa.Provider)
 	if err != nil {
-		if release != nil {
-			release()
-		}
 		return adewire.Launch{}, err
 	}
-	if release != nil {
-		b.bindTUI(res.RecordID, runID, release)
+	pa.Provider = agent.ID()
+	grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
+	var ids []harness.MCPTool
+	if runID != "" {
+		grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
+		ids = append(ids, agentmcp.FinishStep)
+	} else {
+		grant.StepID = grantStep
 	}
+	cfg, release, err := b.agent.Register(grant)
+	if err != nil {
+		return adewire.Launch{}, err
+	}
+	ids = append(ids, agentmcp.RunOutcome)
+	if runID == "" {
+		ids = append(ids, agentmcp.Handover)
+	}
+	if space {
+		ids = append(ids, agentmcp.SpaceToolIDs...)
+	}
+	pa.MCPConfig, pa.AllowedTools = cfg, harness.ToolNames(agent, ids...)
+	res, err := tr.Prepare(pa)
+	if err != nil {
+		release()
+		return adewire.Launch{}, err
+	}
+	b.bindTUI(res.RecordID, runID, release)
 	return launchOf(res), nil
 }
 
@@ -545,7 +540,7 @@ func (b *TaskBoard) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs)
 	if len(extra) > 0 {
 		pa.AddDirs = extra
 	}
-	return b.prepareWithGrant(tr, tc, pa, "")
+	return b.prepareWithGrant(tr, tc, pa, "", step.ID)
 }
 
 // launchDirs gathers the repos of a task-level session: the first writable branch's worktree is the
@@ -642,7 +637,7 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 		message = composeStartMessage(b.prompts(), taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
 			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc))
 	}
-	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "")
+	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "", "")
 }
 
 // checkNoBackgroundRun refuses a session on a worktree a run or a rebase is working in.

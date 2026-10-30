@@ -61,6 +61,11 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 	}
 	out := b.toWireTask(t, ids, runs, reviews)
 	decorateTask(&out, t, b.liveWorkflows())
+	bh, err := b.deps.Tasks.BoardHandovers()
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	applyHandovers(&out, bh[t.ID])
 	b.badgeTasks([]adewire.Task{out})
 	return out, nil
 }

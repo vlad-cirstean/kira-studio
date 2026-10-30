@@ -111,7 +111,7 @@ func TestFirstRunJourney(t *testing.T) {
 		t.Fatalf("run = %+v", run)
 	}
 	for _, want := range []string{"ship", "done"} {
-		if got, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil || got.EntryStepID != want {
+		if got, err := app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: task.ID}); err != nil || got.EntryStepID != want {
 			t.Fatalf("StepDone = %+v, %v, want entry step %s", got, err, want)
 		}
 	}

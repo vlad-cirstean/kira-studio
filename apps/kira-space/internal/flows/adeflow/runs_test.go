@@ -53,7 +53,7 @@ func TestRunLifecycle(t *testing.T) {
 			agentStep("one", "    allowed_tools: [\"Bash(git *)\"]\n")+agentStep("two", "    before: approval\n")+manualStep)
 		app := f.app
 		setPrepare(t, app, f.repoID, "echo prepared")
-		if _, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID}); err == nil {
+		if _, err := app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: f.taskID}); err == nil {
 			t.Fatal("StepDone accepted before the steps ran")
 		}
 		mark := app.Events.Mark()
@@ -117,7 +117,7 @@ func TestRunLifecycle(t *testing.T) {
 		}
 		app.Contract(t, "ade-run", "AdeTaskService.Run#two-done", waitRun(t, app, f.taskID, "two", "done"), flowharness.Mask("startedAt", "finishedAt", "sessionId", "createdAt"))
 
-		task, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
+		task, err := app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: f.taskID})
 		if err != nil || task.EntryStepID != "done" {
 			t.Fatalf("StepDone = %+v, %v, want done", task, err)
 		}

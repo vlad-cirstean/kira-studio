@@ -1004,6 +1004,9 @@
         "gitCredential": {
           "title": "{count} Git credential requests wait"
         },
+        "handover": {
+          "title": "{count} tasks are ready to move on"
+        },
         "mobilePairing": {
           "title": "{count} phones ask for access"
         },
@@ -1031,6 +1034,9 @@
       },
       "gitCredentialNamed": {
         "title": "Git needs a credential · {repository}"
+      },
+      "handover": {
+        "title": "Move {task} to the next stage"
       },
       "mobilePairing": {
         "title": "A phone asks for access"
@@ -1087,6 +1093,9 @@
         },
         "estimateTooLong": {
           "body": "An estimate can be at most 480h or 60d."
+        },
+        "handoverTooLong": {
+          "body": "The handover notes are too long."
         },
         "jiraKeyInvalid": {
           "body": "That Jira key isn’t valid."

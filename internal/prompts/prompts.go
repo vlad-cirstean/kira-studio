@@ -10,6 +10,7 @@ const (
 	KindSchedule      Kind = "schedule"
 	KindDbMcp         Kind = "dbmcp"
 	KindGitCredential Kind = "git-credential"
+	KindHandover      Kind = "handover"
 	KindMobilePairing Kind = "mobile-pairing"
 	KindUpdate        Kind = "update"
 	KindQuit          Kind = "quit"

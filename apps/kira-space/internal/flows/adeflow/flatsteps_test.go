@@ -27,7 +27,7 @@ func entryOf(t *testing.T, f *runFixture) adewire.Task {
 // pastSpec ends the manual first step so the task waits on Run.
 func pastSpec(t *testing.T, f *runFixture) {
 	t.Helper()
-	if _, err := f.app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID}); err != nil {
+	if _, err := f.app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: f.taskID}); err != nil {
 		t.Fatalf("StepDone: %v", err)
 	}
 }
@@ -54,7 +54,7 @@ func TestFlatSteps(t *testing.T) {
 		manual := entryOf(t, f)
 		f.app.Contract(t, "ade-flat-steps", "AdeTaskService.Task#manual", manual, taskMask)
 
-		done, err := f.app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
+		done, err := f.app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: f.taskID})
 		if err != nil || done.EntryStepID != "implement" {
 			t.Fatalf("StepDone = %+v, %v, want entry implement", done, err)
 		}

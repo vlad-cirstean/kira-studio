@@ -20,6 +20,10 @@ const reviewStepID = "review"
 // none on a resume, the composed review message on a new launch). step, when set, adds its prompt
 // to the composed message. The task mutex is held.
 func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Tracker, message string, step *adewire.WorkflowStep) (adewire.Launch, bool, string, error) {
+	stepID := ""
+	if step != nil {
+		stepID = step.ID
+	}
 	row, err := b.deps.Sessions.ReviewAgent(tc.task.ID)
 	if err != nil {
 		return adewire.Launch{}, false, "", err
@@ -34,11 +38,11 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 	note := ""
 	if row != nil {
 		if info, serr := os.Stat(row.Cwd); serr == nil && info.IsDir() {
-			res, err := tr.Prepare(PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, AddDirs: extra})
+			l, err := b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, AddDirs: extra, Provider: row.Provider}, "", stepID)
 			if err != nil {
 				return adewire.Launch{}, false, "", err
 			}
-			return launchOf(res), true, "", nil
+			return l, true, "", nil
 		}
 		if err := b.deps.Sessions.ClearPurpose(row.ID); err != nil {
 			return adewire.Launch{}, false, "", err
@@ -52,13 +56,13 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 			message += "\n" + substitute(step.Prompt, repoVars(title, tc.task.JiraKey, lines), false)
 		}
 	}
-	res, err := tr.Prepare(PrepareArgs{
+	l, err := b.prepareWithGrant(tr, tc, PrepareArgs{
 		TaskID: tc.task.ID, Cwd: cwd, Message: message, AddDirs: extra, Purpose: model.AdeSessionPurposeReview,
-	})
+	}, "", stepID)
 	if err != nil {
 		return adewire.Launch{}, false, "", err
 	}
-	return launchOf(res), false, note, nil
+	return l, false, note, nil
 }
 
 // LaunchReviewAgent starts or resumes the task's review agent (the review window's button).

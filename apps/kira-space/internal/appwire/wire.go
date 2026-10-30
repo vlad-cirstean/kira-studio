@@ -35,6 +35,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/memcheck"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -184,7 +185,7 @@ func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
 	notifier *agentnotify.Notifier, usage *agentusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
-	agents harness.Selector,
+	agents harness.Selector, promptSink prompts.Sink,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -193,8 +194,8 @@ func wireAdeTask(
 	gitPath := adeGitPathSetting(repositories)
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
 		Agent:   agents,
-		Prompts: runs.LlmPrompts,
-		Tasks:   repositories.AdeTasks, Statuses: repositories.AdeStatuses, RepoConfig: repositories.AdeRepoConfig,
+		Prompts: runs.LlmPrompts, PromptSink: promptSink,
+		Tasks: repositories.AdeTasks, Statuses: repositories.AdeStatuses, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
 		Registry:        git.registry,
 		GitStatus:       func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },

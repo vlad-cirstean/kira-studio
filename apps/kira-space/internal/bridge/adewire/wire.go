@@ -452,6 +452,46 @@ type Task struct {
 	// StatusID is the task's status; StatusBy says who set it last: 'auto' (a step change) or 'user'.
 	StatusID string `json:"statusId"`
 	StatusBy string `json:"statusBy"`
+	// HandoverIn is the newest handed handover (what the last stage move left); nil before any.
+	// HandoverDrafts are the open drafts sessions wrote, never nil. Full history comes from Handovers.
+	HandoverIn     *Handover  `json:"handoverIn"`
+	HandoverDrafts []Handover `json:"handoverDrafts"`
+}
+
+// Handover is the text one stage leaves for the next. A draft (State 'draft', ToStepID empty) is open until
+// the task moves; a handed row is one stage move. Step names are snapshots; a step id of 'done' is past
+// the last step. Source is 'agent' (a session's handover call), 'run' (a finished run's summary) or 'user'.
+type Handover struct {
+	ID           string `json:"id"`
+	TaskID       string `json:"taskId"`
+	FromStepID   string `json:"fromStepId"`
+	FromStepName string `json:"fromStepName"`
+	ToStepID     string `json:"toStepId"`
+	ToStepName   string `json:"toStepName"`
+	Body         string `json:"body"`
+	Source       string `json:"source"`
+	State        string `json:"state"`
+	Finished     bool   `json:"finished"`
+	Dismissed    bool   `json:"dismissed"`
+	Edited       bool   `json:"edited"`
+	CreatedAt    int64  `json:"createdAt"`
+	UpdatedAt    int64  `json:"updatedAt"`
+}
+
+type HandoversResult struct {
+	Handovers []Handover `json:"handovers"`
+}
+
+type UpdateHandoverArgs struct {
+	ID string `json:"id"`
+	// Body '' deletes the row.
+	Body string `json:"body"`
+}
+
+// StepDoneArgs ends the current manual step. Notes, when set, replace the stage's draft handover; empty drops it.
+type StepDoneArgs struct {
+	TaskID string  `json:"taskId"`
+	Notes  *string `json:"notes,omitempty"`
 }
 
 // TaskStatusDef is one status of the user's set. Category is 'todo' | 'active' | 'review' | 'done'
@@ -986,6 +1026,8 @@ type SetTaskStepArgs struct {
 	// FromStepID, when set, is the step the caller saw; the engine refuses with ErrStale when the
 	// task has moved on. Desktop leaves it empty.
 	FromStepID string `json:"fromStepId,omitempty"`
+	// Notes, when set, replace the stage's draft handover; empty drops it. Nil keeps the draft.
+	Notes *string `json:"notes,omitempty"`
 }
 
 type SendArgs struct {

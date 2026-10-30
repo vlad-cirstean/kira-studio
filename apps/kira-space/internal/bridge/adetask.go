@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/shell"
@@ -892,12 +893,51 @@ func (s *AdeTaskService) FinishReview(ctx context.Context, args adewire.FinishRe
 	return adeTaskError(s.Engine.FinishReview(ctx, args))
 }
 
-func (s *AdeTaskService) StepDone(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
+func (s *AdeTaskService) StepDone(ctx context.Context, args adewire.StepDoneArgs) (adewire.Task, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
-	t, err := s.Engine.StepDone(ctx, args.TaskID)
+	if err := validateAdeHandoverNotes(args.Notes); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.StepDone(ctx, args.TaskID, args.Notes)
 	return t, adeTaskError(err)
+}
+
+// validateAdeHandoverNotes refuses handover text over the limit; nil is "keep the draft".
+func validateAdeHandoverNotes(notes *string) error {
+	if notes != nil && len(*notes) > agentmcp.MaxHandoverBytes {
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.ade.handoverTooLong.body", nil)
+	}
+	return nil
+}
+
+// Handovers lists a task's handover rows, newest first. Archived tasks work too.
+func (s *AdeTaskService) Handovers(ctx context.Context, args adewire.TaskArgs) (adewire.HandoversResult, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.HandoversResult{}, err
+	}
+	rows, err := s.Engine.Handovers(ctx, args.TaskID)
+	return adewire.HandoversResult{Handovers: rows}, adeTaskError(err)
+}
+
+// UpdateHandover replaces a handover row's body; an empty body deletes it.
+func (s *AdeTaskService) UpdateHandover(ctx context.Context, args adewire.UpdateHandoverArgs) error {
+	if err := validateAdeItemID(args.ID, "id"); err != nil {
+		return err
+	}
+	if err := validateAdeHandoverNotes(&args.Body); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.UpdateHandover(ctx, args.ID, args.Body))
+}
+
+// DismissHandover hides the task's "move to next stage" prompt; the draft stays.
+func (s *AdeTaskService) DismissHandover(ctx context.Context, args adewire.TaskArgs) error {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.DismissHandover(ctx, args.TaskID))
 }
 
 func (s *AdeTaskService) SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error) {
@@ -910,7 +950,10 @@ func (s *AdeTaskService) SetTaskStep(ctx context.Context, args adewire.SetTaskSt
 	if err := validateAdeFromStep(args.FromStepID); err != nil {
 		return adewire.Task{}, err
 	}
-	t, err := s.Engine.SetTaskStep(ctx, args.TaskID, args.StepID, args.FromStepID)
+	if err := validateAdeHandoverNotes(args.Notes); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.SetTaskStep(ctx, args.TaskID, args.StepID, args.FromStepID, args.Notes)
 	return t, adeTaskError(err)
 }
 

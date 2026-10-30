@@ -27,6 +27,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -45,7 +46,9 @@ const (
 
 // TaskBoardDeps is NewTaskBoard's construction seam.
 type TaskBoardDeps struct {
-	Tasks           *repos.AdeTaskRepo
+	Tasks *repos.AdeTaskRepo
+	// PromptSink receives the "move to next stage" prompt a finished handover raises; nil drops it.
+	PromptSink      prompts.Sink
 	Statuses        *repos.AdeStatusRepo
 	RepoConfig      *repos.AdeRepoConfigRepo
 	Facts           *repos.AdeFactsRepo
@@ -178,7 +181,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]agentmcp.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 	}
-	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts()})
+	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Handover: b, Prompts: b.prompts()})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)
@@ -346,6 +349,7 @@ type boardData struct {
 	setups     map[string]model.AdeWorktreeSetup
 	archived   []model.AdeTask
 	archBranch []model.AdeTaskBranch
+	handovers  map[string]repos.BoardHandover
 }
 
 func (b *TaskBoard) load() (boardData, error) {
@@ -375,7 +379,10 @@ func (b *TaskBoard) load() (boardData, error) {
 	if d.archived, err = b.deps.Tasks.ListArchived(); err != nil {
 		return d, err
 	}
-	d.archBranch, err = b.deps.Tasks.BranchesArchived()
+	if d.archBranch, err = b.deps.Tasks.BranchesArchived(); err != nil {
+		return d, err
+	}
+	d.handovers, err = b.deps.Tasks.BoardHandovers()
 	return d, err
 }
 
@@ -466,6 +473,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	for _, t := range d.tasks {
 		wt := b.toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
 		decorateTask(&wt, t, liveWf)
+		applyHandovers(&wt, d.handovers[t.ID])
 		tasks = append(tasks, wt)
 	}
 	b.badgeTasks(tasks)
@@ -519,6 +527,7 @@ func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
 		StatusID: t.StatusID, StatusBy: t.StatusBy,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
+		HandoverDrafts: []adewire.Handover{},
 	}
 	out.BranchIDs = append(out.BranchIDs, branchIDs...)
 	if t.JiraKey != "" || t.JiraURL != "" {

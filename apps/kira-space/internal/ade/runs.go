@@ -1031,6 +1031,7 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 		return
 	}
 	b.emitRuns(updated)
+	b.recordRunHandoverLocked(updated)
 	switch {
 	case loop != nil:
 		loop.queue(b)
@@ -1251,7 +1252,10 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 }
 
 // StepDone ends the current manual step: the task enters the next step, or finishes after the last.
-func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, error) {
+func (b *TaskBoard) StepDone(_ context.Context, taskID string, notes *string) (adewire.Task, error) {
+	if err := checkNotes(notes); err != nil {
+		return adewire.Task{}, err
+	}
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -1281,9 +1285,10 @@ func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, er
 	if i, more := nextStep(*tc.wf, cur); more {
 		next = tc.wf.Steps[i].ID
 	}
-	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil, nil); err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil, b.handoffFor(tc, plan[cur].Def.ID, next, notes)); err != nil {
 		return adewire.Task{}, err
 	}
+	b.closeHandoverPrompt(taskID)
 	b.syncStatus(taskID)
 	b.notifyBoard()
 	task, err := b.deps.Tasks.GetTask(taskID)
@@ -1295,7 +1300,10 @@ func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, er
 
 // SetTaskStep moves the task to any non-skipped step of its workflow, or to "done". The target and every
 // later step run fresh: their earlier runs stay as history. Refused while a run of the task is live.
-func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID string) (adewire.Task, error) {
+func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID string, notes *string) (adewire.Task, error) {
+	if err := checkNotes(notes); err != nil {
+		return adewire.Task{}, err
+	}
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -1312,7 +1320,8 @@ func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID st
 	if tc.wf == nil {
 		return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
 	}
-	if stepID == b.currentStepID(tc) {
+	from := b.currentStepID(tc)
+	if stepID == from {
 		return b.wireTask(tc.task)
 	}
 	running, err := b.deps.Tasks.HasRunning(taskID)
@@ -1348,9 +1357,10 @@ func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID st
 			}
 		}
 	}
-	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since, nil); err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since, b.handoffFor(tc, from, stepID, notes)); err != nil {
 		return adewire.Task{}, err
 	}
+	b.closeHandoverPrompt(taskID)
 	b.syncStatus(taskID)
 	b.clearStepMessages(taskID)
 	b.notifyBoard()

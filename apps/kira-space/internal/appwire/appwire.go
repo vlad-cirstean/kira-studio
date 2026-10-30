@@ -327,7 +327,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, runs, w.Agents)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, runs, w.Agents, w.Prompts)
 	runs.ADE = w.AdeBoard
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()

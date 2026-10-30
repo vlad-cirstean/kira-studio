@@ -148,6 +148,7 @@ func (b *TaskBoard) Start() {
 			b.goTracked(func() { b.reverifyRecovered(recovered) })
 		}
 		b.goTracked(b.launchAutomationHeld)
+		b.goTracked(b.reopenHandoverPrompts)
 		b.goTracked(func() { b.RunAllEnvScripts(b.ctx) })
 		folders, err := b.deps.RepoConfig.Folders()
 		if err != nil {
