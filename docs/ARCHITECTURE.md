@@ -2147,7 +2147,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - Headless runs execute via a login shell running claude -p with --output-format stream-json, --verbose, --session-id, --mcp-config and --setting-sources, cwd the worktree, prompt on stdin, using Setsid and procgroup.GracefulCancel; no --permission-mode and no --strict-mcp-config.
 - App setting ade.headlessSettingSources is either all (the default, meaning user,project,local) or user.
-- The finish_step MCP server (internal/agentmcp) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit.
+- The finish_step MCP server (internal/agentmcp) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit. Its summary is the run's handover (P407).
 - The per-run MCP config is <home>/ade/runs/<runId>.mcp.json with mode 0600, deleted at process exit; the token is never put on argv.
 - A grant with declared results (P247) gets its own per-run mcp.Server whose status enum is the result ids plus needs_input; implicit grants keep the shared servers and done|failed|needs_input.
 - suffix.go holds the text appended to the message; FinishStepSuffixFor(results) names the result ids, and the TS mirror is finishStepSuffix.
@@ -2312,6 +2312,7 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 | `git-credential` | `gitcred.Relay` (Space) | stream window key, else none |
 | `mobile-pairing` | `pairing.Broker` (Space) | none |
 | `update` | renderer, through `Raise` and `Dismiss` | the raising window |
+| `handover` | `ade.TaskBoard` (ref = task id) | none |
 
 - A prompt's routing target is the claimed window if still registered, else the origin window if registered, else the main window, else "" (queued).
 - The main window is shell.Registry.MainKey: the lowest open order, ties broken by key, never an ephemeral window.
@@ -2428,6 +2429,21 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Review entry rule (P240): board/reviewCode.ts reviewChoice hides (parked), disables with a reason (uncreated branch, ahead === 0) or enables each branch; useReviewCode is the one caller of OpenReviewWindow.
 - The ade.reviewCode command uses Cmd/Ctrl+Shift+R as a local binding with no accel.go row; a task with several branches shows a picker.
 - Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[]. A part with `kind: 'branch'` renders as `BranchChip` (git-branch Badge, the git graph ref-badge recipe); ADE builds branch-name parts with `branchParts`. `kind: 'path'` renders `PathChip` (folder icon, same Badge). Both share `ValueChip` (Badge + icon + truncating value).
+
+### Stage handover (P407)
+
+Stage = workflow step. A handover is text one stage leaves for the next. Table `ade_task_handovers` (migration 0057): one `handed` row per stage move, plus at most one open `draft` per (task, stage), enforced by a partial unique index.
+
+- Sources: `agent` (the `handover` tool), `run` (a finished run's summaries), `user` (notes typed in the stage dialog).
+- A draft is written by `TaskBoard.RecordHandover` (`ade/handover.go`). A stage move (`StepDone`, `SetTaskStep`) turns the draft into a handed row in the same transaction as `SetEntryStep`; `notes` replace the draft, empty notes drop it, nil keeps it. A move with no text records nothing.
+- Run handover: a step run that ends `done` while the route path now ends past the step inserts a handed `run` row (summaries joined, an open draft of the step folded in).
+- MCP tool `handover` (`notes`, `finished`, notes at most `agentmcp.MaxHandoverBytes` = 16 KiB) is granted to task sessions without a run (`TaskID != "" && RunID == ""`): manual step sessions, branch Start sessions and the review agent. Run grants report through `finish_step` instead.
+- `Grant.StepID` is the stage the session was opened for. The recorder refuses a call after the task moved on: "The task moved on to <name>; nothing was recorded. Tell the user." An empty `StepID` skips the check.
+- A `finished` draft on a live stage opens the routed prompt `handover` (ref = task id). It reopens at `Start()` and closes on a stage move, `DismissHandover`, draft delete and archive. `DismissHandover` keeps the draft and marks it dismissed.
+- Next-stage input: `handoverFor(tc, stepId)` returns the newest handed row only when its target is that stage. The step prompt gets Notes, Handover and HandoverFrom outside the `Message` block, so an edited Run dialog message keeps them; manual, review and start messages gain the same block (fragment `ade.handoverBlock`) and the tool line (`ade.handoverLine`).
+- Wire: `Task.handoverIn` (newest handed row), `Task.handoverDrafts`; `AdeTaskService.Handovers` (history), `UpdateHandover` (empty body deletes), `DismissHandover`; `StepDoneArgs.notes` and `SetTaskStepArgs.notes` (the mobile `POST /api/ade/tasks/step` passes `notes` through). Notes over the limit fail with `backend.space.ade.handoverTooLong.body`.
+- Frontend: `state/adeStageDialog.ts` (one store) drives `stage/AdeStageDialog.vue`. Every step move opens it: step mover, step block menu, task menu, the Done action and the routed `stage/AdeHandoverPrompt.vue`. Moving a manual step to its natural next stage calls `StepDone`; any other move calls `SetTaskStep` with `fromStepId`. `notes/AdeHandoverList.vue` lists drafts and history in the Notes tab and the archived panel. The session dialog's `compose.ts` mirrors the server's handover block and tool line.
+- Tests: flows/adeflow `TestStageHandover` (contract `ade-handover`) and tests/ui/ade-v2-handover.spec.ts.
 
 ### Tests
 
