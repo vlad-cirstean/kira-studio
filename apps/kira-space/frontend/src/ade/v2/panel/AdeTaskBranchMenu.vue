@@ -10,15 +10,12 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
-import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
-import { atRisk } from '../dialog/compose';
-import { blockedReason } from '../dialog/flow';
 import type { BranchRowModel } from '../plan/usePlanModel';
-import { useRemoveTaskBranch, useRemoveTaskRepo, useTaskBranchRisk } from '../queries';
+import { useRemoveTaskBranch, useRemoveTaskRepo } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import type { BranchRisk } from '../wire';
 import AdeTaskBranchForm from './AdeTaskBranchForm.vue';
+import { useDiscardGuard } from './useDiscardGuard';
 
 // Row menu of the Task tab: add or change the branch, change or remove the repo (P397).
 const props = defineProps<{
@@ -29,8 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{ error: [message: string] }>();
 
 const ui = useAdeBoardUiStore();
-const confirm = useConfirmDialogStore();
-const riskM = useTaskBranchRisk();
+const guard = useDiscardGuard();
 const removeBranch = useRemoveTaskBranch();
 const removeRepo = useRemoveTaskRepo();
 
@@ -43,53 +39,30 @@ function openForm(next: 'branch' | 'repo'): void {
   formOpen.value = true;
 }
 
-function riskText(risk: BranchRisk): string {
-  return [
-    risk.dirty.length
-      ? t('space.ade.agentDialog.riskUncommitted.label', { count: risk.dirty.length })
-      : '',
-    risk.unmerged ? t('space.ade.agentDialog.riskUnmerged.label', { count: risk.unmerged }) : '',
-  ]
-    .filter(Boolean)
-    .join(', ');
-}
-
 async function remove(what: 'branch' | 'repo'): Promise<void> {
   emit('error', '');
   const branchId = props.row.id;
-  const run = async (): Promise<void> => {
-    await (what === 'branch' ? removeBranch : removeRepo).mutateAsync({ branchId });
-    if (ui.selectedBranchId === branchId) ui.select(props.row.branch.taskId);
-  };
   try {
-    const risk = await riskM.mutateAsync({ branchId });
-    if (risk.blocked !== '') {
-      emit(
-        'error',
-        t('space.ade.taskTab.branchMenu.blocked.error', {
-          name: label.value,
-          reason: blockedReason(risk.blocked),
-        }),
-      );
-      return;
-    }
-    if (!atRisk(risk)) {
-      await run();
-      return;
-    }
-    await confirm.confirm({
-      tone: 'danger',
-      title:
-        what === 'branch'
-          ? t('space.ade.taskTab.branchMenu.removeBranchConfirm.title')
-          : t('space.ade.taskTab.branchMenu.removeRepoConfirm.title'),
-      message: t('space.ade.taskTab.branchMenu.removeConfirm.body', {
+    await guard(
+      {
+        branchId,
         name: label.value,
-        risk: [riskText(risk), ...risk.dirty.map((d) => d.path)].join(' · '),
-      }),
-      confirmLabel: t('common.action.remove.label'),
-      run,
-    });
+        title:
+          what === 'branch'
+            ? t('space.ade.taskTab.branchMenu.removeBranchConfirm.title')
+            : t('space.ade.taskTab.branchMenu.removeRepoConfirm.title'),
+        body: (risk) =>
+          t('space.ade.taskTab.branchMenu.leaveConfirm.body', { name: label.value, risk }),
+        confirmLabel: t('common.action.remove.label'),
+      },
+      async (discardChanges) => {
+        await (what === 'branch' ? removeBranch : removeRepo).mutateAsync({
+          branchId,
+          discardChanges,
+        });
+        if (ui.selectedBranchId === branchId) ui.select(props.row.branch.taskId);
+      },
+    );
   } catch (err) {
     emit('error', errorText(err));
   }

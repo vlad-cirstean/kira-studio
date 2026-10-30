@@ -8403,17 +8403,21 @@
           "changeBranch": {
             "label": "Change branch…"
           },
+          "changeBranchConfirm": {
+            "confirm": "Change branch",
+            "title": "Change branch?"
+          },
           "changeRepo": {
             "label": "Change repository…"
+          },
+          "leaveConfirm": {
+            "body": "{name} leaves the task and its worktree goes. The git branch stays. Lost with the worktree: {risk}."
           },
           "removeBranch": {
             "label": "Remove branch"
           },
           "removeBranchConfirm": {
             "title": "Remove branch from task?"
-          },
-          "removeConfirm": {
-            "body": "{name} leaves the task and its worktree goes. The git branch stays. Lost with the worktree: {risk}."
           },
           "removeRepo": {
             "label": "Remove repository"

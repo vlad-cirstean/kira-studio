@@ -21,7 +21,7 @@ import { useArchivedTask } from '../readQueries';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeArchiveUiStore } from '../state/adeArchiveUi';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import type { ArchivedBranch, ArchivedTask } from '../wire';
+import type { ArchivedBranch, ArchivedComment, ArchivedTask } from '../wire';
 import AdePanelFrame from './AdePanelFrame.vue';
 import { PR_TONE, prStateLabel } from './prState';
 
@@ -86,6 +86,17 @@ function kindLabel(b: ArchivedBranch): string {
   return b.kind === 'parked' ? t('space.ade.board.notMerging.label') : '';
 }
 
+function commentKind(c: ArchivedComment): string {
+  return c.kind === 'question'
+    ? t('space.ade.needs.kind.question.label')
+    : t('git.review.comments.kind.change.label');
+}
+function commentState(c: ArchivedComment): string {
+  return c.state === 'addressed'
+    ? t('git.review.comments.state.addressed.label')
+    : t('common.action.open.label');
+}
+
 function open(url: string, e: MouseEvent): void {
   e.preventDefault();
   fireAndForget(control.openExternal(url), 'ade.archived');
@@ -95,6 +106,7 @@ async function onRestore(): Promise<void> {
   restoreError.value = '';
   try {
     await restore.mutateAsync({ taskId: props.taskId });
+    if (archive.selectedTaskId === props.taskId) archive.select(null);
     boardUi.openTask(props.taskId);
   } catch (err) {
     restoreError.value = errorText(err);
@@ -280,8 +292,8 @@ async function onRestore(): Promise<void> {
                     <span class="min-w-0 truncate font-data"
                       >{{ c.path }}:{{ c.start }}{{ c.end > c.start ? `-${c.end}` : '' }}</span
                     >
-                    <span class="shrink-0">{{ c.kind }}</span>
-                    <span class="shrink-0">{{ c.state }}</span>
+                    <span class="shrink-0">{{ commentKind(c) }}</span>
+                    <span class="shrink-0">{{ commentState(c) }}</span>
                   </div>
                   <div class="whitespace-pre-wrap break-words">{{ c.body }}</div>
                   <div v-if="c.reply" class="whitespace-pre-wrap break-words text-muted-foreground"

@@ -7,7 +7,7 @@ import { computed, toValue } from 'vue';
 import { control } from '../../bridge/control';
 import { withMovedItem } from './backlogOrder';
 import {
-  archivedKey,
+  archivedTaskKey,
   backlogKey,
   boardKey,
   runSandboxKey,
@@ -37,6 +37,7 @@ import type {
   RebaseStart,
   RecordMergeArgs,
   RefreshArgs,
+  RemoveTaskRowArgs,
   RepoBranches,
   RepoBranchesArgs,
   RestartSessionArgs,
@@ -170,11 +171,15 @@ export function useUpdateTaskRepo() {
 }
 
 export function useRemoveTaskBranch() {
-  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRemoveTaskBranch(args) });
+  return useMutation({
+    mutationFn: (args: RemoveTaskRowArgs) => control.adeTaskRemoveTaskBranch(args),
+  });
 }
 
 export function useRemoveTaskRepo() {
-  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRemoveTaskRepo(args) });
+  return useMutation({
+    mutationFn: (args: RemoveTaskRowArgs) => control.adeTaskRemoveTaskRepo(args),
+  });
 }
 
 /** What removing a row's branch would discard; read fresh at click time, like the archive risk. */
@@ -431,16 +436,18 @@ export function useArchiveTask() {
   return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveTask(args) });
 }
 
-/** Unarchives a task; the board, sessions and archived reads refetch. */
+/** Unarchives a task; the board and sessions refetch and its archived read is dropped (the task
+ *  is live, so the read would fail). */
 export function useRestoreTask() {
   return useMutation({
     mutationFn: (args: TaskArgs) => control.adeTaskRestoreTask(args),
-    onSuccess: () =>
-      Promise.all([
+    onSuccess: (_task, args) => {
+      queryClient.removeQueries({ queryKey: archivedTaskKey(args.taskId), exact: true });
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: boardKey, exact: true }),
         queryClient.invalidateQueries({ queryKey: sessionsKey, exact: true }),
-        queryClient.invalidateQueries({ queryKey: archivedKey }),
-      ]),
+      ]);
+    },
   });
 }
 

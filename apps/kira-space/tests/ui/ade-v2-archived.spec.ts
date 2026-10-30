@@ -98,6 +98,8 @@ test('Restore sends the task id and opens it in the Plan', async ({ relaunch }) 
   );
   await expect(page.locator(t('ade-plan'))).toBeVisible();
   await expect(page.locator(t('ade-panel'))).toBeVisible();
+  await page.locator(t('ade-tab-archived')).click();
+  await expect(page.locator(t('ade-panel-empty'))).toBeVisible();
 });
 
 test('a refused Restore shows the error and stays on the archived view', async ({ relaunch }) => {

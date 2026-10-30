@@ -10,6 +10,7 @@ import { useProjectOptions } from '../../../repo/state/projectOptions';
 import { candidateOf, candidateOptions, newBranchError } from '../branchOptions';
 import { useCandidates, useSetTaskBranch, useUpdateTaskRepo } from '../queries';
 import type { Branch } from '../wire';
+import { useDiscardGuard } from './useDiscardGuard';
 
 // Popover of one task row: pick the row's branch (existing, or a typed new name) or its repo.
 const props = defineProps<{
@@ -34,14 +35,32 @@ const branches = computed(() =>
 );
 const projects = useProjectOptions(() => props.usedRepoIds);
 
+const guard = useDiscardGuard();
 const setBranch = useSetTaskBranch();
 const setRepo = useUpdateTaskRepo();
 
 async function submitBranch(name: string, existing: boolean): Promise<void> {
   error.value = '';
-  try {
-    await setBranch.mutateAsync({ branchId: props.branch.id, name, existing });
+  const branchId = props.branch.id;
+  const run = async (discardChanges: boolean): Promise<void> => {
+    await setBranch.mutateAsync({ branchId, name, existing, discardChanges });
     open.value = false;
+  };
+  try {
+    // A not-created row has no worktree to lose.
+    if (props.branch.name === '') await run(false);
+    else
+      await guard(
+        {
+          branchId,
+          name: props.branch.name,
+          title: t('space.ade.taskTab.branchMenu.changeBranchConfirm.title'),
+          body: (risk) =>
+            t('space.ade.taskTab.branchMenu.leaveConfirm.body', { name: props.branch.name, risk }),
+          confirmLabel: t('space.ade.taskTab.branchMenu.changeBranchConfirm.confirm'),
+        },
+        run,
+      );
   } catch (err) {
     error.value = errorText(err);
   }

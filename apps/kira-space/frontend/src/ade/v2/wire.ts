@@ -462,7 +462,7 @@ export interface ArchivedBranch {
   branchUrl: string;
   comments: ArchivedComment[];
 }
-interface ArchivedComment {
+export interface ArchivedComment {
   path: string;
   start: number;
   end: number;
@@ -773,6 +773,13 @@ export interface SetTaskBranchArgs {
   name: string;
   /** true = attach the git branch `name`; false = create a branch of that name. */
   existing: boolean;
+  /** true = delete uncommitted changes in the row's current worktree. */
+  discardChanges: boolean;
+}
+export interface RemoveTaskRowArgs {
+  branchId: string;
+  /** true = delete uncommitted changes in the row's worktree. */
+  discardChanges: boolean;
 }
 export interface UpdateTaskRepoArgs {
   branchId: string;
