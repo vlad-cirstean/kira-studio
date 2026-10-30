@@ -56,6 +56,30 @@ test('a card shows its step, progress, span and clamped title', async ({ relaunc
   expect(clamp).toEqual({ clamp: '2', overflow: 'hidden' });
 });
 
+test('the Plan shows 7 days; later work sits in Later with its date; no date control', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-load-all"]').click();
+  for (let k = 0; k <= 6; k++) await expect(bandOf(page, k)).toBeVisible();
+  await expect(bandOf(page, 7)).toHaveCount(0);
+  await expect(bandOf(page, 8)).toHaveCount(0);
+  const later = bandOf(page, 9999);
+  const ids = await later
+    .locator('[data-testid="ade-card"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-task-id')));
+  expect(ids.indexOf('T_alerts')).toBeGreaterThanOrEqual(0);
+  expect(ids.indexOf('T_alerts')).toBeLessThan(ids.indexOf('T_csv'));
+  await expect(card(page, 'T_alerts').locator('[data-testid="ade-card-meta"]')).toHaveText(
+    /^Tue 29 Sep · /,
+  );
+  await expect(card(page, 'T_csv').locator('[data-testid="ade-card-meta"]')).toHaveText(
+    /^Wed 30 Sep · /,
+  );
+  await expect(page.locator('[data-testid="ade-more-week"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-add-day"]')).toHaveCount(0);
+});
+
 test('branch rows show base markers and the derived branch tags', async ({ relaunch }) => {
   const board = adeFixture<BoardFx>('board');
   const deps = board.branches.find((b) => b.id === 'b_deps');

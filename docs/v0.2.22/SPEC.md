@@ -11,7 +11,7 @@ Source: user request. Phases run top to bottom.
 | P398 | One project picker and one branch picker across the app | Done |
 | P399 | Archived work stays viewable with all data | Done |
 | P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Done |
-| P401 | Task board: 7-day window, Later section, no date control | Todo |
+| P401 | Task board: 7-day window, Later section, no date control | Done |
 | P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Todo |
 | P403 | Chapter close | Todo |
 
@@ -48,6 +48,8 @@ Remove the delimiters between tasks in the same day. Change the board background
 ### P401 Task board: 7-day window, Later section, no date control
 
 Show only the next 7 days on the task board, unless work is scheduled later than that. Remove the date control that adds a new week. Work scheduled beyond the window sits in a Later section.
+
+**Result.** `WINDOW_DAYS = 7` in `timeline.ts`: bands 0..6, work from day 7 on joins Later (true date kept, hours summed, date prefix on card meta). `AdeDayControls`, `ade.horizonDays` and `ade.extraDays` removed (TS schema, Go model and repo, migration 0053 deletes stored rows). History-bar Go-to-date scrolls to Later past the window. Unit specs: 7-day window block, parity spec folds the mockup's later bands into Later; UI spec for the window. Full `test:unit`, `test:ui:space`, `test:visual:space`, `test:flows:space` and `lint:dead` pass; no baseline changes.
 
 ### P402 Agents panel: drop tab delimiter, center action buttons, remove click border flash
 
