@@ -1164,7 +1164,7 @@ var AdeHandoverBlock = define(Entry{
 	TitleKey:   "llmPrompts.entry.adeHandoverBlock.title",
 	PurposeKey: "llmPrompts.entry.adeHandoverBlock.description",
 	UsedByKey:  "llmPrompts.entry.adeHandoverBlock.usedBy.body",
-	Default:    `Handover from {{.HandoverFrom}}:
+	Default: `Handover from {{.HandoverFrom}}:
 {{.Handover}}`,
 }, HandoverBlockVars{HandoverFrom: "Design", Handover: "Form wired; validation still missing."})
 
