@@ -517,6 +517,53 @@ func (b *TaskBoard) SetPlan(_ context.Context, args adewire.SetPlanArgs) error {
 	return nil
 }
 
+// ShelveTask moves a task onto the Later or Backlog shelf, dropping its day. A review item stays on the Plan.
+func (b *TaskBoard) ShelveTask(_ context.Context, args adewire.ShelveTaskArgs) error {
+	if args.Shelf != adewire.ShelfLater && args.Shelf != adewire.ShelfBacklog {
+		return invalid("shelf must be %q or %q", adewire.ShelfLater, adewire.ShelfBacklog)
+	}
+	if args.BeforeID == args.TaskID {
+		return invalid("a task cannot go before itself")
+	}
+	mu := b.taskMu(args.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	t, err := b.deps.Tasks.GetTask(args.TaskID)
+	if err != nil {
+		return err
+	}
+	if t.ArchivedAt != nil {
+		return repos.ErrTaskNotFound
+	}
+	if t.Kind == model.AdeTaskKindReview {
+		return invalid("a review item stays on the Plan")
+	}
+	if err := b.deps.Tasks.Shelve(args.TaskID, args.Shelf == adewire.ShelfBacklog, args.BeforeID); err != nil {
+		if errors.Is(err, repos.ErrShelfTarget) {
+			return invalid("beforeId is not on the %s shelf", args.Shelf)
+		}
+		return err
+	}
+	b.notifyBoard()
+	return nil
+}
+
+// CaptureTask adds a repo-less, workflow-less task at the top of Later.
+func (b *TaskBoard) CaptureTask(_ context.Context, args adewire.CaptureTaskArgs) (adewire.Task, error) {
+	title := strings.TrimSpace(args.Title)
+	if title == "" {
+		return adewire.Task{}, invalid("title is required")
+	}
+	task, err := b.deps.Tasks.CaptureTask(model.AdeTask{
+		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: title, CreatedAt: b.deps.Now().UnixMilli(),
+	})
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	b.notifyBoard()
+	return b.wireTask(task)
+}
+
 // SetQueuedAfter orders a branch after another branch of the same repo; "" clears it.
 func (b *TaskBoard) SetQueuedAfter(_ context.Context, args adewire.SetQueuedAfterArgs) error {
 	live, err := b.deps.Tasks.BranchesLive()

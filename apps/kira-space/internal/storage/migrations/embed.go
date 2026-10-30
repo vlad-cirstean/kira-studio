@@ -70,6 +70,7 @@ var names = []sqlitex.MigrationSource{
 	{Version: 52, Name: "p399_ade_branch_change_request", File: "0052_p399_ade_branch_change_request.sql"},
 	{Version: 53, Name: "p401_ade_drop_horizon", File: "0053_p401_ade_drop_horizon.sql"},
 	{Version: 54, Name: "r1_ade_branch_review_comments", File: "0054_r1_ade_branch_review_comments.sql"},
+	{Version: 55, Name: "p405_ade_plan_backlog", File: "0055_p405_ade_plan_backlog.sql"},
 }
 
 // All returns every migration in ascending version order.

@@ -620,6 +620,34 @@ func (s *AdeTaskService) SetPlan(ctx context.Context, args adewire.SetPlanArgs) 
 	return adeTaskError(s.Engine.SetPlan(ctx, args))
 }
 
+// ShelveTask moves a task onto the Later or Backlog shelf.
+func (s *AdeTaskService) ShelveTask(ctx context.Context, args adewire.ShelveTaskArgs) error {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return err
+	}
+	if args.BeforeID != "" {
+		if err := validateAdeTaskID(args.BeforeID, "beforeId"); err != nil {
+			return err
+		}
+	}
+	if args.Shelf != adewire.ShelfLater && args.Shelf != adewire.ShelfBacklog {
+		return adeTaskInvalid("shelf must be later or backlog")
+	}
+	return adeTaskError(s.Engine.ShelveTask(ctx, args))
+}
+
+// CaptureTask adds a title-only task at the top of Later.
+func (s *AdeTaskService) CaptureTask(ctx context.Context, args adewire.CaptureTaskArgs) (adewire.Task, error) {
+	if strings.TrimSpace(args.Title) == "" {
+		return adewire.Task{}, adeTaskInvalid("title is required")
+	}
+	if err := validateAdeName(args.Title, "title"); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.CaptureTask(ctx, args)
+	return t, adeTaskError(err)
+}
+
 func (s *AdeTaskService) SetQueuedAfter(ctx context.Context, args adewire.SetQueuedAfterArgs) error {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
 		return err

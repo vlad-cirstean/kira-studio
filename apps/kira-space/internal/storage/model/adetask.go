@@ -132,11 +132,12 @@ func (b AdeTaskBranch) Validate() error {
 	return nil
 }
 
-// AdeTaskPlanRow is one row of ade_task_plan; Day nil = Later.
+// AdeTaskPlanRow is one row of ade_task_plan; Day nil = Later, or Backlog when Backlog is set.
 type AdeTaskPlanRow struct {
 	TaskID   string
 	Day      *string
 	Position int
+	Backlog  bool
 }
 
 // AdeRun is one row of ade_runs.

@@ -173,7 +173,7 @@ func (r *AdeBacklogRepo) Promote(id string, toTask model.AdeTask) (model.AdeTask
 	if n, _ := res.RowsAffected(); n == 0 {
 		return model.AdeTask{}, ErrBacklogGone
 	}
-	out, err := insertTask(tx, toTask, nil, nil)
+	out, err := insertTask(tx, toTask, nil, nil, false)
 	if err != nil {
 		return model.AdeTask{}, err
 	}

@@ -10,6 +10,7 @@ const plan: Plan = {
   order: ['a', 'b', 'c', 'd'],
   queuedAfter: {},
   unpushed: {},
+  backlog: [],
 };
 
 describe('movePlanArgs', () => {

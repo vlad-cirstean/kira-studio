@@ -1,0 +1,160 @@
+{
+  "AdeTaskService.Board#shelves": {
+    "autofetchMinutes": 0,
+    "branches": [
+      {
+        "addedAt": 0,
+        "ahead": 0,
+        "base": "main",
+        "baseBranchId": "",
+        "baseMissing": false,
+        "baseOwner": "",
+        "basePendingFrom": "",
+        "behind": 0,
+        "codeRepoId": "<id:1>",
+        "conflictCheck": "done",
+        "conflictCheckReason": "",
+        "conflictsIfRebased": [],
+        "deployments": [],
+        "dirty": [],
+        "id": "<id:2>",
+        "integration": [],
+        "kind": "mine",
+        "lastCommitAt": null,
+        "mergedAt": null,
+        "mergedIntoMain": false,
+        "name": "",
+        "origin": "",
+        "owner": "",
+        "rebaseInProgress": false,
+        "setup": null,
+        "taskId": "<id:3>",
+        "tip": "",
+        "upstream": "",
+        "upstreamAhead": 0,
+        "upstreamBehind": 0,
+        "worktree": ""
+      }
+    ],
+    "history": [],
+    "pairs": [],
+    "plan": {
+      "backlog": [
+        "<id:4>"
+      ],
+      "day": {},
+      "order": [
+        "<id:3>",
+        "<id:5>",
+        "<id:4>"
+      ],
+      "queuedAfter": {},
+      "unpushed": {}
+    },
+    "repos": [
+      {
+        "codeRepoId": "<id:1>",
+        "lastFetchAt": null,
+        "mainName": "main",
+        "remote": ""
+      }
+    ],
+    "statuses": [
+      {
+        "category": "todo",
+        "id": "todo",
+        "name": "To do",
+        "tone": "grey"
+      },
+      {
+        "category": "active",
+        "id": "in-progress",
+        "name": "In progress",
+        "tone": "amber"
+      },
+      {
+        "category": "review",
+        "id": "in-review",
+        "name": "In review",
+        "tone": "blue"
+      },
+      {
+        "category": "done",
+        "id": "done",
+        "name": "Done",
+        "tone": "green"
+      }
+    ],
+    "tasks": [
+      {
+        "branchIds": [
+          "<id:2>"
+        ],
+        "color": 0,
+        "createdAt": 0,
+        "entryStepId": "",
+        "est": "",
+        "hostLink": null,
+        "hostUrl": "",
+        "id": "<id:3>",
+        "jira": null,
+        "kind": "task",
+        "notes": "",
+        "owner": "",
+        "runs": [],
+        "since": {},
+        "statusBy": "auto",
+        "statusId": "todo",
+        "title": "planned",
+        "workflow": null,
+        "workflowId": "",
+        "workflowOutdated": false
+      },
+      {
+        "branchIds": [],
+        "color": 0,
+        "createdAt": 0,
+        "entryStepId": "",
+        "est": "",
+        "hostLink": null,
+        "hostUrl": "",
+        "id": "<id:5>",
+        "jira": null,
+        "kind": "task",
+        "notes": "",
+        "owner": "",
+        "runs": [],
+        "since": {},
+        "statusBy": "auto",
+        "statusId": "todo",
+        "title": "one",
+        "workflow": null,
+        "workflowId": "",
+        "workflowOutdated": false
+      },
+      {
+        "branchIds": [],
+        "color": 0,
+        "createdAt": 0,
+        "entryStepId": "",
+        "est": "",
+        "hostLink": null,
+        "hostUrl": "",
+        "id": "<id:4>",
+        "jira": null,
+        "kind": "task",
+        "notes": "",
+        "owner": "",
+        "runs": [],
+        "since": {},
+        "statusBy": "auto",
+        "statusId": "todo",
+        "title": "two",
+        "workflow": null,
+        "workflowId": "",
+        "workflowOutdated": false
+      }
+    ],
+    "worktreeBasePath": "<home>/wt"
+  }
+}

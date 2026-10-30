@@ -406,6 +406,7 @@ export interface Plan {
   order: string[] /* taskIds */;
   queuedAfter: Record<string, string> /* branchId -> branchId */;
   unpushed: Record<string, boolean>;
+  backlog: string[] /* Backlog shelf taskIds in order */;
 }
 export interface HistoryEntry {
   taskId: string;
@@ -818,6 +819,15 @@ export interface RefreshArgs {
 }
 export interface BranchArgs {
   branchId: string;
+}
+export type Shelf = 'later' | 'backlog';
+export interface ShelveTaskArgs {
+  taskId: string;
+  shelf: Shelf;
+  beforeId: string /* '' = end of the shelf */;
+}
+export interface CaptureTaskArgs {
+  title: string;
 }
 export interface AddBacklogItemArgs {
   text: string;

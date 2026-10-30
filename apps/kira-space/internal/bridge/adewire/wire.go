@@ -468,6 +468,8 @@ type Plan struct {
 	Order       []string          `json:"order"`
 	QueuedAfter map[string]string `json:"queuedAfter"`
 	Unpushed    map[string]bool   `json:"unpushed"`
+	// Backlog holds the Backlog shelf's task ids in order.
+	Backlog []string `json:"backlog"`
 }
 
 type HistoryEntry struct {
@@ -798,6 +800,24 @@ type RefreshArgs struct {
 
 type BranchArgs struct {
 	BranchID string `json:"branchId"`
+}
+
+// Shelf names are the targets of ShelveTask.
+const (
+	ShelfLater   = "later"
+	ShelfBacklog = "backlog"
+)
+
+// ShelveTaskArgs moves a task onto a shelf, right before BeforeID ("" = end of the shelf).
+type ShelveTaskArgs struct {
+	TaskID   string `json:"taskId"`
+	Shelf    string `json:"shelf"`
+	BeforeID string `json:"beforeId"`
+}
+
+// CaptureTaskArgs adds a title-only task at the top of Later.
+type CaptureTaskArgs struct {
+	Title string `json:"title"`
 }
 
 type AddBacklogItemArgs struct {

@@ -478,7 +478,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	}
 	b.badgeTasks(tasks)
 
-	plan := adewire.Plan{Day: map[string]string{}, Order: make([]string, 0, len(d.tasks)), QueuedAfter: map[string]string{}, Unpushed: map[string]bool{}}
+	plan := adewire.Plan{Day: map[string]string{}, Order: make([]string, 0, len(d.tasks)), QueuedAfter: map[string]string{}, Unpushed: map[string]bool{}, Backlog: []string{}}
 	live := make(map[string]bool, len(d.tasks))
 	for _, t := range d.tasks {
 		live[t.ID] = true
@@ -488,6 +488,9 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 			continue
 		}
 		plan.Order = append(plan.Order, p.TaskID)
+		if p.Backlog {
+			plan.Backlog = append(plan.Backlog, p.TaskID)
+		}
 		if p.Day != nil {
 			plan.Day[p.TaskID] = *p.Day
 		}

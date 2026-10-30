@@ -103,7 +103,7 @@ export function mkRun(over: Partial<Run> & Pick<Run, 'taskId' | 'stepId' | 'bran
 }
 
 export function mkPlan(over: Partial<Plan> = {}): Plan {
-  return { day: {}, order: [], queuedAfter: {}, unpushed: {}, ...over };
+  return { day: {}, order: [], queuedAfter: {}, unpushed: {}, backlog: [], ...over };
 }
 
 export function mkStep(over: Partial<WorkflowStep> & Pick<WorkflowStep, 'id'>): WorkflowStep {
