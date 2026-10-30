@@ -123,6 +123,12 @@ type RepoLineVars struct {
 	ReadOnlyRoot string `json:"readOnlyRoot"`
 }
 
+// HandoverBlockVars fills the handover block fragment.
+type HandoverBlockVars struct {
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
+}
+
 // JiraLineVars fills the Jira line.
 type JiraLineVars struct {
 	JiraKey string `json:"jiraKey"`
@@ -147,6 +153,11 @@ type StepVars struct {
 	Context    []string   `json:"context"`
 	Space      bool       `json:"space"`
 	Finish     FinishVars `json:"finish"`
+	// Notes are the task notes; Handover is what the previous stage left, HandoverFrom its stage name.
+	// All arrive capped and outside Message, so a Run dialog edit keeps them.
+	Notes        string `json:"notes"`
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // ManualVars fills the manual step message. StepPrompt arrives substituted; Notes arrive capped.
@@ -158,6 +169,9 @@ type ManualVars struct {
 	Notes      string         `json:"notes"`
 	Repos      []RepoLineVars `json:"repos"`
 	StepPrompt string         `json:"stepPrompt"`
+	// Handover is what the previous stage left, HandoverFrom its stage name; both capped.
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // ReviewVars fills the review message. Notes arrive capped.
@@ -167,6 +181,9 @@ type ReviewVars struct {
 	JiraURL string         `json:"jiraURL"`
 	Notes   string         `json:"notes"`
 	Repos   []RepoLineVars `json:"repos"`
+	// Handover is what the previous stage left, HandoverFrom its stage name; both capped.
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // StartVars fills the Start message; StepName is empty when the workflow has no open step.
@@ -180,6 +197,9 @@ type StartVars struct {
 	ReadOnlyRoot string   `json:"readOnlyRoot"`
 	StepName     string   `json:"stepName"`
 	Context      []string `json:"context"`
+	// Handover is what the previous stage left, HandoverFrom its stage name; both capped.
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // RebaseContextVars fills the line about a branch whose last rebase did not finish.
@@ -996,7 +1016,11 @@ Step {{.StepNumber}}/{{.StepCount}}: {{.StepName}}{{if .StepPrompt}}
 
 {{.Extra}}{{end}}{{if .Context}}
 
-{{join .Context "\n"}}{{end}}{{if .Space}}
+{{join .Context "\n"}}{{end}}{{if .Notes}}
+
+- Notes: {{.Notes}}{{end}}{{if .Handover}}
+
+{{template "ade.handoverBlock" .}}{{end}}{{if .Space}}
 
 {{template "headless.space.suffix"}}{{end}}
 
@@ -1007,6 +1031,7 @@ Step {{.StepNumber}}/{{.StepCount}}: {{.StepName}}{{if .StepPrompt}}
 	Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login",
 	StepNumber: 2, StepCount: 5, StepName: "Implement", StepPrompt: "Implement the task in the worktree.",
 	Context: []string{}, Finish: FinishVars{Implicit: true, Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}},
+	Notes: "Check the error states.", Handover: "Form wired; validation still missing.", HandoverFrom: "Design",
 })
 
 // AdeManualMessage is the first message of a manual step session.
@@ -1019,10 +1044,13 @@ var AdeManualMessage = define(Entry{
 {{template "ade.jiraLine" .}}{{end}}{{range .Repos}}
 {{template "ade.repoLine" .}}{{end}}{{if .Notes}}
 - Notes: {{.Notes}}{{end}}{{if .StepPrompt}}
-{{.StepPrompt}}{{end}}`,
+{{.StepPrompt}}{{end}}{{if .Handover}}
+{{template "ade.handoverBlock" .}}{{end}}
+{{template "ade.handoverLine"}}`,
 }, ManualVars{
 	StepName: "Review", Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Notes: "Check the error states.", StepPrompt: "Check kira-space on feat/login.",
+	Handover: "Form wired; validation still missing.", HandoverFrom: "Implement",
 	Repos: []RepoLineVars{
 		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
@@ -1039,10 +1067,12 @@ var AdeReviewMessage = define(Entry{
 {{template "ade.jiraLine" .}}{{end}}{{if .Notes}}
 - Notes: {{.Notes}}{{end}}{{range .Repos}}
 {{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{end}}
-I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.`,
+I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.{{if .Handover}}
+{{template "ade.handoverBlock" .}}{{end}}
+{{template "ade.handoverLine"}}`,
 }, ReviewVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
-	Notes: "Check the error states.",
+	Notes: "Check the error states.", Handover: "Form wired; validation still missing.", HandoverFrom: "Implement",
 	Repos: []RepoLineVars{
 		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
@@ -1119,12 +1149,33 @@ var AdeStartMessage = define(Entry{
 {{template "ade.jiraLine" .}}{{end}}
 {{template "ade.repoLine" .}}{{if .StepName}}
 Step: {{.StepName}}{{end}}{{range .Context}}
-{{.}}{{end}}`,
+{{.}}{{end}}{{if .Handover}}
+{{template "ade.handoverBlock" .}}{{end}}
+{{template "ade.handoverLine"}}`,
 }, StartVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", StepName: "Implement",
-	Context: []string{},
+	Context: []string{}, Handover: "Form wired; validation still missing.", HandoverFrom: "Design",
 })
+
+// AdeHandoverBlock is what the previous stage left for the next one.
+var AdeHandoverBlock = define(Entry{
+	ID: "ade.handoverBlock", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeHandoverBlock.title",
+	PurposeKey: "llmPrompts.entry.adeHandoverBlock.description",
+	UsedByKey:  "llmPrompts.entry.adeHandoverBlock.usedBy.body",
+	Default:    `Handover from {{.HandoverFrom}}:
+{{.Handover}}`,
+}, HandoverBlockVars{HandoverFrom: "Design", Handover: "Form wired; validation still missing."})
+
+// AdeHandoverLine tells an interactive session to leave notes for the next stage.
+var AdeHandoverLine = define(Entry{
+	ID: "ade.handoverLine", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeHandoverLine.title",
+	PurposeKey: "llmPrompts.entry.adeHandoverLine.description",
+	UsedByKey:  "llmPrompts.entry.adeHandoverLine.usedBy.body",
+	Default:    `Call handover with notes for the next stage. Set finished true when this stage's work is done.`,
+}, NoVars{})
 
 // AdeRepoLine is one repository line of a launch message.
 var AdeRepoLine = define(Entry{

@@ -583,10 +583,12 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		case smart != nil:
 			prompt = smart.prompt
 		default:
+			ho := b.handoverFor(tc, def.ID)
 			prompt = composePrompt(b.prompts(), promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: stepN, Of: stepOf, Def: def, Message: b.stepMessage(tc.task.ID, def.ID), Extra: spec.Extra,
 				Space: b.spaceEnabled(tc.task), Context: b.rebaseContext(tc),
+				Notes: tc.task.Notes, Handover: ho.Body, HandoverFrom: ho.From,
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{

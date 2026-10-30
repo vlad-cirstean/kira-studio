@@ -1,0 +1,5 @@
+Task: Add login form
+- Repo: kira-space · Branch: feat/a · Worktree: /wt/kira-space/feat-a
+Handover from Design:
+Form wired; validation missing.
+Call handover with notes for the next stage. Set finished true when this stage's work is done.

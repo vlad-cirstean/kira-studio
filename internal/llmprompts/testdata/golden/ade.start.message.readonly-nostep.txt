@@ -1,2 +1,3 @@
 Task: Add login form
 - Repo: docs (read only, in /repos/docs)
+Call handover with notes for the next stage. Set finished true when this stage's work is done.

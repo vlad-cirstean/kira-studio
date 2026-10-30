@@ -5417,6 +5417,20 @@
       "body": "The default text changed after this edit was saved. Review the diff."
     },
     "entry": {
+      "adeHandoverBlock": {
+        "description": "The handover text the previous stage left for the next one, under a heading that names that stage.",
+        "title": "Handover block",
+        "usedBy": {
+          "body": "Included in the step, manual step, review and start messages when the task has a handover for the stage."
+        }
+      },
+      "adeHandoverLine": {
+        "description": "Tells an interactive session to call the handover tool with notes for the next stage.",
+        "title": "Handover instruction",
+        "usedBy": {
+          "body": "Ends the manual step, review and start messages."
+        }
+      },
       "adeJiraLine": {
         "description": "The Jira key and link line of a launch message.",
         "title": "Jira line",

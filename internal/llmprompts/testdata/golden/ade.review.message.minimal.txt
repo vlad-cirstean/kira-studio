@@ -1,3 +1,4 @@
 Task: Add login form
 - kira-space: feat/a (base main) worktree /wt/kira-space/feat-a
 I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.
+Call handover with notes for the next stage. Set finished true when this stage's work is done.

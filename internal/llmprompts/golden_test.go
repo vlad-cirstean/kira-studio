@@ -68,6 +68,10 @@ func TestGolden(t *testing.T) {
 			}
 			v.Space = true
 		})},
+		{"ade.step.prompt.notes-handover-message", AdeStepPrompt.id, step(func(v *StepVars) {
+			v.Message = "Do the thing for Add login form."
+			v.Notes, v.Handover, v.HandoverFrom = "Check the error states.", "Form wired; validation missing.", "Design"
+		})},
 		{"ade.step.prompt.declared-results", AdeStepPrompt.id, step(func(v *StepVars) { v.Finish = declared })},
 		{"ade.step.prompt.empty-step-prompt", AdeStepPrompt.id, step(func(v *StepVars) { v.StepPrompt, v.StepNumber, v.StepCount = "", 1, 1 })},
 
@@ -75,12 +79,19 @@ func TestGolden(t *testing.T) {
 			StepName: "Review", Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: repos,
 			StepPrompt: "Check kira-space on feat/a in /wt/kira-space/feat-a for Add login form.",
 		}},
+		{"ade.manual.message.handover", AdeManualMessage.id, ManualVars{
+			StepName: "Review", Title: "Add login form", Repos: repos[:1], Handover: "Form wired; validation missing.", HandoverFrom: "Implement",
+		}},
 		{"ade.manual.message.minimal", AdeManualMessage.id, ManualVars{StepName: "Plan", Title: "Add login form", Repos: repos[:1]}},
 		{"ade.review.message.full", AdeReviewMessage.id, ReviewVars{Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: repos}},
 		{"ade.review.message.minimal", AdeReviewMessage.id, ReviewVars{Title: "Add login form", Repos: repos[:1]}},
 		{"ade.start.message.step", AdeStartMessage.id, StartVars{
 			Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Repo: "kira-space", Branch: "feat/a",
 			Worktree: "/wt/kira-space/feat-a", StepName: "Implement", Context: startCtx,
+		}},
+		{"ade.start.message.handover", AdeStartMessage.id, StartVars{
+			Title: "Add login form", Repo: "kira-space", Branch: "feat/a", Worktree: "/wt/kira-space/feat-a",
+			Handover: "Form wired; validation missing.", HandoverFrom: "Design",
 		}},
 		{"ade.start.message.readonly-nostep", AdeStartMessage.id, StartVars{Title: "Add login form", Repo: "docs", ReadOnlyRoot: "/repos/docs"}},
 		{"ade.rebase.contextLine.failed", AdeRebaseContextLine.id, RebaseContextVars{Branch: "feat/login", Outcome: "failed", Reason: "conflicts in a.go", RunID: "run-7"}},

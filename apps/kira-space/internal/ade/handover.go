@@ -184,6 +184,18 @@ func (b *TaskBoard) runSummaries(tc *taskCtx, v stepView) string {
 	return strings.Join(lines, "\n")
 }
 
+// handoverText is a handover as a prompt carries it: the stage it came from and its body.
+type handoverText struct{ Body, From string }
+
+// handoverFor is the text the next session of stepID gets, empty when the latest stage move went elsewhere.
+func (b *TaskBoard) handoverFor(tc *taskCtx, stepID string) handoverText {
+	h := b.handoverInto(tc.task.ID, stepID)
+	if h == nil {
+		return handoverText{}
+	}
+	return handoverText{Body: h.Body, From: cmpNonEmpty(h.FromStepName, h.FromStepID)}
+}
+
 // handoverInto is the handover the task's latest stage move left for stepID; nil when the latest move
 // went elsewhere. One rule for the prompts the server builds and the preview the client shows.
 func (b *TaskBoard) handoverInto(taskID, stepID string) *model.AdeHandover {

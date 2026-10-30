@@ -3,3 +3,4 @@ Task: Add login form
 - Repo: kira-space · Branch: feat/a · Worktree: /wt/kira-space/feat-a
 Step: Implement
 - Last rebase of feat/a failed: conflicts (run r1; call run_outcome for details)
+Call handover with notes for the next stage. Set finished true when this stage's work is done.
