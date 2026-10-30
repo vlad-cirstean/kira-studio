@@ -15,7 +15,7 @@ export const backlogKey = ['adetask', 'backlog'] as const;
 export const runSandboxKey = ['ade', 'runSandbox'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 export const repoNamesKey = ['adetask', 'repoNames'] as const;
-export const archivedKey = ['adetask', 'archived'] as const;
+const archivedKey = ['adetask', 'archived'] as const;
 export const archivedTaskKey = (taskId: string) => [...archivedKey, taskId] as const;
 const hostProvidersKey = ['adetask', 'hostProviders'] as const;
 
