@@ -5520,6 +5520,13 @@
           "body": "Ends every ADE step prompt and every resumed step message."
         }
       },
+      "headlessHandoverAck": {
+        "description": "The reply to a handover call.",
+        "title": "Handover result",
+        "usedBy": {
+          "body": "Returned to the agent after it records handover notes."
+        }
+      },
       "headlessRebaseReportSuffix": {
         "description": "Tells the rebase agent to run git only through the git tool and how to report with finish_step.",
         "title": "Rebase report instruction",

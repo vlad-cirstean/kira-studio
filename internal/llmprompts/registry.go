@@ -928,6 +928,26 @@ var (
 	_ = arg(HeadlessToolRunOutcome.id, "limit", spaceApp, NextCall, `How many runs, 1 to {{.Max}}. Default 3.`, MaxVars{Max: 10})
 )
 
+// HeadlessToolHandover describes the handover tool.
+var HeadlessToolHandover = define(Entry{
+	ID: "headless.tool.handover", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "handover",
+	Default: `Leave notes for the next stage of this task. Call it when you did work the next stage must know about; again to replace the notes.`,
+}, NoVars{})
+
+var (
+	_ = arg(HeadlessToolHandover.id, "notes", spaceApp, NextCall, `What you did, what is left, what the next stage must know. Plain text, at most {{.Max}} bytes.`, MaxVars{Max: 16384})
+	_ = arg(HeadlessToolHandover.id, "finished", spaceApp, NextCall, `true when your stage's work is done: Kira Space then offers the user to move the task on. Default false.`, NoVars{})
+)
+
+// HeadlessHandoverAck is the reply to a handover call.
+var HeadlessHandoverAck = define(Entry{
+	ID: "headless.handover.ack", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessHandoverAck.title",
+	PurposeKey: "llmPrompts.entry.headlessHandoverAck.description",
+	UsedByKey:  "llmPrompts.entry.headlessHandoverAck.usedBy.body",
+	Default:    `Recorded. The user moves the task on.`,
+}, NoVars{})
+
 // HeadlessToolGit describes the git tool.
 var HeadlessToolGit = define(Entry{
 	ID: "headless.tool.git", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "git",

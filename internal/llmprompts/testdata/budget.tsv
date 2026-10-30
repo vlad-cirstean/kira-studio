@@ -94,6 +94,10 @@ headless.tool.run_outcome.arg.runId	45
 headless.tool.run_outcome.arg.branch	30
 headless.tool.run_outcome.arg.kind	88
 headless.tool.run_outcome.arg.limit	34
+headless.tool.handover	130
+headless.tool.handover.arg.notes	91
+headless.tool.handover.arg.finished	104
+headless.handover.ack	37
 headless.tool.git	325
 headless.tool.git.arg.worktree	36
 headless.tool.git.arg.args	93

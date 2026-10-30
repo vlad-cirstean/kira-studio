@@ -11,6 +11,7 @@ var (
 	RunOutcome  = harness.MCPTool{Server: ServerName, Tool: "run_outcome"}
 	Git         = harness.MCPTool{Server: ServerName, Tool: "git"}
 	ReviewReply = harness.MCPTool{Server: ServerName, Tool: "reply_review_comment"}
+	Handover    = harness.MCPTool{Server: ServerName, Tool: "handover"}
 
 	// SpaceToolIDs are the Kira Space tools; a headless run and a TUI launch pass them next to
 	// finish_step when the workflow turns the tools on.
