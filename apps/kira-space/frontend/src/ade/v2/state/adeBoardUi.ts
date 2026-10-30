@@ -60,6 +60,13 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     revealSessionId.value = e.sessionId;
   }
 
+  /** Opens the Plan on the task's Sessions tab. */
+  function openSessions(taskId: string): void {
+    view.value = 'plan';
+    select(taskId);
+    taskTab.value = 'sessions';
+  }
+
   function toggleRepo(codeRepoId: string): void {
     hiddenRepoIds.value = hiddenRepoIds.value.includes(codeRepoId)
       ? hiddenRepoIds.value.filter((id) => id !== codeRepoId)
@@ -87,6 +94,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     selectBranch,
     openTask,
     openSession,
+    openSessions,
     toggleRepo,
   };
 });

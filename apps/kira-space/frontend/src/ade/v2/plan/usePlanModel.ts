@@ -30,6 +30,7 @@ import {
 } from '../board/progress';
 import { blocked as isBlocked, statusOf } from '../board/status';
 import { buildStepBlocks, type StepBlock } from '../board/stepBlocks';
+import { type TaskSessions, taskSessionsOf } from '../board/taskSessions';
 import {
   buildTimeline,
   type Ripple,
@@ -93,6 +94,8 @@ export interface CardModel {
   meta: string;
   attention: string;
   attentionItem: NeedsItem | null;
+  /** The task's agent sessions as one state, `null` when it has none. */
+  sessions: TaskSessions | null;
   rows: BranchRowModel[];
   review: boolean;
   parked: boolean;
@@ -212,6 +215,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     meta: cardMeta(c, entry, task, branches),
     attention: needsOf?.what ?? '',
     attentionItem: needsOf ?? null,
+    sessions: taskSessionsOf(sessions),
     rows: c.view.branchRows(id).map(({ id: bid, depth }) => buildRow(c, task, bid, depth)),
     review: task.kind === 'review',
     parked: task.kind === 'parked',

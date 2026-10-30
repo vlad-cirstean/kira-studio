@@ -95,6 +95,21 @@ test('branch status tags keep their tones', async ({ relaunch }) => {
   expect(tags.some((x) => x.tone === 'blue')).toBe(true);
 });
 
+test('a card shows its agent sessions as one state; click opens the Sessions tab', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  const state = (id: string) => card(page, id).locator('[data-testid="ade-card-sessions"]');
+  await expect(state('T_bill')).toHaveAttribute('data-state', 'input');
+  await expect(state('T_hooks')).toHaveAttribute('data-state', 'running');
+  await expect(state('T_hooks')).toContainText('2');
+  await expect(state('T_notif')).toHaveAttribute('data-state', 'running');
+  await expect(state('T_notif')).not.toContainText('1');
+  await expect(state('T_cart')).toHaveAttribute('data-state', 'finished');
+  await state('T_hooks').click();
+  await expect(page.locator('[data-testid="ade-sessions-tab"]')).toBeVisible();
+});
+
 test('a card shows its step, progress, span and clamped title', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const search = card(page, 'T_search');

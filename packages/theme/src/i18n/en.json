@@ -7769,6 +7769,15 @@
           },
           "open": {
             "aria": "Open {title}"
+          },
+          "sessionsFinished": {
+            "tooltip": "Agent finished, no session working"
+          },
+          "sessionsInput": {
+            "tooltip": "An agent needs your input"
+          },
+          "sessionsRunning": {
+            "tooltip": "{count} agent session running | {count} agent sessions running"
           }
         },
         "header": {

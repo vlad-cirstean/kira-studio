@@ -30,6 +30,7 @@ import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchRow from './AdeBranchRow.vue';
+import AdeTaskSessions from './AdeTaskSessions.vue';
 import { type BranchRowModel, type CardModel, usePlanModel } from './usePlanModel';
 import { useTaskMenu } from './useTaskMenu';
 
@@ -188,6 +189,7 @@ const boxClass = computed(() => {
               </span>
             </AdeTip>
           </template>
+          <AdeTaskSessions v-if="card.sessions" :task-id="card.task.id" :sessions="card.sessions" />
           <AdeAttention v-if="card.attention" :tip="card.attention" :item="card.attentionItem" />
           <AdeAutomationChip :task-id="card.task.id" />
           <AdeTip :text="card.meta">
