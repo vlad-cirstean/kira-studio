@@ -3,9 +3,10 @@ import { errorText } from '@workbench/bridge/codedError';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import type { TaskAction } from '../board/actions';
 import type { CardModel } from '../plan/usePlanModel';
-import { useApprove, useRetryRun, useStartRun, useStepDone } from '../queries';
+import { useApprove, useRetryRun, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
+import { useAdeStageDialogStore } from '../state/adeStageDialog';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 
 /** The task's rendered step action and the call behind it. */
@@ -16,7 +17,7 @@ export function useTaskAction(card: MaybeRefOrGetter<CardModel>) {
   const start = useStartRun();
   const approve = useApprove();
   const retry = useRetryRun();
-  const done = useStepDone();
+  const stage = useAdeStageDialogStore();
 
   const action = computed<TaskAction | null>(() => toValue(card).action);
 
@@ -43,7 +44,7 @@ export function useTaskAction(card: MaybeRefOrGetter<CardModel>) {
           ?.runs.filter((r) => r.state === 'failed' || r.state === 'stuck');
         await Promise.all((runs ?? []).map((r) => retry.mutateAsync({ runId: r.runId })));
       } else {
-        await done.mutateAsync({ taskId });
+        stage.open({ taskId });
       }
     } catch (err) {
       ui.actionError[taskId] = errorText(err);

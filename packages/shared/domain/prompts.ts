@@ -9,6 +9,7 @@ export const promptKindSchema = /*#__PURE__*/ z.enum([
   'mobile-pairing',
   'update',
   'quit',
+  'handover',
 ]);
 export type PromptKind = z.infer<typeof promptKindSchema>;
 

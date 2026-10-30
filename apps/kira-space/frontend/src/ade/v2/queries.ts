@@ -49,9 +49,11 @@ import type {
   StartBranchArgs,
   StartRunArgs,
   StepArgs,
+  StepDoneArgs,
   TakeOverArgs,
   Task,
   TaskArgs,
+  UpdateHandoverArgs,
   UpdateTaskArgs,
   UpdateTaskRepoArgs,
   ValidateWorkflowYamlArgs,
@@ -73,6 +75,7 @@ export {
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 const candidatesKey = (codeRepoId: string) => ['adetask', 'candidates', codeRepoId] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
+export const handoversPrefix = ['adetask', 'handovers'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
 
@@ -343,7 +346,7 @@ export function useResumeRun() {
 }
 
 export function useStepDone() {
-  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStepDone(args) });
+  return useMutation({ mutationFn: (args: StepDoneArgs) => control.adeTaskStepDone(args) });
 }
 
 /** Applies a step move to a board snapshot; the backend's push reconciles the run-derived fields. */
@@ -432,6 +435,24 @@ export function useReviewAgent(taskId: MaybeRefOrGetter<string>) {
     queryKey: ['adetask', 'reviewAgent', taskId] as const,
     queryFn: () => control.adeTaskReviewAgent({ taskId: toValue(taskId) }),
   });
+}
+
+/** The task's handover history, newest first; a board push refetches it. */
+export function useHandovers(taskId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...handoversPrefix, taskId] as const,
+    queryFn: () => control.adeTaskHandovers({ taskId: toValue(taskId) }),
+  });
+}
+
+export function useUpdateHandover() {
+  return useMutation({
+    mutationFn: (args: UpdateHandoverArgs) => control.adeTaskUpdateHandover(args),
+  });
+}
+
+export function useDismissHandover() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskDismissHandover(args) });
 }
 
 /** A branch's review step for its review window; the review, board and runs pushes refetch it. */

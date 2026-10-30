@@ -16,12 +16,13 @@ import { taskPatch } from '../board/panelFacts';
 import { reviewChoices } from '../board/reviewCode';
 import { shelfIds } from '../board/shelf';
 import { useHostLabels } from '../hostLabels';
-import { useSetPlan, useSetTaskStep, useShelveTask, useStopRun, useUpdateTask } from '../queries';
+import { useSetPlan, useShelveTask, useStopRun, useUpdateTask } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useTaskAction } from '../run/useTaskAction';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
+import { useAdeStageDialogStore } from '../state/adeStageDialog';
 import { type CardModel, usePlanModel } from './usePlanModel';
 
 /** The card box is not focusable; its header is. */
@@ -38,7 +39,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const { model, today, sessions } = usePlanModel();
   const { view } = useSessionViews();
   const { perform } = useTaskAction(card);
-  const setStep = useSetTaskStep();
+  const stage = useAdeStageDialogStore();
   const setPlan = useSetPlan();
   const shelve = useShelveTask();
   const stopRun = useStopRun();
@@ -63,8 +64,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
         case 'action':
           return await perform();
         case 'moveStep':
-          await setStep.mutateAsync({ taskId, stepId: cmd.stepId });
-          return;
+          return stage.open({ taskId, toStepId: cmd.stepId });
         case 'setStatus':
           await update.mutateAsync({ taskId, patch: taskPatch({ statusId: cmd.statusId }) });
           return;
