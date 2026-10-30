@@ -32,9 +32,6 @@ const ACTION_VARIANT: Record<BranchAction['kind'], 'dialog' | 'dialog-danger'> =
   seeError: 'dialog-danger',
   start: 'dialog',
 };
-const tone = computed(() =>
-  !props.row || props.tag.tone === 'red' || props.tag.tone === 'amber' ? props.tag.tone : 'grey',
-);
 const TESTID: Record<BranchAction['kind'], string> = {
   forcePush: 'ade-force-push',
   rebase: 'ade-rebase',
@@ -55,10 +52,20 @@ const TESTID: Record<BranchAction['kind'], string> = {
     data-testid="ade-action-cell"
   >
     <AdeBranchTip v-if="row" :row="row" :color="color ?? null">
-      <AdeChip :label="label" :tone="tone" class="max-w-30 shrink truncate" data-testid="ade-tag" />
+      <AdeChip
+        :label="label"
+        :tone="tag.tone"
+        class="max-w-30 shrink truncate"
+        data-testid="ade-tag"
+      />
     </AdeBranchTip>
     <AdeTip v-else :text="tag.tip" :parts="tag.tipParts">
-      <AdeChip :label="label" :tone="tone" class="max-w-30 shrink truncate" data-testid="ade-tag" />
+      <AdeChip
+        :label="label"
+        :tone="tag.tone"
+        class="max-w-30 shrink truncate"
+        data-testid="ade-tag"
+      />
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.act?.id ?? a.kind" :text="a.tip" :parts="a.tipParts">
       <TooltipDisabledTrigger :disabled="a.disabled === true">

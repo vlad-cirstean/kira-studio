@@ -11,6 +11,7 @@ defineProps<{ label: string; tone: Tone; wide?: boolean }>();
   <Badge
     variant="chip"
     :class="[TONE_TAG_CLASS[tone], wide ? 'min-w-21 justify-center' : '']"
+    :data-tone="tone"
     data-testid="ade-chip"
     >{{
       label

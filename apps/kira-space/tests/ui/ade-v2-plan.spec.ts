@@ -77,6 +77,24 @@ test('weekend bands carry the hatched pattern; workdays do not', async ({ relaun
   expect(await image(bandOf(page, 0))).toBe('none');
 });
 
+test('branch status tags keep their tones', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const tags = await page
+    .locator('[data-testid="ade-branch-row"] [data-testid="ade-tag"]')
+    .evaluateAll((els) =>
+      els.map((el) => ({
+        text: (el.textContent ?? '').trim(),
+        tone: el.getAttribute('data-tone'),
+      })),
+    );
+  const toneOf = (text: string) => tags.filter((x) => x.text === text).map((x) => x.tone);
+  expect(toneOf('Merged').length).toBeGreaterThan(0);
+  expect(new Set(toneOf('Merged'))).toEqual(new Set(['purple']));
+  expect(toneOf('Clean').length).toBeGreaterThan(0);
+  expect(new Set(toneOf('Clean'))).toEqual(new Set(['green']));
+  expect(tags.some((x) => x.tone === 'blue')).toBe(true);
+});
+
 test('a card shows its step, progress, span and clamped title', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const search = card(page, 'T_search');
