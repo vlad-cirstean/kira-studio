@@ -34,7 +34,7 @@ test('loads the archived history into the day bands', async ({ relaunch }) => {
   const load = page.locator('[data-testid="ade-load-history"]');
   await expect(load).toContainText('History');
   await load.hover();
-  await expect(page.getByRole('tooltip').first()).toContainText(
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     '5 archived tasks in the last 2 weeks',
   );
   await load.click();
@@ -79,8 +79,11 @@ test('weekend bands carry the hatched pattern; workdays do not', async ({ relaun
 
 test('branch status tags keep their tones', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-load-all"]').click();
   const tags = await page
-    .locator('[data-testid="ade-branch-row"] [data-testid="ade-tag"]')
+    .locator(
+      '[data-testid="ade-task-cells"] [data-testid="ade-action-cell"]:not(:first-child) [data-testid="ade-tag"]',
+    )
     .evaluateAll((els) =>
       els.map((el) => ({
         text: (el.textContent ?? '').trim(),

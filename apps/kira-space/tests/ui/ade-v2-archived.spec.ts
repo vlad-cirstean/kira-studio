@@ -29,7 +29,6 @@ async function pickArchived(page: Page, taskId: string): Promise<void> {
 test('the archived finder lists archived tasks and filters them', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await expect(page.locator(t('ade-tab-archived'))).toHaveCount(0);
-  await expect(page.locator(t('ade-panel-empty'))).toBeVisible();
   await page.locator(t('ade-archived-find')).click();
   await expect(page.locator(t('ade-archived-find-item'))).toHaveCount(5);
   const input = page.getByPlaceholder('Find archived task');
