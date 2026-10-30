@@ -6581,6 +6581,9 @@
         "confirm": "Move forward",
         "title": "Move forward?"
       },
+      "notes": {
+        "label": "Handover notes (optional)"
+      },
       "noWorkflow": {
         "empty": "No workflow"
       },

@@ -56,8 +56,13 @@ export function useAdeWrites() {
   });
 
   const setTaskStep = useMutation({
-    mutationFn: (v: { taskId: string; fromStepId: string; stepId: string; key: string }) =>
-      adeWriter.setTaskStep(v.taskId, v.fromStepId, v.stepId, v.key),
+    mutationFn: (v: {
+      taskId: string;
+      fromStepId: string;
+      stepId: string;
+      key: string;
+      notes?: string;
+    }) => adeWriter.setTaskStep(v.taskId, v.fromStepId, v.stepId, v.key, v.notes),
     retry,
     onError,
     onSettled: () => invalidate(boardKey),

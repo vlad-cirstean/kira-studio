@@ -16,10 +16,10 @@ export const adeWriter = {
       { taskId, shelf, beforeId },
       { idempotencyKey: key },
     ),
-  setTaskStep: (taskId: string, fromStepId: string, stepId: string, key: string) =>
+  setTaskStep: (taskId: string, fromStepId: string, stepId: string, key: string, notes?: string) =>
     postJson<{ taskId: string; stepId: string }>(
       '/api/ade/tasks/step',
-      { taskId, fromStepId, stepId },
+      { taskId, fromStepId, stepId, ...(notes === undefined ? {} : { notes }) },
       { idempotencyKey: key },
     ),
   startRun: (taskId: string, fromStepId: string, key: string) =>
