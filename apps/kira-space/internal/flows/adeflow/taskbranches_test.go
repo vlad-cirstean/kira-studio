@@ -90,7 +90,7 @@ func TestTaskReposAndBranches(t *testing.T) {
 	if err != nil || risk.Worktree != filled.Worktree || len(risk.Dirty) != 0 {
 		t.Fatalf("risk = %+v, %v, want a clean worktree", risk, err)
 	}
-	if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.BranchArgs{BranchID: filled.ID}); err != nil {
+	if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.RemoveTaskRowArgs{BranchID: filled.ID}); err != nil {
 		t.Fatalf("RemoveTaskBranch: %v", err)
 	}
 	if rows = branchesOf(t, app, task.ID); len(rows) != 1 || rows[0].Name != "" {
@@ -116,8 +116,22 @@ func TestTaskReposAndBranches(t *testing.T) {
 		t.Fatal("a refused edit changed the row")
 	}
 
+	// Uncommitted changes need a confirmed discard.
+	if err := os.WriteFile(filepath.Join(made.Worktree, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: made.ID, Name: "feat/a-other", Existing: true}); errCode(err) != "E_BAD_REQUEST" {
+		t.Fatalf("SetTaskBranch over a dirty worktree = %v, want E_BAD_REQUEST", err)
+	}
+	if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.RemoveTaskRowArgs{BranchID: made.ID}); errCode(err) != "E_BAD_REQUEST" {
+		t.Fatalf("RemoveTaskBranch over a dirty worktree = %v, want E_BAD_REQUEST", err)
+	}
+	if _, err := os.Stat(made.Worktree); err != nil {
+		t.Fatalf("refused edits removed the worktree: %v", err)
+	}
+
 	// Edit branch: the created row points at another existing branch; the old worktree goes.
-	edited, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: made.ID, Name: "feat/a-other", Existing: true})
+	edited, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: made.ID, Name: "feat/a-other", Existing: true, DiscardChanges: true})
 	if err != nil || edited.Name != "feat/a-other" || edited.Worktree == "" {
 		t.Fatalf("SetTaskBranch existing = %+v, %v", edited, err)
 	}
@@ -141,13 +155,13 @@ func TestTaskReposAndBranches(t *testing.T) {
 	if err != nil || swapped.CodeRepoID != c.ID {
 		t.Fatalf("UpdateTaskRepo = %+v, %v", swapped, err)
 	}
-	if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.BranchArgs{BranchID: swapped.ID}); err != nil {
+	if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.RemoveTaskRowArgs{BranchID: swapped.ID}); err != nil {
 		t.Fatalf("RemoveTaskRepo: %v", err)
 	}
 	if rows = branchesOf(t, app, task.ID); len(rows) != 1 || rows[0].CodeRepoID != a.ID {
 		t.Fatalf("rows = %+v, want only repo a", rows)
 	}
-	if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.BranchArgs{BranchID: edited.ID}); err != nil {
+	if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.RemoveTaskRowArgs{BranchID: edited.ID}); err != nil {
 		t.Fatalf("RemoveTaskRepo of a created row: %v", err)
 	}
 	gone(t, edited.Worktree)
@@ -171,14 +185,37 @@ func TestTaskBranchEditRefusals(t *testing.T) {
 			t.Fatalf("review attach = %+v, %v", res.Task, err)
 		}
 		id := res.Branch.ID
-		if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.BranchArgs{BranchID: id}); errCode(err) != "E_BAD_REQUEST" {
+		if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.RemoveTaskRowArgs{BranchID: id}); errCode(err) != "E_BAD_REQUEST" {
 			t.Fatalf("RemoveTaskRepo = %v, want E_BAD_REQUEST", err)
 		}
-		if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.BranchArgs{BranchID: id}); errCode(err) != "E_BAD_REQUEST" {
+		if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.RemoveTaskRowArgs{BranchID: id}); errCode(err) != "E_BAD_REQUEST" {
 			t.Fatalf("RemoveTaskBranch = %v, want E_BAD_REQUEST", err)
 		}
 		if _, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: id, Name: "sara/topic", Existing: true}); errCode(err) != "E_BAD_REQUEST" {
 			t.Fatalf("SetTaskBranch = %v, want E_BAD_REQUEST", err)
+		}
+	})
+
+	t.Run("a review branch on a normal task leaves", func(t *testing.T) {
+		app := flowharness.New(t)
+		repo := app.NewRepo("api")
+		repo.Commit("base", map[string]string{"a.txt": "base\n"})
+		repo.Git("checkout", "-q", "-b", "sara/topic", "main")
+		repo.Commit("topic", map[string]string{"b.txt": "topic\n"})
+		repo.Checkout("main")
+		repo.Git("config", "user.email", "me@example.com")
+		rec := importRepo(t, app, repo.Dir)
+		task := createTask(t, app, "Mine", "")
+		row, err := app.W.AdeTask.AddTaskRepo(ctx, adewire.AddTaskRepoArgs{TaskID: task.ID, CodeRepoID: rec.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		row, err = app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: row.ID, Name: "sara/topic", Existing: true})
+		if err != nil || row.Kind != "review" {
+			t.Fatalf("attach a colleague's branch = %+v, %v, want a review row", row, err)
+		}
+		if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.RemoveTaskRowArgs{BranchID: row.ID}); err != nil {
+			t.Fatalf("RemoveTaskRepo of a review row on a normal task: %v", err)
 		}
 	})
 
@@ -206,7 +243,7 @@ func TestTaskBranchEditRefusals(t *testing.T) {
 		waitSession(t, app, launch.SessionID, "running")
 
 		br = branchOf(t, board(t, app), task.ID, rec.ID)
-		if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.BranchArgs{BranchID: br.ID}); errCode(err) != "E_BAD_REQUEST" {
+		if err := app.W.AdeTask.RemoveTaskBranch(ctx, adewire.RemoveTaskRowArgs{BranchID: br.ID}); errCode(err) != "E_BAD_REQUEST" {
 			t.Fatalf("RemoveTaskBranch under a session = %v, want E_BAD_REQUEST", err)
 		}
 		if _, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: br.ID, Name: "feat/api-other"}); errCode(err) != "E_BAD_REQUEST" {
@@ -224,7 +261,7 @@ func TestTaskBranchEditRefusals(t *testing.T) {
 // A row with runs is archived, not deleted: its runs stay as history.
 func TestTaskBranchDetachKeepsRunHistory(t *testing.T) {
 	f, br := doneFixture(t, "feat/api-history")
-	if err := f.app.W.AdeTask.RemoveTaskBranch(ctx, adewire.BranchArgs{BranchID: br.ID}); err != nil {
+	if err := f.app.W.AdeTask.RemoveTaskBranch(ctx, adewire.RemoveTaskRowArgs{BranchID: br.ID}); err != nil {
 		t.Fatalf("RemoveTaskBranch: %v", err)
 	}
 	count := func(q string, args ...any) int {
@@ -247,7 +284,7 @@ func TestTaskBranchDetachKeepsRunHistory(t *testing.T) {
 	if live.Name != "" || live.ID == br.ID {
 		t.Fatalf("replacement = %+v, want a fresh row without a branch", live)
 	}
-	if err := f.app.W.AdeTask.RemoveTaskRepo(ctx, adewire.BranchArgs{BranchID: live.ID}); err != nil {
+	if err := f.app.W.AdeTask.RemoveTaskRepo(ctx, adewire.RemoveTaskRowArgs{BranchID: live.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if n := count(`SELECT COUNT(*) FROM ade_task_branches WHERE id = ?`, live.ID); n != 0 {

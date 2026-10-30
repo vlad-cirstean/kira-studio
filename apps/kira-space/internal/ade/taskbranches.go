@@ -3,6 +3,7 @@ package ade
 import (
 	"cmp"
 	"context"
+	"log/slog"
 	"slices"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
@@ -32,10 +33,13 @@ func (b *TaskBoard) editableRow(ctx context.Context, taskID, branchID string) (*
 	if !ok {
 		return nil, model.AdeTaskBranch{}, repos.ErrBranchMissing
 	}
-	if row.Kind == model.AdeBranchKindReview {
-		return nil, model.AdeTaskBranch{}, invalid("a review branch cannot change")
-	}
 	label := cmp.Or(row.Name, tc.nick[row.CodeRepoID])
+	b.runMu.Lock()
+	_, setting := b.setupLive[row.ID]
+	b.runMu.Unlock()
+	if setting {
+		return nil, model.AdeTaskBranch{}, invalid("a prepare script is running on %s", label)
+	}
 	// A step session carries no branch id; its cwd is the worktree.
 	wt := b.worktreePath(ctx, row)
 	open, err := b.runningTUI(func(s model.AdeSession) bool {
@@ -56,9 +60,19 @@ func (b *TaskBoard) editableRow(ctx context.Context, taskID, branchID string) (*
 	return tc, row, nil
 }
 
-// detachRow removes the row's linked worktree, then takes the row off the task, putting replacement
-// (when given) in its place. The caller holds the task mutex and has run editableRow.
-func (b *TaskBoard) detachRow(ctx context.Context, old model.AdeTaskBranch, replacement *model.AdeTaskBranch) error {
+// ownKind is the kind a row keeps when its branch is replaced by a branch this app creates: a created
+// branch is never a review branch.
+func ownKind(kind string) string {
+	if kind == model.AdeBranchKindReview {
+		return model.AdeBranchKindMine
+	}
+	return kind
+}
+
+// detachRow takes the row off the task, putting replacement (when given) in its place, then removes
+// the row's linked worktree. A worktree with uncommitted changes needs discard. The caller holds the
+// task mutex and has run editableRow.
+func (b *TaskBoard) detachRow(ctx context.Context, old model.AdeTaskBranch, replacement *model.AdeTaskBranch, discard bool) error {
 	lb, linked, err := b.linkedBranchOf(ctx, old)
 	if err != nil {
 		return err
@@ -71,11 +85,23 @@ func (b *TaskBoard) detachRow(ctx context.Context, old model.AdeTaskBranch, repl
 		if risk.Blocked != "" {
 			return invalid("the worktree of %s cannot be removed (%s)", old.Name, risk.Blocked)
 		}
-		if err := b.removeWorktree(ctx, lb); err != nil {
-			return err
+		if len(risk.Dirty) > 0 && !discard {
+			return invalid("the worktree of %s has uncommitted changes: confirm to discard them", old.Name)
 		}
 	}
-	return b.deps.Tasks.DetachBranch(old.ID, replacement, b.deps.Now().UnixMilli())
+	// Row first: a failed transaction leaves the worktree intact.
+	if err := b.deps.Tasks.DetachBranch(old.ID, replacement, b.deps.Now().UnixMilli()); err != nil {
+		return err
+	}
+	if old.Name != "" {
+		b.snapshotChangeRequests(ctx, old.TaskID, []model.AdeTaskBranch{old})
+	}
+	if linked {
+		if err := b.removeWorktree(ctx, lb); err != nil {
+			slog.Warn("ade: remove detached worktree", "scope", "ade", "branch", old.ID, "path", lb.path, "err", err)
+		}
+	}
+	return nil
 }
 
 // TaskBranchRisk reports what removing the row's branch would discard.
@@ -164,7 +190,7 @@ func (b *TaskBoard) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranc
 	if rec == nil {
 		return adewire.Branch{}, invalid("code repo %s not found", old.CodeRepoID)
 	}
-	next := model.AdeTaskBranch{ID: b.newID(), TaskID: old.TaskID, CodeRepoID: old.CodeRepoID, Kind: old.Kind, AddedAt: b.deps.Now().UnixMilli()}
+	next := model.AdeTaskBranch{ID: b.newID(), TaskID: old.TaskID, CodeRepoID: old.CodeRepoID, Kind: ownKind(old.Kind), AddedAt: b.deps.Now().UnixMilli()}
 	if args.Existing {
 		rmu := b.repoMutex(old.CodeRepoID)
 		rmu.Lock()
@@ -180,7 +206,7 @@ func (b *TaskBoard) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranc
 		}
 		next.Base, next.BaseBranchID, next.QueuedAfter = old.Base, old.BaseBranchID, old.QueuedAfter
 	}
-	if err := b.detachRow(ctx, old, &next); err != nil {
+	if err := b.detachRow(ctx, old, &next, args.DiscardChanges); err != nil {
 		return adewire.Branch{}, err
 	}
 	b.notifyBoard()
@@ -223,7 +249,8 @@ func (b *TaskBoard) wireRow(ctx context.Context, branchID string) (adewire.Branc
 }
 
 // RemoveTaskBranch detaches a created row's branch. The repo stays as a row without a branch.
-func (b *TaskBoard) RemoveTaskBranch(ctx context.Context, branchID string) error {
+func (b *TaskBoard) RemoveTaskBranch(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
+	branchID := args.BranchID
 	cur, err := b.deps.Tasks.GetBranch(branchID)
 	if err != nil {
 		return err
@@ -239,10 +266,10 @@ func (b *TaskBoard) RemoveTaskBranch(ctx context.Context, branchID string) error
 		return invalid("the repo has no branch to remove")
 	}
 	draft := model.AdeTaskBranch{
-		ID: b.newID(), TaskID: old.TaskID, CodeRepoID: old.CodeRepoID, Kind: old.Kind, AddedAt: b.deps.Now().UnixMilli(),
+		ID: b.newID(), TaskID: old.TaskID, CodeRepoID: old.CodeRepoID, Kind: ownKind(old.Kind), AddedAt: b.deps.Now().UnixMilli(),
 		Base: old.Base, BaseBranchID: old.BaseBranchID, QueuedAfter: old.QueuedAfter,
 	}
-	if err := b.detachRow(ctx, old, &draft); err != nil {
+	if err := b.detachRow(ctx, old, &draft, args.DiscardChanges); err != nil {
 		return err
 	}
 	b.notifyBoard()
@@ -250,7 +277,8 @@ func (b *TaskBoard) RemoveTaskBranch(ctx context.Context, branchID string) error
 }
 
 // RemoveTaskRepo detaches the row, its branch and its worktree included.
-func (b *TaskBoard) RemoveTaskRepo(ctx context.Context, branchID string) error {
+func (b *TaskBoard) RemoveTaskRepo(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
+	branchID := args.BranchID
 	cur, err := b.deps.Tasks.GetBranch(branchID)
 	if err != nil {
 		return err
@@ -262,7 +290,7 @@ func (b *TaskBoard) RemoveTaskRepo(ctx context.Context, branchID string) error {
 	if err != nil {
 		return err
 	}
-	if err := b.detachRow(ctx, old, nil); err != nil {
+	if err := b.detachRow(ctx, old, nil, args.DiscardChanges); err != nil {
 		return err
 	}
 	b.notifyBoard()
@@ -293,7 +321,7 @@ func (b *TaskBoard) UpdateTaskRepo(ctx context.Context, args adewire.UpdateTaskR
 		return adewire.Branch{}, repos.ErrRepoOnTask
 	}
 	next := model.AdeTaskBranch{ID: b.newID(), TaskID: old.TaskID, CodeRepoID: args.CodeRepoID, Kind: old.Kind, AddedAt: b.deps.Now().UnixMilli()}
-	if err := b.detachRow(ctx, old, &next); err != nil {
+	if err := b.detachRow(ctx, old, &next, false); err != nil {
 		return adewire.Branch{}, err
 	}
 	b.notifyBoard()

@@ -456,9 +456,10 @@ func (r *AdeTaskRepo) AddBranch(b model.AdeTaskBranch) (model.AdeTaskBranch, err
 
 // DetachBranch takes a live branch off its live task in one transaction. A branch never created and
 // without runs is deleted; any other is archived, so its runs, reviews and marks stay as history.
-// Live branches stacked on it fall back to its name (its ref stays in git) or, while it is not
-// created, to its own base; branches queued after it are freed. A non-nil replacement takes the old
-// position (ErrBranchOnTask on a taken name).
+// Without a replacement, live branches stacked on it fall back to its name (its ref stays in git) or,
+// while it is not created, to its own base, and branches queued after it are freed. A non-nil
+// replacement takes the old position (ErrBranchOnTask on a taken name); one filling a not-created row
+// of the same repo also takes the dependents.
 func (r *AdeTaskRepo) DetachBranch(id string, replacement *model.AdeTaskBranch, now int64) error {
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -485,18 +486,29 @@ func (r *AdeTaskRepo) DetachBranch(id string, replacement *model.AdeTaskBranch, 
 	if err != nil {
 		return fmt.Errorf("repos: detach ade branch %s: %w", id, err)
 	}
-	newBase := cmp.Or(old.Name, old.Base)
-	if _, err := tx.Exec(`UPDATE ade_task_branches SET base_branch_id = '', base = ?, base_pending_from = ''
-		WHERE base_branch_id = ? AND archived_at IS NULL`, newBase, id); err != nil {
-		return fmt.Errorf("repos: free ade branches stacked on %s: %w", id, err)
-	}
-	if _, err := tx.Exec(`UPDATE ade_task_branches SET queued_after = '' WHERE queued_after = ?`, id); err != nil {
-		return fmt.Errorf("repos: free ade branches queued after %s: %w", id, err)
-	}
+	fill := replacement != nil && old.Name == "" && replacement.CodeRepoID == old.CodeRepoID
 	if replacement != nil {
 		replacement.Position = old.Position
 		if err := insertTaskBranch(tx, *replacement); err != nil {
 			return err
+		}
+	}
+	if fill {
+		// The replacement fills the same not-created row, so what depended on the row keeps depending on it.
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET base_branch_id = ? WHERE base_branch_id = ? AND archived_at IS NULL`, replacement.ID, id); err != nil {
+			return fmt.Errorf("repos: repoint ade branches stacked on %s: %w", id, err)
+		}
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET queued_after = ? WHERE queued_after = ?`, replacement.ID, id); err != nil {
+			return fmt.Errorf("repos: repoint ade branches queued after %s: %w", id, err)
+		}
+	} else {
+		newBase := cmp.Or(old.Name, old.Base)
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET base_branch_id = '', base = ?, base_pending_from = ''
+			WHERE base_branch_id = ? AND archived_at IS NULL`, newBase, id); err != nil {
+			return fmt.Errorf("repos: free ade branches stacked on %s: %w", id, err)
+		}
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET queued_after = '' WHERE queued_after = ?`, id); err != nil {
+			return fmt.Errorf("repos: free ade branches queued after %s: %w", id, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -1308,9 +1320,10 @@ func (r *AdeTaskRepo) CountRebaseRuns(branchID string) (int, error) {
 	return n, nil
 }
 
-// SetBranchChangeRequests records each branch's change request (key = branch id) in one transaction.
-func (r *AdeTaskRepo) SetBranchChangeRequests(crs map[string]model.AdeChangeRequest) error {
-	if len(crs) == 0 {
+// SetBranchChangeRequests replaces the stored change request of each listed branch with crs (key =
+// branch id) in one transaction; a listed branch missing from crs ends with none.
+func (r *AdeTaskRepo) SetBranchChangeRequests(ids []string, crs map[string]model.AdeChangeRequest) error {
+	if len(ids) == 0 {
 		return nil
 	}
 	tx, err := r.DB.Begin()
@@ -1318,6 +1331,11 @@ func (r *AdeTaskRepo) SetBranchChangeRequests(crs map[string]model.AdeChangeRequ
 		return fmt.Errorf("repos: begin set ade branch change requests: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
+	for _, id := range ids {
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET cr_number = NULL, cr_title = NULL, cr_state = NULL, cr_url = NULL WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("repos: clear ade branch %s change request: %w", id, err)
+		}
+	}
 	for id, cr := range crs {
 		if _, err := tx.Exec(`UPDATE ade_task_branches SET cr_number = ?, cr_title = ?, cr_state = ?, cr_url = ? WHERE id = ?`,
 			cr.Number, cr.Title, cr.State, cr.URL, id); err != nil {

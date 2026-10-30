@@ -56,7 +56,7 @@ type GitSettings struct {
 }
 
 // AdeSettings is P129 Part 2 §7's own UiPrefs-as-settings-leaves: Part 3's queue-board layout and
-// history-window preferences, persisted so they survive a relaunch. No UI reads them yet.
+// history-window preferences, persisted so they survive a relaunch. The Plan reads them.
 type AdeSettings struct {
 	HistoryDays     int      `json:"historyDays"`
 	OffDays         []string `json:"offDays"`

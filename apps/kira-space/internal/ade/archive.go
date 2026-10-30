@@ -178,7 +178,7 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 		}
 	}
 	b.closeReviewWindows(tc)
-	b.snapshotChangeRequests(ctx, tc)
+	b.snapshotChangeRequests(ctx, taskID, tc.branches)
 	if err := b.deps.Tasks.ArchiveTask(taskID, b.deps.Now().UnixMilli()); err != nil {
 		return err
 	}
@@ -187,12 +187,13 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 	return nil
 }
 
-// snapshotChangeRequests stores each branch's change request on its row, so the archived view shows
-// it when the host is later unreachable or the ref is gone. Best effort: failures log and archive goes on.
-func (b *TaskBoard) snapshotChangeRequests(ctx context.Context, tc *taskCtx) {
+// snapshotChangeRequests stores each row's change request, so the archived view shows it when the host
+// is later unreachable or the ref is gone. A row the host no longer answers for loses its old snapshot.
+// Best effort: failures log and the caller goes on.
+func (b *TaskBoard) snapshotChangeRequests(ctx context.Context, taskID string, rows []model.AdeTaskBranch) {
 	ctx, cancel := context.WithTimeout(ctx, archiveSnapshotTimeout)
 	defer cancel()
-	repoIDs, byRepo := branchesByRepo(tc.branches)
+	repoIDs, byRepo := branchesByRepo(rows)
 	crs := map[string]model.AdeChangeRequest{}
 	for _, id := range repoIDs {
 		entry, err := b.openRepo(ctx, id)
@@ -205,8 +206,12 @@ func (b *TaskBoard) snapshotChangeRequests(ctx context.Context, tc *taskCtx) {
 			crs[branchID] = model.AdeChangeRequest{Number: cr.Number, Title: cr.Title, State: cr.State, URL: cr.URL}
 		}
 	}
-	if err := b.deps.Tasks.SetBranchChangeRequests(crs); err != nil {
-		slog.Warn("ade: archive snapshot: store", "scope", "ade", "task", tc.task.ID, "err", err)
+	ids := make([]string, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.ID)
+	}
+	if err := b.deps.Tasks.SetBranchChangeRequests(ids, crs); err != nil {
+		slog.Warn("ade: archive snapshot: store", "scope", "ade", "task", taskID, "err", err)
 	}
 }
 

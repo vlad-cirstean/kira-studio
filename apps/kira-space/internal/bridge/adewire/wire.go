@@ -743,6 +743,14 @@ type SetTaskBranchArgs struct {
 	BranchID string `json:"branchId"`
 	Name     string `json:"name"`
 	Existing bool   `json:"existing"`
+	// DiscardChanges confirms deleting uncommitted changes in the row's current worktree.
+	DiscardChanges bool `json:"discardChanges"`
+}
+
+// RemoveTaskRowArgs detaches a task row; DiscardChanges confirms deleting uncommitted changes in its worktree.
+type RemoveTaskRowArgs struct {
+	BranchID       string `json:"branchId"`
+	DiscardChanges bool   `json:"discardChanges"`
 }
 
 // UpdateTaskRepoArgs swaps the repo of a row whose branch is not created.

@@ -524,19 +524,19 @@ func (s *AdeTaskService) UpdateTaskRepo(ctx context.Context, args adewire.Update
 }
 
 // RemoveTaskBranch detaches a row's branch; the repo stays on the task.
-func (s *AdeTaskService) RemoveTaskBranch(ctx context.Context, args adewire.BranchArgs) error {
+func (s *AdeTaskService) RemoveTaskBranch(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
-	return adeTaskError(s.Engine.RemoveTaskBranch(ctx, args.BranchID))
+	return adeTaskError(s.Engine.RemoveTaskBranch(ctx, args))
 }
 
 // RemoveTaskRepo detaches a row, its branch included.
-func (s *AdeTaskService) RemoveTaskRepo(ctx context.Context, args adewire.BranchArgs) error {
+func (s *AdeTaskService) RemoveTaskRepo(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
-	return adeTaskError(s.Engine.RemoveTaskRepo(ctx, args.BranchID))
+	return adeTaskError(s.Engine.RemoveTaskRepo(ctx, args))
 }
 
 // TaskBranchRisk reports what removing a row's branch would discard.

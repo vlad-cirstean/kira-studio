@@ -131,6 +131,8 @@ func (b *TaskBoard) archivedRepo(ctx context.Context, id string, rows []model.Ad
 }
 
 // archivedComments reads the branch's stored review comments, unanchored: the branch tip may be gone.
+// Sessions are keyed by repo and branch name, so a later task reusing the name shares the session;
+// comments made after the row was archived belong to that task.
 func (b *TaskBoard) archivedComments(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) []adewire.ArchivedComment {
 	if b.deps.Registry == nil || b.deps.Registry.Review == nil {
 		return nil
@@ -146,6 +148,9 @@ func (b *TaskBoard) archivedComments(ctx context.Context, entry *gitsession.Repo
 	}
 	out := make([]adewire.ArchivedComment, 0, len(cs))
 	for _, c := range cs {
+		if sb.ArchivedAt != nil && c.CreatedAt.UnixMilli() > *sb.ArchivedAt {
+			continue
+		}
 		out = append(out, adewire.ArchivedComment{
 			Path: c.Path, Start: c.Range.Start, End: c.Range.End, Body: c.Body, Kind: c.Kind, State: c.State,
 			Reply: c.Reply, CreatedAt: c.CreatedAt.UnixMilli(),
