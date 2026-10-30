@@ -340,6 +340,65 @@ test('the task open in the panel is marked on its card, spans and branch rows', 
   await expect(span).toHaveAttribute('data-selected', 'true');
 });
 
+test('pressing a card shows no ring, border or outline; keyboard focus still rings', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  const focusColor = await page.evaluate(() => {
+    const span = document.createElement('span');
+    span.style.color = 'var(--kira-focus)';
+    document.body.appendChild(span);
+    const color = getComputedStyle(span).color;
+    span.remove();
+    return color;
+  });
+  const task = page.locator('[data-testid="ade-task"]').first();
+  const cardEl = task.locator('[data-testid="ade-card"]');
+  const head = task.locator('[data-testid="ade-card-head"]');
+  const state = () =>
+    task.evaluate((el) => {
+      const h = el.querySelector('[data-testid="ade-card-head"]');
+      return {
+        shadow: getComputedStyle(el).boxShadow,
+        outline: getComputedStyle(el).outlineStyle,
+        headOutline: h ? getComputedStyle(h).outlineStyle : '',
+        headVisible: h?.matches(':focus-visible') ?? false,
+        ring: [...el.classList].some((c) => c.startsWith('ring-')),
+      };
+    });
+  const expectQuiet = async () =>
+    expect(await state()).toEqual({
+      shadow: 'none',
+      outline: 'none',
+      headOutline: 'none',
+      headVisible: false,
+      ring: false,
+    });
+
+  const targets = [
+    head,
+    task.locator('[data-testid="ade-card-title"]'),
+    task.locator('[data-testid="ade-branch-row"]').first(),
+  ];
+  for (const target of targets) {
+    await target.hover();
+    await page.mouse.down();
+    await expectQuiet();
+    await page.mouse.up();
+    await expectQuiet();
+  }
+  expect(await cardEl.evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(focusColor);
+
+  await page.keyboard.press('Tab');
+  await head.focus();
+  await expect(head).toBeFocused();
+  const ring = await head.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { visible: el.matches(':focus-visible'), style: s.outlineStyle, color: s.outlineColor };
+  });
+  expect(ring).toEqual({ visible: true, style: 'solid', color: focusColor });
+});
+
 test('plan cards use colour only for task edge, status, problems and the repo badge', async ({
   relaunch,
 }) => {
