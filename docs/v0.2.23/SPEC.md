@@ -7,7 +7,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | Phase | Title | Status |
 |---|---|---|
 | P404 | Board: archived tasks inline, session indicator, weekend pattern, branch status colors | Done |
-| P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Todo |
+| P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Done |
 | P406 | Nanoid branch names for agent-created worktrees | Todo |
 | P407 | Stage handover: session context notes and stage-change dialogs | Todo |
 | P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Todo |
@@ -44,6 +44,8 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 - Rename the Backlog tab to Later. Remove the item count from the tab.
 - Quick add goes to Later.
 - Reorder tabs: Needs you, then Plan, then Later (Later after Plan). Planner confirms against current order.
+
+**Result.** Shelf model on `ade_task_plan` (migration 0055 adds `backlog`): Later is undated non-review, Backlog is the flagged rows, review items never shelve. New `ShelveTask` (before-id placement, one transaction) and `CaptureTask` (top of Later). Migration 0056 folds `ade_backlog` rows into repo-less Backlog tasks and drops the table; backlog item API, channel and mobile read removed. Desktop: Later tab (Needs you, Plan, Later; no count) with Later and Backlog drag lists in one Sortable group, task menu and panel "Move to backlog"/"Move to later", quick add via `CaptureTask`; Plan tail band is "Further out", dated work only, refuses drops. Mobile: `LaterScreen` on the board with `later/items` and `shelf/move` routes. Tests: Go `TestShelves`, `TestMigration56FoldsBacklogIntoTasks`, mobileflow reworked; contracts `ade-shelf`, `mobile-board`; timeline and parity units updated, `bun test` 1966 pass; `ui` 786 pass, mobile 83 pass, visual 20 pass, `go test ./...` pass; lint, `lint:dead`, hooks pass.
 
 ### P406 Nanoid branch names for agent-created worktrees
 
