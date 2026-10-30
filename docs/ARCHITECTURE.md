@@ -1284,7 +1284,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - prefers-reduced-motion: reduce zeroes transitions and animations in base.css, except Spinner.
 - Native scrollbars (base.css, pointer: fine only) keep a 12px classic gutter; the thumb is transparent until the pointer is inside that scroller. Thumb colour rides --kira-scrollbar-thumb, set by :where(:hover) on the scroller and reset on every element, because WebKit never repaints a :hover::-webkit-scrollbar-thumb rule and scrollbar-color/scrollbar-width drop the custom styling. Thumb :active keeps a dragged bar shown. Monaco and xterm keep their own hover-reveal scrollbars.
 - QueryState shows its default loading state after TIMING.spinnerDelay (300ms), while Button pending shows its spinner at once.
-- The drag ghost class is SORTABLE_GHOST_CLASS (U76).
+- The drag ghost class is SORTABLE_GHOST_CLASS (U76). No list sets a chosen class: Sortable's unstyled default keeps a press from flashing a ring.
 - Mobile code never hard-codes h-11 (U82).
 - EmptyState (theme) is the only Empty composition (U74), with props/slots icon?, title, description?, default slot for actions, and media slot for a custom glyph.
 - A side panel empty state gets icon, title and a one-line description with no button (U78); its action lives on the module front door.

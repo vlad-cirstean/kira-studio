@@ -12,7 +12,7 @@ Source: user request. Phases run top to bottom.
 | P399 | Archived work stays viewable with all data | Done |
 | P400 | Task board: no same-day delimiters, terminal-dark background, distinguishable task colors | Done |
 | P401 | Task board: 7-day window, Later section, no date control | Done |
-| P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Todo |
+| P402 | Agents panel: drop tab delimiter, center action buttons, remove click border flash | Done |
 | P403 | Chapter close | Todo |
 
 ## Rows
@@ -54,6 +54,8 @@ Show only the next 7 days on the task board, unless work is scheduled later than
 ### P402 Agents panel: drop tab delimiter, center action buttons, remove click border flash
 
 Remove the grey delimiter between the main tabs (Backlog, Plan) and the rest. Center-align the "type a thought" and "add task" buttons. Remove the white border that flashes on click of a task; it must not appear at all.
+
+**Result.** `AdeShell` bar loses `border-b`, becomes a `1fr auto 1fr` grid: capture box and Add sit on the bar's centre; capture note is absolute so the pair never shifts. Flash was Sortable's `chosenClass` (`ring-2`, colourless so `currentcolor`) on pointer down, not focus: `SORTABLE_CHOSEN_CLASS` removed, U76 message updated, keyboard `:focus-visible` ring kept. New `ade-v2-shell.spec.ts` and a press/keyboard-ring test in `ade-v2-plan.spec.ts`. Full `test:ui:space` (780), `test:visual:space` (20) and `lint:dead` pass; no baseline changes.
 
 ### P403 Chapter close
 
