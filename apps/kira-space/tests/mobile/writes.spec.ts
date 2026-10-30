@@ -91,11 +91,18 @@ test.describe('with write access', () => {
     await card.locator(t('plan-step-next')).click();
     await expect(page.locator(t('confirm-dialog'))).toBeVisible();
     expect(posts(server, '/api/ade/tasks/step')).toHaveLength(0);
+    await page.locator(t('plan-step-notes')).fill('  Check the empty state.  ');
     await page.locator(t('confirm-yes')).click();
     await expect.poll(() => posts(server, '/api/ade/tasks/step').length).toBe(1);
     const sent = posts(server, '/api/ade/tasks/step')[0] as { body: string; key: string };
-    const body = JSON.parse(sent.body) as { taskId: string; fromStepId: string; stepId: string };
+    const body = JSON.parse(sent.body) as {
+      taskId: string;
+      fromStepId: string;
+      stepId: string;
+      notes?: string;
+    };
     expect(body.fromStepId).not.toBe(body.stepId);
+    expect(body.notes).toBe('Check the empty state.');
     expect(sent.key).not.toBe('');
   });
 
