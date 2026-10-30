@@ -139,11 +139,10 @@ func (b *TaskBoard) restoreRowComments(ctx context.Context, store *gitreview.Sto
 	if _, err := store.ClearComments(ctx, repoID, branch); err != nil {
 		return err
 	}
-	at := func(ms int64) time.Time { return time.UnixMilli(ms) }
 	for _, sc := range cs {
 		added, err := store.AddComment(ctx, repoID, branch, gitreview.Comment{
 			Path: sc.Path, Range: gitreview.LineRange{Start: sc.Start, End: sc.End}, Body: sc.Body,
-			AnchorSHA: sc.AnchorSHA, AnchorBlobOID: sc.AnchorBlobOID, CreatedAt: at(sc.CreatedAt), Kind: sc.Kind,
+			AnchorSHA: sc.AnchorSHA, AnchorBlobOID: sc.AnchorBlobOID, CreatedAt: time.UnixMilli(sc.CreatedAt), Kind: sc.Kind,
 		})
 		if err != nil {
 			return err
@@ -151,7 +150,7 @@ func (b *TaskBoard) restoreRowComments(ctx context.Context, store *gitreview.Sto
 		resolved := sc.State == gitreview.CommentStateAddressed
 		switch {
 		case sc.Reply != "" && sc.RepliedAt != nil:
-			_, err = store.ReplyComment(ctx, repoID, branch, added.ID, sc.Reply, resolved, at(*sc.RepliedAt))
+			_, err = store.ReplyComment(ctx, repoID, branch, added.ID, sc.Reply, resolved, time.UnixMilli(*sc.RepliedAt))
 		case resolved:
 			_, err = store.SetCommentState(ctx, repoID, branch, added.ID, sc.State)
 		}
@@ -159,7 +158,7 @@ func (b *TaskBoard) restoreRowComments(ctx context.Context, store *gitreview.Sto
 			return err
 		}
 		if sc.SentAt != nil {
-			if err := store.MarkSent(ctx, repoID, branch, []int64{added.ID}, at(*sc.SentAt)); err != nil {
+			if err := store.MarkSent(ctx, repoID, branch, []int64{added.ID}, time.UnixMilli(*sc.SentAt)); err != nil {
 				return err
 			}
 		}

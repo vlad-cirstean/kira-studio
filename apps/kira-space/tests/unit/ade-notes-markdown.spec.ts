@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { getSchema, resolveExtensions } from '@tiptap/core';
+import { getSchema } from '@tiptap/core';
 import { MarkdownManager } from '@tiptap/markdown';
 import { notesExtensions } from '../../frontend/src/ade/v2/notes/notesExtensions';
 
@@ -9,7 +9,7 @@ import { notesExtensions } from '../../frontend/src/ade/v2/notes/notesExtensions
 // JSON is a schema-valid document (catches an extension wired wrong before it ever reaches
 // `AdeNotesEditor.vue`).
 const manager = new MarkdownManager({ extensions: notesExtensions() });
-const schema = getSchema(resolveExtensions(notesExtensions()));
+const schema = getSchema(notesExtensions());
 
 /** Parses `md`, validates the result against the schema, and returns the re-serialized Markdown. */
 function roundTrip(md: string): string {
