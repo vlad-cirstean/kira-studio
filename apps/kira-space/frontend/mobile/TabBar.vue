@@ -3,12 +3,12 @@ import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { useAgentsModel } from './state/useAgentsModel';
 
-// Backlog, Need You and Plan. Plain links: each tab is its own route, so back and reload work.
+// Need You, Plan and Later. Plain links: each tab is its own route, so back and reload work.
 const { model } = useAgentsModel();
 const TABS = [
-  { to: '/backlog', label: 'space.common.backlog.label', id: 'backlog' },
   { to: '/needs', label: 'space.common.needYou.label', id: 'needs' },
   { to: '/plan', label: 'space.common.plan.label', id: 'plan' },
+  { to: '/later', label: 'common.later.label', id: 'later' },
 ] as const;
 </script>
 

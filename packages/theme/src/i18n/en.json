@@ -6444,28 +6444,30 @@
   },
   "mobile": {
     "backlog": {
-      "add": {
-        "placeholder": "Add to the backlog"
-      },
       "handle": {
         "aria": "Drag to reorder"
-      },
-      "list": {
-        "emptyHint": "Items added here or in Kira Space appear here."
-      },
-      "loadError": {
-        "error": "Couldn’t load the backlog."
-      },
-      "notes": {
-        "empty": "No notes"
-      },
-      "writeOff": {
-        "hint": "Adding and reordering are off for this phone."
       }
     },
     "http": {
       "unreachable": {
         "error": "Can’t reach Kira Space."
+      }
+    },
+    "later": {
+      "backlogEmpty": {
+        "empty": "Nothing on the backlog yet"
+      },
+      "laterEmpty": {
+        "empty": "Nothing in later yet"
+      },
+      "loadError": {
+        "error": "Couldn’t load the tasks."
+      },
+      "notes": {
+        "empty": "No notes"
+      },
+      "writeOff": {
+        "hint": "Adding and moving are off for this phone."
       }
     },
     "needs": {

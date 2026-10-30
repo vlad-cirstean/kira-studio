@@ -17,12 +17,12 @@ type MobileWriter struct {
 
 var _ mobileweb.Writer = (*MobileWriter)(nil)
 
-func (w *MobileWriter) AddBacklogItem(ctx context.Context, args adewire.AddBacklogItemArgs) (adewire.BacklogItem, error) {
-	return w.Svc.AddBacklogItem(ctx, args)
+func (w *MobileWriter) CaptureTask(ctx context.Context, args adewire.CaptureTaskArgs) (adewire.Task, error) {
+	return w.Svc.CaptureTask(ctx, args)
 }
 
-func (w *MobileWriter) MoveBacklogItem(ctx context.Context, args adewire.MoveBacklogItemArgs) error {
-	return w.Svc.MoveBacklogItem(ctx, args)
+func (w *MobileWriter) ShelveTask(ctx context.Context, args adewire.ShelveTaskArgs) error {
+	return w.Svc.ShelveTask(ctx, args)
 }
 
 func (w *MobileWriter) SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error) {

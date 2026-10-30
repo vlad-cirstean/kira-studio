@@ -21,15 +21,15 @@ test.describe('paired phone', () => {
     await app();
   });
 
-  test('plan step buttons and the backlog add row are touch sized', async ({ page }) => {
+  test('plan step buttons and the later add row are touch sized', async ({ page }) => {
     await page.locator(t('tab-plan')).click();
     const card = page
       .locator(t('plan-task'))
       .filter({ hasText: 'Cart total test fails intermittently' });
     await card.locator('button').first().click();
     await expectTouch(page, ['plan-step-back', 'plan-step-next']);
-    await page.locator(t('tab-backlog')).click();
-    await expectTouch(page, ['backlog-add', 'backlog-add-submit']);
+    await page.locator(t('tab-later')).click();
+    await expectTouch(page, ['later-add', 'later-add-submit']);
   });
 
   test('the key bar and compose row are touch sized; Ctrl exposes its pressed state', async ({
@@ -65,7 +65,7 @@ test.describe('paired phone', () => {
 for (const [tab, route, screen] of [
   ['tab-needs', '**/api/ade/board', 'needs-screen'],
   ['tab-plan', '**/api/ade/board', 'plan-screen'],
-  ['tab-backlog', '**/api/ade/backlog', 'backlog-screen'],
+  ['tab-later', '**/api/ade/board', 'later-screen'],
 ] as const) {
   test(`${screen} loading shows the spinner and no plain text line`, async ({
     page,

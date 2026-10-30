@@ -3,6 +3,7 @@ package mobileflow_test
 import (
 	"bytes"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -12,15 +13,26 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func backlogTexts(t *testing.T, app *flowharness.App) []string {
+// shelfTitles lists the titles of the named tasks on one shelf, in shelf order.
+func shelfTitles(t *testing.T, app *flowharness.App, shelf string, names ...string) []string {
 	t.Helper()
-	res, err := app.W.AdeTask.Backlog(ctx)
+	b, err := app.W.AdeTask.Board(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := make([]string, len(res.Items))
-	for i, it := range res.Items {
-		out[i] = it.Text
+	title := map[string]adewire.Task{}
+	for _, tk := range b.Tasks {
+		title[tk.ID] = tk
+	}
+	var out []string
+	for _, id := range b.Plan.Order {
+		tk := title[id]
+		_, dated := b.Plan.Day[id]
+		onBacklog := slices.Contains(b.Plan.Backlog, id)
+		if dated || tk.Kind == "review" || onBacklog != (shelf == adewire.ShelfBacklog) || !slices.Contains(names, tk.Title) {
+			continue
+		}
+		out = append(out, tk.Title)
 	}
 	return out
 }
@@ -49,43 +61,49 @@ func TestPhoneWrites(t *testing.T) {
 	}
 
 	setPerms(false)
-	r := p.post("/api/ade/backlog/items", map[string]string{"text": "refused"})
+	r := p.post("/api/ade/later/items", map[string]string{"title": "refused"})
 	if r.Status != http.StatusForbidden || r.code(t) != "E_WRITE_OFF" {
 		t.Fatalf("write without permission = %d %s", r.Status, r.Body)
 	}
-	if got := backlogTexts(t, app); len(got) != 0 {
-		t.Fatalf("a refused write changed the backlog: %v", got)
+	if got := shelfTitles(t, app, adewire.ShelfLater, "refused"); len(got) != 0 {
+		t.Fatalf("a refused write changed Later: %v", got)
 	}
 
 	setPerms(true)
-	if r := p.send(http.MethodPost, "/api/ade/backlog/items", map[string]string{"text": "x"}, ""); r.Status != http.StatusBadRequest || r.code(t) != "E_IDEMPOTENCY_KEY" {
+	if r := p.send(http.MethodPost, "/api/ade/later/items", map[string]string{"title": "x"}, ""); r.Status != http.StatusBadRequest || r.code(t) != "E_IDEMPOTENCY_KEY" {
 		t.Fatalf("write without an Idempotency-Key = %d %s", r.Status, r.Body)
 	}
 	key := uuid.NewString()
-	first := p.send(http.MethodPost, "/api/ade/backlog/items", map[string]string{"text": "first"}, key)
+	first := p.send(http.MethodPost, "/api/ade/later/items", map[string]string{"title": "first"}, key)
 	if first.Status != http.StatusOK {
-		t.Fatalf("backlog add = %d %s", first.Status, first.Body)
+		t.Fatalf("later add = %d %s", first.Status, first.Body)
 	}
-	app.Contract(t, "mobile-board", "args:POST /api/ade/backlog/items", map[string]string{"text": "first"})
-	app.Contract(t, "mobile-board", "http:POST /api/ade/backlog/items", first.raw(t), flowharness.Mask("addedAt"))
-	replay := p.send(http.MethodPost, "/api/ade/backlog/items", map[string]string{"text": "first"}, key)
+	app.Contract(t, "mobile-board", "args:POST /api/ade/later/items", map[string]string{"title": "first"})
+	app.Contract(t, "mobile-board", "http:POST /api/ade/later/items", first.raw(t), flowharness.Mask("createdAt"))
+	replay := p.send(http.MethodPost, "/api/ade/later/items", map[string]string{"title": "first"}, key)
 	if replay.Status != http.StatusOK || replay.Header.Get("Idempotent-Replay") != "true" || !bytes.Equal(replay.Body, first.Body) {
 		t.Fatalf("replay = %d %q (replay header %q), want the first response again", replay.Status, replay.Body, replay.Header.Get("Idempotent-Replay"))
 	}
-	if got := backlogTexts(t, app); !equal(got, []string{"first"}) {
-		t.Fatalf("backlog after a replayed add = %v, want one item", got)
+	names := []string{"first", "second"}
+	if got := shelfTitles(t, app, adewire.ShelfLater, names...); !equal(got, []string{"first"}) {
+		t.Fatalf("Later after a replayed add = %v, want one task", got)
 	}
-	var second adewire.BacklogItem
-	r = p.post("/api/ade/backlog/items", map[string]string{"text": "second"})
+	var second adewire.Task
+	r = p.post("/api/ade/later/items", map[string]string{"title": "second"})
 	r.json(t, &second)
-	if got := backlogTexts(t, app); !equal(got, []string{"second", "first"}) {
-		t.Fatalf("backlog = %v, want the newest first", got)
+	if got := shelfTitles(t, app, adewire.ShelfLater, names...); !equal(got, []string{"second", "first"}) {
+		t.Fatalf("Later = %v, want the newest first", got)
 	}
-	if r := p.post("/api/ade/backlog/move", map[string]any{"id": second.ID, "toIndex": 1}); r.Status != http.StatusOK {
-		t.Fatalf("backlog move = %d %s", r.Status, r.Body)
+	move := map[string]string{"taskId": second.ID, "shelf": adewire.ShelfBacklog, "beforeId": ""}
+	if r := p.post("/api/ade/shelf/move", move); r.Status != http.StatusOK {
+		t.Fatalf("shelf move = %d %s", r.Status, r.Body)
 	}
-	if got := backlogTexts(t, app); !equal(got, []string{"first", "second"}) {
-		t.Fatalf("backlog after move = %v, want first second", got)
+	app.Contract(t, "mobile-board", "args:POST /api/ade/shelf/move", move)
+	if got := shelfTitles(t, app, adewire.ShelfLater, names...); !equal(got, []string{"first"}) {
+		t.Fatalf("Later after the move = %v, want first", got)
+	}
+	if got := shelfTitles(t, app, adewire.ShelfBacklog, names...); !equal(got, []string{"second"}) {
+		t.Fatalf("Backlog after the move = %v, want second", got)
 	}
 
 	// The task sits at its manual step; prev and next walk it through the workflow.

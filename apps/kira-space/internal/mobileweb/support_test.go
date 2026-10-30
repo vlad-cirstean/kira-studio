@@ -150,11 +150,11 @@ func (f *fakeWriter) count() int {
 	return len(f.calls)
 }
 
-func (f *fakeWriter) AddBacklogItem(_ context.Context, a adewire.AddBacklogItemArgs) (adewire.BacklogItem, error) {
-	return adewire.BacklogItem{ID: "new", Text: a.Text}, f.record("AddBacklogItem", a)
+func (f *fakeWriter) CaptureTask(_ context.Context, a adewire.CaptureTaskArgs) (adewire.Task, error) {
+	return adewire.Task{ID: "new", Title: a.Title}, f.record("CaptureTask", a)
 }
-func (f *fakeWriter) MoveBacklogItem(_ context.Context, a adewire.MoveBacklogItemArgs) error {
-	return f.record("MoveBacklogItem", a)
+func (f *fakeWriter) ShelveTask(_ context.Context, a adewire.ShelveTaskArgs) error {
+	return f.record("ShelveTask", a)
 }
 func (f *fakeWriter) SetTaskStep(_ context.Context, a adewire.SetTaskStepArgs) (adewire.Task, error) {
 	return adewire.Task{ID: a.TaskID, EntryStepID: a.StepID}, f.record("SetTaskStep", a)

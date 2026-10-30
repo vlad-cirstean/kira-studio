@@ -41,7 +41,7 @@ test('the reply sheet buttons are at least 44px tall', async ({ page, server, ap
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
-test('empty Needs, Backlog and Plan screens render the shared empty state', async ({
+test('empty Needs and Plan screens render the shared empty state', async ({
   page,
   server,
   app,
@@ -51,11 +51,8 @@ test('empty Needs, Backlog and Plan screens render the shared empty state', asyn
     readFileSync(resolve(__dirname, '../fixtures/ade-v2/board.json'), 'utf8'),
   ) as { tasks: unknown[]; branches: unknown[] };
   server.state.replies.board = { ...board, tasks: [], branches: [] };
-  server.state.replies.backlog = { items: [] };
   await app();
   await expect(page.locator(`${t('needs-empty')}[data-slot="empty-state"]`)).toBeVisible();
-  await page.locator(t('tab-backlog')).click();
-  await expect(page.locator(`${t('backlog-empty')}[data-slot="empty-state"]`)).toBeVisible();
   await page.locator(t('tab-plan')).click();
   await expect(page.locator(`${t('plan-empty')}[data-slot="empty-state"]`)).toBeVisible();
 });

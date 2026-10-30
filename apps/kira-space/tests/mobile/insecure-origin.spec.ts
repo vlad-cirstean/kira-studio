@@ -29,12 +29,12 @@ test('pairs, writes and attaches a terminal on an insecure origin', async ({ pag
   server.resolvePair('approve');
   await expect(page.locator(t('app-shell'))).toBeVisible();
 
-  await page.locator(t('tab-backlog')).click();
-  await page.locator(t('backlog-add')).fill('Works over plain HTTP');
-  await page.locator(t('backlog-add-submit')).click();
-  await expect(page.locator(t('backlog-add'))).toHaveValue('');
+  await page.locator(t('tab-later')).click();
+  await page.locator(t('later-add')).fill('Works over plain HTTP');
+  await page.locator(t('later-add-submit')).click();
+  await expect(page.locator(t('later-add'))).toHaveValue('');
   const sent = server.state.requests.filter(
-    (r) => r.method === 'POST' && r.path === '/api/ade/backlog/items',
+    (r) => r.method === 'POST' && r.path === '/api/ade/later/items',
   );
   expect(sent).toHaveLength(1);
   expect(sent[0]?.key).toMatch(

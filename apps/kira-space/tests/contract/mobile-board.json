@@ -2,6 +2,14 @@
   "args:POST /api/ade/backlog/items": {
     "text": "first"
   },
+  "args:POST /api/ade/later/items": {
+    "title": "first"
+  },
+  "args:POST /api/ade/shelf/move": {
+    "beforeId": "",
+    "shelf": "backlog",
+    "taskId": "<id:2>"
+  },
   "http:GET /api/ade/backlog": {
     "items": [
       {
@@ -23,5 +31,27 @@
     "jira": null,
     "notes": "",
     "text": "first"
+  },
+  "http:POST /api/ade/later/items": {
+    "branchIds": [],
+    "color": 1,
+    "createdAt": 0,
+    "entryStepId": "",
+    "est": "",
+    "hostLink": null,
+    "hostUrl": "",
+    "id": "<id:1>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [],
+    "since": {},
+    "statusBy": "auto",
+    "statusId": "todo",
+    "title": "first",
+    "workflow": null,
+    "workflowId": "",
+    "workflowOutdated": false
   }
 }

@@ -197,20 +197,20 @@ type takeOverRequest struct{}
 
 func badRequest(err error) error { return ipcerr.BadRequest(err.Error()) }
 
-func (s *Server) handleBacklogAdd(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
-	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req adewire.AddBacklogItemArgs) (adewire.BacklogItem, error) {
-		it, err := wr.AddBacklogItem(ctx, req)
+func (s *Server) handleLaterAdd(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
+	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req adewire.CaptureTaskArgs) (adewire.Task, error) {
+		t, err := wr.CaptureTask(ctx, req)
 		if err == nil {
-			auditAdd(r, "item", it.ID)
+			auditAdd(r, "task", t.ID)
 		}
-		return it, err
+		return t, err
 	})(w, r, d)
 }
 
-func (s *Server) handleBacklogMove(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
-	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req adewire.MoveBacklogItemArgs) (empty, error) {
-		auditAdd(r, "item", req.ID, "toIndex", req.ToIndex)
-		return empty{}, wr.MoveBacklogItem(ctx, req)
+func (s *Server) handleShelfMove(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) {
+	writeRoute(s, func(ctx context.Context, wr Writer, r *http.Request, req adewire.ShelveTaskArgs) (empty, error) {
+		auditAdd(r, "task", req.TaskID, "shelf", req.Shelf)
+		return empty{}, wr.ShelveTask(ctx, req)
 	})(w, r, d)
 }
 

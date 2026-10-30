@@ -17,7 +17,7 @@ func TestRoutes_OnlyAllowlistedPairsReachHandlers(t *testing.T) {
 
 	allowed := map[string]bool{}
 	paths := map[string]bool{
-		"/api/ade/backlog/add": true, "/api/ade/workflow-yaml": true, "/api/ade/refresh": true,
+		"/api/ade/later/add": true, "/api/ade/workflow-yaml": true, "/api/ade/refresh": true,
 		"/api/ade/tasks": true, "/api/terminal": true, "/api/settings": true, "/api/ade/board/x": true,
 	}
 	for _, rt := range s.routes() {

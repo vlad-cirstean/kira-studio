@@ -69,22 +69,22 @@ func TestWrite_RefusedWithoutOriginPermissionOrKey(t *testing.T) {
 	s, store, _ := newTestServer(t)
 	writer := s.cfg.Writer.(*fakeWriter)
 	cookie := store.addDeviceWith(t, "dev1", true, false)
-	body := `{"text":"x"}`
+	body := `{"title":"x"}`
 
-	noOrigin := doBody(s, http.MethodPost, "/api/ade/backlog/items", "127.0.0.1:50000", body, func(r *http.Request) {
+	noOrigin := doBody(s, http.MethodPost, "/api/ade/later/items", "127.0.0.1:50000", body, func(r *http.Request) {
 		withCookie(cookie)(r)
 		r.Header.Set(idemKeyHeader, idemA)
 	})
 	if noOrigin.Code != http.StatusForbidden {
 		t.Errorf("no Origin: %d, want 403", noOrigin.Code)
 	}
-	if rec := postJSON(s, "/api/ade/backlog/items", store.addDevice(t, "dev2"), idemA, body); rec.Code != http.StatusForbidden || errCode(t, rec) != codeWriteOff {
+	if rec := postJSON(s, "/api/ade/later/items", store.addDevice(t, "dev2"), idemA, body); rec.Code != http.StatusForbidden || errCode(t, rec) != codeWriteOff {
 		t.Errorf("device without can_write: %d %s", rec.Code, rec.Body)
 	}
-	if rec := postJSON(s, "/api/ade/backlog/items", cookie, "", body); rec.Code != http.StatusBadRequest || errCode(t, rec) != "E_IDEMPOTENCY_KEY" {
+	if rec := postJSON(s, "/api/ade/later/items", cookie, "", body); rec.Code != http.StatusBadRequest || errCode(t, rec) != "E_IDEMPOTENCY_KEY" {
 		t.Errorf("missing key: %d %s", rec.Code, rec.Body)
 	}
-	if rec := postJSON(s, "/api/ade/backlog/items", cookie, "not-a-uuid", body); rec.Code != http.StatusBadRequest {
+	if rec := postJSON(s, "/api/ade/later/items", cookie, "not-a-uuid", body); rec.Code != http.StatusBadRequest {
 		t.Errorf("bad key: %d", rec.Code)
 	}
 	if rec := postJSON(s, "/api/agent/sessions/s1/send", cookie, idemA, `{"message":"hi"}`); rec.Code != http.StatusForbidden || errCode(t, rec) != codeAgentInputOff {
@@ -115,7 +115,7 @@ func TestWrite_HTTPSOriginRefused(t *testing.T) {
 	t.Parallel()
 	s, store, _ := newTestServer(t)
 	cookie := store.addDeviceWith(t, "dev1", true, false)
-	rec := postJSON(s, "/api/ade/backlog/items", cookie, idemA, `{"text":"x"}`, func(r *http.Request) {
+	rec := postJSON(s, "/api/ade/later/items", cookie, idemA, `{"title":"x"}`, func(r *http.Request) {
 		r.Header.Set("Origin", "https://127.0.0.1:7790")
 	})
 	if rec.Code != http.StatusForbidden {

@@ -8,7 +8,7 @@ const t = (id: string) => `[data-testid="${id}"]`;
 test.beforeEach(async ({ app, server }, info) => {
   server.state.auth = 'ok';
   if (info.title.startsWith('contract:'))
-    server.state.replies.backlog = contract('mobile-board', 'http:GET /api/ade/backlog');
+    server.state.replies.board = contract('ade-shelf', 'AdeTaskService.Board#shelves');
   await app();
 });
 
@@ -24,22 +24,23 @@ test('Need you is the landing tab: urgent items first, badge and footer', async 
   );
 });
 
-test('Backlog lists items in priority order and expands notes', async ({ page }) => {
-  await page.locator(t('tab-backlog')).click();
-  await expect(page).toHaveURL(/\/backlog$/);
-  const items = page.locator(t('backlog-item'));
-  await expect(items).toHaveCount(4);
-  await expect(items.first()).toContainText('Rate limit the export endpoint per workspace');
-  await expect(items.first()).toContainText('PAY-140');
+test('Later lists undated tasks and expands notes', async ({ page }) => {
+  await page.locator(t('tab-later')).click();
+  await expect(page).toHaveURL(/\/later$/);
+  const items = page.locator(`${t('later-shelf-later')} ${t('later-item')}`);
+  await expect(items.first()).toBeVisible();
   await items.first().locator('button').click();
-  await expect(page.locator(t('backlog-notes'))).toHaveText('No notes');
+  await expect(page.locator(t('later-notes'))).toHaveText('No notes');
 });
 
-test('contract: Backlog lists what the backend returns', async ({ page }) => {
-  await page.locator(t('tab-backlog')).click();
-  const items = page.locator(t('backlog-item'));
-  await expect(items).toHaveCount(1);
-  await expect(items.first()).toContainText('Write the docs');
+test('contract: Later and Backlog list what the backend returns', async ({ page }) => {
+  await page.locator(t('tab-later')).click();
+  const titles = (shelf: string) =>
+    page.locator(`${t(`later-shelf-${shelf}`)} ${t('later-item')}`).allInnerTexts();
+  const later = await titles('later');
+  expect(later.map((x) => x.split('\n')[0])).toEqual(['planned', 'one']);
+  const backlog = await titles('backlog');
+  expect(backlog.map((x) => x.split('\n')[0])).toEqual(['two']);
 });
 
 test('Plan groups tasks by day and expands a task into its steps', async ({ page }) => {
@@ -69,7 +70,7 @@ test('Plan groups tasks by day and expands a task into its steps', async ({ page
 });
 
 test('every tab fits the screen width', async ({ page }) => {
-  for (const tab of ['backlog', 'needs', 'plan']) {
+  for (const tab of ['needs', 'plan', 'later']) {
     await page.locator(t(`tab-${tab}`)).click();
     await expect(page.locator(t(`${tab}-screen`))).toBeVisible();
     const overflow = await page.evaluate(
