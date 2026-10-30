@@ -8,7 +8,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 |---|---|---|
 | P404 | Board: archived tasks inline, session indicator, weekend pattern, branch status colors | Done |
 | P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Done |
-| P406 | Nanoid branch names for agent-created worktrees | Todo |
+| P406 | Nanoid branch names for agent-created worktrees | Done |
 | P407 | Stage handover: session context notes and stage-change dialogs | Todo |
 | P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Todo |
 | P409 | Finishing a task returns every artifact via MCP | Todo |
@@ -50,6 +50,8 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 ### P406 Nanoid branch names for agent-created worktrees
 
 Worktrees the agent creates use a nanoid as branch name. Agent-chosen names cause many issues.
+
+**Result.** `request_branch` takes only `repo`; Kira Space names new branches `kira/<10-char nanoid>` (`claimBranchName` generated mode, 5 tries on a taken name). New `internal/shortid` shares the nanoid alphabet with memory ids. `ensureWorktree` takes a `newBranchName` value; `validateAgentBranch` gone. Prompts, goldens, contract, ARCHITECTURE and site docs updated; name-validation table moved to `adeflow` `TestTaskBranchEditRefusals`. Real `claude` ADE, smart script and memory gate rows pass; `ade-v2-automations` and `automations-tabs` UI specs pass.
 
 ### P407 Stage handover: session context notes and stage-change dialogs
 
