@@ -137,12 +137,20 @@ func (f *fakeSpace) DeclareRepos(_ context.Context, task string, repos []string)
 	return TaskInfo{Title: "t-" + task, Repos: []TaskRepo{}, Registered: []RegisteredRepo{}}, nil
 }
 
-func (f *fakeSpace) RequestBranch(_ context.Context, task, repo string) (BranchInfo, error) {
-	f.rec("branch|" + task + "|" + repo)
-	if repo == "gone" {
-		return BranchInfo{}, ToolError("repo is no longer registered")
+func (f *fakeSpace) RequestBranches(ctx context.Context, call SpaceCall, repos []string) (RequestBranchesResult, error) {
+	f.rec("branch|" + call.TaskID + "|" + repos[0])
+	if repos[0] == "gone" {
+		return RequestBranchesResult{}, ToolError("repo is no longer registered")
 	}
-	return BranchInfo{Repo: repo, Branch: "kira/x"}, nil
+	if repos[0] == "block" {
+		<-ctx.Done()
+		return RequestBranchesResult{}, ctx.Err()
+	}
+	out := RequestBranchesResult{}
+	for _, r := range repos {
+		out.Branches = append(out.Branches, RequestedBranch{BranchInfo: BranchInfo{Repo: r, Branch: "kira/x"}, Outcome: BranchCreated})
+	}
+	return out, nil
 }
 
 func (f *fakeSpace) BranchStatus(_ context.Context, task, repo string, _ time.Duration) (BranchInfo, error) {
@@ -189,10 +197,10 @@ func TestGrantScopes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if names := toolNames(t, run); !names["finish_step"] || names["request_branch"] || names["task_info"] {
+	if names := toolNames(t, run); !names["finish_step"] || names["request_branches"] || names["task_info"] {
 		t.Fatalf("run-only grant tools = %v", names)
 	}
-	if res, err := run.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branch", Arguments: map[string]any{"repo": "r"}}); err == nil && !res.IsError {
+	if res, err := run.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branches", Arguments: map[string]any{"repos": []string{"r"}}}); err == nil && !res.IsError {
 		t.Fatal("run-only grant called a Space tool")
 	}
 
@@ -200,7 +208,7 @@ func TestGrantScopes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if names := toolNames(t, sp); names["finish_step"] || !names["request_branch"] || !names["declare_repos"] || !names["task_info"] || !names["branch_status"] {
+	if names := toolNames(t, sp); names["finish_step"] || !names["request_branches"] || !names["declare_repos"] || !names["task_info"] || !names["branch_status"] {
 		t.Fatalf("space-only grant tools = %v", names)
 	}
 	if res, err := sp.CallTool(context.Background(), &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": "done", "summary": "x"}}); err == nil && !res.IsError {
@@ -214,14 +222,14 @@ func TestGrantScopes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := both.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branch", Arguments: map[string]any{"repo": "api"}})
+	res, err := both.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branches", Arguments: map[string]any{"repos": []string{"api"}}})
 	if err != nil || res.IsError {
-		t.Fatalf("request_branch: %v %v", err, res)
+		t.Fatalf("request_branches: %v %v", err, res)
 	}
 	if _, err := sp.CallTool(context.Background(), &mcp.CallToolParams{Name: "task_info"}); err != nil {
 		t.Fatal(err)
 	}
-	res, err = both.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branch", Arguments: map[string]any{"repo": "gone"}})
+	res, err = both.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branches", Arguments: map[string]any{"repos": []string{"gone"}}})
 	if err != nil || !res.IsError {
 		t.Fatalf("a ToolError must come back as an error result: %v %v", err, res)
 	}
@@ -323,5 +331,34 @@ func TestFinishStepStatusEnum(t *testing.T) {
 	}
 	if !call("changes") || !reflect.DeepEqual(got, []string{"changes"}) {
 		t.Fatalf("declared result refused or misrecorded: %v", got)
+	}
+}
+
+// A blocked Space call ends when its grant is released, even while the HTTP connection stays open.
+func TestReleaseCancelsBlockedCall(t *testing.T) {
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(string, Finish) {}, Space: &fakeSpace{}})
+	t.Cleanup(func() { _ = srv.Close() })
+	cfg, release, err := srv.Register(Grant{Agent: claude.New(), TaskID: "task-1", Space: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := connect(t, cfg, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan *mcp.CallToolResult, 1)
+	go func() {
+		res, _ := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "request_branches", Arguments: map[string]any{"repos": []string{"block"}}})
+		done <- res
+	}()
+	time.Sleep(200 * time.Millisecond)
+	release()
+	select {
+	case res := <-done:
+		if res != nil && !res.IsError {
+			t.Fatalf("released call succeeded: %+v", res)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("blocked call outlived its release")
 	}
 }

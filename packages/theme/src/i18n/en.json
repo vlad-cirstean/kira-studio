@@ -5586,7 +5586,7 @@
         }
       },
       "headlessSpaceSuffix": {
-        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branch.",
+        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branches.",
         "title": "Kira Space tools notice",
         "usedBy": {
           "body": "Added before the finish instruction when a workflow turns the Kira Space tools on."

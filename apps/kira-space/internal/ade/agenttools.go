@@ -281,62 +281,89 @@ func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, 
 	return "", nil
 }
 
-// RequestBranch implements agentmcp.SpaceTools: it creates the repo's branch and worktree under a
+// RequestBranches implements agentmcp.SpaceTools: per repo it creates the branch and worktree under a
 // generated name, or returns the ones the task already has.
-func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref string) (agentmcp.BranchInfo, error) {
-	mu := b.taskMu(taskID)
+func (b *TaskBoard) RequestBranches(ctx context.Context, call agentmcp.SpaceCall, refs []string) (agentmcp.RequestBranchesResult, error) {
+	mu := b.taskMu(call.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
-	tc, err := b.spaceCtx(taskID)
+	tc, err := b.spaceCtx(call.TaskID)
 	if err != nil {
-		return agentmcp.BranchInfo{}, err
+		return agentmcp.RequestBranchesResult{}, err
 	}
 	if err := b.spaceWritable(tc); err != nil {
-		return agentmcp.BranchInfo{}, err
+		return agentmcp.RequestBranchesResult{}, err
 	}
 	_, cfgs, err := b.registeredCandidates()
 	if err != nil {
-		return agentmcp.BranchInfo{}, err
+		return agentmcp.RequestBranchesResult{}, err
 	}
-	id, err := resolveRepoRef(ref, b.taskCandidates(tc, cfgs), "task")
-	if err != nil {
-		return agentmcp.BranchInfo{}, err
-	}
-	var sb model.AdeTaskBranch
-	for _, br := range tc.branches {
-		if br.CodeRepoID == id {
-			sb = br
+	cands := b.taskCandidates(tc, cfgs)
+	ids := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		id, err := resolveRepoRef(ref, cands, "task")
+		if err != nil {
+			return agentmcp.RequestBranchesResult{}, err
 		}
+		ids = append(ids, id)
 	}
-	nick := tc.nick[id]
+	out := agentmcp.RequestBranchesResult{Branches: make([]agentmcp.RequestedBranch, 0, len(ids))}
+	for _, id := range ids {
+		var sb model.AdeTaskBranch
+		for _, br := range tc.branches {
+			if br.CodeRepoID == id {
+				sb = br
+			}
+		}
+		nick := tc.nick[id]
+		rb, err := b.createBranch(ctx, sb, nick)
+		if err != nil {
+			var te agentmcp.ToolError
+			if !errors.As(err, &te) {
+				return agentmcp.RequestBranchesResult{}, err
+			}
+			rb = agentmcp.RequestedBranch{BranchInfo: agentmcp.BranchInfo{Repo: nick, Next: te.Error()}, Outcome: agentmcp.BranchFailed}
+		}
+		out.Branches = append(out.Branches, rb)
+	}
+	b.notifyBoard()
+	return out, nil
+}
+
+// createBranch makes one repo's branch and worktree under a generated name. A ToolError is a failure
+// of this repo alone.
+func (b *TaskBoard) createBranch(ctx context.Context, sb model.AdeTaskBranch, nick string) (agentmcp.RequestedBranch, error) {
 	if sb.Kind != model.AdeBranchKindMine {
-		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
+		return agentmcp.RequestedBranch{}, agentmcp.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
 	}
-	rec, err := b.deps.CodeRepos.Get(id)
+	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
 	if err != nil {
-		return agentmcp.BranchInfo{}, err
+		return agentmcp.RequestedBranch{}, err
 	}
 	if rec == nil {
-		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
+		return agentmcp.RequestedBranch{}, agentmcp.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
 	}
 	fresh := sb.Name == ""
 	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{generated: true})
 	if err != nil {
-		return agentmcp.BranchInfo{}, toolErr(err)
+		return agentmcp.RequestedBranch{}, toolErr(err)
 	}
 	if fresh {
 		if err := b.deps.Tasks.SetBranchOrigin(sb.ID, model.AdeBranchOriginAgent); err != nil {
-			return agentmcp.BranchInfo{}, err
+			return agentmcp.RequestedBranch{}, err
 		}
 		sb.Name = res.Name
 	}
 	if res.Fresh {
 		if err := b.startSetup(*rec, sb, res.Name, res.Path, b.onSetupReady); err != nil {
-			return agentmcp.BranchInfo{}, err
+			return agentmcp.RequestedBranch{}, err
 		}
 	}
-	b.notifyBoard()
-	return b.branchInfo(sb, nick, res.Path), nil
+	outcome := agentmcp.BranchExisting
+	if res.Fresh {
+		outcome = agentmcp.BranchCreated
+	}
+	return agentmcp.RequestedBranch{BranchInfo: b.branchInfo(sb, nick, res.Path), Outcome: outcome}, nil
 }
 
 func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) agentmcp.BranchInfo {
@@ -401,7 +428,7 @@ func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick
 		}
 		if br.Name == "" {
 			return br, "", &agentmcp.BranchInfo{Repo: tc.nick[id], Setup: agentmcp.SetupInfo{State: "none"},
-				Next: "No branch yet. Call request_branch."}, nil
+				Next: "No branch yet. Call request_branches."}, nil
 		}
 		return br, tc.nick[id], nil, nil
 	}

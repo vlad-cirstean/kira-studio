@@ -56,6 +56,18 @@ func TestSpaceTools_declareIsAdditiveAndIdempotent(t *testing.T) {
 	}
 }
 
+// requestBranch asks for one repo's branch and returns its single result.
+func requestBranch(ctx context.Context, b *TaskBoard, taskID, repo string) (agentmcp.BranchInfo, error) {
+	res, err := b.RequestBranches(ctx, agentmcp.SpaceCall{TaskID: taskID}, []string{repo})
+	if err != nil {
+		return agentmcp.BranchInfo{}, err
+	}
+	if len(res.Branches) != 1 || res.Branches[0].Outcome == agentmcp.BranchFailed {
+		return agentmcp.BranchInfo{}, errors.New("request failed: " + res.Branches[0].Next)
+	}
+	return res.Branches[0].BranchInfo, nil
+}
+
 var generatedBranch = regexp.MustCompile(`^kira/[0-9a-hjkmnp-tv-z]{10}$`)
 
 func TestSpaceTools_requestBranch(t *testing.T) {
@@ -68,10 +80,10 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 	other := e.task("web")
 	ctx := context.Background()
 
-	if _, err := e.board.RequestBranch(ctx, id, "web"); err == nil || !strings.Contains(toolErrText(t, err), "declare_repos") {
+	if _, err := requestBranch(ctx, e.board, id, "web"); err == nil || !strings.Contains(toolErrText(t, err), "declare_repos") {
 		t.Fatalf("branch in an undeclared repo: %v", err)
 	}
-	info, err := e.board.RequestBranch(ctx, id, "api")
+	info, err := requestBranch(ctx, e.board, id, "api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,11 +99,11 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 		return s != nil && s.State == model.AdeSetupReady
 	})
 
-	again, err := e.board.RequestBranch(ctx, id, "api")
+	again, err := requestBranch(ctx, e.board, id, "api")
 	if err != nil || again.Worktree != info.Worktree || again.Branch != info.Branch {
 		t.Fatalf("idempotent re-request: %+v, %v", again, err)
 	}
-	second, err := e.board.RequestBranch(ctx, other, "web")
+	second, err := requestBranch(ctx, e.board, other, "web")
 	if err != nil || !generatedBranch.MatchString(second.Branch) || second.Branch == info.Branch {
 		t.Fatalf("second task branch = %+v, %v; want a different generated name", second, err)
 	}
@@ -110,7 +122,7 @@ func TestSpaceTools_archivedAndBranchStatus(t *testing.T) {
 	if err != nil || st.Setup.State != "none" || st.Next == "" {
 		t.Fatalf("status before branch = %+v, %v", st, err)
 	}
-	if _, err := e.board.RequestBranch(ctx, id, "api"); err != nil {
+	if _, err := requestBranch(ctx, e.board, id, "api"); err != nil {
 		t.Fatal(err)
 	}
 	st, err = e.board.BranchStatus(ctx, id, "api", 0)
@@ -136,7 +148,7 @@ func TestSpaceTools_archivedAndBranchStatus(t *testing.T) {
 	if _, err := e.board.TaskInfo(ctx, id); err == nil || !strings.Contains(toolErrText(t, err), "archived") {
 		t.Fatalf("TaskInfo of an archived task: %v", err)
 	}
-	if _, err := e.board.RequestBranch(ctx, id, "api"); err == nil {
+	if _, err := requestBranch(ctx, e.board, id, "api"); err == nil {
 		t.Fatal("archived task accepted a branch")
 	}
 }
@@ -160,8 +172,8 @@ func TestSpaceTools_startRunCreatesNoBranch(t *testing.T) {
 	if sb := e.branch(t, id, "api"); sb.Name != "" {
 		t.Fatalf("StartRun created branch %q; want none", sb.Name)
 	}
-	info, err := e.board.RequestBranch(context.Background(), id, "api")
+	info, err := requestBranch(context.Background(), e.board, id, "api")
 	if err != nil || !generatedBranch.MatchString(info.Branch) {
-		t.Fatalf("request_branch after start: %+v, %v", info, err)
+		t.Fatalf("request_brancheses after start: %+v, %v", info, err)
 	}
 }

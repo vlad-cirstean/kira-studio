@@ -17,7 +17,7 @@ func FinishInstruction(src llmprompts.Source, results []ResultSpec) string {
 	return llmprompts.HeadlessFinishStepSuffix.Text(src, FinishVars(results))
 }
 
-// SpaceNote goes before the finish instruction when the workflow turns the Kira Space tools on.
+// SpaceNote tells an agent to create branches only through request_branches.
 func SpaceNote(src llmprompts.Source) string {
 	return llmprompts.HeadlessSpaceSuffix.Text(src, llmprompts.NoVars{})
 }

@@ -1,3 +1,3 @@
 Sandbox: write only in /wt/kira-space/feat-login and $TMPDIR.
-No git branch, worktree, tag, stash, fetch or push. Use request_branch, fetch_remote, push_branch.
+No git branch, worktree, tag, stash, fetch or push. Use request_branches, fetch_remote, push_branch.
 "Operation not permitted" means the sandbox blocked it. Do not retry. Call finish_step failed; name the path in reason.

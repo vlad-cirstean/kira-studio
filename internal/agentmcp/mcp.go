@@ -100,6 +100,9 @@ type registration struct {
 	hash, salt []byte
 	// server carries this run's own finish_step schema; nil = the shared server for its flags.
 	server *mcp.Server
+	// ctx ends when the registration is released or the server closes; calls in flight end with it.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 const grantPrefix = "g"
@@ -425,7 +428,8 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	url := "http://" + s.ln.Addr().String() + mcpPath
 	s.seq++
 	id := s.seq
-	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun})
+	regCtx, cancel := context.WithCancel(context.Background())
+	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun, ctx: regCtx, cancel: cancel})
 	s.mu.Unlock()
 
 	cfg, err := g.Agent.MCPConfig([]harness.MCPServer{{Name: ServerName, URL: url, Headers: map[string]string{"Authorization": "Bearer " + plain}}})
@@ -455,9 +459,27 @@ func (s *Server) forget(id uint64) {
 	for _, t := range s.tokens {
 		if t.id != id {
 			kept = append(kept, t)
+		} else if t.cancel != nil {
+			t.cancel()
 		}
 	}
 	s.tokens = kept
+}
+
+// callCtx returns ctx ended also when the caller's registration is released, so a blocking tool call
+// stops when its run or session does even if the HTTP connection lingers.
+func (s *Server) callCtx(ctx context.Context, req *mcp.CallToolRequest) (context.Context, func()) {
+	var info *auth.TokenInfo
+	if req.Extra != nil {
+		info = req.Extra.TokenInfo
+	}
+	reg, ok := s.registered(info)
+	if !ok || reg.ctx == nil {
+		return ctx, func() {}
+	}
+	merged, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(reg.ctx, cancel)
+	return merged, func() { stop(); cancel() }
 }
 
 // Port is the loopback port the server listens on, 0 before the first Register.
@@ -478,6 +500,11 @@ func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
 	srv := s.srv
+	for _, t := range s.tokens {
+		if t.cancel != nil {
+			t.cancel()
+		}
+	}
 	s.srv, s.ln, s.tokens = nil, nil, nil
 	s.mu.Unlock()
 	if srv == nil {

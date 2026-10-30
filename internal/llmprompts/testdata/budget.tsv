@@ -64,11 +64,11 @@ memory.mcp.ingest.awaiting	217
 memory.mcp.semantic.notInstalled	119
 memory.mcp.semantic.unavailable	94
 headless.finishStep.suffix	240
-headless.space.suffix	267
+headless.space.suffix	352
 headless.rebase.reportSuffix	508
 headless.script.reportSuffix	221
-headless.space.instructions	296
-headless.sandbox.note	331
+headless.space.instructions	339
+headless.sandbox.note	333
 headless.tool.finish_step	78
 headless.tool.finish_step.arg.status	86
 headless.tool.finish_step.arg.summary	67
@@ -80,8 +80,8 @@ headless.finishStep.ack	19
 headless.tool.task_info	115
 headless.tool.declare_repos	169
 headless.tool.declare_repos.arg.repos	91
-headless.tool.request_branch	151
-headless.tool.request_branch.arg.repo	42
+headless.tool.request_branches	271
+headless.tool.request_branches.arg.repos	89
 headless.tool.branch_status	93
 headless.tool.branch_status.arg.repo	42
 headless.tool.branch_status.arg.waitSeconds	56

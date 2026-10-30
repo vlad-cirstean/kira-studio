@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -64,12 +65,41 @@ type BranchInfo struct {
 	Next     string    `json:"next"`
 }
 
+// Outcomes of one repo in a request_branches call.
+const (
+	BranchCreated  = "created"
+	BranchExisting = "existing"
+	BranchDenied   = "denied"
+	BranchFailed   = "failed"
+	BranchTimeout  = "timeout"
+)
+
+// RequestedBranch is the answer for one repo of a request_branches call.
+type RequestedBranch struct {
+	BranchInfo
+	Outcome string `json:"outcome"`
+}
+
+// RequestBranchesResult is request_branches' answer, one entry per repo asked for.
+type RequestBranchesResult struct {
+	Branches []RequestedBranch `json:"branches"`
+}
+
+// SpaceCall identifies the caller of a Space tool: the task, and the run or stage it works for.
+type SpaceCall struct {
+	TaskID string
+	// RunID is the headless run behind the call, "" for a session.
+	RunID string
+	// StepID is the stage a session was opened for, "" for a run.
+	StepID string
+}
+
 // SpaceTools is what the Kira Space tools call; *ade.TaskBoard implements it. Every method acts on
-// taskID only.
+// one task only. RequestBranches blocks until the user answers; ctx ends when the caller is gone.
 type SpaceTools interface {
 	TaskInfo(ctx context.Context, taskID string) (TaskInfo, error)
 	DeclareRepos(ctx context.Context, taskID string, repos []string) (TaskInfo, error)
-	RequestBranch(ctx context.Context, taskID, repo string) (BranchInfo, error)
+	RequestBranches(ctx context.Context, call SpaceCall, repos []string) (RequestBranchesResult, error)
 	BranchStatus(ctx context.Context, taskID, repo string, wait time.Duration) (BranchInfo, error)
 }
 
@@ -77,8 +107,8 @@ type declareArgs struct {
 	Repos []string `json:"repos"`
 }
 
-type requestBranchArgs struct {
-	Repo string `json:"repo"`
+type requestBranchesArgs struct {
+	Repos []string `json:"repos"`
 }
 
 type branchStatusArgs struct {
@@ -89,16 +119,37 @@ type branchStatusArgs struct {
 type noArgs struct{}
 
 // spaceTask resolves the Space grant behind a call; every Space tool acts on that task alone.
-func (s *Server) spaceTask(req *mcp.CallToolRequest) (string, *mcp.CallToolResult) {
+func (s *Server) spaceTask(req *mcp.CallToolRequest) (SpaceCall, *mcp.CallToolResult) {
 	var g Grant
 	var ok bool
 	if req.Extra != nil {
 		g, ok = s.grant(req.Extra.TokenInfo)
 	}
 	if !ok || !g.Space || g.TaskID == "" {
-		return "", toolError("Kira Space tools are not available for this session.")
+		return SpaceCall{}, toolError("Kira Space tools are not available for this session.")
 	}
-	return g.TaskID, nil
+	return SpaceCall{TaskID: g.TaskID, RunID: g.RunID, StepID: g.StepID}, nil
+}
+
+// cleanRepos trims and dedups refs; it returns the refusal text when the list is empty, too long or
+// holds a blank entry.
+func cleanRepos(refs []string) ([]string, string) {
+	if n := len(refs); n == 0 || n > maxDeclareRepos {
+		return nil, "repos needs 1 to 20 entries."
+	}
+	out := make([]string, 0, len(refs))
+	seen := map[string]bool{}
+	for _, r := range refs {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			return nil, "repos must not hold an empty entry."
+		}
+		if !seen[r] {
+			seen[r] = true
+			out = append(out, r)
+		}
+	}
+	return out, ""
 }
 
 // fail turns an engine error into a tool result: a ToolError verbatim, anything else generic.
@@ -116,11 +167,13 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 		Name:        "task_info",
 		Description: llmprompts.HeadlessToolTaskInfo.Text(s.prompts, llmprompts.NoVars{}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noArgs) (*mcp.CallToolResult, TaskInfo, error) {
-		task, bad := s.spaceTask(req)
+		call, bad := s.spaceTask(req)
 		if bad != nil {
 			return bad, TaskInfo{}, nil
 		}
-		info, err := s.space.TaskInfo(ctx, task)
+		ctx, done := s.callCtx(ctx, req)
+		defer done()
+		info, err := s.space.TaskInfo(ctx, call.TaskID)
 		if err != nil {
 			return fail("task_info", err), TaskInfo{}, nil
 		}
@@ -133,33 +186,43 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 			"repos": llmprompts.MaxVars{Max: maxDeclareRepos},
 		}), "repos"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args declareArgs) (*mcp.CallToolResult, TaskInfo, error) {
-		task, bad := s.spaceTask(req)
+		call, bad := s.spaceTask(req)
 		if bad != nil {
 			return bad, TaskInfo{}, nil
 		}
 		if n := len(args.Repos); n == 0 || n > maxDeclareRepos {
 			return toolError("repos needs 1 to 20 entries."), TaskInfo{}, nil
 		}
-		info, err := s.space.DeclareRepos(ctx, task, args.Repos)
+		ctx, done := s.callCtx(ctx, req)
+		defer done()
+		info, err := s.space.DeclareRepos(ctx, call.TaskID, args.Repos)
 		if err != nil {
 			return fail("declare_repos", err), TaskInfo{}, nil
 		}
 		return nil, info, nil
 	})
 	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "request_branch",
-		Description: llmprompts.HeadlessToolRequestBranch.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[requestBranchArgs](s.prompts, llmprompts.HeadlessToolRequestBranch.ID(), nil), "repo"),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args requestBranchArgs) (*mcp.CallToolResult, BranchInfo, error) {
-		task, bad := s.spaceTask(req)
+		Name:        "request_branches",
+		Description: llmprompts.HeadlessToolRequestBranches.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[requestBranchesArgs](s.prompts, llmprompts.HeadlessToolRequestBranches.ID(), map[string]any{
+			"repos": llmprompts.MaxVars{Max: maxDeclareRepos},
+		}), "repos"),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args requestBranchesArgs) (*mcp.CallToolResult, RequestBranchesResult, error) {
+		call, bad := s.spaceTask(req)
 		if bad != nil {
-			return bad, BranchInfo{}, nil
+			return bad, RequestBranchesResult{}, nil
 		}
-		info, err := s.space.RequestBranch(ctx, task, args.Repo)
+		repos, msg := cleanRepos(args.Repos)
+		if msg != "" {
+			return toolError(msg), RequestBranchesResult{}, nil
+		}
+		ctx, done := s.callCtx(ctx, req)
+		defer done()
+		res, err := s.space.RequestBranches(ctx, call, repos)
 		if err != nil {
-			return fail("request_branch", err), BranchInfo{}, nil
+			return fail("request_branches", err), RequestBranchesResult{}, nil
 		}
-		return nil, info, nil
+		return nil, res, nil
 	})
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "branch_status",
@@ -168,14 +231,16 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 			"waitSeconds": llmprompts.MaxVars{Max: maxWaitSeconds},
 		}), "repo"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args branchStatusArgs) (*mcp.CallToolResult, BranchInfo, error) {
-		task, bad := s.spaceTask(req)
+		call, bad := s.spaceTask(req)
 		if bad != nil {
 			return bad, BranchInfo{}, nil
 		}
 		if args.WaitSeconds < 0 || args.WaitSeconds > maxWaitSeconds {
 			return toolError("waitSeconds must be 0 to 600."), BranchInfo{}, nil
 		}
-		info, err := s.space.BranchStatus(ctx, task, args.Repo, time.Duration(args.WaitSeconds)*time.Second)
+		ctx, done := s.callCtx(ctx, req)
+		defer done()
+		info, err := s.space.BranchStatus(ctx, call.TaskID, args.Repo, time.Duration(args.WaitSeconds)*time.Second)
 		if err != nil {
 			return fail("branch_status", err), BranchInfo{}, nil
 		}

@@ -791,7 +791,7 @@ var HeadlessSpaceSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceSuffix.usedBy.body",
-	Default:    `Kira Space tools: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only through request_branch, then work in the returned worktree.`,
+	Default:    `Kira Space tools: task_info, declare_repos, request_branches, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only with request_branches, one call for every repo you need; the user approves it. Never git branch, git worktree or git checkout -b. Then work in the returned worktrees.`,
 }, NoVars{})
 
 // HeadlessSandboxNote tells a sandboxed agent what it may write and what to do on a denial.
@@ -803,7 +803,7 @@ var HeadlessSandboxNote = define(Entry{
 	Default: `Sandbox{{if not .Enforced}} (declared, not enforced){{end}}: {{if eq .Access "write"}}write only in {{.Worktree}} and $TMPDIR{{else}}read only; write only in $TMPDIR{{end}}.{{range .Read}}
 Read also: {{.}}{{end}}{{if not .Network}}
 Network: Claude API only.{{end}}{{if .Tools}}
-No git branch, worktree, tag, stash, fetch or push. Use request_branch, fetch_remote, push_branch.{{end}}
+No git branch, worktree, tag, stash, fetch or push. Use request_branches, fetch_remote, push_branch.{{end}}
 "Operation not permitted" means the sandbox blocked it. Do not retry. Call finish_step failed; name the path in reason.`,
 }, SandboxNoteVars{
 	Access: "write", Worktree: "/work/kira-space/feat-login", Read: []string{"/work/specs"}, Network: false, Enforced: true, Tools: true,
@@ -833,7 +833,7 @@ var HeadlessSpaceInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceInstructions.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceInstructions.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceInstructions.usedBy.body",
-	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches only with request_branch, never with git branch or git worktree. A new worktree may still be preparing: call branch_status (it can wait) before editing there.`,
+	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches and worktrees only with request_branches, one call for all repos; the user approves it. Never git branch or git worktree. A new worktree may still be preparing: call branch_status before editing there.`,
 }, NoVars{})
 
 // HeadlessToolFinishStep describes the finish_step tool.
@@ -898,14 +898,14 @@ var HeadlessToolDeclareRepos = define(Entry{
 var _ = arg(HeadlessToolDeclareRepos.id, "repos", spaceApp, NextCall,
 	`Repos to add: nickname, name or code repo id of a registered repo, from task_info. 1 to {{.Max}}.`, MaxVars{Max: 20})
 
-// HeadlessToolRequestBranch describes the request_branch tool.
-var HeadlessToolRequestBranch = define(Entry{
-	ID: "headless.tool.request_branch", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "request_branch",
-	Default: `Create a task repo's branch and worktree; Kira Space names the branch. Returns at once; the prepare script may still run, so call branch_status first.`,
+// HeadlessToolRequestBranches describes the request_branches tool.
+var HeadlessToolRequestBranches = define(Entry{
+	ID: "headless.tool.request_branches", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "request_branches",
+	Default: `Ask the user to approve branches and worktrees for task repos, all in one call; waits for the answer. Kira Space names each new branch. Per repo: created, existing, denied, failed or timeout. A new worktree may still be preparing: call branch_status before editing there.`,
 }, NoVars{})
 
 var (
-	_ = arg(HeadlessToolRequestBranch.id, "repo", spaceApp, NextCall, `Task repo: nickname, name or code repo id.`, NoVars{})
+	_ = arg(HeadlessToolRequestBranches.id, "repos", spaceApp, NextCall, `Task repos, 1 to {{.Max}}: nickname, name or code repo id. Add others first with declare_repos.`, MaxVars{Max: 20})
 )
 
 // HeadlessToolBranchStatus describes the branch_status tool.
