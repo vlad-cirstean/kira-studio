@@ -19,8 +19,9 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
 | P415 | Operations panel: shared git primitives, all git ops, session and MCP ops | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
-| P417 | Code review (1 round) | Todo |
-| P418 | Close chapter v0.2.23 | Todo |
+| P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
+| P418 | Code review (1 round) | Todo |
+| P419 | Close chapter v0.2.23 | Todo |
 
 ## Rows
 
@@ -104,10 +105,17 @@ Task gets a plus button. It starts a terminal or an ad hoc Claude session in tha
 
 Historical runs, success or failed, live in the Operations panel. Automation panel keeps only running ones. Persist errors; keep copy.
 
-### P417 Code review (1 round)
+### P417 Jira via acli behind an issue-tracker abstraction, CLI setup in Settings
+
+- Jira calls go through `acli`, as GitHub already goes through `gh`.
+- From a Jira ID or link, fetch only: title, status, and the associated PRs from the dedicated section.
+- Put `acli` behind an issue-tracker abstraction: more trackers come later.
+- Settings gets a section on how to install and log in to `gh` and `acli`.
+
+### P418 Code review (1 round)
 
 One Opus review over the full diff since `main` (base: the chapter's branch point). Findings file under `plans/`, then one Sonnet fixer.
 
-### P418 Close chapter v0.2.23
+### P419 Close chapter v0.2.23
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
