@@ -415,6 +415,38 @@ export interface Handover {
   createdAt: number;
   updatedAt: number;
 }
+/** Something a task produced or points at. Detected rows have an empty `id`; stored rows can be removed. */
+export interface Artifact {
+  id: string;
+  kind: 'changeRequest' | 'issue' | 'branch' | 'deployment' | 'doc' | 'link';
+  title: string;
+  url: string;
+  ref: string;
+  status: string;
+  repo: string;
+  source: 'task' | 'host' | 'git' | 'agent' | 'user' | (string & {});
+  createdAt: number;
+}
+/** A source that failed or timed out; the list is partial. */
+export interface ArtifactGap {
+  source: string;
+  repo: string;
+}
+export interface ArtifactsResult {
+  artifacts: Artifact[];
+  gaps: ArtifactGap[];
+}
+export interface AddArtifactArgs {
+  taskId: string;
+  kind: 'changeRequest' | 'issue' | 'deployment' | 'doc' | 'link';
+  title: string;
+  url: string;
+  ref: string;
+}
+export interface RemoveArtifactArgs {
+  taskId: string;
+  id: string;
+}
 export interface HandoversResult {
   handovers: Handover[];
 }

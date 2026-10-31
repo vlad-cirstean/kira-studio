@@ -941,6 +941,42 @@ func (s *AdeTaskService) DismissHandover(ctx context.Context, args adewire.TaskA
 	return adeTaskError(s.Engine.DismissHandover(ctx, args.TaskID))
 }
 
+// Artifacts lists a task's artifacts: detected ones (task links, branches, change requests,
+// deployments) and stored ones. Archived tasks work too; a source that fails shows up as a gap.
+func (s *AdeTaskService) Artifacts(ctx context.Context, args adewire.TaskArgs) (adewire.ArtifactsResult, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.ArtifactsResult{}, err
+	}
+	res, err := s.Engine.TaskArtifacts(ctx, args.TaskID)
+	return res, adeTaskError(err)
+}
+
+// AddArtifact stores an artifact the user reports for a live task.
+func (s *AdeTaskService) AddArtifact(ctx context.Context, args adewire.AddArtifactArgs) (adewire.Artifact, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Artifact{}, err
+	}
+	switch {
+	case !agentmcp.ReportableArtifactKind(args.Kind):
+		return adewire.Artifact{}, ipcerr.Contract("kind %q is not a reportable artifact kind", args.Kind)
+	case len(args.Title) > agentmcp.MaxArtifactTitle, len(args.URL) > agentmcp.MaxArtifactURL, len(args.Ref) > agentmcp.MaxArtifactRef:
+		return adewire.Artifact{}, ipcerr.Contract("artifact title, url or ref is too long")
+	}
+	a, err := s.Engine.AddArtifact(ctx, args)
+	return a, adeTaskError(err)
+}
+
+// RemoveArtifact deletes a stored artifact. Detected artifacts have no id and cannot be removed.
+func (s *AdeTaskService) RemoveArtifact(ctx context.Context, args adewire.RemoveArtifactArgs) error {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return err
+	}
+	if err := validateAdeItemID(args.ID, "id"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RemoveArtifact(ctx, args))
+}
+
 func (s *AdeTaskService) SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error) {
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err

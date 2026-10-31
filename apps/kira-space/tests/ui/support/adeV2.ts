@@ -154,6 +154,9 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskHandovers, response: { handovers: [] } },
     { channel: IPC.adeTaskUpdateHandover },
     { channel: IPC.adeTaskDismissHandover },
+    { channel: IPC.adeTaskArtifacts, response: { artifacts: [], gaps: [] } },
+    { channel: IPC.adeTaskAddArtifact },
+    { channel: IPC.adeTaskRemoveArtifact },
     {
       channel: IPC.adeTaskSaveStatuses,
       response: { statuses: adeFixture<{ statuses: unknown[] }>('board').statuses },

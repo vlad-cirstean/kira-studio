@@ -416,6 +416,12 @@ const spaceControl = {
     unwrap(AdeTaskService.UpdateHandover(args)),
   adeTaskDismissHandover: (args: V2.TaskArgs): Promise<void> =>
     unwrap(AdeTaskService.DismissHandover(args)),
+  adeTaskArtifacts: (args: V2.TaskArgs): Promise<V2.ArtifactsResult> =>
+    unwrap(AdeTaskService.Artifacts(args)).then((r) => trust<V2.ArtifactsResult>(r)),
+  adeTaskAddArtifact: (args: V2.AddArtifactArgs): Promise<V2.Artifact> =>
+    unwrap(AdeTaskService.AddArtifact(args)).then((r) => trust<V2.Artifact>(r)),
+  adeTaskRemoveArtifact: (args: V2.RemoveArtifactArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveArtifact(args)),
   adeTaskSetTaskStep: (args: V2.SetTaskStepArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.SetTaskStep(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSaveStatuses: (args: V2.SaveStatusesArgs): Promise<V2.SaveStatusesResult> =>
