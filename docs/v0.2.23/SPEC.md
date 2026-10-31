@@ -25,7 +25,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Done |
 | P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Done |
 | P420 Part 2 | Kira Studio validation proof: window UI, view-state persistence, screenshot, UI spec, visual baselines, docs | Done |
-| P421 | Code review (2 rounds) | Todo |
+| P421 | Code review (2 rounds) | Done |
 | P422 | Close chapter v0.2.23 | Todo |
 
 ## Rows
@@ -192,11 +192,13 @@ App: Kira Studio (not Kira Space). Dedicated MCP tool for validation proof, shap
 
 Scope in Part 1 above; plan in plans/P420.md.
 
-**Result (Part 2).** Proof window: history of 30 with unique names and hover delete with confirm; tab strip in step order; `ConsoleResultGrid` plus read-only Monaco host for data; change panel with current, proposed and compare, accept and reject; ready prompt. View state (scroll, highlight) persists per step and revision; in-memory cache writes throttled to 120 ms, backend write debounced. Screenshot (`modern-screenshot` 4.7.0, MIT, checked in the installed package) copies to clipboard by default, dropdown saves to disk, one tab or all tabs in order, pixel-diff tested against the view state. 8 UI specs, 3 Studio visual baselines. Part 1 Go convention findings fixed on the way (literal errors to `ipcerr.T` keys, `renameio.WriteFile`). Verified on the rebased tree: Studio UI full 663 passed, Studio visual 16, Space `ade-v2-review*` 80 and 6, unit 1968, flows, `go test ./...`, lint, lint:go, knip clean; 0 failed. Not re-run on the final merged head: full Space UI (877 passed on the pre-rebase tree). Known: 4 Studio tests reported "did not run" once, not reproduced in 4 later full runs, cause unknown. Space `ade-v2-review` "context menu adds a review comment from the keyboard route" fails intermittently only in the full spec run (passes 16/16 isolated); gesture wrapped in `toPass`, underlying Monaco layout race not found.
+**Result (Part 2).** Proof window: history of 30 with unique names and hover delete with confirm; tab strip in step order; `ConsoleResultGrid` plus read-only Monaco host for data; change panel with current, proposed and compare, accept and reject; ready prompt. View state (scroll, highlight) persists per step and revision; in-memory cache writes throttled to 120 ms, backend write debounced. Screenshot (`modern-screenshot` 4.7.0, MIT, checked in the installed package) copies to clipboard by default, dropdown saves to disk, one tab or all tabs in order, pixel-diff tested against the view state. 8 UI specs, 3 Studio visual baselines. Part 1 Go convention findings fixed on the way (literal errors to `ipcerr.T` keys, `renameio.WriteFile`). Verified on the rebased tree: Studio UI full 663 passed, Studio visual 16, Space `ade-v2-review*` 80 and 6, unit 1968, flows, `go test ./...`, lint, lint:go, knip clean; 0 failed. Known: 4 Studio tests reported "did not run" once, not reproduced in later full runs, cause unknown.
 
 ### P421 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main` (base: the chapter's branch point), findings file under `plans/`, then one Sonnet fixer. Round 2 covers the full diff again, including round-1 fixes.
+
+**Result.** Round 1 (F1-F4): working review writes guarded by content hash with `E_CONFLICT`, redaction, run-note restore, tracker fixes. Round 2 (R2-F1..F6): per-path hashes on list marks (stale path refuses the whole call, absent content hashes to `absent`), refused-mark notice and reload, review reload only when the branch tip or dirty state moved, `ade-v2-review` context-menu test waits on a ready marker with `toPass` gone, proof step failing to load counts as ready, released proof page drops its console runtime. Final suites on the fixed code: Studio UI 664, Space UI 880, Studio visual 16, Space visual 24; 0 failed, 0 did not run; lint:go clean. Known: `ReviewWorking` reads every changed file once per refresh to hash it (capped by `MaxSnapshotBytes`, debounced). One unreproduced `ade-v2-review` context-menu failure seen once during round 2; if it recurs, run with `--trace=retain-on-failure`.
 
 ### P422 Close chapter v0.2.23
 
