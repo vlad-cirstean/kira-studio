@@ -169,6 +169,7 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskRestartSession, response: adeFixture('launch') },
     { channel: IPC.adeTaskLaunchStep, response: adeFixture('launch') },
     { channel: IPC.adeTaskStartBranch, response: adeFixture('launch') },
+    { channel: IPC.adeTaskStartAdHoc, response: adeFixture('launch') },
     { channel: IPC.adeTaskSend },
     { channel: IPC.adeTaskFocusSession, response: true },
     { channel: IPC.adeTaskArchiveRisk, response: adeFixture('archive-risk') },

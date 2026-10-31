@@ -224,6 +224,7 @@ export const IPC = {
   adeTaskRestartSession: 'kira:adetask:restartSession',
   adeTaskLaunchStep: 'kira:adetask:launchStep',
   adeTaskStartBranch: 'kira:adetask:startBranch',
+  adeTaskStartAdHoc: 'kira:adetask:startAdHoc',
   adeTaskSend: 'kira:adetask:send',
   adeTaskFocusSession: 'kira:adetask:focusSession',
   adeTaskReviewAgent: 'kira:adetask:reviewAgent',
