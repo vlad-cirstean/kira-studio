@@ -3,6 +3,7 @@
 package kibana_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -48,9 +49,23 @@ func TestKibana_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{FailWith: adapters.CodeNotFound},
 		},
 		{
-			Name:   "user without Kibana privileges",
+			// Kibana answers the data view list with 200 and no rows for a user holding no Kibana
+			// privilege, so it connects and shows an empty tree rather than an auth failure.
+			Name:   "user without Kibana privileges connects to an empty tree",
 			Config: func(model.ResolvedConnectionConfig) model.ResolvedConnectionConfig { return f.NoPrivConfig },
-			Expect: testsupport.Outcome{FailWith: adapters.CodeAuth},
+			Expect: testsupport.Outcome{Succeed: true},
+			Then: []testsupport.Scenario{{
+				Name: "lists no data views",
+				Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+					children, err := a.Children(context.Background(), rootPath(cfg), opCtx("matrix-nopriv"))
+					if err != nil {
+						t.Fatalf("Children: %v", err)
+					}
+					if names := testsupport.ChildNames(t, children); len(names) != 0 {
+						t.Errorf("data views = %v, want none", names)
+					}
+				},
+			}},
 		},
 		{
 			Name: "wrong password",
