@@ -2226,6 +2226,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The user message follows ' -- ' in argv so it cannot parse as a flag.
 - A resume runs in the recorded cwd; a missing cwd yields ErrInvalidInput and the directory is not recreated.
 - StartBranch refuses a second session on a branch with the error 'a session is already open on ...'.
+- StartAdHoc (P410) opens an agent TUI on a branch worktree with no first message. It shares StartBranch's rules and grant (handover, Space tools); the row is a plain branch session.
 - A taken-over run can still call finish_step from the TUI (R14). Take over confirms when the run is live and passes stopIfRunning.
 - Sessions are window-scoped like every PTY: closing the window stops the session record, which stays resumable.
 - FocusSession raises the window that holds a session, via kira:adetask:openSession.
@@ -2381,6 +2382,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Pure logic of the ADE frontend lives in frontend/src/ade/v2/board/ (status, actions, needs-you rank, timeline, drop plan, fix menu); components use <script setup>.
 - ADE Pinia stores each have one concern: adeBoardUi (selection, tabs), adeDialogs (dialog flow and pending keys such as merge:<branch>:<target>), adeTakeOver, adeTerminals.
 - ADE server state goes through TanStack Query (queries.ts), invalidated by the push channels.
+- Task plus menu (P410, `sessions/AdeTaskLaunchMenu.vue`) on the card head and the Sessions tab bar: per worktree a Terminal (Git module tab via `openRepoTerminalTab`) or an ad hoc agent session (`StartAdHoc`). Disabled items show their reason inline.
 - The repository list is one Pinia store (state/coderepos.ts) fed by the boot-time kira:adetask:repos subscription (initCodeRepos, called from main.ts), so every module in every window sees every change.
 - All repository configuration lives in one Git-module dialog, repo/ReposDialog.vue (P205), with a Repositories tab (import, list, per-repo form, remove) and a Scan folders tab (add, watch, hide all, remove). Agents has no Repos tab.
 - The per-repo form in ReposDialog sets nickname, prepare script and timeout, integration branches, environments and worktreeBasePath (via UpdateRepo).
@@ -2486,7 +2488,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 
 - ADE Go tests cover internal/ade (board, integration, deploy, run engine, steps, tracker), adeflow, agentmcp and bridge/adewire; run them with go test -race, together with gitsession.
 - The P199 protocol is covered by agentmcp TestGrantScopes (go-sdk client) and agenttools_test.go.
-- ADE frontend tests: tests/unit/ade-v2-* cover board parity with the mockup's logic, dialog, drop plan, progress and timeline; ade-notes-markdown is also covered; 17 tests/ui/ade-v2-*.spec.ts run on the mock runtime.
+- ADE frontend tests: tests/unit/ade-v2-* cover board parity with the mockup's logic, dialog, drop plan, progress and timeline; ade-notes-markdown is also covered; 33 tests/ui/ade-v2-*.spec.ts run on the mock runtime (ade-v2-task-launch covers the task plus menu; contract `ade-adhoc`, flow `TestAdHocSession`, real `claude` `TestAdeAdHocSession`).
 - There is one ADE visual spec, tests/visual/ade-workflow-graph.spec.ts (P247).
 - The live smoke test (server build, real claude -p) covers runs, send-back, restart recovery, Spec/Start/Take over sessions, and merge, rebase and archive dialogs.
 
