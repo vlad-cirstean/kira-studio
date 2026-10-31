@@ -17,7 +17,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Done |
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Done |
 | P414 | Status bar: running ADE agents, interface font, tooltips | Done |
-| P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Todo |
+| P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Done |
 | P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
@@ -128,6 +128,8 @@ Tests: Go flow `TestCommentEdit` with contract `git-review-edit`; UI specs for o
 - Git and ADE modules share one git implementation: same primitives, same abstractions.
 - Also list other ops, e.g. opening an agent session.
 - Also list ops done over MCP (Part 1: in-app `agentmcp` tools).
+
+**Result.** Op log persisted (`op_log`, migration 0060, 30 days / 5000 rows, reconcile at start), two lanes (foreground 500, background 300), batched `kira:op:batch`, failure dedupe, redaction. One seam: `oplog.RecordingRunner` on the shared `gitclient.Runner` records every git spawn from every module as a step or its own row; `Origin` stamped at gitrpc, repo life, auto-fetch, Files and ADE bridge, ADE board ctx. ADE git (`CheckBranchName`, agent `git` tool via `agentmcp.Options.Git` / `TaskBoard.RunGit`) moved onto the shared runner; `runGit` and `noteWrite` removed. Session ops (TUI and headless run, resume, rebase, review, setup, stop) with Cancel; in-app MCP ops via receiving middleware (`Options.OnToolCall`). Panel gains module, subject, background toggle, steps list, xN badge, "Via <tool>", Copy details. OKExits audit and non-read spawn census in ARCHITECTURE.md. Memory MCP (Part 2) out of scope, listed in Known open items. Tests: flows `TestOpsLogAndCancel`, `TestOpsEveryGitSpawn`, `TestOpsAde`, `TestOpsBackgroundDedupe`, `TestOpsCheckRefFormat` (contracts `space-ops`, `space-ops-ade`); units for redaction, dedupe, `OnToolCall`, lanes; `operations.spec.ts` 12; Space UI 831 + flaky repo-graph specs fixed (waits), mobile 83, unit 1968; real `claude` ADE, hook and smart-script rows pass; lint, `lint:dead`, `lint:go`, `lint:claude` clean. Fixed flaky `TestDeployment_scriptStates` (per-repo mutex for env-script passes). Not measured: background spawns/min on an idle 3-repo board. Visual baselines not re-recorded here; re-record once after P417 lands.
 
 ### P415 Part 2: Operations panel: memory MCP tool ops (out-of-process)
 
