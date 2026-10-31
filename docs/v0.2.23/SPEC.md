@@ -14,7 +14,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P409 | Finishing a task returns every artifact via MCP | Done |
 | P410 | Task plus button: terminal or ad hoc Claude session in worktree | Done |
 | P411 | Task statuses: move to Workflow page, fully customizable | Done |
-| P412 | Review: stale-changes indicator, PR link in review agent prompt | Todo |
+| P412 | Review: stale-changes indicator, PR link in review agent prompt | Done |
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Todo |
 | P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
 | P415 | Operations panel: shared git primitives, all git ops, session and MCP ops | Todo |
@@ -97,6 +97,8 @@ Task gets a plus button. It starts a terminal or an ad hoc Claude session in tha
 
 - Review window shows whether changes are stale. The check runs today before approving a PR; show the indicator up front.
 - Review agent prompt includes the PR link.
+
+**Result.** Title bar badge `ade-review-head` (`useReviewHead`, shares the `changeRequest.reviewState` query): "At {short} head" or warn "Stale" (`common.stale.status`), tooltip lists local and host shas; open change request with a local tip only. Shared rule `headStale`, also used by the submit dialog. Refreshes on mount, focus, 60 s staleness and git-stream `repo.changed` refsChanged of the window's repo; no polling, no wire change. Prompts: `changeRequestURL` var on `ade.review.message` repo lines and `ade.review.round.message`; `changeRequestURL` helper in `ade/review.go` (task link first, else branch lookup, never blocks a launch); goldens, budgets, var docs updated. Tests: contract `ade-review-actions` key `#stale` (githostflow), four `ade-v2-review.spec.ts` cases, `TestReviewAgentLinksChangeRequest` (githostflow: lookup, no host) and `TestReviewAgentLinksPR` (adeflow: GitHub task link on a writable and a read-only fork review). Full run: `go test ./...`, `bun run test:unit` 1966, `ui` 820, mobile 83, visual 20 (no re-record), lint, `lint:dead`, `lint:go`, `lint:claude` pass. Real `claude` prompt registry row plus `TestAdeReviewStep`/`TestAdeReviewLost` and `test:claude:studio` pass (`TestMemoryMcpThroughClaude` failed once on model-chosen tool args, passed twice on rerun). Pre-existing flakes fixed: `TestFirstRunJourney` (waits for every branch run) and the wheel-scroll `ui` spec (retries the scroll). Deviations: tooltip attribute is `data-head` (Radix owns `data-state`); round message link is set in a new `roundMessage` helper, not `roundVars`, so followups make no host call; the fake forge has no branch links, so the task-link path is covered in adeflow with GitHub, not githostflow; stale label reuses `common.stale.status`.
 
 ### P413 Review comment dialog: fix overflow and editing, compact gutter
 
