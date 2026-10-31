@@ -9333,20 +9333,48 @@
       "background": {
         "label": "Background"
       },
+      "backgroundCount": {
+        "label": "Background {count}"
+      },
       "clearHint": {
         "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "empty": {
         "hint": "Git commands, agent sessions and MCP calls from every module show here."
       },
+      "field": {
+        "category": {
+          "label": "Category"
+        },
+        "cwd": {
+          "label": "Working directory"
+        },
+        "trigger": {
+          "label": "Trigger"
+        }
+      },
       "module": {
         "label": "Module"
+      },
+      "moduleName": {
+        "ade": {
+          "label": "ADE"
+        },
+        "app": {
+          "label": "Application"
+        },
+        "vscode": {
+          "label": "Code editor"
+        }
       },
       "repeat": {
         "label": "×{count}"
       },
       "step": {
         "label": "{argv} · exit {exit} · {duration}"
+      },
+      "stepsDropped": {
+        "label": "{count} more steps not recorded"
       },
       "via": {
         "label": "Via {tool}"
