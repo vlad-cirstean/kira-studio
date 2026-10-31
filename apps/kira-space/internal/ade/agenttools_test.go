@@ -104,9 +104,6 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 	other := e.task("web")
 	ctx := context.Background()
 
-	if _, err := requestBranch(ctx, e.board, id, "web"); err == nil || !strings.Contains(toolErrText(t, err), "declare_repos") {
-		t.Fatalf("branch in an undeclared repo: %v", err)
-	}
 	info, err := requestBranch(ctx, e.board, id, "api")
 	if err != nil {
 		t.Fatal(err)
@@ -200,6 +197,6 @@ func TestSpaceTools_startRunCreatesNoBranch(t *testing.T) {
 	}
 	info, err := requestBranch(context.Background(), e.board, id, "api")
 	if err != nil || !generatedBranch.MatchString(info.Branch) {
-		t.Fatalf("request_brancheses after start: %+v, %v", info, err)
+		t.Fatalf("request_branches after start: %+v, %v", info, err)
 	}
 }

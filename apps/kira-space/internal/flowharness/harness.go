@@ -61,6 +61,7 @@ type options struct {
 	fileHandlers    filehandlers.Registry
 	trackerGrace    time.Duration
 	rebaseTimeout   time.Duration
+	branchWait      time.Duration
 	mobilePoll      time.Duration
 	seed            func(*App)
 	embedSpec       *embed.Spec
@@ -109,6 +110,9 @@ func WithClock(c scriptruns.Clock) Opt { return func(o *options) { o.clock = c }
 
 // WithMobilePoll sets how often the phone server's network supervisor re-checks (10s by default).
 func WithMobilePoll(d time.Duration) Opt { return func(o *options) { o.mobilePoll = d } }
+
+// WithBranchRequestWait bounds how long an agent's branch request waits for the user.
+func WithBranchRequestWait(d time.Duration) Opt { return func(o *options) { o.branchWait = d } }
 
 // WithRebaseTimeout bounds an ADE rebase run (20 minutes by default).
 func WithRebaseTimeout(d time.Duration) Opt { return func(o *options) { o.rebaseTimeout = d } }
@@ -318,7 +322,7 @@ func (a *App) build() {
 	}
 	a.W = appwire.Build(appwire.Options{
 		Providers: registry,
-		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
+		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, BranchRequestWait: a.opts.branchWait, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake, FileHandlers: a.opts.fileHandlers,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

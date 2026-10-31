@@ -83,6 +83,9 @@ type Options struct {
 	TrackerGrace time.Duration
 	// RebaseTimeout bounds one ADE rebase run; 0 keeps the default (20 minutes).
 	RebaseTimeout time.Duration
+	// BranchRequestWait is how long an agent's branch request waits for the user; 0 keeps the default
+	// (30 minutes).
+	BranchRequestWait time.Duration
 	// Sandbox confines headless agents; nil uses the OS enforcer (a flow-test seam).
 	Sandbox agentsandbox.Enforcer
 	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); 0 keeps each script's.
@@ -327,7 +330,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, runs, w.Agents, w.Prompts)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, opts.BranchRequestWait, runs, w.Agents, w.Prompts)
 	runs.ADE = w.AdeBoard
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()

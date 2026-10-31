@@ -914,6 +914,36 @@ export interface RunArgs {
 export interface TaskArgs {
   taskId: string;
 }
+/** One repo an agent asks branch work for: a new `branch` from `base` ('' = main), or a `worktree` for `branch`. */
+export interface BranchRequestItem {
+  codeRepoId: string;
+  repo: string;
+  kind: 'branch' | 'worktree';
+  branch: string;
+  base: string;
+}
+/** An agent's open request for branches and worktrees. `expiresAt` is unix millis. */
+export interface BranchRequest {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  source: 'run' | 'session' | 'automation';
+  stepName: string;
+  items: BranchRequestItem[];
+  createdAt: number;
+  expiresAt: number;
+}
+export interface BranchRequestArgs {
+  id: string;
+}
+export interface ApproveBranchRequestArgs {
+  id: string;
+  codeRepoIds: string[];
+}
+/** `resolved` is false when the request was already answered. */
+export interface BranchRequestAnswer {
+  resolved: boolean;
+}
 export interface ReadLogArgs {
   kind: LogKind;
   id: string;

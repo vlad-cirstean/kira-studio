@@ -482,6 +482,14 @@ const spaceControl = {
     unwrap(AdeTaskService.ArchiveTask(args)),
   adeTaskArchivedTask: (args: V2.TaskArgs): Promise<V2.ArchivedTask> =>
     unwrap(AdeTaskService.ArchivedTask(args)).then((r) => trust<V2.ArchivedTask>(r)),
+  adeTaskBranchRequest: (args: V2.BranchRequestArgs): Promise<V2.BranchRequest> =>
+    unwrap(AdeTaskService.BranchRequest(args)).then((r) => trust<V2.BranchRequest>(r)),
+  adeTaskApproveBranchRequest: (
+    args: V2.ApproveBranchRequestArgs,
+  ): Promise<V2.BranchRequestAnswer> =>
+    unwrap(AdeTaskService.ApproveBranchRequest(args)).then((r) => trust<V2.BranchRequestAnswer>(r)),
+  adeTaskDenyBranchRequest: (args: V2.BranchRequestArgs): Promise<V2.BranchRequestAnswer> =>
+    unwrap(AdeTaskService.DenyBranchRequest(args)).then((r) => trust<V2.BranchRequestAnswer>(r)),
   adeTaskRestoreTask: (args: V2.TaskArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.RestoreTask(args)).then((r) => trust<V2.Task>(r)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBoard, cb),

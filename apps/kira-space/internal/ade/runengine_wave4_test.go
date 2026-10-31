@@ -410,8 +410,9 @@ func TestRunEngine_takeOver(t *testing.T) {
 
 const manualSessionStep = "  - id: spec\n    name: Spec\n    kind: manual\n    status: To do\n    session: true\n    prompt: Write the spec for {task}\n"
 
-// handoverLine ends every interactive launch message.
-var handoverLine = llmprompts.AdeHandoverLine.Text(llmprompts.Defaults(), llmprompts.NoVars{})
+// handoverLine ends every interactive launch message, after the Kira Space note.
+var handoverLine = llmprompts.HeadlessSpaceSuffix.Text(llmprompts.Defaults(), llmprompts.NoVars{}) + "\n" +
+	llmprompts.AdeHandoverLine.Text(llmprompts.Defaults(), llmprompts.NoVars{})
 
 func TestRunEngine_launchStep(t *testing.T) {
 	ctx := context.Background()

@@ -1094,6 +1094,9 @@
         "branchOnTask": {
           "body": "That branch is already on a task."
         },
+        "branchRequestGone": {
+          "body": "This branch request was already answered."
+        },
         "estimateInvalid": {
           "body": "Enter an estimate like 2h or 3d."
         },
