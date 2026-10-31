@@ -12,7 +12,7 @@ const redacted = "***"
 
 var (
 	secretKey   = regexp.MustCompile(`(?i)extraheader|password|token|secret|authorization|credential`)
-	urlUserinfo = regexp.MustCompile(`([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s@:]*:[^/\s@]*@`)
+	urlUserinfo = regexp.MustCompile(`([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s@]+@`)
 )
 
 // RedactText masks URL credentials in free text (stderr tails, arguments).

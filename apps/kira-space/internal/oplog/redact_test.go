@@ -33,9 +33,9 @@ func TestRedactArgv(t *testing.T) {
 }
 
 func TestRedactJSON(t *testing.T) {
-	raw := []byte(`{"token":"s3","n":5,"url":"https://a:b@h/x","args":["push","-c","x.password=p","https://u:p@h/r"],"nested":{"authorization":"Bearer z","list":["https://a:b@h"]}}`)
+	raw := []byte(`{"token":"s3","n":5,"url":"https://a:b@h/x","args":["push","-c","x.password=p","https://u:p@h/r"],"nested":{"authorization":"Bearer z","list":["https://a:b@h","https://ghp_tok@github.com/o/r.git"]}}`)
 	got := RedactJSON(raw, 4096)
-	for _, leak := range []string{"s3", "Bearer z", "a:b@", "u:p@", "x.password=p"} {
+	for _, leak := range []string{"s3", "Bearer z", "a:b@", "u:p@", "ghp_tok", "x.password=p"} {
 		if strings.Contains(got, leak) {
 			t.Fatalf("leaked %q in %s", leak, got)
 		}
