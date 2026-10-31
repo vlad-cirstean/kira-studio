@@ -23,7 +23,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Done |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Done |
-| P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Todo |
+| P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Done |
 | P420 Part 2 | Kira Studio validation proof: window UI, view-state persistence, screenshot, UI spec, visual baselines, docs | Todo |
 | P421 | Code review (2 rounds) | Todo |
 | P422 | Close chapter v0.2.23 | Todo |
@@ -185,6 +185,8 @@ App: Kira Studio (not Kira Space). Dedicated MCP tool for validation proof, shap
 - Window design closely follows the Kira Space review window.
 - Screenshot button: one tab or all tabs in order. Dropdown to save to disk; default is copy to clipboard.
 - Scroll position and click-highlighted data persist per tab and match the screenshot exactly.
+
+**Result (Part 1).** Proof storage (Studio migration 0046: sessions, revisions, steps, view state; INTEGER ms times; foreign keys ON per connection), service with validation and limits (100 steps, 5 drafts, 32 MiB per session, 30-session retention), five kira-db MCP tools (`proof_start_session`, `proof_edit_session`, `proof_add_step`, `proof_close_session`, `proof_list_sessions`) reading raw args so integer precision and key order survive; draft/revision edit model with read-time provenance diff; `ProofService` bridge (sessions, session, step, view state, accept/reject, delete, mark seen, open window, window target, save PNG); ephemeral `proof-` windows purged at startup; `kira:proof:changed/select` events; `proof` prompt kind re-raised at startup; shared zod types; Go flows `proofflow` with contracts `proof.json`, `proof-pending.json`; real `claude` `TestProofMcpThroughClaude`. Window UI, screenshot and baselines are Part 2. Go flows both apps, Studio UI 655, Space UI 877, mobile 83, visual 13 and 24, lint pass. llmpromptsflow count 34 to 53.
 
 ### P421 Code review (2 rounds)
 
