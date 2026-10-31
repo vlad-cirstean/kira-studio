@@ -180,22 +180,7 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		command, env = composed, composedEnv
 	}
 
-	var tap func([]byte)
-	var onExit func()
-	if agent && b.Arbiter != nil {
-		id := args.TerminalID
-		tap = func(data []byte) { b.Arbiter.Output(id, data) }
-		onExit = func() { b.Arbiter.Exited(id) }
-	}
-	if scriptRun != "" {
-		id, agentTap := args.TerminalID, tap
-		tap = func(data []byte) {
-			if agentTap != nil {
-				agentTap(data)
-			}
-			b.Scripts.Output(id, data)
-		}
-	}
+	tap, onExit := b.outputTaps(agent, scriptRun != "", args.TerminalID)
 	var onEnd func(int, CloseCause)
 	if scriptRun != "" {
 		id := args.TerminalID
@@ -232,6 +217,25 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		b.Arbiter.Opened(args.TerminalID, args.Cols, args.Rows)
 	}
 	return OpenResult{Shell: sess.Shell()}, nil
+}
+
+// outputTaps builds the reader-goroutine tap and exit hook for an agent session (arbiter) and a script
+// session (run tail); a session can be both.
+func (b *BoundService) outputTaps(agent, script bool, id string) (tap func([]byte), onExit func()) {
+	if agent && b.Arbiter != nil {
+		tap = func(data []byte) { b.Arbiter.Output(id, data) }
+		onExit = func() { b.Arbiter.Exited(id) }
+	}
+	if script {
+		agentTap := tap
+		tap = func(data []byte) {
+			if agentTap != nil {
+				agentTap(data)
+			}
+			b.Scripts.Output(id, data)
+		}
+	}
+	return tap, onExit
 }
 
 func (b *BoundService) abortAgent(terminalID string) {
