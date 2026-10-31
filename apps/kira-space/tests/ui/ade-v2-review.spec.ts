@@ -1185,12 +1185,16 @@ reviewTest(
   async ({ relaunch }) => {
     const { page, modified } = await openHunkDiff(relaunch, { comments: [] });
     await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
-    // The diff relays out while hunks settle; a right-click that lands mid-layout targets another
-    // line, so the whole gesture retries until the thread opens.
-    await expect(async () => {
-      await renderedLine(modified, 'CHANGED 100').click({ button: 'right' });
-      await page.getByRole('menuitem', { name: 'Add review comment' }).click();
-      await expect(page.locator(t('review-thread'))).toBeVisible({ timeout: 3_000 });
-    }).toPass({ timeout: 20_000 });
+    // The menu item exists only once the review layer attached; wait for that, not for a retry.
+    await expect(page.locator(t('repo-diff-editor'))).toHaveAttribute('data-review-ready', 'true');
+    await renderedLine(modified, 'CHANGED 100').click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Add review comment' }).click();
+    const thread = page.locator(t('review-thread'));
+    await expect(thread).toBeVisible();
+    await thread.getByTestId('review-thread-input').fill('from the menu');
+    await thread.getByTestId('review-thread-send').click();
+    await expect
+      .poll(async () => (await gitStreamParams(page, 'review.comment.add'))[0])
+      .toMatchObject({ range: { start: 100, end: 100 }, body: 'from the menu' });
   },
 );

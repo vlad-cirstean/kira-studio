@@ -61,6 +61,8 @@ const container = ref<HTMLElement | null>(null);
 let unregisterFind: (() => void) | null = null;
 let unregisterGoToFile: (() => void) | null = null;
 let reviewDecorations: ReviewDecorationsHandle | null = null;
+// True once the review layer (glyphs, context-menu actions, first load) is attached and loaded.
+const reviewReady = ref(false);
 
 const navigation = useReviewNavigationStore();
 const diffNavigation = shallowRef<DiffNavigation | null>(null);
@@ -207,6 +209,11 @@ async function mount(): Promise<void> {
     );
   }
 
+  const attached = reviewDecorations;
+  void attached?.ready.then(() => {
+    if (reviewDecorations === attached) reviewReady.value = true;
+  });
+
   // After the decorations so its listener runs once comment lines were revealed.
   const changeNav = attachDiffNavigation(editor);
   diffNavigation.value = changeNav;
@@ -320,6 +327,7 @@ onUnmounted(() => {
       ref="container"
       class="monaco-host flex-auto min-h-0 w-full"
       data-testid="repo-diff-editor"
+      :data-review-ready="reviewReady"
     />
     <EmptyState
       v-else-if="state === 'binary'"
