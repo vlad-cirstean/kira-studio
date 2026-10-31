@@ -129,9 +129,14 @@ function menuFor(record: Row): MenuItem[] {
     <template #cell="{ column, record }">
       <template v-if="isAutomationOp(record)">
         <span v-if="column.id === 'module'" class="truncate min-w-0">{{ auto.kindLabel() }}</span>
-        <span v-else-if="column.id === 'source'" class="truncate min-w-0">{{
-          triggerLabel(record.run)
-        }}</span>
+        <span
+          v-else-if="column.id === 'source'"
+          class="truncate min-w-0"
+          data-testid="op-source-cell"
+          >{{
+            triggerLabel(record.run)
+          }}</span
+        >
         <Tooltip v-else-if="column.id === 'subject'">
           <TooltipTrigger as-child>
             <span class="truncate min-w-0">{{
