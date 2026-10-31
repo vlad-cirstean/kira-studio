@@ -586,7 +586,7 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
   they skip and report green.
 - **Check `df -h /` before a build.** Aim for 6 GB free. The Go build cache once reached 8 GB and filled the
   disk (P236). Reclaim regenerable files first: `/tmp/go-build*`, `/tmp/go-link-*`,
-  `/tmp/playwright-transform-cache-*`, `apps/*/test-results`, `playwright-report`. `go clean -cache` only
+  `/tmp/playwright-transform-cache-*`, `apps/*/test-results`. `go clean -cache` only
   when the disk is full: the next build is cold. Keep the Docker images (`docker image prune` would force a
   pull before the complete suites).
 - **`e2e-real` keeps only what cannot split at the IPC boundary** (P249): Space `boot-real`, `multiwindow-real`,
