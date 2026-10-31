@@ -15,7 +15,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P410 | Task plus button: terminal or ad hoc Claude session in worktree | Done |
 | P411 | Task statuses: move to Workflow page, fully customizable | Done |
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Done |
-| P413 | Review comment dialog: fix overflow and editing, compact gutter | Todo |
+| P413 | Review comment dialog: fix overflow and editing, compact gutter | Done |
 | P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
 | P415 | Operations panel: shared git primitives, all git ops, session and MCP ops | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
@@ -106,6 +106,12 @@ Task gets a plus button. It starts a terminal or an ad hoc Claude session in tha
 - Comment dialog is taller than the viewport. Fix.
 - Messages cannot be edited. Fix.
 - Gutter columns eat space. Proposal: plus icon replaces the line number; hunk checkmark becomes its own empty row (line 1, then checkmark row, then empty line, then line 2). If not feasible, report back.
+
+**Result.** Feasibility verdict: both proposals feasible, both shipped, nothing declined. Plus replaces the line number: Monaco 0.56 `lineNumberClassName` hides the hovered line's digits and draws the `add` codicon; click on `GUTTER_LINE_NUMBERS` opens the composer. A commented line keeps its number, tinted; click opens the thread. Tradeoffs: clicking a number no longer selects the line (`selectOnLineNumbers: false`, right pane; drag and the context menu still work); the hovered number is hidden under the pointer; keyboard route is the context menu "Add review comment". Hunk mark as its own row: one-line view zone above each hunk's first changed line, mark in the zone's margin node (`ReviewHunkMark.vue`). Zones are not model lines, so anchors, ranges, `getLineChanges` and `revealCommentLines` keep their coordinates, and the diff editor aligns the left pane. Tradeoffs: one extra line of height per hunk; a pure deletion hunk has no mark (as before). Glyph margin gone on both panes: measured `.margin` width per pane before 64px (original) and 82px (modified), after 46px both.
+
+Overflow: a thread is a spacer view zone plus an overlay widget (`ReviewThread.vue`), width of the visible editor, height capped at `max(12 lines, 80% of editor height)`, re-laid out by a ResizeObserver; the wheel scrolls the box, not the editor; the compose textarea autosizes and takes focus; action buttons wrap. The spacer zone sets `showInHiddenAreas` so a thread beside a collapsed region stays visible. Edit: new `review.comment.edit` (id, body, kind; keeps range, state and reply, clears `sentAt`), `ContractVersion` 55 to 56, store/session/rpc/transport, edit mode in the thread, Escape cancels, Ctrl/Cmd+Enter submits, errors show inline. Keystroke leak: suspected, tested first on the base, not reproduced (textarea keys behave normally), so no containment fix was added. Monaco forces a glyph margin onto the original pane side by side; `reviewDecorations.ts` switches it back off on change. `.margin-view-zones` is lifted over the number overlays (z-index 2) and `ReviewHunkMark` stops pointer events, else the mark click never lands.
+
+Tests: Go flow `TestCommentEdit` with contract `git-review-edit`; UI specs for overflow, edit (ok and error), keystroke containment, gutter (no glyph margin, hover plus, comment tint, hunk row side by side and inline, mark click), context menu route; shared fixtures moved to `tests/ui/support/reviewHunkDiff.ts`; new visual baseline `review-diff-gutter`, existing baselines unchanged. Full run: `go test ./...`, `bun run test:unit` 1966, `ui` 828, mobile 83, visual 21, lint, `lint:dead`, `lint:go`, `lint:claude` pass. No real `claude` tests: no Claude integration code changed. No pre-existing failures found. Deviations: none from the plan; the review banner keeps the z-index 10 rule, the thread no longer needs it.
 
 ### P414 Status bar: running ADE agents, interface font, tooltips
 
