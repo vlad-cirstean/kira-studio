@@ -269,13 +269,14 @@ func checkDocuments(data json.RawMessage) (any, error) {
 		}
 		id := strconv.Itoa(i + 1)
 		if raw := bytes.TrimSpace(d.ID); len(raw) > 0 && string(raw) != "null" {
-			if raw[0] == '"' {
+			switch {
+			case raw[0] == '"':
 				if err := json.Unmarshal(raw, &id); err != nil {
 					return nil, invalid("data.documents[%d].id is not a valid string", i)
 				}
-			} else if raw[0] >= '0' && raw[0] <= '9' || raw[0] == '-' {
+			case raw[0] >= '0' && raw[0] <= '9' || raw[0] == '-':
 				id = string(raw)
-			} else {
+			default:
 				return nil, invalid("data.documents[%d].id must be a string or number", i)
 			}
 		}

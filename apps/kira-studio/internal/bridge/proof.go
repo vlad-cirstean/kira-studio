@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"os"
@@ -317,7 +318,7 @@ func (s *ProofService) SavePng(args ProofSavePngArgs) (ProofSavePngResult, error
 		return ProofSavePngResult{}, ipcerr.BadRequest("the screenshot is too large to save")
 	}
 	data, err := base64.StdEncoding.DecodeString(args.PngBase64)
-	if err != nil || len(data) > maxPngBytes || len(data) < len(pngMagic) || string(data[:len(pngMagic)]) != string(pngMagic) {
+	if err != nil || len(data) > maxPngBytes || !bytes.HasPrefix(data, pngMagic) {
 		return ProofSavePngResult{}, ipcerr.BadRequest("the screenshot is not a PNG image")
 	}
 	path, err := s.Dialogs.SaveFile(SaveFileRequest{Directory: downloadsDir(), Filename: safePngName(args.Filename)})

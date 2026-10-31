@@ -262,6 +262,39 @@ type ProofNewStep struct {
 	Keep, Replaces                             *int
 }
 
+// applyRef resolves keepOrdinal/replacesOrdinal against the current revision's steps and fills step.
+func applyRef(tx *sql.Tx, sid string, rev int, curRev int64, in ProofNewStep, step *ProofStepRow) error {
+	ref := in.Keep
+	if in.Replaces != nil {
+		ref = in.Replaces
+	}
+	if ref == nil {
+		return nil
+	}
+	if err := tx.QueryRow(`SELECT 1 FROM proof_steps WHERE session_id = ? AND rev = ? AND origin_ordinal = ?`, sid, rev, *ref).Scan(new(int)); err == nil {
+		return proofErr(ProofBadRef, "old step %d is already referenced by another step of this draft", *ref)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	var old ProofStepRow
+	err := tx.QueryRow(`SELECT description, query, language, source, view, payload FROM proof_steps WHERE session_id = ? AND rev = ? AND ordinal = ?`,
+		sid, curRev, *ref).Scan(&old.Description, &old.Query, &old.Language, &old.Source, &old.View, &old.Payload)
+	if errors.Is(err, sql.ErrNoRows) {
+		return proofErr(ProofBadRef, "the session has no step %d to keep or replace", *ref)
+	}
+	if err != nil {
+		return err
+	}
+	step.OriginOrdinal = ref
+	if in.Keep != nil {
+		step.Description, step.Query, step.Language, step.Source, step.View, step.Payload = old.Description, old.Query, old.Language, old.Source, old.View, old.Payload
+		step.Diff = "unchanged"
+	} else {
+		step.Diff = "changed"
+	}
+	return nil
+}
+
 // AddStep appends a step to an open draft and returns its ordinal.
 func (r *ProofRepo) AddStep(draftID string, in ProofNewStep) (int, error) {
 	var ordinal int
@@ -290,32 +323,8 @@ func (r *ProofRepo) AddStep(draftID string, in ProofNewStep) (int, error) {
 		}
 		step := ProofStepRow{SessionID: sid, Rev: rev, Description: in.Description, Query: in.Query, Language: in.Language,
 			Source: in.Source, View: in.View, Payload: in.Payload, Diff: "added"}
-		ref := in.Keep
-		if in.Replaces != nil {
-			ref = in.Replaces
-		}
-		if ref != nil {
-			if err := tx.QueryRow(`SELECT 1 FROM proof_steps WHERE session_id = ? AND rev = ? AND origin_ordinal = ?`, sid, rev, *ref).Scan(new(int)); err == nil {
-				return proofErr(ProofBadRef, "old step %d is already referenced by another step of this draft", *ref)
-			} else if !errors.Is(err, sql.ErrNoRows) {
-				return err
-			}
-			var old ProofStepRow
-			err := tx.QueryRow(`SELECT description, query, language, source, view, payload FROM proof_steps WHERE session_id = ? AND rev = ? AND ordinal = ?`,
-				sid, cur.Int64, *ref).Scan(&old.Description, &old.Query, &old.Language, &old.Source, &old.View, &old.Payload)
-			if errors.Is(err, sql.ErrNoRows) {
-				return proofErr(ProofBadRef, "the session has no step %d to keep or replace", *ref)
-			}
-			if err != nil {
-				return err
-			}
-			step.OriginOrdinal = ref
-			if in.Keep != nil {
-				step.Description, step.Query, step.Language, step.Source, step.View, step.Payload = old.Description, old.Query, old.Language, old.Source, old.View, old.Payload
-				step.Diff = "unchanged"
-			} else {
-				step.Diff = "changed"
-			}
+		if err := applyRef(tx, sid, rev, cur.Int64, in, &step); err != nil {
+			return err
 		}
 		step.PayloadBytes = len(step.Payload)
 		var used int
@@ -382,29 +391,36 @@ func (r *ProofRepo) CloseDraft(draftID string, now time.Time) (ProofClosed, erro
 		if _, err := tx.Exec(`UPDATE proof_sessions SET state = 'closed', current_rev = ?, closed_at = ?, updated_at = ? WHERE id = ?`, out.Rev, closedAt, closedAt, out.SessionID); err != nil {
 			return err
 		}
-		rows, err := tx.Query(`SELECT id FROM proof_sessions WHERE state = 'closed' ORDER BY closed_at DESC, rowid DESC LIMIT -1 OFFSET ?`, ProofKeepClosed)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				_ = rows.Close()
-				return err
-			}
-			out.Pruned = append(out.Pruned, id)
-		}
-		if err := rows.Close(); err != nil {
-			return err
-		}
-		for _, id := range out.Pruned {
-			if _, err := tx.Exec(`DELETE FROM proof_sessions WHERE id = ?`, id); err != nil {
-				return err
-			}
-		}
-		return nil
+		out.Pruned, err = pruneClosed(tx)
+		return err
 	})
 	return out, err
+}
+
+// pruneClosed deletes the closed sessions beyond the newest ProofKeepClosed and returns their ids.
+func pruneClosed(tx *sql.Tx) ([]string, error) {
+	rows, err := tx.Query(`SELECT id FROM proof_sessions WHERE state = 'closed' ORDER BY closed_at DESC, rowid DESC LIMIT -1 OFFSET ?`, ProofKeepClosed)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		if _, err := tx.Exec(`DELETE FROM proof_sessions WHERE id = ?`, id); err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
 }
 
 // monotonicClose returns now (unix ms) strictly after every closed_at, so "newest closed" is a
