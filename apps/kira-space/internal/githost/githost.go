@@ -46,13 +46,15 @@ const (
 
 // Status is a host call's actionability.
 type Status struct {
-	Kind    string   `json:"kind"`
-	Path    string   `json:"path,omitempty"` // CLI path, when the host uses one.
-	Version string   `json:"version,omitempty"`
-	Host    string   `json:"host,omitempty"`
-	Account string   `json:"account,omitempty"`
-	Probed  []string `json:"probed,omitempty"`
-	Reason  string   `json:"reason,omitempty"`
+	Kind    string `json:"kind"`
+	Path    string `json:"path,omitempty"` // CLI path, when the host uses one.
+	Version string `json:"version,omitempty"`
+	Host    string `json:"host,omitempty"`
+	Account string `json:"account,omitempty"`
+	// Site is the account scope the CLI signed in to, for hosts that sign in per organization; "" otherwise.
+	Site   string   `json:"site,omitempty"`
+	Probed []string `json:"probed,omitempty"`
+	Reason string   `json:"reason,omitempty"`
 	// RateLimited arms the per-repo breaker.
 	RateLimited bool `json:"-"`
 	// ResetAt is when a rate limited call may be retried; zero when the host did not say.
@@ -97,8 +99,10 @@ type Remotes interface {
 
 // Auth is the host account the user is signed in as. A provider owns its credentials; Kira holds none.
 type Auth interface {
-	Status(ctx context.Context, host string) Status
-	Account(ctx context.Context, host string) string
+	// Status is whether the CLI can act on r: installed, signed in to the account scope r lives in.
+	Status(ctx context.Context, r Repo) Status
+	// Account is the signed-in login for r's account scope; "" when unknown.
+	Account(ctx context.Context, r Repo) string
 }
 
 // ChangeRequests reads pull or merge requests. Every call reports failure in Status, never an error.
@@ -221,6 +225,7 @@ type ChangeRequestSearch interface {
 // sign in to.
 type CLISetup interface {
 	Setup() clisetup.Setup
-	// CLIStatus probes the CLI against the provider's primary host. refresh drops the cached probe first.
+	// CLIStatus probes the CLI against the provider's primary account scope (GitHub: github.com; Azure: the
+	// default organization). refresh drops the cached probe first.
 	CLIStatus(ctx context.Context, refresh bool) Status
 }

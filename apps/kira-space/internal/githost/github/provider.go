@@ -75,12 +75,12 @@ func (p *Provider) Claims(ctx context.Context, host string) bool {
 	return false
 }
 
-func (p *Provider) Status(ctx context.Context, host string) githost.Status {
-	return toStatus(p.client.discovery.Status(ctx, host))
+func (p *Provider) Status(ctx context.Context, r githost.Repo) githost.Status {
+	return toStatus(p.client.discovery.Status(ctx, r.Host))
 }
 
-func (p *Provider) Account(ctx context.Context, host string) string {
-	return p.client.Account(ctx, host)
+func (p *Provider) Account(ctx context.Context, r githost.Repo) string {
+	return p.client.Account(ctx, r.Host)
 }
 
 func (p *Provider) ForCommit(ctx context.Context, r githost.Repo, sha string) ([]githost.ChangeRequest, githost.Status) {

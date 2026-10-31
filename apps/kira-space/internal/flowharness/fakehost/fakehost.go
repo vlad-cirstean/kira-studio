@@ -176,11 +176,11 @@ func (f *Forge) ParseRemote(remoteURL string) (githost.Repo, bool) {
 
 func (f *Forge) Claims(_ context.Context, host string) bool { return host == Host }
 
-func (f *Forge) Status(context.Context, string) githost.Status {
+func (f *Forge) Status(context.Context, githost.Repo) githost.Status {
 	return githost.Status{Kind: githost.KindOK, Host: Host, Account: f.accountName()}
 }
 
-func (f *Forge) Account(context.Context, string) string { return f.accountName() }
+func (f *Forge) Account(context.Context, githost.Repo) string { return f.accountName() }
 
 func (f *Forge) accountName() string {
 	f.mu.Lock()
@@ -437,4 +437,4 @@ func (f *Forge) Setup() clisetup.Setup {
 	}
 }
 
-func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status { return f.Status(ctx, Host) }
+func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status { return f.Status(ctx, githost.Repo{Host: Host}) }
