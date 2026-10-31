@@ -2,8 +2,7 @@ package agentmcp
 
 import (
 	"context"
-	"strings"
-
+	"github.com/kirathecat/kira-studio/internal/mcpcall"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -13,37 +12,16 @@ type ToolCall struct {
 	Args                []byte
 }
 
-// recordCalls adds the one receiving middleware that reports every tools/call, so no tool wraps
-// itself.
+// recordCalls reports every tools/call to Options.OnToolCall with its grant's run and task.
 func (s *Server) recordCalls(srv *mcp.Server) {
 	if s.onCall == nil {
 		return
 	}
-	srv.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
-		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
-			cr, ok := req.(*mcp.CallToolRequest)
-			if method != "tools/call" || !ok || cr.Params == nil {
-				return next(ctx, method, req)
-			}
-			var g Grant
-			if cr.Extra != nil {
-				g, _ = s.grant(cr.Extra.TokenInfo)
-			}
-			ctx, done := s.onCall(ctx, ToolCall{Tool: cr.Params.Name, Args: cr.Params.Arguments, RunID: g.RunID, TaskID: g.TaskID})
-			res, err := next(ctx, method, req)
-			isErr, text := false, ""
-			if tr, ok := res.(*mcp.CallToolResult); ok && tr != nil {
-				isErr = tr.IsError
-				var b strings.Builder
-				for _, c := range tr.Content {
-					if tc, ok := c.(*mcp.TextContent); ok {
-						b.WriteString(tc.Text)
-					}
-				}
-				text = b.String()
-			}
-			done(isErr, text, err)
-			return res, err
+	mcpcall.Record(srv, func(ctx context.Context, c mcpcall.Call) (context.Context, func(bool, string, error)) {
+		var g Grant
+		if c.Extra != nil {
+			g, _ = s.grant(c.Extra.TokenInfo)
 		}
+		return s.onCall(ctx, ToolCall{Tool: c.Tool, RunID: g.RunID, TaskID: g.TaskID, Args: c.Args})
 	})
 }

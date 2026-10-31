@@ -2,7 +2,6 @@ package ade
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
@@ -127,18 +126,7 @@ func (b *TaskBoard) mcpRecorder(ctx context.Context, c agentmcp.ToolCall) (conte
 		Category: oplog.CategoryMCP, Kind: c.Tool, Source: "MCP " + c.Tool, Subject: b.opSubject(c.TaskID),
 	})
 	op.SetCommand(c.Tool + " " + oplog.RedactJSON(c.Args, 2<<10))
-	return oplog.WithOp(ctx, op), func(isError bool, text string, err error) {
-		switch {
-		case errors.Is(err, context.Canceled):
-			op.Finish(oplog.StatusCancelled, "")
-		case err != nil:
-			op.Finish(oplog.StatusError, err.Error())
-		case isError:
-			op.Finish(oplog.StatusError, text)
-		default:
-			op.Finish(oplog.StatusOK, "")
-		}
-	}
+	return oplog.WithOp(ctx, op), func(isError bool, text string, err error) { oplog.FinishCall(op, isError, text, err) }
 }
 
 // recordSessionEnd logs one finished stop of an interactive session: a user stop, a terminal that
