@@ -15,6 +15,7 @@ const (
 	KindMobilePairing Kind = "mobile-pairing"
 	KindUpdate        Kind = "update"
 	KindQuit          Kind = "quit"
+	KindProof         Kind = "proof"
 )
 
 // Prompt is one popup. It never carries a statement, git prompt text, pairing code or params.

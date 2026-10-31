@@ -1024,6 +1024,9 @@
         "mobilePairing": {
           "title": "{count} phones ask for access"
         },
+        "proof": {
+          "title": "{count} validation proofs are ready"
+        },
         "schedule": {
           "title": "{count} scripts wait for confirmation"
         },
@@ -1060,6 +1063,12 @@
       },
       "open": {
         "body": "Open Kira {app} to answer."
+      },
+      "proof": {
+        "title": "Validation proof ready · {name}"
+      },
+      "proofEdit": {
+        "title": "Validation proof changed · {name}"
       },
       "quit": {
         "title": "Kira {app} waits to quit"
