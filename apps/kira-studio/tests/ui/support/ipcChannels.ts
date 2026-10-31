@@ -95,6 +95,11 @@ export const IPC = {
   schemaGet: 'kira:schema:get',
   schemaSet: 'kira:schema:set',
 
+  kibanaDataViews: 'kira:kibana:dataViews',
+  kibanaDataView: 'kira:kibana:dataView',
+  kibanaHistogram: 'kira:kibana:histogram',
+  kibanaSuggest: 'kira:kibana:suggest',
+
   collectionsList: 'kira:collections:list',
   collectionsGetRequest: 'kira:collections:getRequest',
   collectionsSaveRequest: 'kira:collections:saveRequest',

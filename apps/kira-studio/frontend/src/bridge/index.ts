@@ -7,6 +7,7 @@ import * as DbMcpService from '@bindings/dbmcpservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
+import * as KibanaService from '@bindings/kibanaservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
@@ -39,6 +40,16 @@ import type {
   DbMcpStatus,
 } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
+import {
+  type KibanaDataView,
+  type KibanaDiscoverRequest,
+  type KibanaHistogram,
+  type KibanaInterval,
+  type KibanaSuggestions,
+  kibanaDataViewSchema,
+  kibanaHistogramSchema,
+  kibanaSuggestionsSchema,
+} from '@shared/domain/kibana';
 import type { Layout } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { AppMode } from '@shared/domain/mode';
@@ -419,6 +430,33 @@ const studioControl = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
+
+  // P424: Discover reads beyond execute(). The wire shapes are zod-parsed, not trusted.
+  kibanaDataViews: (connectionId: string, opId: string): Promise<KibanaDataView[]> =>
+    unwrap(KibanaService.DataViews({ connectionId, opId })).then((r) =>
+      kibanaDataViewSchema.array().parse(r ?? []),
+    ),
+  kibanaDataView: (connectionId: string, opId: string, id: string): Promise<KibanaDataView> =>
+    unwrap(KibanaService.DataView({ connectionId, opId, id })).then((r) =>
+      kibanaDataViewSchema.parse(r),
+    ),
+  kibanaHistogram: (args: {
+    connectionId: string;
+    opId: string;
+    tabId: string;
+    request: KibanaDiscoverRequest;
+    interval: KibanaInterval;
+  }): Promise<KibanaHistogram> =>
+    unwrap(KibanaService.Histogram(args)).then((r) => kibanaHistogramSchema.parse(r)),
+  kibanaSuggest: (args: {
+    connectionId: string;
+    opId: string;
+    tabId: string;
+    request: KibanaDiscoverRequest;
+    field: string;
+    prefix: string;
+  }): Promise<KibanaSuggestions> =>
+    unwrap(KibanaService.Suggest(args)).then((r) => kibanaSuggestionsSchema.parse(r)),
 
   // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
   // state/customScripts.ts, the one store that wraps these.
