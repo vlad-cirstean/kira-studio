@@ -2,12 +2,23 @@ import { domToCanvas } from 'modern-screenshot';
 
 const SEPARATOR_PX = 8;
 
+/** Every real CSS property, none of the custom ones. The page defines thousands of `--kira-*` and
+ *  `--tw-*` properties that every element inherits; copying them into each clone made a capture
+ *  take minutes, and the resolved values are already on the real properties. */
+function paintedProperties(): string[] {
+  const style = getComputedStyle(document.documentElement);
+  return Array.from({ length: style.length }, (_, i) => style.item(i)).filter(
+    (name) => !name.startsWith('--'),
+  );
+}
+
 /** Renders the element as it is on screen, scrolled lists included: `restoreScrollPosition` shifts
  *  each scrolled container's children by its offset in the clone. */
 export function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
   return domToCanvas(el, {
     scale: window.devicePixelRatio || 1,
     backgroundColor: getComputedStyle(el).backgroundColor,
+    includeStyleProperties: paintedProperties(),
     features: { restoreScrollPosition: true },
   });
 }
