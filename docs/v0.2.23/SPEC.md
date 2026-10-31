@@ -22,8 +22,9 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
-| P420 | Code review (1 round) | Todo |
-| P421 | Close chapter v0.2.23 | Todo |
+| P420 | Kira Studio: validation proof MCP tool and window | Todo |
+| P421 | Code review (1 round) | Todo |
+| P422 | Close chapter v0.2.23 | Todo |
 
 ## Rows
 
@@ -143,10 +144,24 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - Save via a Save button or a keyboard shortcut.
 - No autocomplete or other editor extras.
 
-### P420 Code review (1 round)
+### P420 Kira Studio: validation proof MCP tool and window
+
+App: Kira Studio (not Kira Space). Dedicated MCP tool for validation proof, shaped like the query editor: query plus results.
+
+- Generic: reuses the existing data views, but the agent pushes arbitrary data from its own tools and picks how to show it (e.g. Elastic log hits pushed into an SQL data view when they map). Only plain data views for now; no visualisation view.
+- Each step carries a short description of what it does.
+- Grouped by session. The agent starts a session, does its operations, closes it. The user is notified only on close.
+- Opens in a new window. History of older sessions; only the last 30 are kept; manual delete. Session names are unique.
+- An agent can modify an existing session. The user sees old and new and accepts the new.
+- Order matters everywhere: create, edit, display.
+- Window design closely follows the Kira Space review window.
+- Screenshot button: one tab or all tabs in order. Dropdown to save to disk; default is copy to clipboard.
+- Scroll position and click-highlighted data persist per tab and match the screenshot exactly.
+
+### P421 Code review (1 round)
 
 One Opus review over the full diff since `main` (base: the chapter's branch point). Findings file under `plans/`, then one Sonnet fixer.
 
-### P421 Close chapter v0.2.23
+### P422 Close chapter v0.2.23
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
