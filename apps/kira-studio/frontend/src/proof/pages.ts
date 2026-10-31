@@ -11,8 +11,8 @@ import {
   type Page,
   unpagedPosition,
 } from '@shared/protocol/page';
+import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { documentRow, drop, setPage } from '../views/console/resultPages';
-import { useConsoleViewStore } from '../views/console/state';
 import { useDocumentRowsStore } from '../views/shared/document/rows';
 
 /** One result page per (session, revision, step); also the console-store tab id the grid keys on. */
@@ -70,7 +70,6 @@ export function releaseProofPage(key: string): void {
   drop(key);
   rows.unregisterDocumentRows(key);
   rows.dropRows(key);
-  const view = useConsoleViewStore();
-  view.setAllResultDocsExpanded(key, key, [], false);
-  view.setConsoleColumnWidths(key, {});
+  // Frees the step's console runtime record (expansion, widths) the grid created under this key.
+  cleanupTabRuntime(key);
 }
