@@ -291,9 +291,6 @@
       "none": {
         "emptyHint": "No automation is running. Finished runs are in the operations panel."
       },
-      "running": {
-        "label": "Running: {count}"
-      },
       "showHistory": {
         "label": "Show history"
       }
@@ -9339,6 +9336,9 @@
       "clearHint": {
         "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
+      "empty": {
+        "hint": "Git commands, agent sessions and MCP calls from every module show here."
+      },
       "module": {
         "label": "Module"
       },
@@ -12851,7 +12851,10 @@
         "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "commandTruncated": {
-        "status": "Command (truncated at 64 kibibytes, can’t be re-run): {command}"
+        "status": "Command truncated at 64 kibibytes, can’t be re-run"
+      },
+      "empty": {
+        "hint": "Queries, connections and HTTP calls show here."
       },
       "menu": {
         "rerun": {
@@ -14507,6 +14510,9 @@
       "cancel": {
         "aria": "Cancel operation"
       },
+      "clearFilters": {
+        "label": "Clear filters"
+      },
       "copiedCommand": {
         "announce": "Copied command"
       },
@@ -14522,17 +14528,23 @@
       "copyError": {
         "label": "Copy error"
       },
+      "detail": {
+        "exit": {
+          "label": "Exit {code}"
+        }
+      },
       "error": {
         "status": "Error"
-      },
-      "errorDetail": {
-        "label": "Failed: {value}"
       },
       "errors": {
         "option": "Errors"
       },
       "filter": {
         "aria": "Filter operations"
+      },
+      "noMatch": {
+        "empty": "No operations match",
+        "hint": "Change or clear the filters to see more."
       },
       "none": {
         "empty": "No operations yet"

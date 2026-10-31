@@ -9,10 +9,9 @@ import { triggerLabel, useAutomationOps } from '@workbench/automations/runs/useA
 import { displayValue, formatElapsed } from '@workbench/behaviour/format';
 import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
-import { type OpLogColumn, opLogMenuItems } from '@workbench/lib/opLog';
+import { type OpLogColumn, type OpLogDetailLine, opLogMenuItems } from '@workbench/lib/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
-import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useModeStore, workspaceKeyOf } from '../../state/mode';
 import { useOpsStore } from '../../state/ops';
@@ -168,6 +167,13 @@ function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
   ];
 }
 
+function detailLines(record: OpRecord | AutomationOp): OpLogDetailLine[] {
+  if (isAutomationOp(record)) return auto.detailLines(record);
+  return record.commandTruncated
+    ? [{ text: t('studio.operations.commandTruncated.status'), tone: 'error' }]
+    : [];
+}
+
 // Counts the preconnect delay down in the command cell; falls back to the command once it elapses.
 function preconnectNote(record: OpRecord | AutomationOp, now: number): string | null {
   if (isAutomationOp(record)) return auto.runningNote(record);
@@ -186,6 +192,8 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
     v-model:status-filter="opsStore.statusFilter"
     :records="records"
     :running-count="runningCount"
+    :loading="!opsStore.hydrated"
+    :empty-hint="t('studio.operations.empty.hint')"
     :columns="columns"
     :clear-hint="t('studio.operations.clear.hint')"
     :menu-for="menuFor"
@@ -193,8 +201,9 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
     :can-cancel="(record) => (isAutomationOp(record) ? auto.canCancel(record) : true)"
     :kind-label="(record) => (isAutomationOp(record) ? auto.kindLabel() : record.kind)"
     :status-note="(record) => (isAutomationOp(record) ? auto.statusNote(record) : null)"
-    :detail-lines="(record) => (isAutomationOp(record) ? auto.detailLines(record) : [])"
+    :detail-lines="detailLines"
     @clear="opsStore.clearOps"
+    @reset-filters="opsStore.resetFilters"
     @cancel="onCancel"
   >
     <template #cell="{ column, record }">
@@ -237,64 +246,5 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
       }}</span>
       <span v-else-if="column.id === 'rows'">{{ displayValue(record.rows) }}</span>
     </template>
-    <template #detail="{ record, part }">
-      <div
-        v-if="isAutomationOp(record)"
-        class="px-2 truncate font-data"
-        data-testid="op-automation-detail"
-      >
-        {{
-          part === 'command' ? t('common.command.label', { value: record.command ?? '' }) : t('workbench.opLog.errorDetail.label', { value: record.error ?? '' })
-        }}
-      </div>
-      <div v-else class="ops-detail-cm h-full min-w-0">
-        <MonacoHost
-          v-if="part === 'command'"
-          :doc="
-            record.commandTruncated
-              ? t('studio.operations.commandTruncated.status', { command: record.command ?? '' })
-              : t('common.command.label', { value: record.command ?? '' })
-          "
-          :language="record.kind === 'http' || record.kind === 'preconnect' ? 'plain' : 'sql'"
-          :sql-dialect="opSqlDialect(record)"
-          readonly
-          :single-line="true"
-        />
-        <MonacoHost
-          v-else
-          :doc="`error: ${record.error}`"
-          language="plain"
-          readonly
-          :single-line="true"
-        />
-      </div>
-    </template>
   </OpLogPanel>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P132 Part 1 (§2.3): moved from the pre-shared OperationsPanel.vue unchanged — the slot root
-   above (`.ops-detail-cm`) is rendered by this component, so it still carries this component's own
-   scope id, and these :deep() rules still match Monaco's internal DOM the same way they always
-   did. */
-.ops-detail-cm :deep(.monaco-editor) {
-  @apply h-4.5 text-kira-sm;
-}
-
-/* The detail row is a single fixed-height (20px) line — VirtualList (P2 §0 note 14) has no
-   notion of a variable-height row — so a long command can't wrap into view. Horizontal scroll
-   (trackpad/shift-wheel/drag, same as the tab strip) is what actually lets you read all of it,
-   rather than clipping it exactly like the collapsed row it replaces. `single-line` (above)
-   already turns wordWrap off and the gutter off; this only adds the left/right breathing room
-   `.cm-line`'s own padding used to give each row. */
-.ops-detail-cm :deep(.monaco-scrollable-element) {
-  @apply overflow-x-auto overflow-y-hidden;
-}
-
-.ops-detail-cm :deep(.view-line) {
-  /* P110 B37: padding: 0 var(--kira-s-4) (8px sides) -> px-2. */
-  @apply px-2;
-}
-</style>

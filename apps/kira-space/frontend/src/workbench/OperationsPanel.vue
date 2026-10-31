@@ -100,6 +100,8 @@ function menuFor(record: Row): MenuItem[] {
     v-model:status-filter="opsStore.statusFilter"
     :records="records"
     :running-count="runningCount"
+    :loading="!opsStore.hydrated"
+    :empty-hint="t('space.operations.empty.hint')"
     :columns="columns"
     :clear-hint="t('space.operations.clearHint.hint')"
     :can-cancel="canCancel"
@@ -109,6 +111,7 @@ function menuFor(record: Row): MenuItem[] {
     :status-note="statusNote"
     :detail-lines="detailLines"
     @clear="opsStore.clearOps"
+    @reset-filters="opsStore.resetFilters"
     @cancel="onCancel"
   >
     <template #toolbar>

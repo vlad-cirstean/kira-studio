@@ -26,7 +26,8 @@ export const PANEL_PAD_PX = 8;
 export interface OpLogField {
   label: string;
   value: string;
-  mono?: boolean;
+  /** Render in the data font (paths, ids). */
+  code?: boolean;
 }
 
 /** One recorded step of a multi-step op (Space's git steps). */
