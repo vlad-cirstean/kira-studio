@@ -2,10 +2,10 @@ package gitprepare
 
 import (
 	"bytes"
-	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/internal/termtext"
 )
 
 // maxRetainedOutput/maxRetainedLines are the caps on the FINAL result's own retained
@@ -43,93 +43,6 @@ const maxUnterminatedBuf = 1 << 20
 type Line struct {
 	Stream string // "stdout" | "stderr"
 	Text   string
-}
-
-// sanitizeLine is the output sanitizer, applied to one already-newline-split line (never
-// applied across a line boundary, so a multi-byte UTF-8 sequence or an ANSI escape sequence split
-// across two Write calls is always whole by the time this runs, since the caller only calls this
-// once a full '\n'-terminated line — or the final unterminated remainder at EOF — has been
-// assembled): ANSI CSI/OSC sequences are stripped first (pure ASCII, so stripping them first can
-// neither create nor destroy a multi-byte UTF-8 sequence elsewhere in the line), then invalid UTF-8
-// is replaced with U+FFFD, and every C0 control byte other than tab (plus DEL) is dropped.
-func sanitizeLine(raw string) string {
-	stripped := stripANSI(raw)
-
-	var b strings.Builder
-	b.Grow(len(stripped))
-	for i := 0; i < len(stripped); {
-		r, size := utf8.DecodeRuneInString(stripped[i:])
-		if r == utf8.RuneError && size <= 1 {
-			b.WriteRune(utf8.RuneError)
-			i++
-			continue
-		}
-		if (r < 0x20 && r != '\t') || r == 0x7f {
-			i += size
-			continue
-		}
-		b.WriteRune(r)
-		i += size
-	}
-	return b.String()
-}
-
-// stripANSI removes every ANSI CSI ("\x1b[" ... a final byte in 0x40-0x7E) and OSC ("\x1b]" ...
-// terminated by BEL or "\x1b\\") sequence from s. An unterminated sequence at the end of s (the
-// process was killed mid-escape-sequence) is dropped entirely rather than left dangling.
-func stripANSI(s string) string {
-	if !strings.ContainsRune(s, 0x1b) {
-		return s
-	}
-	var b strings.Builder
-	b.Grow(len(s))
-	for i := 0; i < len(s); {
-		if s[i] == 0x1b && i+1 < len(s) && (s[i+1] == '[' || s[i+1] == ']') {
-			var next int
-			if s[i+1] == '[' {
-				next = consumeCSI(s, i)
-			} else {
-				next = consumeOSC(s, i)
-			}
-			if next < 0 {
-				break // unterminated — drop the rest.
-			}
-			i = next
-			continue
-		}
-		b.WriteByte(s[i])
-		i++
-	}
-	return b.String()
-}
-
-// consumeCSI returns the index just past one ANSI CSI sequence ("\x1b[" ... a final byte in
-// 0x40-0x7e) starting at s[i], or -1 if it runs off the end of s unterminated.
-func consumeCSI(s string, i int) int {
-	j := i + 2
-	for j < len(s) && !(s[j] >= 0x40 && s[j] <= 0x7e) {
-		j++
-	}
-	if j >= len(s) {
-		return -1
-	}
-	return j + 1
-}
-
-// consumeOSC returns the index just past one ANSI OSC sequence ("\x1b]" ... terminated by BEL or
-// "\x1b\\") starting at s[i], or -1 if it runs off the end of s unterminated.
-func consumeOSC(s string, i int) int {
-	j := i + 2
-	for j < len(s) {
-		if s[j] == 0x07 {
-			return j + 1
-		}
-		if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
-			return j + 2
-		}
-		j++
-	}
-	return -1
 }
 
 // outputCollector accumulates a running process's stdout/stderr into a bounded, sanitized final
@@ -215,11 +128,11 @@ func (c *outputCollector) write(stream string, chunk []byte) {
 		if idx < 0 {
 			break
 		}
-		c.addLineLocked(stream, sanitizeLine(string(buf[:idx])))
+		c.addLineLocked(stream, termtext.SanitizeLine(string(buf[:idx])))
 		buf = buf[idx+1:]
 	}
 	for len(buf) > maxUnterminatedBuf {
-		c.addLineLocked(stream, sanitizeLine(string(buf[:maxUnterminatedBuf])))
+		c.addLineLocked(stream, termtext.SanitizeLine(string(buf[:maxUnterminatedBuf])))
 		buf = buf[maxUnterminatedBuf:]
 	}
 	c.streamBuf[stream] = buf
@@ -237,7 +150,7 @@ func (c *outputCollector) flush() {
 	c.closed = true
 	for _, stream := range []string{"stdout", "stderr"} {
 		if rest := c.streamBuf[stream]; len(rest) > 0 {
-			c.addLineLocked(stream, sanitizeLine(string(rest)))
+			c.addLineLocked(stream, termtext.SanitizeLine(string(rest)))
 			c.streamBuf[stream] = nil
 		}
 	}
