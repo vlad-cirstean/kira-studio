@@ -361,9 +361,12 @@ func (e *RepoEntry) PromoteWorkingReview(ctx context.Context, branch, tip string
 	for p := range records {
 		paths[p] = struct{}{}
 	}
+	// Loaded once: each load inflates every snapshot blob.
+	commentsByPath := map[string][]gitreview.Comment{}
 	for _, c := range stored {
 		if c.Origin == gitreview.OriginWorking {
 			paths[c.Path] = struct{}{}
+			commentsByPath[c.Path] = append(commentsByPath[c.Path], c)
 		}
 	}
 	var promoted []string
@@ -371,7 +374,7 @@ func (e *RepoEntry) PromoteWorkingReview(ctx context.Context, branch, tip string
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		changed, err := e.promoteWorkingPath(ctx, tip, branch, path)
+		changed, err := e.promoteWorkingPath(ctx, tip, branch, path, commentsByPath[path])
 		if err != nil {
 			return nil, err
 		}
@@ -382,7 +385,7 @@ func (e *RepoEntry) PromoteWorkingReview(ctx context.Context, branch, tip string
 	return promoted, nil
 }
 
-func (e *RepoEntry) promoteWorkingPath(ctx context.Context, tip, branch, path string) (bool, error) {
+func (e *RepoEntry) promoteWorkingPath(ctx context.Context, tip, branch, path string, comments []gitreview.Comment) (bool, error) {
 	unlock := e.review.Lock(e.Summary.RepoID, branch, path)
 	defer unlock()
 
@@ -394,7 +397,7 @@ func (e *RepoEntry) promoteWorkingPath(ctx context.Context, tip, branch, path st
 	if err != nil {
 		return false, err
 	}
-	commentsChanged, err := e.promoteWorkingComments(ctx, tip, branch, path, tipContent, tipOID)
+	commentsChanged, err := e.promoteWorkingComments(ctx, tip, branch, comments, tipContent, tipOID)
 	if err != nil {
 		return false, err
 	}
@@ -523,21 +526,17 @@ func (e *RepoEntry) rebaseWorkingRecord(ctx context.Context, branch string, rec 
 	return e.review.PutWorking(ctx, e.Summary.RepoID, branch, rec, snapshot)
 }
 
-func (e *RepoEntry) promoteWorkingComments(ctx context.Context, tip, branch, path string, tipContent WorkingContent, tipOID string) (bool, error) {
+func (e *RepoEntry) promoteWorkingComments(ctx context.Context, tip, branch string, comments []gitreview.Comment, tipContent WorkingContent, tipOID string) (bool, error) {
 	if tipContent.Kind != gitreview.ContentText {
 		return false, nil
 	}
-	stored, err := e.review.Comments(ctx, e.Summary.RepoID, branch)
-	if err != nil {
-		return false, err
-	}
 	hunksByKey := map[string][]porcelain.DiffHunk{}
 	promoted := false
-	for _, c := range stored {
-		if c.Origin != gitreview.OriginWorking || c.Path != path || len(c.AnchorContent) == 0 {
+	for _, c := range comments {
+		if len(c.AnchorContent) == 0 {
 			continue
 		}
-		moved, err := e.committedSince(ctx, c.AnchorSHA, tip, tipOID, path)
+		moved, err := e.committedSince(ctx, c.AnchorSHA, tip, tipOID, c.Path)
 		if err != nil {
 			return false, err
 		}
