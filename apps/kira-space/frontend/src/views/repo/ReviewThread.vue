@@ -2,8 +2,9 @@
 // One review thread's body over Monaco, mounted into the overlay widget of a thread by
 // reviewDecorations.ts via createApp/unmount, never routed through the workbench's own tab system
 // (editor-surface furniture, not a view). 'view' renders an existing ReviewComment; 'compose' is
-// the add-comment form. Transport calls stay in reviewDecorations.ts: the actions below are async
-// callbacks that reject on failure, and this component shows the error inline.
+// the add-comment form; 'edit' reuses that form for an existing comment. Transport calls stay in
+// reviewDecorations.ts: the actions below are async callbacks that reject on failure, and this
+// component shows the error inline.
 import type { ReviewComment, ReviewCommentKind, ReviewCommentState } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
@@ -15,17 +16,20 @@ import { t } from '@theme/i18n';
 import { useEventListener, useFocus, useResizeObserver, useTextareaAutosize } from '@vueuse/core';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, ref, type ShallowRef, useTemplateRef } from 'vue';
 import { anchorParts } from './reviewAnchor';
 
 const props = defineProps<{
+  /** The mode the thread opens in. */
   mode: 'view' | 'compose';
-  comment?: ReviewComment;
+  /** A live ref: a repaint after a save swaps in the stored comment without remounting. */
+  comment?: Readonly<ShallowRef<ReviewComment | undefined>>;
   /** The review session's branch — reviewComments.ts:63-74's own anchorLabel needs it for the
    *  'removed'/'stale' message text; 'exact'/'projected' render no label (current lines, no
    *  caveat). */
   branch: string;
   onSubmit?: (body: string, kind: ReviewCommentKind) => Promise<void>;
+  onEdit?: (body: string, kind: ReviewCommentKind) => Promise<void>;
   onSetState?: (state: ReviewCommentState) => Promise<void>;
   onDelete?: () => Promise<void>;
 }>();
@@ -37,7 +41,9 @@ const emit = defineEmits<{
   resize: [height: number];
 }>();
 
-const anchorLabel = computed(() => anchorParts(props.comment, props.branch));
+const current = computed(() => props.comment?.value);
+const mode = ref<'view' | 'compose' | 'edit'>(props.mode);
+const anchorLabel = computed(() => anchorParts(current.value, props.branch));
 
 const draft = ref('');
 const kind = ref<ReviewCommentKind>('change');
@@ -54,7 +60,7 @@ const KIND_ITEMS = computed(() => [
   },
 ]);
 const nextState = computed<ReviewCommentState>(() =>
-  props.comment?.state === 'addressed' ? 'open' : 'addressed',
+  current.value?.state === 'addressed' ? 'open' : 'addressed',
 );
 
 const root = useTemplateRef<HTMLElement>('root');
@@ -90,10 +96,28 @@ const { run, pending, error } = useAsyncAction(async (action: () => Promise<void
   await action();
 });
 
-function submit(): void {
+async function submit(): Promise<void> {
   const body = draft.value.trim();
   if (body === '' || pending.value) return;
-  void run(() => props.onSubmit?.(body, kind.value));
+  if (mode.value === 'edit') {
+    if (await run(() => props.onEdit?.(body, kind.value))) mode.value = 'view';
+  } else {
+    await run(() => props.onSubmit?.(body, kind.value));
+  }
+}
+
+function startEdit(): void {
+  const comment = current.value;
+  if (!comment) return;
+  draft.value = comment.body;
+  kind.value = comment.kind;
+  error.value = null;
+  mode.value = 'edit';
+}
+
+function cancelEdit(): void {
+  error.value = null;
+  mode.value = 'view';
 }
 
 function act(action: () => Promise<void> | undefined): void {
@@ -101,8 +125,9 @@ function act(action: () => Promise<void> | undefined): void {
 }
 
 useShortcut(root, ['form.submit', 'form.cancel'], (id) => {
-  if (id === 'form.submit') submit();
-  else if (props.mode === 'compose') emit('cancel');
+  if (id === 'form.submit') void submit();
+  else if (mode.value === 'edit') cancelEdit();
+  else if (mode.value === 'compose') emit('cancel');
   else emit('close');
 });
 </script>
@@ -115,29 +140,29 @@ useShortcut(root, ['form.submit', 'form.cancel'], (id) => {
     data-testid="review-thread"
   >
     <div ref="content" class="flex flex-col gap-1.5 py-2 px-3">
-      <template v-if="mode === 'view' && comment">
+      <template v-if="mode === 'view' && current">
         <div v-if="anchorLabel" class="text-warn italic"><VarText :parts="anchorLabel" /></div>
         <div class="flex items-center gap-1.5 text-kira-sm text-muted-foreground">
           <span data-testid="review-thread-kind-chip">{{
-            comment.kind === 'question'
+            current.kind === 'question'
               ? t('space.ade.needs.kind.question.label')
               : t('git.review.comments.kind.change.label')
           }}</span>
           <span data-testid="review-thread-state-chip">{{
-            comment.state === 'addressed'
+            current.state === 'addressed'
               ? t('git.review.comments.state.addressed.label')
               : t('common.action.open.label')
           }}</span>
         </div>
         <div class="whitespace-pre-wrap break-words" data-testid="review-thread-body">
-          {{ comment.body }}
+          {{ current.body }}
         </div>
         <div
-          v-if="comment.reply"
+          v-if="current.reply"
           class="whitespace-pre-wrap break-words border-l-2 border-border-strong pl-2 text-muted-foreground"
           data-testid="review-thread-reply"
         >
-          {{ comment.reply }}
+          {{ current.reply }}
         </div>
         <Alert v-if="error" variant="error" data-testid="review-thread-error"
           ><AlertDescription>{{ error }}</AlertDescription></Alert
@@ -151,10 +176,14 @@ useShortcut(root, ['form.submit', 'form.cancel'], (id) => {
             @click="act(() => props.onSetState?.(nextState))"
           >
             {{
-              comment.state === 'addressed'
+              current.state === 'addressed'
                 ? t('git.review.comments.reopen.label')
                 : t('git.review.comments.markAddressed.label')
             }}
+          </Button>
+          <Button variant="toolbar" size="kira" data-testid="review-thread-edit" @click="startEdit">
+            <CodiconIcon name="pencil" :size="13" />
+            {{ t('common.action.edit.label') }}
           </Button>
           <Button variant="toolbar" size="kira" @click="emit('close')">
             <CodiconIcon name="close" :size="13" />
@@ -190,18 +219,25 @@ useShortcut(root, ['form.submit', 'form.cancel'], (id) => {
           ><AlertDescription>{{ error }}</AlertDescription></Alert
         >
         <div class="flex justify-end gap-1.5">
-          <Button variant="toolbar" size="kira" @click="emit('cancel')">{{
-            t('common.action.cancel.label')
-          }}</Button>
+          <Button
+            variant="toolbar"
+            size="kira"
+            data-testid="review-thread-cancel"
+            @click="mode === 'edit' ? cancelEdit() : emit('cancel')"
+            >{{
+              t('common.action.cancel.label')
+            }}</Button
+          >
           <Button
             variant="toolbar-primary"
             size="kira"
             :pending="pending"
             :disabled="draft.trim() === ''"
+            :data-testid="mode === 'edit' ? 'review-thread-save' : 'review-thread-send'"
             @click="submit"
           >
-            <CodiconIcon name="comment" :size="13" />
-            {{ t('common.comment.label') }}
+            <CodiconIcon :name="mode === 'edit' ? 'save' : 'comment'" :size="13" />
+            {{ mode === 'edit' ? t('common.action.save.label') : t('common.comment.label') }}
           </Button>
         </div>
       </template>

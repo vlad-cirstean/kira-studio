@@ -36,7 +36,7 @@ import type {
 } from '@kira/git-ipc';
 import { i18n, t } from '@theme/i18n';
 import { logError } from '@workbench/bridge/log';
-import { type App, createApp } from 'vue';
+import { type App, createApp, shallowRef } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
 import ReviewBanner from './ReviewBanner.vue';
@@ -165,11 +165,14 @@ export function attachReviewDecorations(
   let hoverLine: number | null = null;
   let openThreadCommentId: number | null = null;
   let closeThread: (() => void) | null = null;
+  // The open thread's comment; a repaint swaps in the stored copy so a saved edit shows at once.
+  const openComment = shallowRef<ReviewComment | undefined>();
 
   function closeZone(): void {
     const close = closeThread;
     closeThread = null;
     openThreadCommentId = null;
+    openComment.value = undefined;
     close?.();
   }
 
@@ -375,8 +378,10 @@ export function attachReviewDecorations(
 
     // A repaint can move or remove the line the open thread was anchored to (a mark/comment
     // mutation elsewhere, §7.6) — close it rather than leave it pointing at a stale line.
-    if (openThreadCommentId !== null && !comments.some((c) => c.id === openThreadCommentId)) {
-      closeZone();
+    if (openThreadCommentId !== null) {
+      const fresh = comments.find((c) => c.id === openThreadCommentId);
+      if (fresh) openComment.value = fresh;
+      else closeZone();
     }
   }
 
@@ -563,10 +568,11 @@ export function attachReviewDecorations(
     openZone(comment.range.start, (container, onResize) => {
       const app = createApp(ReviewThread, {
         mode: 'view' as const,
-        comment,
+        comment: openComment,
         branch: deps.review.branch,
         onClose: () => closeZone(),
         onResize,
+        onEdit: (body: string, kind: ReviewCommentKind) => handleEdit(comment, body, kind),
         onDelete: () => handleDelete(comment),
         onSetState: (state: ReviewCommentState) => handleSetState(comment, state),
       });
@@ -575,6 +581,7 @@ export function attachReviewDecorations(
       return app;
     });
     openThreadCommentId = comment.id;
+    openComment.value = comment;
   }
 
   function openCompose(line: number): void {
@@ -620,6 +627,25 @@ export function attachReviewDecorations(
         body,
         kind,
       }),
+    );
+  }
+
+  function handleEdit(
+    comment: ReviewComment,
+    body: string,
+    kind: ReviewCommentKind,
+  ): Promise<void> {
+    return runThreadAction(
+      'review.comment.edit',
+      () =>
+        deps.transport.request('review.comment.edit', {
+          repoId: deps.gitRepoId,
+          branch: deps.review.branch,
+          id: comment.id,
+          body,
+          kind,
+        }),
+      false,
     );
   }
 
