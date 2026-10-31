@@ -17,7 +17,8 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Done |
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Done |
 | P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
-| P415 | Operations panel: shared git primitives, all git ops, session and MCP ops | Todo |
+| P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Todo |
+| P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
@@ -119,12 +120,16 @@ Tests: Go flow `TestCommentEdit` with contract `git-review-edit`; UI specs for o
 - Status bar widgets use the interface font and look better.
 - Review tooltips: they look odd and the text is hard to follow.
 
-### P415 Operations panel: shared git primitives, all git ops, session and MCP ops
+### P415 Part 1: Operations panel: shared git primitives, all git ops, session and in-app MCP ops
 
 - Operations panel lists every git op, whatever the module.
 - Git and ADE modules share one git implementation: same primitives, same abstractions.
 - Also list other ops, e.g. opening an agent session.
-- Also list ops done over MCP.
+- Also list ops done over MCP (Part 1: in-app `agentmcp` tools).
+
+### P415 Part 2: Operations panel: memory MCP tool ops (out-of-process)
+
+The memory MCP server (`kira-space memory-mcp`) runs as a separate process started by Claude Code; its tool calls reach the op log through a cross-process channel into the `op_log` table Part 1 builds.
 
 ### P416 Move automation runs into Operations panel
 
