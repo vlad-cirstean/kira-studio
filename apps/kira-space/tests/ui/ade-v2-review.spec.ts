@@ -510,6 +510,24 @@ reviewTest(
   },
 );
 
+reviewTest(
+  'a board push that leaves the branch alone does not re-read the uncommitted list',
+  async ({ relaunch }) => {
+    const { window: page, control } = await relaunch({
+      storage: AGENT_PANEL_ON,
+      control: reviewControl(withWorking),
+      gitStream: GIT,
+    });
+    await page.locator(t('ade-review-window')).waitFor();
+    const reads = () => calls(control, IPC.adeTaskReviewWorking).length;
+    await expect.poll(reads).toBeGreaterThan(0);
+    const before = reads();
+    await emitWailsEvent(page, IPC.adeTaskBoardChanged, null);
+    await page.waitForTimeout(600);
+    expect(reads()).toBe(before);
+  },
+);
+
 reviewTest('a file already marked reviewed still opens its diff', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     storage: AGENT_PANEL_ON,

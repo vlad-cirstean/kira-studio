@@ -5,7 +5,8 @@ import { TIMING } from '@workbench/behaviour/timing';
 import { queryClient } from '@workbench/state/queryClient';
 import { type MaybeRefOrGetter, toValue, watch } from 'vue';
 import { control } from '../../../bridge/control';
-import type { ReviewWindowTarget, ReviewWorkingMarkArgs } from '../wire';
+import { useBoard } from '../readQueries';
+import type { Board, ReviewWindowTarget, ReviewWorkingMarkArgs } from '../wire';
 
 // The uncommitted files of a review window's branch worktree, and each file's diff. List and diffs
 // share one key prefix so a single invalidation re-reads them all.
@@ -60,9 +61,18 @@ function isInside(cwd: string, root: string): boolean {
   return root !== '' && (cwd === root || cwd.startsWith(`${root}/`));
 }
 
-/** Keeps the uncommitted queries fresh: a board push (commit, stage, checkout), window focus, and
- *  agent activity inside the worktree. There is no polling; an edit made elsewhere shows on refocus. */
+/** Tip and dirty paths of the window's branch: the part of a board push that moves its uncommitted list. */
+function branchSignature(board: Board | undefined, branchId: string | undefined): string | null {
+  const branch = board?.branches.find((b) => b.id === branchId);
+  if (!branch) return null;
+  return `${branch.tip}\n${branch.dirty.map((d) => `${d.code} ${d.path}`).join('\n')}`;
+}
+
+/** Keeps the uncommitted queries fresh: a change to this branch's tip or dirty paths (commit, stage,
+ *  checkout), window focus, and agent activity inside the worktree. Other tasks' board pushes are
+ *  ignored. There is no polling; an edit made elsewhere shows on refocus. */
 export function useReviewWorkingSync(target: () => ReviewWindowTarget | null): void {
+  const board = useBoard();
   const invalidate = (): void => {
     void invalidateReviewWorking();
   };
@@ -71,8 +81,13 @@ export function useReviewWorkingSync(target: () => ReviewWindowTarget | null): v
   watch(focused, (now, was) => {
     if (now && !was) invalidate();
   });
+  watch(
+    () => branchSignature(board.data.value, target()?.branchId),
+    (now, was) => {
+      if (was !== null && now !== was) void invalidateSoon();
+    },
+  );
   const stops = [
-    control.onAdeTaskBoard(invalidate),
     control.onAgentEvent((event: AgentEvent) => {
       const root = target()?.worktree ?? '';
       if (SETTLE_EVENTS.has(event.event) && isInside(event.cwd, root)) void invalidateSoon();
