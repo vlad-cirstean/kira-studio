@@ -22,6 +22,9 @@ const (
 	AnchorRemoved CommentAnchor = "removed"
 	// AnchorStale: history was rewritten and no mapping exists; Range is as of AnchorSHA.
 	AnchorStale CommentAnchor = "stale"
+	// AnchorUncommitted: the comment was written against uncommitted worktree content; Range is as
+	// of that content and no commit projection applies.
+	AnchorUncommitted CommentAnchor = "uncommitted"
 )
 
 // AnchoredComment is one stored Comment plus D7's anchor resolution against a requested revision.
@@ -80,6 +83,8 @@ func FormatComments(branch string, cs []AnchoredComment) string {
 		switch c.Anchor {
 		case AnchorRemoved:
 			fmt.Fprintf(&b, "  [these lines no longer exist on %s; shown as of %s]", branch, gitclient.ShortSHA(c.AnchorSHA))
+		case AnchorUncommitted:
+			b.WriteString("  [uncommitted; lines as of the worktree]")
 		case AnchorStale:
 			fmt.Fprintf(&b, "  [lines as of %s; %s's history was rewritten since]", gitclient.ShortSHA(c.AnchorSHA), branch)
 		}
