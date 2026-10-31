@@ -1335,12 +1335,12 @@ var (
 // DbmcpToolRunQuery describes the run_query tool.
 var DbmcpToolRunQuery = define(Entry{
 	ID: "dbmcp.tool.run_query", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "run_query",
-	Default: "Run one statement per call, not a script, through the app's SQL console path. Connects the connection if not connected. Reading stops at maxRows: rowCount is rows fetched, a lower bound on result size when truncated is true; the database may still run the statement to completion. Read/write/DDL permission is checked first: a denied class is refused; a class set to prompt waits up to two minutes for user approval. With auto-explain on (owner setting), an explainable SELECT/WITH is planned first; a plan over the owner's expensive-query threshold pauses the query for approval, as a prompt permission does.",
+	Default: "Run one statement per call, not a script, through the app's SQL console path. Connects the connection if not connected. Reading stops at maxRows: rowCount is rows fetched, a lower bound on result size when truncated is true; the database may still run the statement to completion. Read/write/DDL permission is checked first: a denied class is refused; a class set to prompt waits up to two minutes for user approval. With auto-explain on (owner setting), an explainable SELECT/WITH is planned first; a plan over the owner's expensive-query threshold pauses the query for approval, as a prompt permission does. On a kibana connection, `sql` is one Discover request as a JSON object (see the `sql` argument), read-only.",
 }, NoVars{})
 
 var (
 	_ = arg(DbmcpToolRunQuery.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement; not a script.`, NoVars{})
+	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement; not a script. On kibana: a JSON object with exactly the keys dataView (data view id from list_children), query (KQL or Lucene text), language ("kuery" or "lucene"), timeRange ({"from","to"} ISO-8601 or date math such as "now-15m", or null), filters (array of {"field","operator","values","disabled"}; operator is, is_not, is_one_of, is_not_one_of, exists, does_not_exist or between), sort (array of {"field","order"}), size (hits to return) and timeZone (IANA name).`, NoVars{})
 	_ = arg(DbmcpToolRunQuery.id, "path", studioApp, NextCall, `Encoded database path from list_children. Required on postgres, mysql, mariadb and mongodb; pass "" on other engines.`, NoVars{})
 	_ = arg(DbmcpToolRunQuery.id, "maxRows", studioApp, NextCall, `Rows to return, 1-{{.Max}}. Default {{.Default}}. Reading stops at this many rows; rowCount is then a lower bound.`, LimitVars{Default: 200, Max: 2000})
 )
@@ -1348,7 +1348,7 @@ var (
 // DbmcpToolExplainQuery describes the explain_query tool.
 var DbmcpToolExplainQuery = define(Entry{
 	ID: "dbmcp.tool.explain_query", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "explain_query",
-	Default: "Plan one SELECT or WITH statement without running it. Returns the normalized plan: node tree, each node's estimated rows and native cost, and structural issues the app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
+	Default: "Plan one SELECT or WITH statement without running it. Returns the normalized plan: node tree, each node's estimated rows and native cost, and structural issues the app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3, sqs or kibana. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
 }, NoVars{})
 
 var (
