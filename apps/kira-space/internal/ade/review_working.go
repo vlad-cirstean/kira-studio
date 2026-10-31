@@ -81,7 +81,7 @@ func (w *workingReview) current(ctx context.Context, path string) (gitsession.Wo
 
 // promote moves uncommitted review state onto commits made since it was taken.
 func (w *workingReview) promote(ctx context.Context) ([]string, error) {
-	paths, err := w.entry.PromoteWorkingReview(ctx, w.branch)
+	paths, err := w.entry.PromoteWorkingReview(ctx, w.branch, w.head)
 	if paths == nil {
 		paths = []string{}
 	}
@@ -98,7 +98,15 @@ func (b *TaskBoard) promoteBranchReview(ctx context.Context, sb model.AdeTaskBra
 	if err != nil {
 		return err
 	}
-	_, err = entry.PromoteWorkingReview(ctx, branch)
+	worktree, err := b.worktreeOf(ctx, sb)
+	if err != nil || worktree == "" {
+		return err
+	}
+	_, head, err := entry.WorktreeHead(ctx, worktree)
+	if err != nil {
+		return err
+	}
+	_, err = entry.PromoteWorkingReview(ctx, branch, head)
 	return err
 }
 

@@ -343,11 +343,11 @@ func intersectRanges(a, b []gitreview.LineRange) []gitreview.LineRange {
 
 // PromoteWorkingReview carries uncommitted review state onto commits made since it was taken, and
 // returns the paths it changed. A path is touched only when the branch tip's blob differs from the
-// blob at the record's head; ranges move only for lines the work added. Idempotent.
-func (e *RepoEntry) PromoteWorkingReview(ctx context.Context, branch string) ([]string, error) {
-	tip, err := e.branchTip(ctx, branch)
-	if err != nil {
-		return nil, err
+// blob at the record's head; ranges move only for lines the work added. Idempotent. tip is the
+// worktree's own HEAD, read fresh by the caller: the cached ref snapshot can lag a commit.
+func (e *RepoEntry) PromoteWorkingReview(ctx context.Context, branch, tip string) ([]string, error) {
+	if tip == "" {
+		return nil, nil
 	}
 	records, err := e.review.WorkingRecords(ctx, e.Summary.RepoID, branch)
 	if err != nil {
