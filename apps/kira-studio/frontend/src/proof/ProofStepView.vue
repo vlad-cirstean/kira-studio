@@ -71,6 +71,15 @@ watch(
   { immediate: true },
 );
 
+// A step that failed to load renders its error state; that is what a capture shows, so it is ready.
+watch(
+  () => step.isError.value || view.loadFailed.value,
+  (failed) => {
+    if (failed) store.markReady(key);
+  },
+  { immediate: true },
+);
+
 onBeforeUnmount(() => {
   store.unmarkReady(key);
   releaseProofPage(key);

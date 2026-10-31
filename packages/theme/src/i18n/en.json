@@ -13240,6 +13240,9 @@
         "more": {
           "aria": "Screenshot options"
         },
+        "notSettled": {
+          "error": "The step did not finish loading."
+        },
         "save": {
           "label": "Save tab as PNG…"
         },

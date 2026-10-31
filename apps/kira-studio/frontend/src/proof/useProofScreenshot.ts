@@ -26,7 +26,7 @@ async function whenSettled(root: HTMLElement): Promise<void> {
   for (;;) {
     const views = root.querySelectorAll('[data-step-key]');
     if (views.length > 0 && [...views].every((v) => v.getAttribute('data-ready') === 'true')) break;
-    if (performance.now() > deadline) throw new Error('whenSettled: step view did not settle');
+    if (performance.now() > deadline) throw new Error(t('studio.proof.shot.notSettled.error'));
     await frames(1);
   }
   await frames(2);

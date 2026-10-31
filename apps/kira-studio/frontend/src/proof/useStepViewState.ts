@@ -86,6 +86,7 @@ export function useStepViewState(ids: StepIds) {
   return {
     /** `null` until the saved view has loaded. */
     seed,
+    loadFailed: query.isError,
     setResult: (state: ResultViewState) => update(state),
     setQueryScroll: (queryScrollTop: number) => update({ queryScrollTop }),
   };

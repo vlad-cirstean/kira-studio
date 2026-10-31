@@ -277,6 +277,34 @@ test('copy all tabs stacks every tab in order, and save writes a PNG', async ({
   expect(args.pngBase64.startsWith('iVBORw0KGgo')).toBe(true);
 });
 
+test('copy all tabs does not wait on a step that failed to load', async ({
+  relaunch,
+  uiServer,
+}) => {
+  test.setTimeout(180_000);
+  const { window: page } = await relaunch({
+    control: proofControl([
+      stepSnapshot(SESSION_ID, 1, 1, 'table'),
+      {
+        channel: IPC.proofStep,
+        args: { sessionId: SESSION_ID, rev: 1, ordinal: 2 },
+        error: { code: 'E_INTERNAL', message: 'step unreadable' },
+      },
+      stepSnapshot(SESSION_ID, 1, 3, 'keyvalue'),
+    ]),
+  });
+  await openProofWindow(page, uiServer.url);
+  await stepsReady(page);
+  await installClipboardSpy(page, { image: true });
+
+  const started = Date.now();
+  await page.locator('[data-testid="proof-shot-more"]').click();
+  await page.locator('[data-testid="proof-shot-copy-all"]').click();
+  await expect.poll(() => copiedImageCount(page), { timeout: CAPTURE_MS }).toBe(1);
+  // The ready timeout is 15 s; a failed step must not burn it.
+  expect(Date.now() - started).toBeLessThan(14_000);
+});
+
 test('a pending edit shows the diff, compares old to new, and accepts', async ({
   relaunch,
   uiServer,
