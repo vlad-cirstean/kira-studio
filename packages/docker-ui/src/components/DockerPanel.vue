@@ -153,7 +153,7 @@ async function refresh(): Promise<void> {
           t('docker.panel.showStopped.label')
         }}</Label>
         <span class="ml-auto" data-testid="docker-summary">{{
-          stopped ? t('docker.panel.summaryStopped.label', { running, stopped }) : t('docker.panel.summary.label', { running })
+          stopped ? t('docker.panel.summaryStopped.label', { running, stopped }) : t('common.state.runningCount.status', { count: running })
         }}</span>
       </div>
       <ContainerList v-if="ui.section === 'containers'" />

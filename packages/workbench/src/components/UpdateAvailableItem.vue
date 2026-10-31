@@ -1,40 +1,34 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TooltipDetails from '@theme/components/TooltipDetails.vue';
 import { t } from '@theme/i18n';
-import { computed } from 'vue';
+import StatusBarItem from '@workbench/components/StatusBarItem.vue';
 
 // Hoisted from Kira Studio's own StatusBar.vue (same data-testid, same markup) —
 // AppMetricsItem.vue's own plain-props shape, shared with Kira Space's own status bar. The click
 // used to open GitHub's release page directly (OpenReleasePage); it now tells the store to
 // open the in-app dialog (the deliberate behavior change).
-const props = defineProps<{ latestVersion: string; currentVersion: string }>();
+defineProps<{ latestVersion: string; currentVersion: string }>();
 
 const emit = defineEmits<(e: 'open') => void>();
-
-const tooltip = computed(() =>
-  t('workbench.update.available.tooltip', {
-    latest: props.latestVersion,
-    current: props.currentVersion,
-  }),
-);
 </script>
 
 <template>
-  <Tooltip>
-    <TooltipTrigger as-child>
-      <Button
-        variant="toolbar"
-        size="status"
-        class="text-info"
-        data-testid="update-available"
-        @click="emit('open')"
-      >
-        <CodiconIcon name="cloud-download" :size="13" />
-        {{ t('workbench.update.available.label', { version: latestVersion }) }}
-      </Button>
-    </TooltipTrigger>
-    <TooltipContent>{{ tooltip }}</TooltipContent>
-  </Tooltip>
+  <StatusBarItem
+    icon="cloud-download"
+    tone="info"
+    data-testid="update-available"
+    @click="emit('open')"
+  >
+    {{ t('workbench.update.available.label', { version: latestVersion }) }}
+    <template #tip>
+      <TooltipDetails
+        :title="t('workbench.update.available.tooltip')"
+        :rows="[
+          { label: t('workbench.update.newVersion.label'), value: latestVersion },
+          { label: t('workbench.update.installed.label'), value: currentVersion },
+        ]"
+        :hint="t('workbench.update.available.hint')"
+      />
+    </template>
+  </StatusBarItem>
 </template>

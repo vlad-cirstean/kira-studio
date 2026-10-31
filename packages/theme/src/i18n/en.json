@@ -2666,6 +2666,9 @@
       "running": {
         "status": "Running"
       },
+      "runningCount": {
+        "status": "{count} running"
+      },
       "unsavedChanges": {
         "status": "Unsaved changes"
       }
@@ -3275,9 +3278,6 @@
       },
       "showStopped": {
         "label": "Show stopped"
-      },
-      "summary": {
-        "label": "{running} running"
       },
       "summaryStopped": {
         "label": "{running} running · {stopped} stopped"
@@ -9187,6 +9187,9 @@
         "openInGraph": {
           "label": "Open blame commit in graph"
         },
+        "reveal": {
+          "hint": "Click to show the commit."
+        },
         "uncommitted": {
           "tooltip": "Not committed yet"
         }
@@ -9508,17 +9511,20 @@
         }
       },
       "agentUsage": {
-        "fiveHourLong": {
-          "label": "Five-hour"
+        "limits": {
+          "tooltip": "{product} usage limits"
         },
         "line": {
-          "status": "{window}: {percent}% used · resets {when} (in {left})"
+          "status": "{percent}% used, resets in {left} ({when})"
         },
         "readFailed": {
           "error": "Couldn’t read the usage limits."
         },
         "session": {
           "label": "Session"
+        },
+        "sessionWindow": {
+          "label": "Session (5-hour)"
         },
         "sourceRun": {
           "status": "From a background ADE run, {when}"
@@ -9535,7 +9541,7 @@
         "waiting": {
           "hint": "Start a {product} session to see usage."
         },
-        "weeklyLong": {
+        "weekly": {
           "label": "Weekly"
         }
       },
@@ -13926,6 +13932,29 @@
         "label": "Show more ({count} remaining)"
       }
     },
+    "statusBar": {
+      "metrics": {
+        "cores": {
+          "label": "Cores"
+        },
+        "cpuShare": {
+          "label": "{percent} of total capacity"
+        },
+        "interval": {
+          "hint": "Includes helper processes. Updates every 5 seconds."
+        },
+        "processes": {
+          "label": "Processes"
+        },
+        "tooltip": "{app} resource use"
+      },
+      "runs": {
+        "open": {
+          "hint": "Click to show the runs list."
+        },
+        "tooltip": "Automation runs"
+      }
+    },
     "tabStrip": {
       "discard": {
         "body": "{count} tab has unsaved changes. Closing discards them. | {count} tabs have unsaved changes. Closing discards them.",
@@ -13965,8 +13994,9 @@
     },
     "update": {
       "available": {
+        "hint": "Click to review and install.",
         "label": "Update {version}",
-        "tooltip": "Version {latest} is available (you have {current})"
+        "tooltip": "Update available"
       },
       "checking": {
         "status": "Checking for updates…"
@@ -13983,8 +14013,14 @@
       "installDetails": {
         "error": "Details: {log}."
       },
+      "installed": {
+        "label": "Installed"
+      },
       "installing": {
         "body": "Downloading and verifying {app} {version}. {app} quits once the new version is ready."
+      },
+      "newVersion": {
+        "label": "New version"
       },
       "upToDate": {
         "body": "{app} {current} is the latest version."

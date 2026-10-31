@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import TooltipDetails from '@theme/components/TooltipDetails.vue';
+import { t } from '@theme/i18n';
 import { useAgentInfo } from '@workbench/agent/agentInfo';
 import RunsStatusItem from '@workbench/automations/runs/RunsStatusItem.vue';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
+import StatusBarItem from '@workbench/components/StatusBarItem.vue';
 import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
 import { computed } from 'vue';
 import { useAppMetricsStore } from '../state/appMetrics';
@@ -39,7 +34,7 @@ const blame = computed(() =>
   blameStatusStore.status.kind === 'resolved' ? blameStatusStore.status : null,
 );
 const blameText = computed(() => (blame.value ? blameLineText(blame.value) : ''));
-const blameTooltip = computed(() => (blame.value ? blameLineTooltip(blame.value).join(' — ') : ''));
+const blameTooltip = computed(() => (blame.value ? blameLineTooltip(blame.value) : null));
 
 function onRevealBlameCommit(): void {
   if (blame.value) blameStatusStore.reveal?.(blame.value.sha);
@@ -50,24 +45,26 @@ function onRevealBlameCommit(): void {
   <StatusBarBase>
     <template #left-extra>
       <!-- P76 §5.2: left-side item. -->
-      <Tooltip v-if="blame">
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger>
-            <Button
-              variant="toolbar"
-              size="status"
-              class="text-fg"
-              data-testid="blame-status"
-              :disabled="!blameStatusStore.reveal"
-              @click="onRevealBlameCommit"
-            >
-              <CodiconIcon name="git-commit" :size="13" />
-              <span class="max-w-80 truncate">{{ blameText }}</span>
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{{ blameTooltip }}</TooltipContent>
-      </Tooltip>
+      <StatusBarItem
+        v-if="blame"
+        icon="git-commit"
+        :disabled="!blameStatusStore.reveal"
+        data-testid="blame-status"
+        @click="onRevealBlameCommit"
+      >
+        <span class="max-w-80 truncate">{{ blameText }}</span>
+        <template #tip>
+          <TooltipDetails
+            v-if="blameTooltip"
+            :title="blameTooltip.subject"
+            :rows="[
+              { label: t('git.search.field.author.label'), value: blameTooltip.author },
+              { label: t('common.field.date.label'), value: blameTooltip.date },
+            ]"
+            :hint="blameStatusStore.reveal ? t('space.repo.blame.reveal.hint') : undefined"
+          />
+        </template>
+      </StatusBarItem>
       <!-- P239: agent usage limits, ADE module only, for a provider that reports them. -->
       <AgentUsageItem
         v-if="modeStore.active === 'ade' && settingsStore.agent.usageEnabled && agentInfo.usage"
@@ -81,15 +78,7 @@ function onRevealBlameCommit(): void {
         :current-version="appUpdateStore.currentVersion"
         @open="appUpdateStore.openUpdateDialog()"
       />
-      <AppMetricsItem :sample="appMetricsStore.sample" />
+      <AppMetricsItem :sample="appMetricsStore.sample" :app-name="appUpdateStore.appName" />
     </template>
-    <!-- `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
-         truncation, folded onto the button/span above -- Preflight already sets `font: inherit` on
-         every <button>, so `text-kira-sm` was redundant with what the button already inherits and
-         was dropped; `text-fg` and `disabled:cursor-default` stay explicit (a plain <button> resets
-         color to black otherwise). Measured getComputedStyle(button) on `[data-testid="blame-
-         status"]` before/after: fontSize 12px -> 12px, fontFamily unchanged, color rgb(204, 204,
-         204) -> rgb(204, 204, 204) (text-fg). max-w-80 (320px): ~48ch in the body's system-ui font
-         at the 12px default, the nearest default step. -->
   </StatusBarBase>
 </template>

@@ -28,7 +28,7 @@ const appUpdateStore = useAppUpdateStore();
         :current-version="appUpdateStore.currentVersion"
         @open="appUpdateStore.openUpdateDialog()"
       />
-      <AppMetricsItem :sample="appMetricsStore.sample" />
+      <AppMetricsItem :sample="appMetricsStore.sample" :app-name="appUpdateStore.appName" />
     </template>
   </StatusBarBase>
 </template>
