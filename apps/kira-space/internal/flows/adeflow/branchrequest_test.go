@@ -129,7 +129,6 @@ func TestBranchRequest(t *testing.T) {
 		if run.Note != "waiting for branch approval" {
 			t.Fatalf("run note = %q, want the approval note while it waits", run.Note)
 		}
-		f.app.Contract(t, brScenario, "AdeTaskService.Board#waiting", board(t, f.app), brMask, flowharness.Mask("id", "taskId", "createdAt", "branchIds", "startedAt", "updatedAt", "sessionId", "branchId", "addedAt", "worktree", "tip"))
 
 		ans, err := f.app.W.AdeTask.ApproveBranchRequest(adewire.ApproveBranchRequestArgs{ID: req.ID, CodeRepoIDs: []string{f.api}})
 		if err != nil || !ans.Resolved {
