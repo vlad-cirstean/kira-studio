@@ -99,7 +99,7 @@ func startKibana() (*KibanaFixture, error) {
 				"cluster.routing.allocation.disk.threshold_enabled": "false",
 			},
 			WaitingFor: wait.ForHTTP("/_cluster/health?wait_for_status=yellow").WithPort("9200/tcp").
-				WithBasicAuth("elastic", kibanaElasticPW).WithStartupTimeout(3 * time.Minute),
+				WithBasicAuth("elastic", kibanaElasticPW).WithStartupTimeout(8 * time.Minute),
 		},
 	})
 	if err != nil {
@@ -143,7 +143,7 @@ func startKibana() (*KibanaFixture, error) {
 				WithResponseMatcher(func(r io.Reader) bool {
 					b, _ := io.ReadAll(r)
 					return strings.Contains(string(b), `"level":"available"`)
-				}).WithStartupTimeout(5 * time.Minute).WithPollInterval(2 * time.Second),
+				}).WithStartupTimeout(10 * time.Minute).WithPollInterval(2 * time.Second),
 		},
 	})
 	if err != nil {
@@ -205,7 +205,7 @@ func (c *kibanaHTTP) do(ctx context.Context, method, path string, body, out any)
 	req.SetBasicAuth(c.user, c.pass)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("kbn-xsrf", "kira-studio")
-	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: 3 * time.Minute}).Do(req)
 	if err != nil {
 		return err
 	}

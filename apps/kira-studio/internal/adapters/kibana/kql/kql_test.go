@@ -3,9 +3,8 @@ package kql_test
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kibana/kql"
 )
@@ -17,6 +16,20 @@ var fields = []kql.Field{
 	{Name: "user.name", Type: "string", Nested: "user", Searchable: true},
 	{Name: "host.name", Type: "string", Searchable: true},
 	{Name: "host.os", Type: "string", Searchable: true},
+}
+
+func jsonEq(t *testing.T, want, got string) {
+	t.Helper()
+	var w, g any
+	if err := json.Unmarshal([]byte(want), &w); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(got), &g); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(w, g) {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
 }
 
 func TestCompile(t *testing.T) {
@@ -52,10 +65,11 @@ func TestCompile(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := kql.Compile(c.query, fields, "UTC")
-			require.NoError(t, err)
-			b, err := json.Marshal(got)
-			require.NoError(t, err)
-			require.JSONEq(t, c.want, string(b))
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, _ := json.Marshal(got)
+			jsonEq(t, c.want, string(b))
 		})
 	}
 }
@@ -76,15 +90,19 @@ func TestSyntaxErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			_, err := kql.Compile(c.query, fields, "")
 			var se *kql.SyntaxError
-			require.True(t, errors.As(err, &se), "got %v", err)
-			require.Equal(t, c.pos, se.Pos)
+			if !errors.As(err, &se) {
+				t.Fatalf("err = %v, want a SyntaxError", err)
+			}
+			if se.Pos != c.pos {
+				t.Errorf("pos = %d, want %d", se.Pos, c.pos)
+			}
 		})
 	}
 }
 
 func TestLuceneQuery(t *testing.T) {
 	b, _ := json.Marshal(kql.LuceneQuery("status:[400 TO 499]", "UTC"))
-	require.JSONEq(t, `{"query_string":{"analyze_wildcard":true,"query":"status:[400 TO 499]","time_zone":"UTC"}}`, string(b))
+	jsonEq(t, `{"query_string":{"analyze_wildcard":true,"query":"status:[400 TO 499]","time_zone":"UTC"}}`, string(b))
 	b, _ = json.Marshal(kql.LuceneQuery(" ", ""))
-	require.JSONEq(t, `{"match_all":{}}`, string(b))
+	jsonEq(t, `{"match_all":{}}`, string(b))
 }
