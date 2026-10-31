@@ -15,7 +15,7 @@ import { useProofWindowStore } from './state';
 
 // Flat `[domain, ...ids]` keys (workbench/state/queryClient.ts). Go pushes `kira:proof:changed`,
 // so every read stays fresh until the broadcast invalidates it.
-export const proofKey = {
+const proofKey = {
   all: ['proof'] as const,
   sessions: ['proof', 'sessions'] as const,
   session: (id: string) => ['proof', 'session', id] as const,
