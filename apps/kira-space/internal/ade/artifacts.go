@@ -54,9 +54,13 @@ var artifactKindOrder = map[string]int{
 	model.AdeArtifactDeployment: 3, model.AdeArtifactDoc: 4, model.AdeArtifactLink: 5,
 }
 
-// builtinArtifactSources is the registration order: task links, repos, stored rows.
+// builtinArtifactSources is the registration order: task links, repos, one per issue tracker, stored rows.
 func (b *TaskBoard) builtinArtifactSources() []ArtifactSource {
-	return []ArtifactSource{taskLinkSource{b}, repoSource{b}, storedSource{b}}
+	out := []ArtifactSource{taskLinkSource{b}, repoSource{b}}
+	for _, p := range b.deps.Trackers.All() {
+		out = append(out, trackerSource{b: b, p: p})
+	}
+	return append(out, storedSource{b})
 }
 
 // TaskArtifacts lists the task's artifacts (archived tasks included), merged, deduped and sorted. A
@@ -165,12 +169,6 @@ func (s taskLinkSource) Artifacts(_ context.Context, sc ArtifactScope) ([]adewir
 			}
 		}
 		out = append(out, a)
-	}
-	if t.JiraKey != "" {
-		out = append(out, adewire.Artifact{
-			Kind: model.AdeArtifactIssue, Title: t.JiraKey, URL: t.JiraURL, Ref: t.JiraKey,
-			Source: artifactSrcTask, CreatedAt: t.CreatedAt,
-		})
 	}
 	return out, nil, nil
 }
@@ -478,7 +476,7 @@ func agentArtifacts(res adewire.ArtifactsResult) agentmcp.TaskArtifacts {
 		out.Artifacts[i] = agentmcp.Artifact{Kind: a.Kind, Title: a.Title, URL: a.URL, Ref: a.Ref, Status: a.Status, Repo: a.Repo, Source: a.Source}
 	}
 	for i, g := range res.Gaps {
-		out.Gaps[i] = agentmcp.ArtifactGap{Source: g.Source, Repo: g.Repo}
+		out.Gaps[i] = agentmcp.ArtifactGap{Source: g.Source, Repo: g.Repo, Reason: g.Reason, Count: g.Count}
 	}
 	return out
 }

@@ -177,11 +177,11 @@ func (c *client) fetch(ctx context.Context, ref issuetracker.Ref) (issuetracker.
 	}
 
 	if c.crs != nil && (iss.Summary.Count > 0 || !iss.Summary.Known) {
+		// Rows found beside a failure stay: a failed host leaves the other matches in place.
 		crs, err := c.crs(ctx, p.key)
+		iss.ChangeRequests = crs
 		if err != nil {
 			iss.ChangeRequestsReason = issuetracker.Reason(err)
-		} else {
-			iss.ChangeRequests = crs
 		}
 	}
 	return iss, nil

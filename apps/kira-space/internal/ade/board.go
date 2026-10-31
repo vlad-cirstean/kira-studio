@@ -21,6 +21,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -105,7 +106,9 @@ type TaskBoardDeps struct {
 	// policy and denials.
 	Sandbox    agentsandbox.Enforcer
 	RunSandbox *repos.AdeRunSandboxRepo
-	// ArtifactSources append to the built-in task artifact sources (P417's issue tracker).
+	// Trackers are the issue tracker providers; each adds a task artifact source and fills TaskIssue. nil = none.
+	Trackers *issuetracker.Registry
+	// ArtifactSources append to the built-in task artifact sources.
 	ArtifactSources []ArtifactSource
 	// BranchRequestWait is how long an agent's branch request waits for the user; 0 = defaultBranchRequestWait.
 	BranchRequestWait time.Duration
