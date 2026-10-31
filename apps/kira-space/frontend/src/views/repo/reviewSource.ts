@@ -19,7 +19,7 @@ import type { ReviewWindowTarget } from '../../ade/v2/wire';
 import { control } from '../../bridge/control';
 import { gitTransportFor, notifyReviewRepaint, onReviewRepaint } from '../../repo/git/transport';
 
-export interface ReviewDiffLoad {
+interface ReviewDiffLoad {
   readonly hunks: readonly DiffHunk[];
   readonly bodyKind: FileDiffBody['kind'];
   readonly reviewedRanges: readonly LineRange[];
