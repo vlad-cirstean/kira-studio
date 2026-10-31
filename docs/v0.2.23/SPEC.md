@@ -16,7 +16,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P411 | Task statuses: move to Workflow page, fully customizable | Done |
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Done |
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Done |
-| P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
+| P414 | Status bar: running ADE agents, interface font, tooltips | Done |
 | P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Todo |
 | P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
@@ -119,6 +119,8 @@ Tests: Go flow `TestCommentEdit` with contract `git-review-edit`; UI specs for o
 - Status bar shows running agents from the ADE module, next to running processes.
 - Status bar widgets use the interface font and look better.
 - Review tooltips: they look odd and the text is hard to follow.
+
+**Result.** Status bar shows running ADE agents next to runs: `AdeAgentsStatusItem` reads "N agents · M needs input" from `useSessions`, warn tone when input is needed. Popover lists sessions by activity rank; a row opens the session through the new `useOpenSession`; footer "All sessions" opens the needs page via `adeBoardUi.showAllSessions`. Bar is 22px (`--kira-statusbar-h`) in the interface font. Every item is a `StatusBarItem` with a `tip` slot (runs, update, metrics, blame, agent usage). Tooltips share one elevated ground, no arrow, `sideOffset` 4, fade only. New `TooltipDetails` (title, label/value rows, hint) replaces joined-sentence tooltips; file-tree, ref-badge and branch-popover tooltips are `\n`-split plain text. Tests: Go `TestRunningSessionsList` (contract `ade-sessions-running.json`), `status-agents.spec.ts` (6), updated specs, Space UI 832, Studio UI 641, mobile 83, unit 1966 pass; lint, `lint:dead`, `lint:go`, `lint:claude` clean. Visual baselines re-recorded (Space 24, Studio 13); P415 Part 1 may move them again, so re-record once after it lands. Fixed flaky `TestTaskArtifacts` (reply file read mid-write). Not covered: no UI test for the agents item when the last agent stops.
 
 ### P415 Part 1: Operations panel: shared git primitives, all git ops, session and in-app MCP ops
 
