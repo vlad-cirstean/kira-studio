@@ -2141,7 +2141,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The current step is derived by walkPath from the entry: skip steps are passed over, a done step moves to its forwardTarget, and the first step not done (a manual step never is) ends the path. Running past the last step, or an `end` route, finishes the task.
 - `skip: true` steps (adewire.WorkflowStep.Skip) are passed over by moves and routes; a workflow needs at least one unskipped step.
 - SetTaskStep(taskId, stepId) moves to any step or `done` and is refused while a run of the task is live; StepDone finishes a manual step. The stale guard FromStepID compares with the derived current step.
-- Workflow flag `kira_space_mcp: true` (wire kiraSpaceMcp, P199) enables agent tools.
+- Agent tools are always on (P408). A legacy `kira_space_mcp` key is accepted and ignored, and dropped on save.
 
 ### Run engine
 
@@ -2164,9 +2164,10 @@ and `docs/HISTORY.md (v2.0)`.
 - Restart recovery (D7): Recover() runs before Start(); running runs become stuck with note 'interrupted by restart', running setups fail, task sessions stop, and stale *.mcp.json files are removed.
 - After restart, pending runs keep their launch spec and launch when their gate opens; nothing auto-resumes, and a restart-stuck agent run offers Resume.
 - Agent tools (P199) are implemented in ade/agenttools.go as agentmcp.SpaceTools on *ade.TaskBoard; the loopback MCP server issues scoped grants (run, task, Space) with one bearer token per launch.
-- A workflow with kira_space_mcp gives headless runs and the task's TUI sessions the Space grant: task_info, declare_repos, request_branch, branch_status.
+- Every task grant except rebase runs and review rounds carries the Space tools: task_info, declare_repos, request_branches, branch_status. Releasing a grant (run end, session stop, app close) cancels its in-flight calls.
 - declare_repos accepts registered repos only and is additive.
-- request_branch takes only repo. Kira Space names a new branch kira/<10-char nanoid> (claimBranchName generated mode, up to 5 tries on a taken name), never an agent-chosen name; a named row returns its existing worktree. Worktree and prepare script go through ensureWorktree/startSetup.
+- request_branches takes `repos`, 1 to 20, and waits for the user (see Branch requests). Kira Space names a new branch kira/<10-char nanoid> (claimBranchName generated mode, up to 5 tries on a taken name), never an agent-chosen name; a named row with a worktree returns `existing`. Worktree and prepare script go through ensureWorktree/startSetup. Outcomes per repo: created, existing, denied, timeout, failed.
+- Run on an agent step leaves an unnamed branch to the agent: the run starts at the repo root, and its sandbox may write the per-repo worktree folders. A script or review step derives `feat/<slug>` from the task title.
 - Agent tools act only on the token's task; repo refs resolve by nickname, then name, then id; errors return as actionable ToolError text.
 - Branches and repos added by an agent carry origin = 'agent' and show an agent chip.
 - Git refresh (P191): the UI sends the explicit repo ids it shows; refreshRepo runs env scripts beside the fetch, not before it.
@@ -2258,7 +2259,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Sandbox data is stored in table ade_run_sandbox (migration 0037): access, enforced, resolved policy JSON, profile, denials; AdeTaskService.Run.sandbox carries the badge and RunSandbox returns the detail.
 - fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements agentmcp.SandboxGit via Grant.Sandbox).
 - push_branch pushes the run's branch to the same-named remote branch (RemoteOpParams.RemoteBranch), refuses protected branches, and is refused for read steps.
-- request_branch remains the way to create a branch and its worktree.
+- request_branches remains the way to create a branch and its worktree.
 
 ### Agent launch check and folder-scan hiding (P277)
 
@@ -2313,6 +2314,7 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 | `mobile-pairing` | `pairing.Broker` (Space) | none |
 | `update` | renderer, through `Raise` and `Dismiss` | the raising window |
 | `handover` | `ade.TaskBoard` (ref = task id) | none |
+| `branch-request` | `ade.TaskBoard` (ref = request id) | none |
 
 - A prompt's routing target is the claimed window if still registered, else the origin window if registered, else the main window, else "" (queued).
 - The main window is shell.Registry.MainKey: the lowest open order, ties broken by key, never an ephemeral window.
@@ -2368,7 +2370,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Until the worktree is ready, pipeline steps for that branch wait (waiting for worktree setup) and Start/Take over are not offered.
 - Retry setup reruns the worktree setup and recreates the worktree.
 - Attaching a remote-only branch creates a local branch from <remote>/<name> (origin preferred) that tracks it, implemented in ade/setup.go ensureWorktree (P231).
-- Every start path (StartRun, LaunchStep, StartBranch, TakeOver, review agent, AddExistingBranch, RetrySetup, request_branch) records a setup failure reason in ade_worktree_setup.note (wire WorktreeSetup.note, recordSetupFailure) (P202).
+- Every start path (StartRun, LaunchStep, StartBranch, TakeOver, review agent, AddExistingBranch, RetrySetup, request_branches) records a setup failure reason in ade_worktree_setup.note (wire WorktreeSetup.note, recordSetupFailure) (P202).
 - A launch blocked by a pending setup returns E_PREPARING (ErrSetupPending), and the UI waits (useSetupWait) and starts when the worktree is ready.
 - One ScriptProgress component in packages/theme (running, ready, failed, elapsed, actions slot) serves both ADE (AdeSetupProgress, AdeWorktreeSetup) and git-ui (WorktreeDialog, toolbar strip with an Output popover via PrepareOutput.vue, Cancel while running).
 - OpsState keeps worktreePrepareStatus, StartedAt, FinishedAt and LastPath; a prepare failure stays until dismissWorktreePrepareResult() is called, while success fades after 5 s.
@@ -2444,6 +2446,28 @@ Stage = workflow step. A handover is text one stage leaves for the next. Table `
 - Wire: `Task.handoverIn` (newest handed row), `Task.handoverDrafts`; `AdeTaskService.Handovers` (history), `UpdateHandover` (empty body deletes), `DismissHandover`; `StepDoneArgs.notes` and `SetTaskStepArgs.notes` (the mobile `POST /api/ade/tasks/step` passes `notes` through). Notes over the limit fail with `backend.space.ade.handoverTooLong.body`.
 - Frontend: `state/adeStageDialog.ts` (one store) drives `stage/AdeStageDialog.vue`. Every step move opens it: step mover, step block menu, task menu, the Done action and the routed `stage/AdeHandoverPrompt.vue`. Moving a manual step to its natural next stage calls `StepDone`; any other move calls `SetTaskStep` with `fromStepId`. `notes/AdeHandoverList.vue` lists drafts and history in the Notes tab and the archived panel. The session dialog's `compose.ts` mirrors the server's handover block and tool line.
 - Tests: flows/adeflow `TestStageHandover` (contract `ade-handover`) and tests/ui/ade-v2-handover.spec.ts.
+
+### Branch requests (P408)
+
+An agent asks the user to approve branches and worktrees. `request_branches` blocks until the user answers; `ade/branchrequest.go` holds the engine.
+
+- Phase 1 validates under the task lock: repos resolve, the task is writable, each repo is failed, `existing` (branch and worktree exist) or an item for the user. Items are kind `branch` (unnamed, base shown) or `worktree` (named, no checkout). No item means the call answers at once and raises no prompt.
+- Phase 2 waits with the lock released, so board writes continue. One request per task: a second call gets "already waits". One resolver wins; end conditions:
+
+| End | Result |
+|---|---|
+| Approve | checked repos created, unchecked `denied` |
+| Deny | every repo `denied` |
+| Timeout (30 min, `TaskBoardDeps.BranchRequestWait`) | `timeout`, nothing created |
+| Caller gone (grant released, session stop) | request abandoned, nothing created |
+| Archive, app close | abandoned |
+
+- Phase 3 re-locks, reloads the task and creates the approved branches (`createBranch`, origin `agent`, `startSetup`), since the task may have changed during the wait.
+- Prompt: routed kind `branch-request` (ref = request id), opened and closed under the broker mutex so a fast answer cannot close it before it opens. While a run waits its note reads "waiting for branch approval". `Task.branchRequestId` shows the open request on the board.
+- The CLI cuts an MCP call at 60 s. Every `claude` launch sets `MCP_TOOL_TIMEOUT` to 35 minutes (headless env in `harness/claude/headless.go`, TUI env in `hooks.Server.Env`). `TestAdeBranchRequest` holds a request 65 s to guard it.
+- Desktop only: the answer comes from the dialog (`AdeBranchRequestDialog`, store `adeBranchRequest`), the routed prompt or the Task tab row. Escape hides the dialog and never answers. Mobile has no approval surface.
+- Bridge: `AdeTaskService.BranchRequest`, `ApproveBranchRequest` (non-empty subset, rest denied), `DenyBranchRequest`; `resolved` is false when the request is already gone.
+- Tests: flows/adeflow `TestBranchRequest` (contract `ade-branch-request`) and tests/ui/ade-v2-branch-request.spec.ts.
 
 ### Tests
 
@@ -3349,8 +3373,7 @@ Performance:
 - **Re-importing a changed document never retracts facts (P211).** New facts add or update; facts the edit removed stay as current memories. Delete if memories gain a delete or retract path.
 - **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
-- **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` creates a branch only when the agent calls it; a branch the run already created keeps its derived name.
-- **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `agentmcp` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
+- **`declare_repos` is untested against a real board and real `claude` (P199).** Covered by the `agentmcp` go-sdk client test and `agenttools_test.go` only. `request_branches` and `branch_status` run in `TestAdeBranchRequest`. Delete once one live run calls `declare_repos`.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **Change request facts correct on the next request, not by push (P189).** No server-to-client change notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
