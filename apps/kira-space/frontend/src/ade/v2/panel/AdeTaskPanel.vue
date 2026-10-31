@@ -11,6 +11,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
+import AdeArtifactList from '../artifacts/AdeArtifactList.vue';
 import AdeAutomationsBlock from '../automation/AdeAutomationsBlock.vue';
 import { archiveTip } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
@@ -129,6 +130,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
     :tabs="[
       { value: 'task', label: t('common.task.label') },
       { value: 'notes', label: t('space.common.notes.label') },
+      { value: 'artifacts', label: t('space.ade.artifacts.title.title') },
       { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },
     ]"
   >
@@ -229,6 +231,13 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
     </template>
     <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />
     <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
+    <div
+      v-else-if="ui.taskTab === 'artifacts'"
+      class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"
+      data-testid="ade-artifacts-tab"
+    >
+      <AdeArtifactList :task-id="card.task.id" />
+    </div>
     <div
       v-else
       class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"

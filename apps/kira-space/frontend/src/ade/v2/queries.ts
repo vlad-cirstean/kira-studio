@@ -8,6 +8,7 @@ import { control } from '../../bridge/control';
 import { withShelved } from './board/shelf';
 import { archivedTaskKey, boardKey, runSandboxKey, sessionsKey } from './readQueries';
 import type {
+  AddArtifactArgs,
   AddExistingBranchArgs,
   AddTaskRepoArgs,
   ApproveBranchRequestArgs,
@@ -29,6 +30,7 @@ import type {
   RebaseStart,
   RecordMergeArgs,
   RefreshArgs,
+  RemoveArtifactArgs,
   RemoveTaskRowArgs,
   RepoBranches,
   RepoBranchesArgs,
@@ -78,6 +80,7 @@ export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 const candidatesKey = (codeRepoId: string) => ['adetask', 'candidates', codeRepoId] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const handoversPrefix = ['adetask', 'handovers'] as const;
+export const artifactsPrefix = ['adetask', 'artifacts'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
 
@@ -434,6 +437,30 @@ export function useHandovers(taskId: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: [...handoversPrefix, taskId] as const,
     queryFn: () => control.adeTaskHandovers({ taskId: toValue(taskId) }),
+  });
+}
+
+/** The task's artifacts, detected and stored; a board push refetches it while mounted. */
+export function useTaskArtifacts(taskId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...artifactsPrefix, taskId] as const,
+    queryFn: () => control.adeTaskArtifacts({ taskId: toValue(taskId) }),
+  });
+}
+
+const refetchArtifacts = () => queryClient.invalidateQueries({ queryKey: artifactsPrefix });
+
+export function useAddArtifact() {
+  return useMutation({
+    mutationFn: (args: AddArtifactArgs) => control.adeTaskAddArtifact(args),
+    onSuccess: refetchArtifacts,
+  });
+}
+
+export function useRemoveArtifact() {
+  return useMutation({
+    mutationFn: (args: RemoveArtifactArgs) => control.adeTaskRemoveArtifact(args),
+    onSuccess: refetchArtifacts,
   });
 }
 

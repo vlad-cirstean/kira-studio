@@ -55,7 +55,7 @@ export function useDialogCtx() {
       handoverInto: (id) => {
         const card = m.cardFor(id);
         const h = card?.task.handoverIn;
-        if (!card || !h || !h.body) return null;
+        if (!card || !h?.body) return null;
         const stepId = card.progress.finished ? 'done' : (card.progress.step?.id ?? '');
         return h.toStepId === stepId ? { from: h.fromStepName, body: h.body } : null;
       },

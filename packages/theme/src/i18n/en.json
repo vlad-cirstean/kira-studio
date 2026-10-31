@@ -5987,7 +5987,7 @@
       },
       "groupKind": {
         "document": {
-          "label": "Document"
+          "label": "Documentation"
         },
         "thread": {
           "label": "Thread"
@@ -7023,6 +7023,54 @@
         },
         "snapshot": {
           "hint": "Taken when the task was archived."
+        }
+      },
+      "artifacts": {
+        "add": {
+          "label": "Add artifact"
+        },
+        "empty": {
+          "body": "No artifacts yet. Branches, pull requests and deployments show up as the task produces them."
+        },
+        "gap": {
+          "body": "Couldn’t read {source} for {repo}. The list may be incomplete."
+        },
+        "gapNoRepo": {
+          "body": "Couldn’t read {source}. The list may be incomplete."
+        },
+        "kind": {
+          "deployment": {
+            "label": "Deployment"
+          },
+          "doc": {
+            "label": "Doc file"
+          },
+          "link": {
+            "label": "Web link"
+          }
+        },
+        "ref": {
+          "label": "Reference"
+        },
+        "remove": {
+          "tooltip": "Remove artifact"
+        },
+        "stageDone": {
+          "label": "Produced by this task"
+        },
+        "status": {
+          "local": {
+            "status": "Local only"
+          },
+          "pushed": {
+            "status": "Pushed"
+          }
+        },
+        "title": {
+          "title": "Artifacts"
+        },
+        "url": {
+          "label": "Web address"
         }
       },
       "automation": {

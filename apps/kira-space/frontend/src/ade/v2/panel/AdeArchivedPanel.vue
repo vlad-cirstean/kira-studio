@@ -13,6 +13,7 @@ import { control } from '../../../bridge/control';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
+import AdeArtifactList from '../artifacts/AdeArtifactList.vue';
 import { useHostLabels } from '../hostLabels';
 import AdeHandoverList from '../notes/AdeHandoverList.vue';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
@@ -49,6 +50,7 @@ const count = computed(() => sessions.value.filter((s) => s.taskId === props.tas
 const tabs = computed(() => [
   { value: 'task', label: t('common.task.label') },
   { value: 'notes', label: t('space.common.notes.label') },
+  { value: 'artifacts', label: t('space.ade.artifacts.title.title') },
   { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: count.value }) },
 ]);
 
@@ -312,6 +314,13 @@ async function onRestore(): Promise<void> {
         >
           <AdeNotesEditor :notes="a.task.notes" :item-id="a.task.id" readonly />
           <AdeHandoverList :task-id="a.task.id" readonly />
+        </div>
+        <div
+          v-else-if="tab === 'artifacts'"
+          class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"
+          data-testid="ade-archived-artifacts"
+        >
+          <AdeArtifactList :task-id="a.task.id" readonly />
         </div>
         <AdeSessionsTab v-else :task-id="a.task.id" archived />
       </AdePanelFrame>

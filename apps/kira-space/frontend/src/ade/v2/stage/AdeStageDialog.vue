@@ -15,6 +15,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
+import AdeArtifactList from '../artifacts/AdeArtifactList.vue';
 import { useAdeStageDialogStore } from '../state/adeStageDialog';
 
 // Moves a task to another stage with handover notes for it. `routed` picks which mount shows it: the
@@ -79,6 +80,14 @@ async function move(): Promise<void> {
             data-testid="ade-stage-notes"
           />
           <FieldDescription>{{ t('space.ade.stageDialog.notes.hint') }}</FieldDescription>
+        </div>
+        <div
+          v-if="store.taskId && store.toStepId === 'done'"
+          class="flex flex-col gap-1"
+          data-testid="ade-stage-artifacts"
+        >
+          <div class="text-muted-foreground">{{ t('space.ade.artifacts.stageDone.label') }}</div>
+          <AdeArtifactList :task-id="store.taskId" compact readonly />
         </div>
         <Alert v-if="live" variant="error" data-testid="ade-stage-live">
           <AlertDescription>{{
