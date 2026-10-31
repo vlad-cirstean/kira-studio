@@ -87,6 +87,8 @@ export type ReviewRepaintEvent =
   | { readonly kind: 'comments'; readonly repoId: string; readonly branch: string }
   | {
       readonly kind: 'mark';
+      /** `commit`: the committed review; `working`: the uncommitted one (same path, other marks). */
+      readonly scope: 'commit' | 'working';
       readonly repoId: string;
       readonly branch: string;
       readonly paths: readonly string[];
@@ -102,7 +104,7 @@ export function onReviewRepaint(listener: (event: ReviewRepaintEvent) => void): 
   };
 }
 
-function fireReviewRepaint(event: ReviewRepaintEvent): void {
+export function notifyReviewRepaint(event: ReviewRepaintEvent): void {
   for (const listener of reviewRepaintListeners) listener(event);
 }
 
@@ -176,14 +178,20 @@ function createNativeGitTransport(codeRepoId: string): Transport {
         };
         const paths = p.paths ?? (p.path === undefined ? [] : [p.path]);
         return result.then((value) => {
-          fireReviewRepaint({ kind: 'mark', repoId: p.repoId, branch: p.branch, paths });
+          notifyReviewRepaint({
+            kind: 'mark',
+            scope: 'commit',
+            repoId: p.repoId,
+            branch: p.branch,
+            paths,
+          });
           return value;
         });
       }
       if (COMMENT_MUTATION_METHODS.has(method)) {
         const { repoId, branch } = params as unknown as { repoId: string; branch: string };
         return result.then((value) => {
-          fireReviewRepaint({ kind: 'comments', repoId, branch });
+          notifyReviewRepaint({ kind: 'comments', repoId, branch });
           local.emit('ui.action', { action: 'refreshReviewComments' });
           return value;
         });

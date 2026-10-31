@@ -1,11 +1,11 @@
 import type { AgentEvent } from '@shared/domain/agent';
-import { queryOptions, useQuery } from '@tanstack/vue-query';
+import { queryOptions, useMutation, useQuery } from '@tanstack/vue-query';
 import { tryOnScopeDispose, useDebounceFn, useWindowFocus } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { queryClient } from '@workbench/state/queryClient';
 import { type MaybeRefOrGetter, toValue, watch } from 'vue';
 import { control } from '../../../bridge/control';
-import type { ReviewWindowTarget } from '../wire';
+import type { ReviewWindowTarget, ReviewWorkingMarkArgs } from '../wire';
 
 // The uncommitted files of a review window's branch worktree, and each file's diff. List and diffs
 // share one key prefix so a single invalidation re-reads them all.
@@ -37,6 +37,14 @@ export function useReviewWorkingDiff(
     queryFn: () =>
       control.adeTaskReviewWorkingDiff({ branchId: toValue(branchId), path: toValue(path) }),
     enabled: () => toValue(branchId) !== '',
+  });
+}
+
+/** Marks uncommitted files reviewed or not; the list and every diff re-read afterwards. */
+export function useReviewWorkingMark() {
+  return useMutation({
+    mutationFn: (args: ReviewWorkingMarkArgs) => control.adeTaskReviewWorkingMark(args),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: reviewWorkingPrefix }),
   });
 }
 

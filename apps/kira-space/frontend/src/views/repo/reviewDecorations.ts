@@ -27,20 +27,18 @@ import type {
   DiffHunk,
   FileDiffBody,
   LineRange,
-  ResultOf,
   ReviewComment,
   ReviewCommentKind,
   ReviewCommentState,
-  Transport,
 } from '@kira/git-ipc';
 import { i18n, t } from '@theme/i18n';
 import { logError } from '@workbench/bridge/log';
 import { type App, createApp, shallowRef } from 'vue';
-import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
 import ReviewBanner from './ReviewBanner.vue';
 import ReviewHunkMark from './ReviewHunkMark.vue';
 import ReviewThread from './ReviewThread.vue';
+import type { ReviewSource } from './reviewSource';
 
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 type ModifiedEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
@@ -59,62 +57,12 @@ const VIEW_ZONE_Z_INDEX = '10';
 const THREAD_MIN_LINES = 12;
 const THREAD_MAX_FRACTION = 0.8;
 
-export interface ReviewDecorationsDeps {
-  readonly transport: Transport;
-  readonly gitRepoId: string;
-  readonly path: string;
-  /** `repoDiffTabStateSchema.left` — the tab's own leftRev (merge base in `range` mode, the
-   *  file's own `reviewedAtSha` in `sinceReview` mode), compared against a fresh
-   *  `review.fileDiff`'s own `reviewedAtSha` exactly as `reviewMarking.ts:249-276`'s `resolve`
-   *  does, so a tab opened in one mode never silently repaints as the other. */
-  readonly leftRev: string;
-  readonly review: {
-    readonly branch: string;
-    readonly branchTip: string;
-    readonly leftLabel: string;
-  };
-}
-
 export interface ReviewDecorationsHandle {
   /** Settles once the first diff and comment load finished (or failed). */
   readonly ready: Promise<void>;
+  /** Re-reads the diff and the comments, e.g. after the file's models were rewritten. */
+  reload(): void;
   dispose(): void;
-}
-
-// reviewMarking.ts:221-241's own memoised resolveBase, ported: review.fileDiff needs `base`, which
-// nothing on the diff tab carries directly (only `leftRev`) — re-resolving here, memoised by
-// (repoId, branch), is the same trade the extension already made rather than threading `base`
-// through the whole tab-open path for a value this module can cheaply ask for itself. Module-level
-// (not per-handle): two review diff tabs for the same branch share one resolution.
-//
-// Only a SUCCESSFUL resolution stays cached. A failure (e.g. a transient index.lock
-// conflict) used to cache `null` forever, with no expiry — every load() thereafter silently
-// early-returned, permanently disabling the whole review layer for that branch until the app
-// restarted. Evicting the entry on failure lets the next call (this editor's own retry, or
-// another editor's load()) try fresh instead of replaying the same rejection from cache forever.
-//
-// A REJECTION is now propagated (not swallowed into a `null` value) so load() can tell it
-// apart from a resolved `base: null` — the legitimate, permanent "no base branch configured for
-// this repository" answer. The collapse of both into the same cached `null` routed a
-// permanent condition to the same "Couldn't load, click Retry" banner built for transient
-// failures — Retry could never succeed there, since re-resolving just returns the same `null`.
-const baseMemo = new Map<string, Promise<string | null>>();
-
-function resolveBase(transport: Transport, repoId: string, branch: string): Promise<string | null> {
-  const key = `${repoId}\0${branch}`;
-  let cached = baseMemo.get(key);
-  if (!cached) {
-    cached = transport
-      .request('review.resolveBase', { repoId, branch }, undefined)
-      .then((r) => r.base)
-      .catch((err) => {
-        baseMemo.delete(key);
-        logError('reviewDecorations', 'review.resolveBase failed', err);
-        throw err;
-      });
-    baseMemo.set(key, cached);
-  }
-  return cached;
 }
 
 function commentHoverMessage(comment: ReviewComment): { value: string } {
@@ -128,7 +76,7 @@ function commentHoverMessage(comment: ReviewComment): { value: string } {
 export function attachReviewDecorations(
   mod: MonacoModule,
   diffEditor: DiffEditor,
-  deps: ReviewDecorationsDeps,
+  source: ReviewSource,
 ): ReviewDecorationsHandle {
   const modifiedEditor: ModifiedEditor = diffEditor.getModifiedEditor();
   // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
@@ -428,61 +376,27 @@ export function attachReviewDecorations(
   // banner instead.
   async function loadDiff(): Promise<boolean> {
     const seq = ++diffSeq;
-    let base: string | null;
+    let loaded: Awaited<ReturnType<ReviewSource['loadDiff']>>;
     try {
-      base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
+      loaded = await source.loadDiff();
     } catch (err) {
       if (disposed || seq !== diffSeq) return false;
-      // C13-9: a genuine rejection (a transient index.lock conflict, most likely) — resolveBase
-      // no longer caches this (see baseMemo's own comment), so the banner's own Retry button (or
-      // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
-      logError('reviewDecorations', 'review.resolveBase failed', err);
+      // A transient failure (index.lock, say) is not cached upstream, so Retry can succeed.
+      logError('reviewDecorations', 'review diff load failed', err);
       showLoadError();
       return false;
     }
     if (disposed || seq !== diffSeq) return false;
-    if (base === null) {
-      // C13-9: a SUCCESSFUL resolution to "no base configured" — permanent, not transient, so
-      // Retry (which would just re-resolve the same legitimate null) is actively misleading here.
-      // Distinct message, no Retry button.
+    if (loaded === null) {
+      // Permanent: no base branch configured. Retry would only re-resolve the same answer.
       showNoBaseConfigured();
       return false;
     }
     closeErrorZone();
-
-    let result: ResultOf<'review.fileDiff'>;
-    try {
-      result = await deps.transport.request('review.fileDiff', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        base,
-        path: deps.path,
-        mode: 'sinceReview',
-      });
-      if (disposed || seq !== diffSeq) return false;
-      if (result.reviewedAtSha !== null && result.reviewedAtSha !== deps.leftRev) {
-        result = await deps.transport.request('review.fileDiff', {
-          repoId: deps.gitRepoId,
-          branch: deps.review.branch,
-          base,
-          path: deps.path,
-          mode: 'range',
-        });
-        if (disposed || seq !== diffSeq) return false;
-      }
-    } catch (err) {
-      if (disposed || seq !== diffSeq) return false;
-      // C13-9: previously uncaught — a rejection here left a silently blank review layer and an
-      // unhandled promise rejection in the console, entirely bypassing C12-7's retry-banner
-      // mechanism (unlike the review.comment.list call below, which already had a `.catch`).
-      logError('reviewDecorations', 'review.fileDiff failed', err);
-      showLoadError();
-      return false;
-    }
-    hunks = result.body.kind === 'text' ? result.body.hunks : [];
-    bodyKind = result.body.kind;
-    reviewedRanges = result.reviewedRanges;
-    lineCount = result.lineCount;
+    hunks = loaded.hunks;
+    bodyKind = loaded.bodyKind;
+    reviewedRanges = loaded.reviewedRanges;
+    lineCount = loaded.lineCount;
     paint();
     return true;
   }
@@ -514,27 +428,19 @@ export function attachReviewDecorations(
 
   async function loadComments(): Promise<void> {
     const seq = ++commentsSeq;
-    let commentsResult: Awaited<ReturnType<typeof deps.transport.request<'review.comment.list'>>>;
+    let loaded: readonly ReviewComment[];
     try {
-      commentsResult = await deps.transport.request('review.comment.list', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        at: deps.review.branchTip,
-      });
+      loaded = await source.loadComments();
     } catch (err) {
       if (disposed || seq !== commentsSeq) return;
       // Keep the comments already painted: a transient failure must not look like "all deleted".
-      logError('reviewDecorations', 'review.comment.list failed', err);
+      logError('reviewDecorations', 'review comment load failed', err);
       commentsLoadFailed = true;
       showLoadError();
       return;
     }
     if (disposed || seq !== commentsSeq) return;
-    // review.comment.list is scoped to the whole review SESSION (every file on the
-    // branch), not this editor's own file -- without this filter, a comment on another file could
-    // paint as a phantom glyph/hover/thread here if that file happened to have a line at the same
-    // number.
-    comments = commentsResult.comments.filter((c) => c.path === deps.path);
+    comments = loaded;
     if (commentsLoadFailed) {
       commentsLoadFailed = false;
       closeErrorZone();
@@ -556,23 +462,12 @@ export function attachReviewDecorations(
     const clamped = clampRanges([range], lineCount);
     if (clamped.length === 0) return;
     try {
-      await deps.transport.request('review.mark', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        path: deps.path,
-        reviewed,
-        ranges: clamped,
-      });
+      await source.mark(clamped[0] as LineRange, reviewed);
     } catch (err) {
-      logError('reviewDecorations', 'review.mark failed', err);
-      return;
+      logError('reviewDecorations', 'review mark failed', err);
     }
-    // (reviewMarking.ts:520-521): never predict the stored state locally — reload from the
-    // server's own fresh review.fileDiff. No explicit reload here: transport.ts's own repaint
-    // fan-out is the ONE reload path for every open tab on this (repoId, branch, path),
-    // this editor included — its `onReviewRepaint` filter matches this editor's own deps just
-    // like every other subscriber's (an extra `load()` call here used to double-reload
-    // this same editor, since the fan-out never excluded the tab that made the call).
+    // No local prediction and no explicit reload: the source's repaint event reloads every open
+    // tab on this file, this editor included.
   }
 
   function currentSelectionRange(): LineRange {
@@ -593,7 +488,7 @@ export function attachReviewDecorations(
       const app = createApp(ReviewThread, {
         mode: 'view' as const,
         comment: openComment,
-        branch: deps.review.branch,
+        branch: source.branch,
         onClose: () => closeZone(),
         onResize,
         onEdit: (body: string, kind: ReviewCommentKind) => handleEdit(comment, body, kind),
@@ -612,7 +507,7 @@ export function attachReviewDecorations(
     openZone(line, (container, onResize) => {
       const app = createApp(ReviewThread, {
         mode: 'compose' as const,
-        branch: deps.review.branch,
+        branch: source.branch,
         onCancel: () => closeZone(),
         onResize,
         onSubmit: (body: string, kind: ReviewCommentKind) => handleSubmit(line, body, kind),
@@ -641,16 +536,8 @@ export function attachReviewDecorations(
   }
 
   function handleSubmit(line: number, body: string, kind: ReviewCommentKind): Promise<void> {
-    return runThreadAction('review.comment.add', () =>
-      deps.transport.request('review.comment.add', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        path: deps.path,
-        at: deps.review.branchTip,
-        range: { start: line, end: line },
-        body,
-        kind,
-      }),
+    return runThreadAction('add comment', () =>
+      source.addComment({ start: line, end: line }, body, kind),
     );
   }
 
@@ -659,39 +546,15 @@ export function attachReviewDecorations(
     body: string,
     kind: ReviewCommentKind,
   ): Promise<void> {
-    return runThreadAction(
-      'review.comment.edit',
-      () =>
-        deps.transport.request('review.comment.edit', {
-          repoId: deps.gitRepoId,
-          branch: deps.review.branch,
-          id: comment.id,
-          body,
-          kind,
-        }),
-      false,
-    );
+    return runThreadAction('edit comment', () => source.editComment(comment.id, body, kind), false);
   }
 
   function handleSetState(comment: ReviewComment, state: ReviewCommentState): Promise<void> {
-    return runThreadAction('review.comment.setState', () =>
-      deps.transport.request('review.comment.setState', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        id: comment.id,
-        state,
-      }),
-    );
+    return runThreadAction('set comment state', () => source.setCommentState(comment.id, state));
   }
 
   function handleDelete(comment: ReviewComment): Promise<void> {
-    return runThreadAction('review.comment.remove', () =>
-      deps.transport.request('review.comment.remove', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        id: comment.id,
-      }),
-    );
+    return runThreadAction('remove comment', () => source.removeComment(comment.id));
   }
 
   const mouseDownDisposable = modifiedEditor.onMouseDown((e) => {
@@ -741,20 +604,12 @@ export function attachReviewDecorations(
     run: () => void mark(currentSelectionRange(), false),
   });
 
-  // The listening side of transport.ts's fan-out — a mutation from either half of the UI (this
-  // editor or the panel's own Comments pane) reloads this editor exactly once it succeeded.
-  // Dispatches by the event's own `kind` rather than always reloading both halves — a `mark`
-  // mutation can only have changed the file diff (reviewed ranges/hunks), a `comments` mutation
-  // only the comment list.
-  const unsubscribeRepaint = onReviewRepaint((event) => {
-    if (event.repoId !== deps.gitRepoId || event.branch !== deps.review.branch) return;
-    if (event.kind === 'mark') {
-      if (!event.paths.includes(deps.path)) return;
-      void loadDiff();
-    } else {
-      void loadComments();
-    }
-  });
+  // A mutation from either half of the UI (this editor or the panel's Comments pane) reloads
+  // only what it could have changed: a mark the diff, a comment change the comments.
+  const unsubscribeRepaint = source.subscribe(
+    () => void loadDiff(),
+    () => void loadComments(),
+  );
 
   // Regions rebuild on every diff compute, which can re-collapse lines revealed earlier.
   const diffUpdateDisposable = diffEditor.onDidUpdateDiff(revealCommentLines);
@@ -765,6 +620,9 @@ export function attachReviewDecorations(
 
   return {
     ready,
+    reload(): void {
+      void load().catch((err: unknown) => logError('reviewDecorations', 'reload failed', err));
+    },
     dispose(): void {
       disposed = true;
       diffUpdateDisposable.dispose();
@@ -782,9 +640,7 @@ export function attachReviewDecorations(
       clearHunkRows();
       commentCollection.clear();
       addGlyphCollection.clear();
-      // 7d (P68 review): this module is what leases deps.transport (gitTransportFor, called once
-      // per mount by RepoDiffView.vue) — nothing else holds a reference to release it.
-      deps.transport.dispose();
+      source.dispose();
     },
   };
 }

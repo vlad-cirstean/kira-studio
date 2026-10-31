@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
+import type { ReviewComment, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
@@ -349,8 +349,9 @@ watch(
   },
 );
 
-function onSelectComment(path: string): void {
-  reviewFiles.value?.selectFile(path);
+function onSelectComment(path: string, origin: ReviewComment['origin']): void {
+  if (origin === 'working' && props.workingChanges) props.workingChanges.onOpen(path, false);
+  else reviewFiles.value?.selectFile(path);
 }
 
 // P75 §1.2: the Commits pane's own row-action bundle — a plain computed (not the raw

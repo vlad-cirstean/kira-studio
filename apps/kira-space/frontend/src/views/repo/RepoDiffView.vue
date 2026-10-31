@@ -2,12 +2,14 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { useReviewWorkingDiff } from '../../ade/v2/review/useReviewWorking';
+import { useAdeReviewWindowStore } from '../../ade/v2/state/adeReviewWindow';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 // The diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
@@ -30,6 +32,7 @@ import { type DiffLayout, useDiffLayout } from './diffLayout';
 import { attachDiffNavigation, type DiffNavigation } from './diffNavigation';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
+import { committedReviewSource, workingReviewSource } from './reviewSource';
 import { useDiffEditor } from './useDiffEditor';
 
 const props = defineProps<{ tab: RepoDiffTabRecord }>();
@@ -62,6 +65,10 @@ const diffNavigation = shallowRef<DiffNavigation | null>(null);
 const navTick = ref(0);
 const isReview = props.tab.state.review !== null;
 const workingBranchId = props.tab.state.working?.branchId;
+// Only a review window can mark and comment on uncommitted lines; elsewhere the tab stays a plain diff.
+const windowTarget = useAdeReviewWindowStore().target;
+const workingTarget =
+  workingBranchId !== undefined && windowTarget?.branchId === workingBranchId ? windowTarget : null;
 const repoIdForNav = repoIdOfTab(props.tab);
 
 function hasAdjacentFile(dir: 'next' | 'previous'): boolean {
@@ -163,13 +170,23 @@ async function mount(): Promise<void> {
   // C11 §7.4/S11: the comment-thread/mark-reviewed layer, only for a review diff tab. `left` is
   // never null here — openRepoReviewDiffTab (S8) always supplies both revisions alongside `review`.
   if (review !== null && gitRepoId !== undefined && left !== null) {
-    reviewDecorations = attachReviewDecorations(mod, editor, {
-      transport: gitTransportFor(repoId),
-      gitRepoId,
-      path: props.tab.path,
-      leftRev: left,
-      review,
-    });
+    reviewDecorations = attachReviewDecorations(
+      mod,
+      editor,
+      committedReviewSource({
+        transport: gitTransportFor(repoId),
+        gitRepoId,
+        path: props.tab.path,
+        leftRev: left,
+        review,
+      }),
+    );
+  } else if (workingTarget !== null) {
+    reviewDecorations = attachReviewDecorations(
+      mod,
+      editor,
+      workingReviewSource({ target: workingTarget, path: props.tab.path }),
+    );
   }
 
   // After the decorations so its listener runs once comment lines were revealed.
@@ -198,6 +215,7 @@ watch(
     if (models.modified.getValue() !== diff.worktree.text) {
       models.modified.setValue(diff.worktree.text);
     }
+    reviewDecorations?.reload();
   },
 );
 
@@ -256,6 +274,9 @@ onUnmounted(() => {
         <CodiconIcon name="go-to-file" :size="13" />
         {{ t('common.goToFile.label') }}
       </Button>
+      <Badge v-if="workingBranchId" variant="warn" data-testid="repo-diff-uncommitted">
+        {{ t('space.ade.changes.uncommitted.label') }}
+      </Badge>
       <SecondaryTabs
         v-if="state === 'found'"
         class="ml-auto"

@@ -5018,6 +5018,9 @@
           "label": "{count} commit | {count} commits"
         }
       },
+      "committed": {
+        "title": "Committed"
+      },
       "empty": {
         "body": "“{branch}” adds no commits to “{base}”."
       },
@@ -5094,6 +5097,9 @@
       "resolving": {
         "loading": "Resolving comparison…"
       },
+      "reviewedCount": {
+        "label": "{reviewed} of {total} reviewed"
+      },
       "stale": {
         "status": "This comparison has changed"
       },
@@ -5107,7 +5113,7 @@
         "body": "“{branch}” and “{base}” share no common history."
       },
       "working": {
-        "hint": "Not committed yet. Not part of the review marks."
+        "hint": "Not committed yet. Reviewed separately; checks and comments move to the committed list once the lines are committed."
       }
     },
     "search": {
@@ -8294,7 +8300,7 @@
             "label": "At {short} head"
           },
           "uncommitted": {
-            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review.",
+            "hint": "{count} uncommitted change in the worktree, reviewed in the uncommitted section. | {count} uncommitted changes in the worktree, reviewed in the uncommitted section.",
             "label": "{count} uncommitted | {count} uncommitted"
           }
         },
