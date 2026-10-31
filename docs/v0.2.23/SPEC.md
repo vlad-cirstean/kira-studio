@@ -13,7 +13,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Done |
 | P409 | Finishing a task returns every artifact via MCP | Done |
 | P410 | Task plus button: terminal or ad hoc Claude session in worktree | Done |
-| P411 | Task statuses: move to Workflow page, fully customizable | Todo |
+| P411 | Task statuses: move to Workflow page, fully customizable | Done |
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Todo |
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Todo |
 | P414 | Status bar: running ADE agents, interface font, tooltips | Todo |
@@ -88,6 +88,8 @@ Task gets a plus button. It starts a terminal or an ad hoc Claude session in tha
 - Task statuses live on the Workflow page, not Settings.
 - Remove the unclear mapping and hardcoding. Defaults ship with the app but are fully customizable, with more color options.
 - Changing a status leaves existing work items as they are.
+
+**Result.** Editor moved from Settings to a Task statuses row on the Workflows page (`workflows/statuses/AdeTaskStatuses.vue`). A status is id, name, color (16 `--kira-status-*` colours), position; categories and the first-of-category rule are gone. Four default slots (`new`, `step`, `review`, `finished`) in `ade_task_status_defaults` name each automatic change; empty keeps the current status. Step `status:` empty uses the slot of its kind; parser and writer no longer inject seed ids. Delete requires a reassign target for every removed id, archived tasks included. Edits never touch existing tasks. Migration 0059 seeds slots from the first status per old category (test `migrate_ade_task_status_defaults_test.go`). Tests: flows/adeflow `TestTaskStatuses`, tests/ui/ade-v2-task-status.spec.ts. Full Go, unit, ui (817), mobile (83), visual (4 settings snapshots re-recorded: Settings nav lost a row), lint, lint:dead, lint:go, lint:claude pass. Three plan commits merged into one (feat(ade) editor): the old Settings pane could not typecheck against the new wire alone. No `claude` row run: no Claude integration change.
 
 ### P412 Review: stale-changes indicator, PR link in review agent prompt
 
