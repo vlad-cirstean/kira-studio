@@ -853,9 +853,15 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 
 - WorkbenchShell.vue (shared) always mounts #dock; hasDock is removed, opsVisible/opsHeight are required props, and the status bar is always mt-1.
 - Kira Space's dock also shows in the ade full layout, gated only by panel.operations.visible.
-- apps/kira-space/internal/oplog is a 500-record ring, process-global, lost on quit and app-local; Studio's op log is SQLite-backed and shares nothing with it.
-- In Kira Space, gitsession produces op log entries: RunOp, UndoRun, RunRemote with a non-nil conn, and RunRestack start an op, and four write-spawn sites record argv through noteWrite.
-- Auto-fetch ticks (nil conn) and reads are not logged in the Space op log; an auto-fetch stop and a failed graph load are each recorded once via Log.Record.
+- The Space op log (apps/kira-space/internal/oplog) is persisted in `op_log` (migration 0060): 30 days or 5000 rows, pruned at start and every 500 finished ops; rows left `running` by a quit are reconciled to `error` at start. It shares nothing with Studio's op log.
+- Two in-memory lanes: foreground (500) and background (300). Only foreground rows and failed background rows persist, through one writer goroutine. Foreground changes push on `kira:op:update`; background rows coalesce on `kira:op:batch` (about 1 s).
+- A spawn is background when it is `ReadOnly` with no enclosing op, or its `Origin.Background` is set (auto-fetch, repo life reads, the ADE board context). The panel hides the lane until its Background toggle (`kira.ops.showBackground`); background rows never count as running.
+- A background failure with the same (module, repo root, kind, first error line) within 10 minutes folds into the earlier row and bumps `repeat`.
+- `oplog.Origin` (module, trigger, label, task id, background) travels in ctx. Stamp sites: the gitrpc `ForConn`, `RepoEntry.life`, the auto-fetch ctx, the Files and ADE bridge methods, the ADE board's own ctx. A child op carries `parentId` of the enclosing op in ctx. No row has module `app` unless a spawn has no stamp.
+- `oplog.RecordingRunner` decorates the one `gitclient.Runner`, so every spawn is recorded at one seam: a step of the enclosing op, else its own row. `Spec.Stdin` spawns (the persistent `cat-file` pair) are not recorded. `Spec.OKExits` marks expected non-zero exits (`merge-base --is-ancestor`, `check-ref-format`) as ok. The `command` of a git op is its write steps only.
+- Redaction runs before anything is stored or sent: URL userinfo, secret-keyed `-c` and `--config-env` values, `--password=`-style flags, secret keys and `args` arrays in MCP arguments.
+- Session ops (category `session`: `start`, `adHoc`, `takeOver`, `restart`, `manual`, `reviewAgent`, `run`, `resume`, `rebase`, `review`, `setup`, `stop`) and in-app MCP ops (category `mcp`, `trigger mcp`) share the record shape; a running session op registers Cancel that stops the run. MCP calls are recorded by one receiving middleware (`agentmcp.Options.OnToolCall`), so no tool wraps itself.
+- The panel's steps list, `×N` repeat badge, "Via <tool>" and Copy details are Space's own; OpLogPanel only gains the `toolbar` slot, `statusNote` and `detailLines`.
 - The op command is taken from argv only, so the askpass token in the environment is never recorded.
 - Cancel is registered only for fetch, pull's fetch stage and restack (CancelRemote/CancelRestack); the push family is never cancellable.
 - Each op unregisters its cancel before releasing its opSlot, and Log.Cancel calls the func under the log lock, so a late cancel never hits the next op.
@@ -1713,7 +1719,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - The toolbar shows an Auto-fetch stopped marker (autofetch-stopped) even with write controls hidden; clicking runs Fetch when Fetch is enabled.
 - Failures are shown in an inline banner (FailureBanner.vue, shadcn Alert, role=region) under ConnectionBanner in App.vue, not a toast, because a toast needs a host, covers grid rows and vanishes before being read; the banner stays until dismissed or superseded.
 - Graph failures add Retry (graph.refresh) and "Show in Operations" to the banner; a corrupted graph stream is reported with graph.reportFailure, where {reason: 'corrupted'} is the only reason and Go composes the message and records it in the op log.
-- The op log records user-initiated git writes, plus auto-fetch stops and graph-load failures; failures before an op starts, and anything while the transport is down, are banner-only.
+- The op log records every git spawn from every module (background reads hidden by default); failures before an op starts, and anything while the transport is down, are banner-only.
 - Search must make Go's RE2 and JavaScript RegExp agree exactly, because the server-side tail scan and client-side scan of loaded rows must match; the module never runs a second, different engine on the same query text.
 - Literal-mode search runs no regex engine: it enumerates occurrences of an escaped fixed needle and does a byte-level word-boundary post-check, byte-exact to JavaScript by construction.
 - Regex-mode search translates rewritable JS constructs into RE2 and applies whole-word as a consuming rewrite, not a post-check, because a post-check disagrees with JavaScript backtracking on patterns like foo|foobar.
@@ -2213,6 +2219,7 @@ and `docs/HISTORY.md (v2.0)`.
 - model.AdeRunOutcome is runoutcome.Outcome plus an optional Report (conflicted files, last git error, what was tried) and Rebase facts; finish_step takes reason, conflictedFiles, lastGitError, tried.
 - The rebase run timeout is Deps.RebaseTimeout.
 - The rebase agent has no Bash and loads no settings file (Isolated); git runs only through the git tool on the kira-ade MCP server.
+- ADE git runs through gitsession and the shared runner, including `check-ref-format` (`CheckBranchName`) and the agent `git` tool (`agentmcp.Options.Git`, `TaskBoard.RunGit`); there is no second `exec git` path. Output no longer interleaves stdout and stderr.
 - The git tool requires worktree to be a stack worktree and args to match an exact shape in agentmcp.CheckGitArgs; -c, -C, --output, --exec and --upload-pack are rejected, and unlisted options fail, abbreviations included.
 - Stack worktrees are passed as --add-dir so child branches can restack and edit.
 - AbortRebase runs git rebase --abort in the worktree; BranchInventory keeps the worktree path of a mid-rebase branch (detached HEAD, read from rebase-merge/head-name) so abort and rebaseInProgress work.
@@ -3124,6 +3131,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Memory MCP tool calls are not in the op log (P415 Part 2).** The memory server runs out of process and records nothing until Part 2 lands. The agent's own shell `git` in a non-isolated run is the agent's process, never an app op.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
 - **Archived ADE data grows without bound (P399).** Archive keeps run and step logs (2 MiB tail each), pinned review sessions and history rows forever; nothing purges them. Every board read and push carries the whole history. No user action deletes an archived task yet and the archived finder lists all history at once. Delete this item once a delete action (cascading its logs) and a paged history read land.
 - **The macOS default-app switch is unverified on a real Mac (P332).** No Mac was available: the cgo registry, the document types in LaunchServices, whether a system prompt appears when setting a content-type default, and the UTI of each imported row are untested. Check: install the DMG, run it once from `/Applications`, then `lsregister -dump` lists both document types, Open With lists Kira Space, and the pane's switch changes `mdls -name kMDItemContentType` output.
