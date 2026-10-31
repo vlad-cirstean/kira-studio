@@ -326,6 +326,7 @@ const spaceControl = {
     unwrap(OpsService.Recent({ limit })).then((r) => trust<SpaceOpRecord[]>(r ?? [])),
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: SpaceOpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
+  onOpBatch: (cb: (records: SpaceOpRecord[]) => void): (() => void) => on(CHANNEL.opBatch, cb),
 
   // P144: AdeTaskService (v2 task board). Types from ../ade/v2/wire; payload-free pushes invalidate queries.
   adeTaskBoard: (): Promise<V2.Board> =>

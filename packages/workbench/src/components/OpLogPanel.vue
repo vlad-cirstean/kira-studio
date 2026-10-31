@@ -19,7 +19,12 @@ import { displayValue, formatClockTime, formatDuration, formatElapsed } from '..
 import { useListNavigation } from '../behaviour/listNavigation';
 import { TIMING } from '../behaviour/timing';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
-import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from '../lib/opLog';
+import {
+  type OpLogColumn,
+  type OpLogDetailLine,
+  type OpLogStatusFilter,
+  opLogMenuItems,
+} from '../lib/opLog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 
 // Store-agnostic (props/emits only, no Pinia import here), generic over each app's own record
@@ -39,6 +44,10 @@ interface Props {
   menuFor?: (record: R) => MenuItem[];
   /** Replaces the command cell of a running row while non-null; `now` is the shared clock. */
   runningNote?: (record: R, now: number) => string | null;
+  /** Short text after the status label, e.g. a repeat count. */
+  statusNote?: (record: R) => string | null;
+  /** Extra detail rows under an expanded record, one fixed-height line each. */
+  detailLines?: (record: R) => readonly OpLogDetailLine[];
 }
 const props = defineProps<Props>();
 
@@ -67,8 +76,9 @@ function menuForRecord(record: R): MenuItem[] {
 
 interface OpsListItem {
   key: string;
-  kind: 'op' | 'detail-command' | 'detail-error';
+  kind: 'op' | 'detail-command' | 'detail-error' | 'detail-line';
   record: R;
+  line?: OpLogDetailLine;
 }
 
 const expandedId = ref<string | null>(null);
@@ -107,6 +117,9 @@ const listItems = computed<OpsListItem[]>(() => {
     if (expandedId.value === record.id) {
       if (record.command) out.push({ key: `${record.id}-cmd`, kind: 'detail-command', record });
       if (record.error) out.push({ key: `${record.id}-err`, kind: 'detail-error', record });
+      props.detailLines?.(record).forEach((line, i) => {
+        out.push({ key: `${record.id}-line-${i}`, kind: 'detail-line', record, line });
+      });
     }
   }
   return out;
@@ -163,6 +176,7 @@ function onRowContextMenu(record: R, event: MouseEvent): void {
 defineSlots<{
   cell(props: { column: OpLogColumn; record: R }): unknown;
   detail?(props: { record: R; part: 'command' | 'error' }): unknown;
+  toolbar?(): unknown;
 }>();
 
 function durationText(ms: number | null): string | null {
@@ -213,6 +227,7 @@ function elapsedText(record: R): string {
         :items="statusFilterOptions"
         @update:model-value="(v) => emit('update:statusFilter', v as OpLogStatusFilter)"
       />
+      <slot name="toolbar" />
       <span class="ml-auto text-muted-foreground">{{
         t('automations.runs.running.label', { count: runningCount })
       }}</span>
@@ -278,6 +293,14 @@ function elapsedText(record: R): string {
                 <span v-else-if="column.id === 'status'" class="flex items-center gap-1">
                   <Spinner v-if="listItems[vi.index].record.status === 'running'" label="" />
                   {{ t(STATUS_LABEL[listItems[vi.index].record.status]) }}
+                  <span
+                    v-if="statusNote?.(listItems[vi.index].record)"
+                    class="text-muted-foreground"
+                    data-testid="op-status-note"
+                    >{{
+                      statusNote(listItems[vi.index].record)
+                    }}</span
+                  >
                   <Button
                     v-if="listItems[vi.index].record.status === 'running' && canCancelRecord(listItems[vi.index].record)"
                     variant="toolbar"
@@ -333,6 +356,17 @@ function elapsedText(record: R): string {
                   t('common.command.label', { value: listItems[vi.index].record.command ?? '' })
                 }}</span>
               </slot>
+            </li>
+            <li
+              v-else-if="listItems[vi.index].kind === 'detail-line'"
+              class="grid items-center grid-cols-1 truncate h-4.5 bg-elevated p-0"
+              :class="[VIRTUAL_ROW_CLASS, listItems[vi.index].line?.tone === 'error' ? 'text-error' : 'text-muted-foreground']"
+              data-testid="op-detail-line"
+              :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
+            >
+              <span class="font-data px-2 whitespace-nowrap overflow-x-auto">{{
+                listItems[vi.index].line?.text
+              }}</span>
             </li>
             <li
               v-else

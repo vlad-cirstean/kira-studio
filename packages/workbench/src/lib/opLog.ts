@@ -15,6 +15,12 @@ export interface OpLogColumn {
   width: string;
 }
 
+/** One extra line under an expanded record. */
+export interface OpLogDetailLine {
+  text: string;
+  tone?: 'error';
+}
+
 export type OpLogStatusFilter = 'all' | 'running' | 'error';
 
 // The default context-menu items every op-log row gets: Copy command, Copy error, Cancel — exactly

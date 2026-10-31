@@ -9178,8 +9178,29 @@
       }
     },
     "operations": {
+      "background": {
+        "label": "Background"
+      },
       "clearHint": {
-        "hint": "Clears this window’s list only. The log resets when Kira Space quits."
+        "hint": "Clears this window’s list only. History is kept 30 days."
+      },
+      "copiedDetails": {
+        "announce": "Copied details"
+      },
+      "copyDetails": {
+        "label": "Copy details"
+      },
+      "module": {
+        "label": "Module"
+      },
+      "repeat": {
+        "label": "×{count}"
+      },
+      "step": {
+        "label": "{argv} · exit {exit} · {duration}"
+      },
+      "via": {
+        "label": "Via {tool}"
       }
     },
     "repo": {
