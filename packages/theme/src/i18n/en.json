@@ -13144,6 +13144,47 @@
       }
     },
     "proof": {
+      "change": {
+        "accept": {
+          "label": "Accept"
+        },
+        "accepted": {
+          "announce": "Edit accepted"
+        },
+        "current": {
+          "label": "Current"
+        },
+        "proposed": {
+          "label": "Proposed"
+        },
+        "reject": {
+          "label": "Reject"
+        },
+        "rejected": {
+          "announce": "Edit rejected"
+        },
+        "steps": {
+          "aria": "Changed steps"
+        },
+        "title": "Proposed edit",
+        "view": {
+          "aria": "Revision to show"
+        }
+      },
+      "compare": {
+        "added": {
+          "emptyHint": "This step is new in the edit."
+        },
+        "new": {
+          "label": "New"
+        },
+        "old": {
+          "label": "Old"
+        },
+        "removed": {
+          "emptyHint": "The edit removes this step."
+        }
+      },
       "delete": {
         "body": "Removes {name} and its saved views. This can’t be undone.",
         "title": "Delete this session"

@@ -17,6 +17,7 @@ export function proofTabId(rev: number, ordinal: number): string {
 /** The read-only tab strip contract: no close, no reorder, activation only. */
 export function createProofTabHost(
   tabs: ComputedRef<ProofTab[]>,
+  activeId: ComputedRef<string | null>,
   store: ReturnType<typeof useProofWindowStore>,
   badge?: (tab: ProofTab) => { icon: string; tooltip: string } | null,
 ): TabStripHost<'proof', ProofTab> {
@@ -24,7 +25,7 @@ export function createProofTabHost(
     activeWorkspace: computed(() => 'proof' as const),
     tabs: {
       get activeIdByWorkspace() {
-        return { proof: store.activeId ?? tabs.value[0]?.id ?? null };
+        return { proof: activeId.value };
       },
       tabsForWorkspace: () => tabs.value,
       activateTab: (id) => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProofDiff, ProofStepMeta } from '@shared/domain/proof';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
@@ -7,6 +8,8 @@ import { usePersistedState } from '@workbench/behaviour/persisted';
 import QueryState from '@workbench/components/QueryState.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import { computed, watch } from 'vue';
+import ProofChangePanel from './ProofChangePanel.vue';
+import ProofCompare from './ProofCompare.vue';
 import ProofHeader from './ProofHeader.vue';
 import ProofHistory from './ProofHistory.vue';
 import ProofStepView from './ProofStepView.vue';
@@ -36,17 +39,49 @@ const side = computed(() => store.side ?? (detail.value?.pending ? 'pending' : '
 const revision = computed(() =>
   detail.value ? (side.value === 'pending' && detail.value.pending) || detail.value.current : null,
 );
-const tabs = computed<ProofTab[]>(() => {
+const comparing = computed(() => store.compare && detail.value?.pending != null);
+// Compare walks the proposed steps, then the ones the edit removes (which only the old side has).
+const baseTabs = computed<ProofTab[]>(() => {
+  const d = detail.value;
   const rev = revision.value;
-  if (!rev) return [];
-  const activeId = store.activeId ?? (rev.steps[0] && proofTabId(rev.rev, rev.steps[0].ordinal));
-  return rev.steps.map((meta) => {
-    const id = proofTabId(rev.rev, meta.ordinal);
-    return { id, kind: 'step', state: { rev: rev.rev, meta }, active: id === activeId };
+  if (!d || !rev) return [];
+  const make = (r: number, meta: ProofStepMeta): ProofTab => ({
+    id: proofTabId(r, meta.ordinal),
+    kind: 'step',
+    state: { rev: r, meta },
+    active: false,
   });
+  const steps = rev.steps.map((meta) => make(rev.rev, meta));
+  return comparing.value
+    ? [...steps, ...d.removed.map((meta) => make(d.current.rev, meta))]
+    : steps;
 });
+// A stale id (after accept, or a side switch) falls back to the same step number, then the first.
+const activeId = computed<string | null>(() => {
+  const list = baseTabs.value;
+  const wanted = store.activeId;
+  if (wanted && list.some((tab) => tab.id === wanted)) return wanted;
+  const ordinal = wanted ? Number(wanted.split(':')[1]) : null;
+  return list.find((tab) => tab.state.meta.ordinal === ordinal)?.id ?? list[0]?.id ?? null;
+});
+const tabs = computed(() =>
+  baseTabs.value.map((tab) => ({ ...tab, active: tab.id === activeId.value })),
+);
 const activeTab = computed(() => tabs.value.find((tab) => tab.active) ?? null);
-const host = createProofTabHost(tabs, store);
+
+const DIFF_BADGE: Record<ProofDiff, { icon: string; label: () => string } | null> = {
+  added: { icon: 'diff-added', label: () => t('common.added.status') },
+  changed: { icon: 'diff-modified', label: () => t('common.changed.status') },
+  removed: { icon: 'diff-removed', label: () => t('common.removed.status') },
+  unchanged: null,
+};
+const host = createProofTabHost(tabs, activeId, store, (tab) => {
+  const badge =
+    detail.value?.pending && (side.value === 'pending' || comparing.value)
+      ? DIFF_BADGE[tab.state.meta.diff]
+      : null;
+  return badge ? { icon: badge.icon, tooltip: badge.label() } : null;
+});
 
 const LEFT_MIN = 180;
 const LEFT_MAX = 480;
@@ -55,6 +90,16 @@ const left = useLiveSize(
   () => Math.max(LEFT_MIN, Math.min(LEFT_MAX, storedLeft.value)),
   (w) => {
     storedLeft.value = w;
+  },
+);
+
+const RIGHT_MIN = 280;
+const RIGHT_MAX = 720;
+const storedRight = usePersistedState('kira.proof.rightWidth', 340);
+const right = useLiveSize(
+  () => Math.max(RIGHT_MIN, Math.min(RIGHT_MAX, storedRight.value)),
+  (w) => {
+    storedRight.value = w;
   },
 );
 </script>
@@ -94,8 +139,14 @@ const left = useLiveSize(
               <TabStrip :host="host" />
             </div>
             <div class="min-h-0 flex-1" data-testid="proof-body">
+              <ProofCompare
+                v-if="activeTab && comparing"
+                :key="activeTab.id"
+                :detail="data"
+                :meta="activeTab.state.meta"
+              />
               <ProofStepView
-                v-if="activeTab"
+                v-else-if="activeTab"
                 :key="activeTab.id"
                 :session-id="data.id"
                 :rev="activeTab.state.rev"
@@ -112,6 +163,24 @@ const left = useLiveSize(
           data-testid="proof-empty"
         />
       </section>
+      <template v-if="detail?.pending">
+        <ResizeHandle
+          :label="t('studio.proof.resize.label')"
+          data-testid="proof-change-resize-handle"
+          direction="reverse"
+          :min="RIGHT_MIN"
+          :max="RIGHT_MAX"
+          v-bind="right.bind"
+        />
+        <section
+          class="flex min-h-0 flex-none flex-col overflow-hidden rounded-kira border border-border bg-bg"
+          :style="{ width: `${right.size.value}px` }"
+          :aria-label="t('studio.proof.change.title')"
+          data-testid="proof-right"
+        >
+          <ProofChangePanel :detail="detail" :pending="detail.pending" />
+        </section>
+      </template>
     </div>
   </div>
 </template>

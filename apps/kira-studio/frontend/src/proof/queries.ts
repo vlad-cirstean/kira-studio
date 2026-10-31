@@ -6,6 +6,8 @@ import type {
   ProofViewStateEntry,
 } from '@shared/domain/proof';
 import { useMutation, useQuery } from '@tanstack/vue-query';
+import { t } from '@theme/i18n';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import { queryClient } from '@workbench/state/queryClient';
 import { type MaybeRefOrGetter, onUnmounted, toValue } from 'vue';
 import { control } from '../bridge/control';
@@ -68,6 +70,13 @@ export function cacheViewState(
   ]);
 }
 
+function refreshProof(): Promise<void> {
+  return queryClient.invalidateQueries({
+    queryKey: proofKey.all,
+    predicate: (q) => q.queryKey[1] !== 'viewState',
+  });
+}
+
 export function useDeleteProof() {
   return useMutation({
     mutationFn: (sessionId: string) => control.proofDelete(sessionId),
@@ -78,15 +87,33 @@ export function useDeleteProof() {
   });
 }
 
+/** Accept or reject the pending edit; both land back on the (new) current revision. */
+export function useReviewEdit() {
+  const store = useProofWindowStore();
+  const settle = async (message: string): Promise<void> => {
+    store.side = null;
+    store.compare = false;
+    store.activeId = null;
+    await refreshProof();
+    announceApp(message);
+  };
+  const accept = useMutation({
+    mutationFn: (sessionId: string) => control.proofAcceptEdit(sessionId),
+    onSuccess: () => settle(t('studio.proof.change.accepted.announce')),
+  });
+  const reject = useMutation({
+    mutationFn: (sessionId: string) => control.proofRejectEdit(sessionId),
+    onSuccess: () => settle(t('studio.proof.change.rejected.announce')),
+  });
+  return { accept, reject };
+}
+
 /** Go broadcasts: refetch whatever changed, and follow a `select` push to a session. */
 export function useProofSync(): void {
   const store = useProofWindowStore();
   const offs = [
     control.onProofChanged(() => {
-      void queryClient.invalidateQueries({
-        queryKey: proofKey.all,
-        predicate: (q) => q.queryKey[1] !== 'viewState',
-      });
+      void refreshProof();
     }),
     control.onProofSelect(({ sessionId }) => {
       store.selectSession(sessionId);

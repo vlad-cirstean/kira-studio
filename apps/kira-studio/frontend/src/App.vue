@@ -29,6 +29,7 @@ import { openApiRequestTab } from './api/tabs';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
+import ProofReadyPrompt from './proof/ProofReadyPrompt.vue';
 import { studioPaletteCommands } from './shortcuts/studioCommands';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useConnectionDialogStore } from './state/connections';
@@ -68,6 +69,7 @@ const promptKinds = {
   dbmcp: markRaw(DbMcpApprovalDialog),
   update: markRaw(UpdatePrompt),
   quit: markRaw(QuitPrompt),
+  proof: markRaw(ProofReadyPrompt),
 };
 const paletteStore = usePaletteStore();
 providePaletteCommands(studioPaletteCommands());
