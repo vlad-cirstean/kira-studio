@@ -147,56 +147,74 @@ type HeadIndex interface {
 // Rows found are returned even beside an error, so a failed host leaves the index matches in place.
 func KeyChangeRequests(hosts *githost.Registry, index HeadIndex) func(ctx context.Context, key string) ([]issuetracker.ChangeRequest, error) {
 	return func(ctx context.Context, key string) ([]issuetracker.ChangeRequest, error) {
-		in := keyBoundary(key)
-		var out []issuetracker.ChangeRequest
-		seen := map[string]bool{}
-		add := func(provider string, cr githost.ChangeRequest, repoKeyTail string) {
-			if cr.URL == "" || seen[cr.URL] {
-				return
-			}
-			seen[cr.URL] = true
-			out = append(out, issuetracker.ChangeRequest{
-				Title: cr.Title, URL: cr.URL, Ref: fmt.Sprintf("#%d", cr.Number), State: cr.State,
-				Repo: changeRequestRepo(cr.URL, repoKeyTail), Provider: provider,
-			})
+		c := &keyCollector{in: keyBoundary(key), seen: map[string]bool{}}
+		failed := c.fromHosts(ctx, hosts, key)
+		if err := c.fromIndex(index, key); err != nil && failed == nil {
+			failed = err
 		}
-		var failed error
-		for _, p := range hosts.All() {
-			s, ok := p.(githost.ChangeRequestSearch)
-			if !ok {
-				continue
-			}
-			crs, st := s.SearchChangeRequests(ctx, key, keySearchLimit)
-			if st.Kind == githost.KindNotFound {
-				continue // a host whose CLI is not installed is a host the user does not use; Settings shows it
-			}
-			if !st.OK() {
-				if failed == nil {
-					failed = searchError(st)
-				}
-				continue
-			}
-			for _, cr := range crs {
-				if in.MatchString(cr.Title) {
-					add(p.ID(), cr, "")
-				}
-			}
-		}
-		if index != nil {
-			hits, err := index.ByHeadContaining(key, keySearchLimit)
-			if err != nil && failed == nil {
-				failed = err
-			}
-			for _, h := range hits {
-				if !in.MatchString(h.HeadRef) {
-					continue
-				}
-				provider, _, _ := strings.Cut(h.RepoKey, "|")
-				add(provider, githost.ChangeRequest{Number: h.Number, Title: h.Title, URL: h.URL, State: indexState(h)}, repoKeyTail(h.RepoKey))
-			}
-		}
-		return out, failed
+		return c.out, failed
 	}
+}
+
+// keyCollector gathers the change requests that carry an issue key, once per URL.
+type keyCollector struct {
+	in   *regexp.Regexp
+	seen map[string]bool
+	out  []issuetracker.ChangeRequest
+}
+
+func (c *keyCollector) add(provider string, cr githost.ChangeRequest, repoKeyTail string) {
+	if cr.URL == "" || c.seen[cr.URL] {
+		return
+	}
+	c.seen[cr.URL] = true
+	c.out = append(c.out, issuetracker.ChangeRequest{
+		Title: cr.Title, URL: cr.URL, Ref: fmt.Sprintf("#%d", cr.Number), State: cr.State,
+		Repo: changeRequestRepo(cr.URL, repoKeyTail), Provider: provider,
+	})
+}
+
+// fromHosts adds the title matches of every searchable host and returns the first host failure.
+func (c *keyCollector) fromHosts(ctx context.Context, hosts *githost.Registry, key string) error {
+	var failed error
+	for _, p := range hosts.All() {
+		s, ok := p.(githost.ChangeRequestSearch)
+		if !ok {
+			continue
+		}
+		crs, st := s.SearchChangeRequests(ctx, key, keySearchLimit)
+		if st.Kind == githost.KindNotFound {
+			continue // a host whose CLI is not installed is a host the user does not use; Settings shows it
+		}
+		if !st.OK() {
+			if failed == nil {
+				failed = searchError(st)
+			}
+			continue
+		}
+		for _, cr := range crs {
+			if c.in.MatchString(cr.Title) {
+				c.add(p.ID(), cr, "")
+			}
+		}
+	}
+	return failed
+}
+
+// fromIndex adds the head branch matches of the persisted index.
+func (c *keyCollector) fromIndex(index HeadIndex, key string) error {
+	if index == nil {
+		return nil
+	}
+	hits, err := index.ByHeadContaining(key, keySearchLimit)
+	for _, h := range hits {
+		if !c.in.MatchString(h.HeadRef) {
+			continue
+		}
+		provider, _, _ := strings.Cut(h.RepoKey, "|")
+		c.add(provider, githost.ChangeRequest{Number: h.Number, Title: h.Title, URL: h.URL, State: indexState(h)}, repoKeyTail(h.RepoKey))
+	}
+	return err
 }
 
 // keyBoundary matches key as a whole token: PROJ-1 must not match PROJ-12 or XPROJ-1.
