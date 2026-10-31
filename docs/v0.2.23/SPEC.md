@@ -18,7 +18,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Done |
 | P414 | Status bar: running ADE agents, interface font, tooltips | Done |
 | P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Done |
-| P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Todo |
+| P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Done |
 | P416 | Move automation runs into Operations panel | Todo |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
@@ -134,6 +134,8 @@ Tests: Go flow `TestCommentEdit` with contract `git-review-edit`; UI specs for o
 ### P415 Part 2: Operations panel: memory MCP tool ops (out-of-process)
 
 The memory MCP server (`kira-space memory-mcp`) runs as a separate process started by Claude Code; its tool calls reach the op log through a cross-process channel into the `op_log` table Part 1 builds.
+
+**Result.** Memory MCP tool calls reach the Operations panel. `internal/mcpcall.Record` middleware, shared with `agentmcp`, feeds `mcpserver.Options.OnToolCall`; `oplog.FinishCall` is the single status mapping. `kira-space memory-mcp` writes `op_log` rows into `kira.db` through its own `oplog.Log` (module `memory`, category `mcp`); no-op if `kira.db` or the table is absent, never migrates. Ids `<owner token>.<random>`; owner holds `op-owners/<token>.lock` until its writer drains. App polls `data_version` every 1 s, ingests foreign rows by rowid cursor plus tracked ids, not persisted. Start reconcile skips foreign rows; running row with free owner lock becomes `error` ("Memory MCP server stopped while this ran."). Import-mode calls are background, so only failures persist. Not cancellable, no migration. Tests: oplog units, flow `TestMemoryMcpOps` (ok, error, running, SIGKILL orphan, restart keeps live row, no `kira.db`, import mode; contract `space-ops-memory`), UI `operations-memory.spec.ts`; Go, Space UI 846, mobile 83, visual 24, lint and real `claude` Memory MCP, ADE, smart-script rows pass. Follow-up: `oplogforeign.go` duplicates the `Recent` column list and scan; fold into one helper after P416 lands.
 
 ### P416 Move automation runs into Operations panel
 
