@@ -347,3 +347,33 @@ func TestAdeRebaseRun(t *testing.T) {
 		})
 	}
 }
+
+// TestAdeReportArtifacts runs a step that reports a doc by ref: the real claude must call
+// report_artifacts with a doc, and the task's artifacts hold the row.
+func TestAdeReportArtifacts(t *testing.T) {
+	f := newAdeFixture(t, nil)
+	step := "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 3m\n" +
+		"    prompt: Do not write any file. Call report_artifacts once with one artifact of kind doc, title Notes, " +
+		"ref notes.md. Then call finish_step with status pass and summary ok.\n"
+	f.saveWorkflow(t, "flow", step+manualStepYAML)
+	task := f.createTask(t, "flow")
+	run := f.startRun(t, task, "feat/real-claude")
+	log := f.runLog(t, run.ID)
+	if run.State != "done" {
+		t.Fatalf("run = %+v, want done; log:\n%s", run, tail(log, 1500))
+	}
+	if !strings.Contains(log, "mcp__kira-ade__report_artifacts") {
+		t.Fatalf("run log lacks the report_artifacts tool call:\n%s", tail(log, 1500))
+	}
+	res, err := f.W.AdeTask.Artifacts(ctx, adewire.TaskArgs{TaskID: task.ID})
+	if err != nil {
+		t.Fatalf("Artifacts: %v", err)
+	}
+	for _, a := range res.Artifacts {
+		if a.Kind == "doc" && a.Ref == "notes.md" {
+			f.requireCostUnder(t)
+			return
+		}
+	}
+	t.Fatalf("no doc artifact notes.md in %+v; log:\n%s", res.Artifacts, tail(log, 1500))
+}
