@@ -1683,6 +1683,12 @@ export type Contract = {
       params: { repoId: string; branch: string; id: number; state: ReviewCommentState };
       result: { readonly changed: boolean };
     };
+    /** P413: replaces body and kind; keeps range, anchor, state and reply; clears `sentAt` (the edited
+     *  text was never sent). `changed` is false when the id matches nothing. */
+    'review.comment.edit': {
+      params: { repoId: string; branch: string; id: number; body: string; kind: ReviewCommentKind };
+      result: { readonly changed: boolean };
+    };
     /** G13 D11: `at` defaults to the branch tip when omitted — the resolved value is echoed back
      *  so a caller never has to guess which coordinates it is holding. */
     'review.comment.list': {

@@ -192,7 +192,8 @@ package gitrpc
 // changeRequest.comment (review a change request, comment on its conversation).
 // P392: 54 -> 55, additive. 'changeRequest.reviewState' gains optional 'number' (a known change
 // request skips the branch lookup).
-const ContractVersion = 55
+// P413: 55 -> 56, additive. New request review.comment.edit (replace a comment's body and kind).
+const ContractVersion = 56
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

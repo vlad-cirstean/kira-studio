@@ -166,6 +166,12 @@ func (s *Store) SetCommentState(ctx context.Context, repoID, branch string, id i
 	return s.updateComment(ctx, repoID, branch, `state = ?`, []any{state}, id)
 }
 
+// EditComment replaces body and kind. Range, anchor, state and reply stay; sent_at clears, since the
+// edited text was never sent.
+func (s *Store) EditComment(ctx context.Context, repoID, branch string, id int64, body, kind string) (bool, error) {
+	return s.updateComment(ctx, repoID, branch, `body = ?, kind = ?, sent_at = NULL`, []any{body, kind}, id)
+}
+
 // ReplyComment stores an agent reply; resolved moves the comment to addressed, otherwise it stays open.
 func (s *Store) ReplyComment(ctx context.Context, repoID, branch string, id int64, reply string, resolved bool, at time.Time) (bool, error) {
 	state := CommentStateOpen

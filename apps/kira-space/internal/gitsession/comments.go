@@ -172,6 +172,18 @@ func (e *RepoEntry) SetCommentState(ctx context.Context, branch string, id int64
 	return changed, nil
 }
 
+// EditComment is review.comment.edit's whole orchestration.
+func (e *RepoEntry) EditComment(ctx context.Context, branch string, id int64, body, kind string) (bool, error) {
+	changed, err := e.review.EditComment(ctx, e.Summary.RepoID, branch, id, body, kind)
+	if err != nil {
+		return false, err
+	}
+	if err := e.review.Touch(ctx, e.Summary.RepoID, branch); err != nil {
+		return false, err
+	}
+	return changed, nil
+}
+
 // ClearComments is review.comment.clear's whole orchestration — a thin pass-through plus Touch.
 func (e *RepoEntry) ClearComments(ctx context.Context, branch string) (int, error) {
 	n, err := e.review.ClearComments(ctx, e.Summary.RepoID, branch)
