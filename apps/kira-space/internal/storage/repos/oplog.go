@@ -89,9 +89,10 @@ func (r *OpLogRepo) Prune(cutoff time.Time, maxRows int) error {
 	return nil
 }
 
-// ReconcileInterrupted turns rows left running by a quit into errors carrying msg.
+// ReconcileInterrupted turns rows left running by a quit into errors carrying msg. Foreign rows
+// (id holds a '.') belong to a process that may outlive the app; the owner sweep handles them.
 func (r *OpLogRepo) ReconcileInterrupted(msg string) error {
-	if _, err := r.DB.Exec(`UPDATE op_log SET status = 'error', error = ? WHERE status = 'running'`, msg); err != nil {
+	if _, err := r.DB.Exec(`UPDATE op_log SET status = 'error', error = ? WHERE status = 'running' AND instr(id, '.') = 0`, msg); err != nil {
 		return fmt.Errorf("repos: reconcile ops: %w", err)
 	}
 	return nil

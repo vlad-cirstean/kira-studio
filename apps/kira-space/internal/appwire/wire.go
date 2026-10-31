@@ -323,7 +323,7 @@ func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 }
 
 // newOpLog opens the persisted op log: interrupted rows become errors, old rows are pruned, the
-// foreground lane is seeded from disk. A storage failure leaves a memory-only log.
+// foreground lane is seeded from disk and rows other processes write are ingested. A storage failure leaves a memory-only log.
 func newOpLog(repositories *repos.Repos) *oplog.Log {
 	store := repositories.OpLog
 	if err := store.ReconcileInterrupted("Kira Space quit while this ran."); err != nil {
@@ -332,12 +332,21 @@ func newOpLog(repositories *repos.Repos) *oplog.Log {
 	if err := store.Prune(time.Now().Add(-oplog.Retention), oplog.MaxRows); err != nil {
 		slog.Warn("op log: prune", "scope", "startup", "err", err)
 	}
+	if err := oplog.SweepDeadOwners(store, opOwnersDir()); err != nil {
+		slog.Warn("op log: sweep foreign", "scope", "startup", "err", err)
+	}
+	cur, curErr := oplog.NewForeignCursor(store)
 	l := oplog.New(oplog.WithStore(store))
 	recent, err := store.Recent(oplog.FgCapacity)
 	if err != nil {
 		slog.Warn("op log: load", "scope", "startup", "err", err)
 	}
 	l.Seed(recent)
+	if curErr != nil {
+		slog.Warn("op log: foreign cursor", "scope", "startup", "err", curErr)
+		return l
+	}
+	oplog.WatchForeign(l, store, opOwnersDir(), oplog.FlushInterval, cur)
 	return l
 }
 

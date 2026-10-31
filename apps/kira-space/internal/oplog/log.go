@@ -55,6 +55,9 @@ type Log struct {
 
 	store Store
 	w     *writer
+
+	idPrefix string
+	closers  []func()
 }
 
 type dedupeEntry struct {
@@ -108,7 +111,17 @@ func (l *Log) Seed(recs []Record) {
 
 // Close drains pending persistence writes, bounded.
 func (l *Log) Close() {
-	if l == nil || l.w == nil {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	closers := l.closers
+	l.closers = nil
+	l.mu.Unlock()
+	for _, c := range closers {
+		c()
+	}
+	if l.w == nil {
 		return
 	}
 	l.w.close(2 * time.Second)
@@ -152,7 +165,7 @@ func (l *Log) Start(ctx context.Context, m Meta) *Op {
 		source = o.Label
 	}
 	rec := &Record{
-		ID:         rand.Text(),
+		ID:         l.idPrefix + rand.Text(),
 		StartedAt:  kiratime.NowISO(),
 		Category:   cat,
 		Kind:       m.Kind,
