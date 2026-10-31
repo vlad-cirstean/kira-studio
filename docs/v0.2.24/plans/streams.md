@@ -156,6 +156,15 @@ to the orchestrator before editing.
   `tests/contract/ade-stage-settings.json`, new `tests/claude/stagesettings_test.go` (C adds only this file there; B's
   `tests/claude/**` claim is "none expected"), ADE-only fixtures `tests/fixtures/ade-v2/workflows.json` and
   `tests/unit/support/adeV2Fixtures.ts`. B touches none of them.
+- Amendment (P432 plan): `apps/kira-space/tests/claude/memory_test.go` (pre-existing flaky `TestMemoryMcpThroughClaude`
+  prompt fix; C adds only this file there, B's claim stays "none expected"). Op-log panel tests: Space
+  `tests/ui/{operations,operations-memory,list-keyboard,automations-ops}.spec.ts`, `tests/contract/space-ops-ade.json`,
+  new `tests/visual/operations.spec.ts` and its snapshots; Studio `tests/ui/{operations,font-roles,automations-ops}.spec.ts`,
+  new `tests/visual/operations.spec.ts` and its snapshots (carve-outs from A's `apps/kira-studio/**`);
+  `packages/workbench/src/testing/ui/scenarios/automationsOps.ts`; new op-log-only files
+  `packages/workbench/src/components/OpLogDetail.vue`, `OpLogCodeBlock.vue`, `packages/workbench/src/lib/opLogTree.ts`
+  (+ `.spec.ts`). An existing A or B visual baseline that moves only because of the panel is re-recorded by whichever
+  stream lands second, per the baseline rule below.
 
 Consequences named so no stream drifts across:
 
