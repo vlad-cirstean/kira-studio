@@ -167,7 +167,7 @@ useShortcut(root, ['form.submit', 'form.cancel'], (id) => {
         <Alert v-if="error" variant="error" data-testid="review-thread-error"
           ><AlertDescription>{{ error }}</AlertDescription></Alert
         >
-        <div class="flex justify-end gap-1.5">
+        <div class="flex flex-wrap justify-end gap-1.5">
           <Button
             variant="toolbar"
             size="kira"
@@ -218,7 +218,7 @@ useShortcut(root, ['form.submit', 'form.cancel'], (id) => {
         <Alert v-if="error" variant="error" data-testid="review-thread-error"
           ><AlertDescription>{{ error }}</AlertDescription></Alert
         >
-        <div class="flex justify-end gap-1.5">
+        <div class="flex flex-wrap justify-end gap-1.5">
           <Button
             variant="toolbar"
             size="kira"
