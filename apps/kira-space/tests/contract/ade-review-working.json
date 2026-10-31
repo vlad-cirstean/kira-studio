@@ -19,6 +19,25 @@
       }
     ],
     "head": "<masked>",
+    "promoted": [],
+    "reviews": {
+      "fresh.txt": {
+        "changedSinceReview": false,
+        "kind": "none"
+      },
+      "gone.txt": {
+        "changedSinceReview": false,
+        "kind": "none"
+      },
+      "keep.txt": {
+        "changedSinceReview": false,
+        "kind": "none"
+      },
+      "staged.txt": {
+        "changedSinceReview": false,
+        "kind": "none"
+      }
+    },
     "worktree": "<worktree>"
   },
   "AdeTaskService.ReviewWorkingDiff": {

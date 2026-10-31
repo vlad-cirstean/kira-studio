@@ -9,6 +9,7 @@
         "createdAt": 0,
         "id": 1,
         "kind": "change",
+        "origin": "commit",
         "path": "edit.txt",
         "range": {
           "end": 2,
@@ -26,6 +27,7 @@
         "createdAt": 0,
         "id": 2,
         "kind": "change",
+        "origin": "commit",
         "path": "edit.txt",
         "range": {
           "end": 2,
