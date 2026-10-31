@@ -44,6 +44,19 @@ export const fileContentSchema = /*#__PURE__*/ z.object({
 });
 export type FileContent = z.infer<typeof fileContentSchema>;
 
+// ReadFileForEdit: FileContent's classification plus the on-disk content hash a save must present,
+// and `notUtf8` for a found file whose bytes JSON cannot carry back unchanged.
+export const editContentSchema = /*#__PURE__*/ z.object({
+  kind: /*#__PURE__*/ z.enum(['found', 'binary', 'tooLarge', 'missing', 'notUtf8']),
+  text: z.string(),
+  hash: z.string(),
+  language: z.string(),
+});
+export type EditContent = z.infer<typeof editContentSchema>;
+
+export const writeFileResultSchema = /*#__PURE__*/ z.object({ hash: z.string() });
+export type WriteFileResult = z.infer<typeof writeFileResultSchema>;
+
 // One file an external open (Finder, a default-app double-click) brought to a window: `repoId` and
 // `relPath` when it lies in an imported repository, else `path` (absolute) alone.
 export interface OpenedFileTarget {

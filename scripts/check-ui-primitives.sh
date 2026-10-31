@@ -117,6 +117,7 @@ U37 apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue # plan board branc
 U37 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # plan board history and span row selected fill, board visual exempt per P263 §2.10
 U62 apps/kira-space/frontend/src/views/repo/useReadonlyFileViewer.ts # Monaco editor.focus(), not DOM focus
 U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
+U62 apps/kira-space/frontend/src/views/repo/useFileEdit.ts # Monaco editor.focus(), not DOM focus
 U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
 U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha

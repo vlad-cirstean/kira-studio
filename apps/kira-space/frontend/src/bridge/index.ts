@@ -39,6 +39,7 @@ import type {
 import type {
   CodeSearchEvent,
   DiffContent,
+  EditContent,
   FileContent,
   FileHandlersSetResult,
   FileHandlersStatus,
@@ -46,6 +47,7 @@ import type {
   OpenedFileTarget,
   RepoSummary,
   SearchRequest,
+  WriteFileResult,
 } from '@shared/domain/repo';
 import type {
   ScriptRun,
@@ -276,6 +278,17 @@ const spaceControl = {
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
   codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
     unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+  codeWorkspaceReadFileForEdit: (id: string, path: string): Promise<EditContent> =>
+    unwrap(CodeWorkspaceService.ReadFileForEdit({ id, path })).then((r) => trust<EditContent>(r)),
+  codeWorkspaceWriteFile: (
+    id: string,
+    path: string,
+    text: string,
+    baseHash: string,
+  ): Promise<WriteFileResult> =>
+    unwrap(CodeWorkspaceService.WriteFile({ id, path, text, baseHash })).then((r) =>
+      trust<WriteFileResult>(r),
+    ),
 
   // External opens: the files this window was opened for (once), and a standalone file's content.
   openedFilesPending: (): Promise<OpenedFileTarget[]> =>

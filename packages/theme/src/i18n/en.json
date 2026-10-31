@@ -9394,6 +9394,17 @@
           "example": "curl -s https://…/version"
         }
       },
+      "file": {
+        "changedOnDisk": {
+          "body": "This file changed on disk since you started editing."
+        },
+        "deletedOnDisk": {
+          "body": "This file was deleted on disk since you started editing."
+        },
+        "notUtf8": {
+          "error": "This file’s text encoding isn’t supported for editing."
+        }
+      },
       "heads": {
         "detached": {
           "label": "Detached at {sha}"

@@ -1,23 +1,29 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
+import { useFileEditStore } from '../../state/fileEdit';
 import type { RepoFileTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { attachDistillSelection } from './distillSelection';
 import { registerEditor, unmountEditor } from './editors';
 import { loadFileContent } from './fileContent';
-import { loadMonaco, repoFileUri, repoRevisionFileUri } from './monaco';
+import { loadMonaco, peekModel, repoFileUri, repoRevisionFileUri } from './monaco';
+import RepoFileEditBar from './RepoFileEditBar.vue';
 import { consumeReveal } from './reveal';
-import { useInlineBlame } from './useInlineBlame';
+import { useFileEdit } from './useFileEdit';
+import { type InlineBlameAttachParams, useInlineBlame } from './useInlineBlame';
 import { useReadonlyFileViewer } from './useReadonlyFileViewer';
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
 const tabsStore = useTabsStore();
+const fileEdit = useFileEditStore();
 
 type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'missing' | 'error';
 const state = ref<ViewState>('loading');
@@ -37,6 +43,41 @@ const viewer = useReadonlyFileViewer({
 const { container, readingPane, isMarkdown, view, viewOptions, renderedHtml, onViewChange } =
   viewer;
 
+const root = useTemplateRef<HTMLElement>('root');
+// Only a worktree tab (not revision-pinned) whose file read as text can be edited.
+const canEdit = computed(() => props.tab.state.rev === null && state.value === 'found');
+let blameParams: InlineBlameAttachParams | null = null;
+
+function teardownEditor(): void {
+  disposeCursorSub?.();
+  disposeCursorSub = null;
+  disposeDistill?.();
+  disposeDistill = null;
+  edit.detach();
+  viewer.dispose();
+  inlineBlame.dispose();
+  unmountEditor(props.tab.id);
+}
+
+const edit = useFileEdit({
+  tabId: props.tab.id,
+  path: props.tab.path,
+  root,
+  repoId: () => repoIdOfTab(props.tab),
+  showSource: () => {
+    if (viewer.isMarkdown.value && viewer.view.value === 'reading') viewer.onViewChange('source');
+  },
+  onText: (text) => viewer.setText(text),
+  dropBlame: () => inlineBlame.dispose(),
+  restoreBlame: () => {
+    if (blameParams) inlineBlame.attach(blameParams);
+  },
+  onGone: () => {
+    teardownEditor();
+    state.value = 'missing';
+  },
+});
+
 let disposeCursorSub: (() => void) | null = null;
 let disposeDistill: (() => void) | null = null;
 const inlineBlame = useInlineBlame();
@@ -50,18 +91,30 @@ async function mount(): Promise<void> {
   }
 
   const rev = props.tab.state.rev;
-  const result = await loadFileContent(repoId, props.tab.path, rev);
-  if (result.kind === 'error') {
-    state.value = 'error';
-    errorMessage.value = result.message;
-    return;
-  }
-  if (result.kind !== 'found') {
-    state.value = result.kind;
-    return;
+  // Back from a tab switch mid-edit: the cached model holds the draft, so skip the read that would
+  // overwrite it with the disk text.
+  const draft = fileEdit.isEditing(props.tab.id)
+    ? peekModel(repoFileUri(await loadMonaco(), repoId, props.tab.path))
+    : undefined;
+  if (!draft) fileEdit.end(props.tab.id);
+  let text: string;
+  if (draft) {
+    text = draft.getValue();
+  } else {
+    const result = await loadFileContent(repoId, props.tab.path, rev);
+    if (result.kind === 'error') {
+      state.value = 'error';
+      errorMessage.value = result.message;
+      return;
+    }
+    if (result.kind !== 'found') {
+      state.value = result.kind;
+      return;
+    }
+    text = result.text;
   }
   // D11: held on a ref (not only handed to the model) so the reading view can render it too.
-  viewer.setText(result.text);
+  viewer.setText(text);
 
   const mod = await loadMonaco();
   // Unmounted (tab closed/switched away) while the read/import above was in flight.
@@ -71,9 +124,10 @@ async function mount(): Promise<void> {
     rev === null
       ? repoFileUri(mod, repoId, props.tab.path)
       : repoRevisionFileUri(mod, repoId, props.tab.path, rev);
-  const editor = viewer.createEditor(mod, uri, result.text);
+  const editor = viewer.createEditor(mod, uri, text);
   if (!editor) return;
   registerEditor(props.tab.id, uri, editor);
+  edit.attach(editor);
   disposeDistill = attachDistillSelection(editor, props.tab.path);
 
   // Attached after the editor exists, guarded on the setting and on whether this window has a git
@@ -84,7 +138,15 @@ async function mount(): Promise<void> {
   // its line numbers do not correspond.
   const blameable = gitRepoId !== undefined && rev === null;
   if (blameable && gitRepoId) {
-    inlineBlame.attach({ gitRepoId, workspaceRepoId: repoId, path: props.tab.path, editor, mod });
+    blameParams = {
+      gitRepoId,
+      workspaceRepoId: repoId,
+      path: props.tab.path,
+      editor,
+      mod,
+    };
+    // Edit mode drops blame: its line numbers stop matching once the text changes.
+    if (!fileEdit.isEditing(props.tab.id)) inlineBlame.attach(blameParams);
   }
 
   // A pending reveal (a search result or go-to-definition match that arrived while this tab wasn't
@@ -127,50 +189,77 @@ onMounted(() => void mount());
 // A mere tab switch away (MainView's own `v-if`): the widget disposes, the model (and the
 // tabId -> uri mapping) survives in editors.ts until an actual close calls
 // TAB_KINDS['repo-file'].dropResources. Remounting re-runs mount(), which reuses the cached model.
-onUnmounted(() => {
-  disposeCursorSub?.();
-  disposeCursorSub = null;
-  disposeDistill?.();
-  disposeDistill = null;
-  viewer.dispose();
-  inlineBlame.dispose();
-  unmountEditor(props.tab.id);
-});
+onUnmounted(teardownEditor);
 </script>
 
 <template>
-  <template v-if="state === 'loading' || state === 'found'">
-    <div v-if="isMarkdown" class="flex flex-col h-full w-full">
-      <ViewToolbar border="none">
-        <SecondaryTabs
-          :model-value="view"
-          :items="viewOptions"
-          data-testid="repo-file-view-toggle"
-          @update:model-value="(v) => onViewChange(v as 'source' | 'reading')"
-        />
-      </ViewToolbar>
-      <!-- `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
-           toggle, only hidden, so scroll position/selection/find state survive a round trip.
-           flex-1/min-h-0 (not h-full/w-full, the standalone-mount branch below) since this is
-           nested in the markdown toolbar's own flex column. -->
-      <div
-        v-show="view === 'source'"
-        ref="container"
-        class="monaco-host flex-1 min-h-0"
-        data-testid="repo-file-editor"
+  <div
+    v-if="state === 'loading' || state === 'found'"
+    ref="root"
+    class="flex flex-col h-full w-full"
+  >
+    <ViewToolbar v-if="isMarkdown || canEdit" border="none">
+      <SecondaryTabs
+        v-if="isMarkdown && !edit.editing.value"
+        :model-value="view"
+        :items="viewOptions"
+        data-testid="repo-file-view-toggle"
+        @update:model-value="(v) => onViewChange(v as 'source' | 'reading')"
       />
-      <!-- D11: `markdown-it`'s `html: false` (markdownReading.ts) escapes any literal HTML tag in
-           the source, so this is the one `v-html` in this view that's safe. -->
-      <div
-        v-if="view === 'reading'"
-        ref="readingPane"
-        class="kira-prose flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4 [&>*]:max-w-prose [&>pre]:max-w-none [&>table]:max-w-none"
-        data-testid="repo-file-markdown"
-        v-html="renderedHtml"
+      <RepoFileEditBar
+        v-if="canEdit"
+        :editing="edit.editing.value"
+        :dirty="edit.dirty.value"
+        :saving="edit.saving.value"
+        :locked="edit.busy.value"
+        @edit="edit.enter()"
+        @save="edit.save()"
+        @done="edit.done()"
       />
-    </div>
-    <div v-else ref="container" class="monaco-host h-full w-full" data-testid="repo-file-editor" />
-  </template>
+    </ViewToolbar>
+    <Alert v-if="edit.conflict.value" variant="warn" strip data-testid="repo-file-conflict">
+      <AlertDescription>
+        {{
+          edit.conflict.value === 'gone'
+            ? t('space.repo.file.deletedOnDisk.body')
+            : t('space.repo.file.changedOnDisk.body')
+        }}
+      </AlertDescription>
+      <AlertAction>
+        <Button variant="toolbar" size="kira" data-testid="repo-file-reload" @click="edit.reload()">
+          {{ t('common.action.refresh.label') }}
+        </Button>
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="repo-file-overwrite"
+          @click="edit.overwrite()"
+        >
+          {{ t('space.ade.workflows.conflict.overwrite.label') }}
+        </Button>
+      </AlertAction>
+    </Alert>
+    <Alert v-if="edit.errorMessage.value" variant="error" strip data-testid="repo-file-edit-error">
+      <AlertDescription>{{ edit.errorMessage.value }}</AlertDescription>
+    </Alert>
+    <!-- `v-show`, never `v-if` — the editor widget must never be disposed/recreated by the markdown
+         toggle, only hidden, so scroll position/selection/find state survive a round trip. -->
+    <div
+      v-show="!isMarkdown || view === 'source'"
+      ref="container"
+      class="monaco-host flex-1 min-h-0"
+      data-testid="repo-file-editor"
+    />
+    <!-- D11: `markdown-it`'s `html: false` (markdownReading.ts) escapes any literal HTML tag in
+         the source, so this is the one `v-html` in this view that's safe. -->
+    <div
+      v-if="isMarkdown && view === 'reading'"
+      ref="readingPane"
+      class="kira-prose flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4 [&>*]:max-w-prose [&>pre]:max-w-none [&>table]:max-w-none"
+      data-testid="repo-file-markdown"
+      v-html="renderedHtml"
+    />
+  </div>
   <EmptyState
     v-else-if="state === 'binary'"
     fill
