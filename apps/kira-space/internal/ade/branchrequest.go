@@ -235,7 +235,7 @@ func (b *TaskBoard) RequestBranches(ctx context.Context, call agentmcp.SpaceCall
 		dec = <-req.result
 	}
 	if noted {
-		b.setRunNote(call.RunID, prevNote)
+		b.restoreRunNote(call.TaskID, call.RunID, prevNote)
 	}
 	return b.finishBranchRequest(ctx, call, slots, dec)
 }
@@ -380,6 +380,24 @@ func (b *TaskBoard) setRunNote(runID, note string) (prev string, ok bool) {
 	}
 	b.emitRuns(updated)
 	return run.Note, true
+}
+
+// restoreRunNote puts the pre-request note back only while the run still runs and still shows the
+// approval note; a run that ended during the wait keeps the note its end path wrote.
+func (b *TaskBoard) restoreRunNote(taskID, runID, note string) {
+	mu := b.taskMu(taskID)
+	mu.Lock()
+	defer mu.Unlock()
+	run, err := b.deps.Tasks.GetRun(runID)
+	if err != nil || run.State != model.AdeRunRunning || run.Note != noteBranchApproval {
+		return
+	}
+	updated, err := b.deps.Tasks.UpdateRun(runID, model.AdeRunPatch{Note: &note})
+	if err != nil {
+		slog.Warn("ade: branch request run note", "scope", "ade", "run", runID, "err", err)
+		return
+	}
+	b.emitRuns(updated)
 }
 
 // finishBranchRequest maps the user's decision to a result per repo; approved repos are created under
