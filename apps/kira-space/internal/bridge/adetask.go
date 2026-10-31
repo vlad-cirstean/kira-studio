@@ -327,16 +327,19 @@ func validateSetPlan(a adewire.SetPlanArgs) error {
 // --- reads -------------------------------------------------------------------------------------
 
 func (s *AdeTaskService) Board(ctx context.Context) (adewire.Board, error) {
+	ctx = adeUserCtx(ctx)
 	b, err := s.Engine.Board(ctx)
 	return b, adeTaskError(err)
 }
 
 func (s *AdeTaskService) ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error) {
+	ctx = adeUserCtx(ctx)
 	r, err := s.Engine.ChangeRequests(ctx)
 	return r, adeTaskError(err)
 }
 
 func (s *AdeTaskService) Refresh(ctx context.Context, args adewire.RefreshArgs) (adewire.RefreshResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskRepoIDs(args.CodeRepoIDs); err != nil {
 		return adewire.RefreshResult{}, err
 	}
@@ -345,6 +348,7 @@ func (s *AdeTaskService) Refresh(ctx context.Context, args adewire.RefreshArgs) 
 }
 
 func (s *AdeTaskService) ForcePush(ctx context.Context, args adewire.BranchArgs) (adewire.ForcePushResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
 		return adewire.ForcePushResult{}, err
 	}
@@ -353,6 +357,7 @@ func (s *AdeTaskService) ForcePush(ctx context.Context, args adewire.BranchArgs)
 }
 
 func (s *AdeTaskService) CandidateBranches(ctx context.Context, args adewire.CandidateBranchesArgs) (adewire.CandidateBranchesResult, error) {
+	ctx = adeUserCtx(ctx)
 	if args.CodeRepoID != "" {
 		if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
 			return adewire.CandidateBranchesResult{}, err
@@ -363,11 +368,13 @@ func (s *AdeTaskService) CandidateBranches(ctx context.Context, args adewire.Can
 }
 
 func (s *AdeTaskService) Workflows(ctx context.Context) (adewire.WorkflowsResult, error) {
+	ctx = adeUserCtx(ctx)
 	r, err := s.Engine.Workflows(ctx)
 	return r, adeTaskError(err)
 }
 
 func (s *AdeTaskService) Repos(ctx context.Context) (adewire.ReposResult, error) {
+	ctx = adeUserCtx(ctx)
 	r, err := s.Engine.Repos(ctx)
 	return r, adeTaskError(err)
 }
@@ -392,6 +399,7 @@ func (s *AdeTaskService) validateHostLink(raw string) error {
 }
 
 func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTaskArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateCreateTask(args); err != nil {
 		return adewire.Task{}, err
 	}
@@ -403,6 +411,7 @@ func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTask
 }
 
 func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateUpdateTask(args); err != nil {
 		return adewire.Task{}, err
 	}
@@ -417,6 +426,7 @@ func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTask
 
 // SaveStatuses rewrites the task status set; tasks on a removed status move to its reassign target.
 func (s *AdeTaskService) SaveStatuses(ctx context.Context, args adewire.SaveStatusesArgs) (adewire.SaveStatusesResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateSaveStatuses(args); err != nil {
 		return adewire.SaveStatusesResult{}, err
 	}
@@ -425,6 +435,7 @@ func (s *AdeTaskService) SaveStatuses(ctx context.Context, args adewire.SaveStat
 }
 
 func (s *AdeTaskService) AddTaskRepo(ctx context.Context, args adewire.AddTaskRepoArgs) (adewire.Branch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Branch{}, err
 	}
@@ -442,6 +453,7 @@ func (s *AdeTaskService) AddTaskRepo(ctx context.Context, args adewire.AddTaskRe
 
 // RebasePreview returns the prompt Rebase would send, its stack and what blocks it.
 func (s *AdeTaskService) RebasePreview(ctx context.Context, args adewire.OntoArgs) (adewire.RebasePreview, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeOnto(args); err != nil {
 		return adewire.RebasePreview{}, err
 	}
@@ -451,6 +463,7 @@ func (s *AdeTaskService) RebasePreview(ctx context.Context, args adewire.OntoArg
 
 // Rebase starts the background rebase of a branch (and the branches stacked on it).
 func (s *AdeTaskService) Rebase(ctx context.Context, args adewire.RebaseArgs) (adewire.RebaseStart, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeOnto(adewire.OntoArgs{BranchID: args.BranchID, Onto: args.Onto, QueueWith: args.QueueWith}); err != nil {
 		return adewire.RebaseStart{}, err
 	}
@@ -463,6 +476,7 @@ func (s *AdeTaskService) Rebase(ctx context.Context, args adewire.RebaseArgs) (a
 
 // AbortRebase aborts the rebase left in progress in a branch worktree.
 func (s *AdeTaskService) AbortRebase(ctx context.Context, args adewire.BranchArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -471,6 +485,7 @@ func (s *AdeTaskService) AbortRebase(ctx context.Context, args adewire.BranchArg
 
 // SetBranchBase sets the base of a branch that is not created yet.
 func (s *AdeTaskService) SetBranchBase(ctx context.Context, args adewire.SetBranchBaseArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -482,6 +497,7 @@ func (s *AdeTaskService) SetBranchBase(ctx context.Context, args adewire.SetBran
 
 // SetTaskBranch gives a task row an existing git branch or creates a new one for it.
 func (s *AdeTaskService) SetTaskBranch(ctx context.Context, args adewire.SetTaskBranchArgs) (adewire.Branch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.Branch{}, err
 	}
@@ -494,6 +510,7 @@ func (s *AdeTaskService) SetTaskBranch(ctx context.Context, args adewire.SetTask
 
 // UpdateTaskRepo swaps the repo of a row whose branch is not created.
 func (s *AdeTaskService) UpdateTaskRepo(ctx context.Context, args adewire.UpdateTaskRepoArgs) (adewire.Branch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.Branch{}, err
 	}
@@ -506,6 +523,7 @@ func (s *AdeTaskService) UpdateTaskRepo(ctx context.Context, args adewire.Update
 
 // RemoveTaskBranch detaches a row's branch; the repo stays on the task.
 func (s *AdeTaskService) RemoveTaskBranch(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -514,6 +532,7 @@ func (s *AdeTaskService) RemoveTaskBranch(ctx context.Context, args adewire.Remo
 
 // RemoveTaskRepo detaches a row, its branch included.
 func (s *AdeTaskService) RemoveTaskRepo(ctx context.Context, args adewire.RemoveTaskRowArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -522,6 +541,7 @@ func (s *AdeTaskService) RemoveTaskRepo(ctx context.Context, args adewire.Remove
 
 // TaskBranchRisk reports what removing a row's branch would discard.
 func (s *AdeTaskService) TaskBranchRisk(ctx context.Context, args adewire.BranchArgs) (adewire.BranchRisk, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.BranchRisk{}, err
 	}
@@ -531,6 +551,7 @@ func (s *AdeTaskService) TaskBranchRisk(ctx context.Context, args adewire.Branch
 
 // RepoBranches lists the bases the picker offers for a repo.
 func (s *AdeTaskService) RepoBranches(ctx context.Context, args adewire.RepoBranchesArgs) (adewire.RepoBranches, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.CodeRepoID, "codeRepoId"); err != nil {
 		return adewire.RepoBranches{}, err
 	}
@@ -544,6 +565,7 @@ func (s *AdeTaskService) RepoBranches(ctx context.Context, args adewire.RepoBran
 }
 
 func (s *AdeTaskService) AddExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs) (adewire.AddExistingBranchResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.CodeRepoID, "codeRepoId"); err != nil {
 		return adewire.AddExistingBranchResult{}, err
 	}
@@ -576,6 +598,7 @@ func validateHostLinkArgs(args adewire.HostLinkArgs) (adewire.HostLinkArgs, erro
 
 // ResolveHostLink names the branch a pasted PR or branch link points at; it changes nothing.
 func (s *AdeTaskService) ResolveHostLink(ctx context.Context, args adewire.HostLinkArgs) (adewire.HostLinkTarget, error) {
+	ctx = adeUserCtx(ctx)
 	args, err := validateHostLinkArgs(args)
 	if err != nil {
 		return adewire.HostLinkTarget{}, err
@@ -586,6 +609,7 @@ func (s *AdeTaskService) ResolveHostLink(ctx context.Context, args adewire.HostL
 
 // AddHostLink attaches the branch a pasted PR or branch link points at.
 func (s *AdeTaskService) AddHostLink(ctx context.Context, args adewire.HostLinkArgs) (adewire.AddExistingBranchResult, error) {
+	ctx = adeUserCtx(ctx)
 	args, err := validateHostLinkArgs(args)
 	if err != nil {
 		return adewire.AddExistingBranchResult{}, err
@@ -595,6 +619,7 @@ func (s *AdeTaskService) AddHostLink(ctx context.Context, args adewire.HostLinkA
 }
 
 func (s *AdeTaskService) SetPlan(ctx context.Context, args adewire.SetPlanArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateSetPlan(args); err != nil {
 		return err
 	}
@@ -603,6 +628,7 @@ func (s *AdeTaskService) SetPlan(ctx context.Context, args adewire.SetPlanArgs) 
 
 // ShelveTask moves a task onto the Later or Backlog shelf.
 func (s *AdeTaskService) ShelveTask(ctx context.Context, args adewire.ShelveTaskArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return err
 	}
@@ -619,6 +645,7 @@ func (s *AdeTaskService) ShelveTask(ctx context.Context, args adewire.ShelveTask
 
 // CaptureTask adds a title-only task at the top of Later.
 func (s *AdeTaskService) CaptureTask(ctx context.Context, args adewire.CaptureTaskArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if strings.TrimSpace(args.Title) == "" {
 		return adewire.Task{}, adeTaskInvalid("title is required")
 	}
@@ -630,6 +657,7 @@ func (s *AdeTaskService) CaptureTask(ctx context.Context, args adewire.CaptureTa
 }
 
 func (s *AdeTaskService) SetQueuedAfter(ctx context.Context, args adewire.SetQueuedAfterArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -700,6 +728,7 @@ func validateUpdateRepo(a adewire.UpdateRepoArgs) error {
 }
 
 func (s *AdeTaskService) WorkflowYaml(ctx context.Context, args adewire.FileNameArgs) (adewire.WorkflowYaml, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeBranchName(args.FileName, "fileName"); err != nil {
 		return adewire.WorkflowYaml{}, err
 	}
@@ -708,6 +737,7 @@ func (s *AdeTaskService) WorkflowYaml(ctx context.Context, args adewire.FileName
 }
 
 func (s *AdeTaskService) ValidateWorkflowYaml(ctx context.Context, args adewire.ValidateWorkflowYamlArgs) (adewire.WorkflowValidation, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeYaml(args.Yaml); err != nil {
 		return adewire.WorkflowValidation{}, err
 	}
@@ -715,6 +745,7 @@ func (s *AdeTaskService) ValidateWorkflowYaml(ctx context.Context, args adewire.
 }
 
 func (s *AdeTaskService) SaveWorkflow(ctx context.Context, args adewire.SaveWorkflowArgs) (adewire.WorkflowEntry, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeBranchName(args.FileName, "fileName"); err != nil {
 		return adewire.WorkflowEntry{}, err
 	}
@@ -723,6 +754,7 @@ func (s *AdeTaskService) SaveWorkflow(ctx context.Context, args adewire.SaveWork
 }
 
 func (s *AdeTaskService) SaveWorkflowYaml(ctx context.Context, args adewire.SaveWorkflowYamlArgs) (adewire.WorkflowEntry, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeBranchName(args.FileName, "fileName"); err != nil {
 		return adewire.WorkflowEntry{}, err
 	}
@@ -734,6 +766,7 @@ func (s *AdeTaskService) SaveWorkflowYaml(ctx context.Context, args adewire.Save
 }
 
 func (s *AdeTaskService) ImportWorkflow(ctx context.Context, args adewire.ImportWorkflowArgs) (adewire.WorkflowEntry, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdePath(args.Path, "path"); err != nil {
 		return adewire.WorkflowEntry{}, err
 	}
@@ -742,6 +775,7 @@ func (s *AdeTaskService) ImportWorkflow(ctx context.Context, args adewire.Import
 }
 
 func (s *AdeTaskService) NewWorkflow(ctx context.Context, args adewire.NewWorkflowArgs) (adewire.WorkflowEntry, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeName(args.Name, "name"); err != nil {
 		return adewire.WorkflowEntry{}, err
 	}
@@ -750,6 +784,7 @@ func (s *AdeTaskService) NewWorkflow(ctx context.Context, args adewire.NewWorkfl
 }
 
 func (s *AdeTaskService) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs) (adewire.Repo, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateUpdateRepo(args); err != nil {
 		return adewire.Repo{}, err
 	}
@@ -758,6 +793,7 @@ func (s *AdeTaskService) UpdateRepo(ctx context.Context, args adewire.UpdateRepo
 }
 
 func (s *AdeTaskService) AddFolder(ctx context.Context, args adewire.FolderArgs) (adewire.FolderImportResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdePath(args.Path, "path"); err != nil {
 		return adewire.FolderImportResult{}, err
 	}
@@ -766,6 +802,7 @@ func (s *AdeTaskService) AddFolder(ctx context.Context, args adewire.FolderArgs)
 }
 
 func (s *AdeTaskService) SetFolderWatch(ctx context.Context, args adewire.FolderArgs) (adewire.Folder, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdePath(args.Path, "path"); err != nil {
 		return adewire.Folder{}, err
 	}
@@ -774,6 +811,7 @@ func (s *AdeTaskService) SetFolderWatch(ctx context.Context, args adewire.Folder
 }
 
 func (s *AdeTaskService) SetFolderHidden(ctx context.Context, args adewire.FolderHiddenArgs) (adewire.Folder, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdePath(args.Path, "path"); err != nil {
 		return adewire.Folder{}, err
 	}
@@ -782,6 +820,7 @@ func (s *AdeTaskService) SetFolderHidden(ctx context.Context, args adewire.Folde
 }
 
 func (s *AdeTaskService) RemoveFolder(ctx context.Context, args adewire.PathArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdePath(args.Path, "path"); err != nil {
 		return err
 	}
@@ -789,6 +828,7 @@ func (s *AdeTaskService) RemoveFolder(ctx context.Context, args adewire.PathArgs
 }
 
 func (s *AdeTaskService) RecordMerge(ctx context.Context, args adewire.RecordMergeArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -801,6 +841,7 @@ func (s *AdeTaskService) RecordMerge(ctx context.Context, args adewire.RecordMer
 // --- runs --------------------------------------------------------------------------------------
 
 func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.StartRunResult{}, err
 	}
@@ -829,6 +870,7 @@ func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs
 }
 
 func (s *AdeTaskService) SetTaskWorkflow(ctx context.Context, args adewire.SetTaskWorkflowArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
@@ -840,6 +882,7 @@ func (s *AdeTaskService) SetTaskWorkflow(ctx context.Context, args adewire.SetTa
 }
 
 func (s *AdeTaskService) Approve(ctx context.Context, args adewire.StepArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return err
 	}
@@ -850,6 +893,7 @@ func (s *AdeTaskService) Approve(ctx context.Context, args adewire.StepArgs) err
 }
 
 func (s *AdeTaskService) RetryRun(ctx context.Context, args adewire.RunArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
 		return err
 	}
@@ -857,6 +901,7 @@ func (s *AdeTaskService) RetryRun(ctx context.Context, args adewire.RunArgs) err
 }
 
 func (s *AdeTaskService) ResumeRun(ctx context.Context, args adewire.RunArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
 		return err
 	}
@@ -865,6 +910,7 @@ func (s *AdeTaskService) ResumeRun(ctx context.Context, args adewire.RunArgs) er
 
 // ReviewStep describes the branch's review step for its review window.
 func (s *AdeTaskService) ReviewStep(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewStepState, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.ReviewStepState{}, err
 	}
@@ -874,6 +920,7 @@ func (s *AdeTaskService) ReviewStep(ctx context.Context, args adewire.BranchArgs
 
 // SendReview sends the open review comments of a waiting review run to an agent.
 func (s *AdeTaskService) SendReview(ctx context.Context, args adewire.SendReviewArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
 		return err
 	}
@@ -890,6 +937,7 @@ func (s *AdeTaskService) SendReview(ctx context.Context, args adewire.SendReview
 
 // FinishReview ends a waiting review run on the result the user picked.
 func (s *AdeTaskService) FinishReview(ctx context.Context, args adewire.FinishReviewArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
 		return err
 	}
@@ -903,6 +951,7 @@ func (s *AdeTaskService) FinishReview(ctx context.Context, args adewire.FinishRe
 }
 
 func (s *AdeTaskService) StepDone(ctx context.Context, args adewire.StepDoneArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
@@ -923,6 +972,7 @@ func validateAdeHandoverNotes(notes *string) error {
 
 // Handovers lists a task's handover rows, newest first. Archived tasks work too.
 func (s *AdeTaskService) Handovers(ctx context.Context, args adewire.TaskArgs) (adewire.HandoversResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.HandoversResult{}, err
 	}
@@ -932,6 +982,7 @@ func (s *AdeTaskService) Handovers(ctx context.Context, args adewire.TaskArgs) (
 
 // UpdateHandover replaces a handover row's body; an empty body deletes it.
 func (s *AdeTaskService) UpdateHandover(ctx context.Context, args adewire.UpdateHandoverArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.ID, "id"); err != nil {
 		return err
 	}
@@ -943,6 +994,7 @@ func (s *AdeTaskService) UpdateHandover(ctx context.Context, args adewire.Update
 
 // DismissHandover hides the task's "move to next stage" prompt; the draft stays.
 func (s *AdeTaskService) DismissHandover(ctx context.Context, args adewire.TaskArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return err
 	}
@@ -952,6 +1004,7 @@ func (s *AdeTaskService) DismissHandover(ctx context.Context, args adewire.TaskA
 // Artifacts lists a task's artifacts: detected ones (task links, branches, change requests,
 // deployments) and stored ones. Archived tasks work too; a source that fails shows up as a gap.
 func (s *AdeTaskService) Artifacts(ctx context.Context, args adewire.TaskArgs) (adewire.ArtifactsResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.ArtifactsResult{}, err
 	}
@@ -961,6 +1014,7 @@ func (s *AdeTaskService) Artifacts(ctx context.Context, args adewire.TaskArgs) (
 
 // AddArtifact stores an artifact the user reports for a live task.
 func (s *AdeTaskService) AddArtifact(ctx context.Context, args adewire.AddArtifactArgs) (adewire.Artifact, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Artifact{}, err
 	}
@@ -976,6 +1030,7 @@ func (s *AdeTaskService) AddArtifact(ctx context.Context, args adewire.AddArtifa
 
 // RemoveArtifact deletes a stored artifact. Detected artifacts have no id and cannot be removed.
 func (s *AdeTaskService) RemoveArtifact(ctx context.Context, args adewire.RemoveArtifactArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return err
 	}
@@ -986,6 +1041,7 @@ func (s *AdeTaskService) RemoveArtifact(ctx context.Context, args adewire.Remove
 }
 
 func (s *AdeTaskService) SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
@@ -1003,6 +1059,7 @@ func (s *AdeTaskService) SetTaskStep(ctx context.Context, args adewire.SetTaskSt
 }
 
 func (s *AdeTaskService) RetrySetup(ctx context.Context, args adewire.BranchArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return err
 	}
@@ -1010,6 +1067,7 @@ func (s *AdeTaskService) RetrySetup(ctx context.Context, args adewire.BranchArgs
 }
 
 func (s *AdeTaskService) ReadLog(ctx context.Context, args adewire.ReadLogArgs) (adewire.LogPage, error) {
+	ctx = adeUserCtx(ctx)
 	if args.Kind != "run" && args.Kind != "setup" {
 		return adewire.LogPage{}, adeTaskInvalid("kind must be run or setup")
 	}
@@ -1025,6 +1083,7 @@ func (s *AdeTaskService) ReadLog(ctx context.Context, args adewire.ReadLogArgs) 
 
 // RunSandbox returns the sandbox a headless run started with.
 func (s *AdeTaskService) RunSandbox(ctx context.Context, args adewire.RunArgs) (adewire.RunSandboxDetail, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
 		return adewire.RunSandboxDetail{}, err
 	}
@@ -1033,11 +1092,13 @@ func (s *AdeTaskService) RunSandbox(ctx context.Context, args adewire.RunArgs) (
 }
 
 func (s *AdeTaskService) Sessions(ctx context.Context) (adewire.SessionsResult, error) {
+	ctx = adeUserCtx(ctx)
 	r, err := s.Engine.Sessions(ctx)
 	return r, adeTaskError(err)
 }
 
 func (s *AdeTaskService) StopRun(ctx context.Context, args adewire.RunArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
 		return err
 	}
@@ -1045,6 +1106,7 @@ func (s *AdeTaskService) StopRun(ctx context.Context, args adewire.RunArgs) erro
 }
 
 func (s *AdeTaskService) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (adewire.Launch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
 		return adewire.Launch{}, err
 	}
@@ -1053,6 +1115,7 @@ func (s *AdeTaskService) TakeOver(ctx context.Context, args adewire.TakeOverArgs
 }
 
 func (s *AdeTaskService) RestartSession(ctx context.Context, args adewire.RestartSessionArgs) (adewire.Launch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
 		return adewire.Launch{}, err
 	}
@@ -1061,6 +1124,7 @@ func (s *AdeTaskService) RestartSession(ctx context.Context, args adewire.Restar
 }
 
 func (s *AdeTaskService) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (adewire.Launch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Launch{}, err
 	}
@@ -1075,6 +1139,7 @@ func (s *AdeTaskService) LaunchStep(ctx context.Context, args adewire.LaunchStep
 }
 
 func (s *AdeTaskService) StartBranch(ctx context.Context, args adewire.StartBranchArgs) (adewire.Launch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.Launch{}, err
 	}
@@ -1086,6 +1151,7 @@ func (s *AdeTaskService) StartBranch(ctx context.Context, args adewire.StartBran
 }
 
 func (s *AdeTaskService) StartAdHoc(ctx context.Context, args adewire.BranchArgs) (adewire.Launch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.Launch{}, err
 	}
@@ -1094,6 +1160,7 @@ func (s *AdeTaskService) StartAdHoc(ctx context.Context, args adewire.BranchArgs
 }
 
 func (s *AdeTaskService) Send(ctx context.Context, args adewire.SendArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
 		return err
 	}
@@ -1141,6 +1208,7 @@ func (s *AdeTaskService) FocusSession(_ context.Context, args adewire.FocusSessi
 }
 
 func (s *AdeTaskService) ArchiveRisk(ctx context.Context, args adewire.TaskArgs) (adewire.ArchiveRisk, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.ArchiveRisk{}, err
 	}
@@ -1149,6 +1217,7 @@ func (s *AdeTaskService) ArchiveRisk(ctx context.Context, args adewire.TaskArgs)
 }
 
 func (s *AdeTaskService) ArchiveTask(ctx context.Context, args adewire.TaskArgs) error {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return err
 	}
@@ -1189,6 +1258,7 @@ func (s *AdeTaskService) DenyBranchRequest(args adewire.BranchRequestArgs) (adew
 
 // ArchivedTask reads an archived task with everything it kept.
 func (s *AdeTaskService) ArchivedTask(ctx context.Context, args adewire.TaskArgs) (adewire.ArchivedTask, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.ArchivedTask{}, err
 	}
@@ -1198,6 +1268,7 @@ func (s *AdeTaskService) ArchivedTask(ctx context.Context, args adewire.TaskArgs
 
 // RestoreTask unarchives a task into Later.
 func (s *AdeTaskService) RestoreTask(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.Task{}, err
 	}
@@ -1207,6 +1278,7 @@ func (s *AdeTaskService) RestoreTask(ctx context.Context, args adewire.TaskArgs)
 
 // OpenReviewWindow opens the branch's review window, or focuses it when already open. true = opened.
 func (s *AdeTaskService) OpenReviewWindow(ctx context.Context, args adewire.BranchArgs) (bool, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return false, err
 	}
@@ -1230,6 +1302,7 @@ func (s *AdeTaskService) OpenReviewWindow(ctx context.Context, args adewire.Bran
 
 // ReviewWindowTarget returns what the window with this key reviews, null when it is no review window.
 func (s *AdeTaskService) ReviewWindowTarget(ctx context.Context, args adewire.WindowKeyArgs) (*adewire.ReviewWindowTarget, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.WindowKey, "windowKey"); err != nil {
 		return nil, err
 	}
@@ -1239,6 +1312,7 @@ func (s *AdeTaskService) ReviewWindowTarget(ctx context.Context, args adewire.Wi
 
 // ReviewWorking lists the uncommitted changes of the branch's worktree against its HEAD.
 func (s *AdeTaskService) ReviewWorking(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewWorking, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.ReviewWorking{}, err
 	}
@@ -1248,6 +1322,7 @@ func (s *AdeTaskService) ReviewWorking(ctx context.Context, args adewire.BranchA
 
 // ReviewWorkingDiff reads one uncommitted file of the branch's worktree for a diff tab.
 func (s *AdeTaskService) ReviewWorkingDiff(ctx context.Context, args adewire.ReviewWorkingDiffArgs) (codeworkspace.DiffContent, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return codeworkspace.DiffContent{}, err
 	}
@@ -1278,6 +1353,7 @@ func (s *AdeTaskService) ReviewAgent(_ context.Context, args adewire.TaskArgs) (
 
 // LaunchReviewAgent starts or resumes the task's review agent. E_CONFLICT when one already runs.
 func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.TaskArgs) (adewire.ReviewAgentLaunch, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
 		return adewire.ReviewAgentLaunch{}, err
 	}
@@ -1287,6 +1363,7 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 
 // ForwardReviewComments pastes the branch's open review comments into its task's running review agent.
 func (s *AdeTaskService) ForwardReviewComments(ctx context.Context, args adewire.BranchArgs) (adewire.ForwardReviewResult, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.ForwardReviewResult{}, err
 	}
@@ -1296,6 +1373,7 @@ func (s *AdeTaskService) ForwardReviewComments(ctx context.Context, args adewire
 
 // ReviewForwardText returns the message ForwardReviewComments would send. It sends and stamps nothing.
 func (s *AdeTaskService) ReviewForwardText(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewForwardText, error) {
+	ctx = adeUserCtx(ctx)
 	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
 		return adewire.ReviewForwardText{}, err
 	}

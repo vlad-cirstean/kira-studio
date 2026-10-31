@@ -29,6 +29,9 @@ func newTestEntry(t *testing.T, connID ConnID, repoDir string, opts testEntryOpt
 	if runner == nil {
 		runner = gitclient.NewExecRunner()
 	}
+	if opts.opLog != nil {
+		runner = oplog.NewRecordingRunner(runner, opts.opLog)
+	}
 	registry := NewRegistry(runner)
 	if opts.store != nil {
 		registry.Review = opts.store

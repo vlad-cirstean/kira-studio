@@ -33,6 +33,7 @@ export const CHANNEL = {
   settingsChanged: 'kira:settings:changed',
   layoutChanged: 'kira:layout:changed',
   opUpdate: 'kira:op:update',
+  opBatch: 'kira:op:batch',
   appMetrics: 'kira:app:metrics',
   schemaChanged: 'kira:schema:changed',
   // P11 D8: a server-streaming call's coalesced message batches, delivered via EmitTo (one window

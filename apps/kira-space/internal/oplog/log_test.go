@@ -1,6 +1,7 @@
 package oplog
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -20,15 +21,15 @@ func TestEvictionKeepsEvictedOpLive(t *testing.T) {
 	})
 
 	var cancelled atomic.Bool
-	first := l.Start(Meta{Kind: "first"})
+	first := l.Start(context.Background(), Meta{Kind: "first"})
 	first.SetCancel(func() bool { cancelled.Store(true); return true })
-	for i := 0; i < Capacity; i++ {
-		l.Start(Meta{Kind: "other"})
+	for i := 0; i < FgCapacity; i++ {
+		l.Start(context.Background(), Meta{Kind: "other"})
 	}
 
 	recs := l.Recent(1000)
-	if len(recs) != Capacity {
-		t.Fatalf("Recent len = %d, want %d", len(recs), Capacity)
+	if len(recs) != FgCapacity {
+		t.Fatalf("Recent len = %d, want %d", len(recs), FgCapacity)
 	}
 	for _, r := range recs {
 		if r.Kind == "first" {
@@ -49,7 +50,7 @@ func TestEvictionKeepsEvictedOpLive(t *testing.T) {
 func TestCancelNeverRunsAfterClearCancel(t *testing.T) {
 	for range 200 {
 		l := New()
-		op := l.Start(Meta{Kind: "fetch"})
+		op := l.Start(context.Background(), Meta{Kind: "fetch"})
 		var calls atomic.Int32
 		op.SetCancel(func() bool { calls.Add(1); return true })
 
@@ -96,8 +97,8 @@ func TestConcurrentOpsEmitRunningFirstFinalLast(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			op := l.Start(Meta{Kind: fmt.Sprint("k", i)})
-			op.AddCommand([]string{"status"})
+			op := l.Start(context.Background(), Meta{Kind: fmt.Sprint("k", i)})
+			op.BeginStep([]string{"commit"}, false).End(StatusOK, nil, "")
 			op.Finish(StatusOK, "")
 		}()
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/rpcstream"
 )
@@ -81,6 +82,7 @@ type CredentialAsker interface {
 // with windowKey.
 func ServeGitStream(router *gitrpc.Router, conn StreamSession, windowKey string, relay CredentialAsker) {
 	gconn := gitsession.NewConn(newStreamConnID(), nativeClientID, nativeLabel, nil)
+	gconn.Module = oplog.ModuleGit
 	gconn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return relay.AskFrom(ctx, windowKey, nativeLabel, req)
 	})

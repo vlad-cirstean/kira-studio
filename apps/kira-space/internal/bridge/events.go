@@ -94,6 +94,7 @@ const (
 const (
 	ChannelToggleOperationsPanel = appevent.ChannelToggleOperationsPanel
 	ChannelOpUpdate              = appevent.ChannelOpUpdate
+	ChannelOpBatch               = appevent.ChannelOpBatch
 )
 
 // Events is the Go->renderer push wrapper every bridge service that emits goes through — Kira
@@ -119,10 +120,15 @@ func (ev *Events) AttachMetrics(m *metrics.Ticker) (detach func()) {
 	})
 }
 
-// AttachOpLog broadcasts every op record change to every window: one process-wide log, so a write
-// from any window or client is every window's news.
+// AttachOpLog broadcasts every op record change to every window: one process-wide log, so an op
+// from any window or client is every window's news. Foreground changes go one by one; background
+// changes arrive coalesced on ChannelOpBatch.
 func (ev *Events) AttachOpLog(l *oplog.Log) (detach func()) {
-	return l.OnUpdate(func(r oplog.Record) {
+	d1 := l.OnUpdate(func(r oplog.Record) {
 		ev.emit.Emit(ChannelOpUpdate, r)
 	})
+	d2 := l.OnBatch(func(rs []oplog.Record) {
+		ev.emit.Emit(ChannelOpBatch, rs)
+	})
+	return func() { d1(); d2() }
 }

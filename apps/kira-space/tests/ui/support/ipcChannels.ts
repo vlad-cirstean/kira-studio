@@ -94,6 +94,7 @@ export const IPC = {
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
   opUpdate: 'kira:op:update',
+  opBatch: 'kira:op:batch',
 
   // P119: Kira Studio's own three update channels — same values as its own ipcChannels.ts.
   updateStatus: 'kira:update:status',

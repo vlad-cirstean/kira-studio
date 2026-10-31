@@ -3,6 +3,7 @@ package gitsession
 import (
 	"context"
 	"errors"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"strings"
 	"sync"
 	"time"
@@ -190,7 +191,7 @@ func (e *RepoEntry) autoFetchTick() {
 		return
 	}
 
-	remote, ok := e.pickAutoFetchRemote(context.Background())
+	remote, ok := e.pickAutoFetchRemote(autoFetchCtx)
 	if !ok {
 		e.rescheduleAutoFetch(interval)
 		return
@@ -199,7 +200,7 @@ func (e *RepoEntry) autoFetchTick() {
 	if e.autoFetchDisabled() { // teardown may have stopped auto-fetch while the remote was picked.
 		return
 	}
-	result, err := e.RunRemote(context.WithoutCancel(context.Background()), nil, RemoteOpParams{
+	result, err := e.RunRemote(context.WithoutCancel(autoFetchCtx), nil, RemoteOpParams{
 		Kind: "fetch", Remote: remote, Prune: true,
 	}, RemoteDeps{})
 	e.settleAutoFetch(interval, remote, result, err)
@@ -257,7 +258,7 @@ func (e *RepoEntry) stopAutoFetchFor(remote, kind, message string) {
 	if line != "" {
 		logMsg += " — " + line
 	}
-	e.recordFailure("autoFetch", "Auto-fetch", logMsg)
+	e.recordFailure(e.life, "autoFetch", "Auto-fetch", logMsg)
 	e.autoFetch.changed.Emit(AutoFetchChange{AutoFetch: status})
 }
 
@@ -311,3 +312,8 @@ func (e *RepoEntry) pickAutoFetchRemote(ctx context.Context) (string, bool) {
 	}
 	return "", false
 }
+
+// autoFetchCtx stamps every spawn of an auto-fetch pass as Kira's own background work.
+var autoFetchCtx = oplog.WithOrigin(context.Background(), oplog.Origin{
+	Module: oplog.ModuleGit, Trigger: oplog.TriggerAuto, Label: "Auto-fetch", Background: true,
+})

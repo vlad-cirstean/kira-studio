@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -252,14 +251,16 @@ func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, 
 	case strings.HasPrefix(name, "-") || strings.Contains(name, "@{") || name == "HEAD":
 		return fmt.Sprintf("%q is not a valid branch name.", name), nil
 	}
-	cmd := exec.CommandContext(ctx, "git", "check-ref-format", "--branch", name)
-	cmd.Dir = rec.Root
-	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return fmt.Sprintf("%q is not a valid git branch name.", name), nil
-		}
+	entry, err := b.openRepo(ctx, rec.ID)
+	if err != nil {
 		return "", fmt.Errorf("ade: check branch name: %w", err)
+	}
+	valid, err := entry.CheckBranchName(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("ade: check branch name: %w", err)
+	}
+	if !valid {
+		return fmt.Sprintf("%q is not a valid git branch name.", name), nil
 	}
 	if main := b.mainShortName(ctx, rec.ID); main != "" && name == main {
 		return fmt.Sprintf("%q is the repo's main branch. Pick a new feature branch name.", name), nil

@@ -479,6 +479,7 @@ func (w *Wired) teardown(db io.Closer) {
 	w.detachMobile()
 	// Ends entries, watchers, auto-fetch timers and review.db.
 	w.Git.registry.Close()
+	w.Git.opLog.Close()
 	if w.Git.askpassBroker != nil {
 		if err := w.Git.askpassBroker.Close(); err != nil {
 			slog.Warn("close askpass broker", "scope", "shutdown", "err", err)

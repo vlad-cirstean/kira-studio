@@ -14,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
@@ -1126,7 +1127,6 @@ func (e *RepoEntry) runGuardedWriteArgvList(ctx context.Context, argvList [][]st
 			}
 		}
 		for i, argv := range argvList {
-			e.noteWrite(ctx, argv)
 			res, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 				Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: false,
 				// G8 D6: see runWriteArgv's own identical comment.
@@ -1169,9 +1169,9 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	if !ok {
 		return OpResult{}, ErrUnservedOpKind{Kind: op.Kind}
 	}
-	logOp := e.startOp(op.Kind, connLabel)
+	logOp := e.startOp(ctx, op.Kind, connLabel)
 	defer func() { finishOpResult(logOp, result, runErr) }()
-	ctx = withOp(ctx, logOp)
+	ctx = oplog.WithOp(ctx, logOp)
 
 	prep, err := spec.Prepare(ctx, e, conn, connLabel, op)
 	if err != nil {
@@ -1338,7 +1338,7 @@ func (e *RepoEntry) tipsMoved(ctx context.Context, want map[string]string) (bool
 	for ref, sha := range want {
 		argv := []string{"rev-parse", "--verify", "-q", "--end-of-options", ref}
 		res, err := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
-			Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: true,
+			Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: true, OKExits: []int{1},
 		})
 		if err != nil {
 			return false, gitclient.Classify(ctx, argv, res, err)
@@ -1360,9 +1360,9 @@ func (e *RepoEntry) tipsMoved(ctx context.Context, want map[string]string) (bool
 // no ref the op moved has moved again. A transient check error therefore leaves the record armed.
 // The replay then runs as one write list, the same read-back/error-mapping shape as RunOp.
 func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result OpResult, runErr error) {
-	logOp := e.startOp("undo", connLabel)
+	logOp := e.startOp(ctx, "undo", connLabel)
 	defer func() { finishOpResult(logOp, result, runErr) }()
-	ctx = withOp(ctx, logOp)
+	ctx = oplog.WithOp(ctx, logOp)
 
 	record := e.undo.Peek()
 	if record == nil || record.ID != id {

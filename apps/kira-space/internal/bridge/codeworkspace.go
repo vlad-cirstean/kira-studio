@@ -135,6 +135,7 @@ const repoHeadsConcurrency = 4
 // code. A row whose repository can no longer be read (removed from disk, permission denied)
 // resolves to {Head: nil, Error: …} rather than failing the whole call.
 func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeadsArgs) ([]CodeRepoHead, error) {
+	ctx = filesCtx(ctx)
 	repos, err := s.Deps.Repos.CodeRepos.List()
 	if err != nil {
 		return nil, ipcerr.InternalErr(err)
@@ -196,6 +197,7 @@ type CodeRepoWorktreeLink struct {
 // (the panel's onMounted and its records watcher) refresh the whole list, the same shape ListRepos
 // already uses.
 func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRepoWorktreeLink, error) {
+	ctx = filesCtx(ctx)
 	repos, err := s.Deps.Repos.CodeRepos.List()
 	if err != nil {
 		return nil, ipcerr.InternalErr(err)
@@ -284,6 +286,7 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 // repository at all; a friendlier E_ALREADY_IMPORTED than the UNIQUE index's own
 // constraint-violation text when repo_id is already stored.
 func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspaceImportArgs) (model.CodeRepo, error) {
+	ctx = filesCtx(ctx)
 	if args.Path == "" {
 		return model.CodeRepo{}, ipcerr.Required("path")
 	}
@@ -395,6 +398,7 @@ func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 }
 
 func (s *CodeWorkspaceService) ListFiles(ctx context.Context, args CodeWorkspaceIDArgs) (codeworkspace.FileListing, error) {
+	ctx = filesCtx(ctx)
 	if args.ID == "" {
 		return codeworkspace.FileListing{}, ipcerr.Required("id")
 	}
@@ -410,6 +414,7 @@ func (s *CodeWorkspaceService) ListFiles(ctx context.Context, args CodeWorkspace
 // filepath.EvalSymlinks, since a repository can contain a symlink pointing anywhere on the
 // machine.
 func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceReadFileArgs) (codeworkspace.FileContent, error) {
+	ctx = filesCtx(ctx)
 	if args.ID == "" {
 		return codeworkspace.FileContent{}, ipcerr.Required("id")
 	}
@@ -430,6 +435,7 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 // OpenWorkspace opens args.ID's own session (§2/§12) — the registry entry CloseWorkspace pairs
 // with.
 func (s *CodeWorkspaceService) OpenWorkspace(ctx context.Context, args CodeWorkspaceIDArgs) error {
+	ctx = filesCtx(ctx)
 	if args.ID == "" {
 		return ipcerr.Required("id")
 	}
@@ -452,6 +458,7 @@ func (s *CodeWorkspaceService) CloseWorkspace(args CodeWorkspaceIDArgs) error {
 // HEAD side never touches the working tree at all, and the worktree side goes through the same
 // ReadFile classification every other read does.
 func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceReadFileArgs) (codeworkspace.DiffContent, error) {
+	ctx = filesCtx(ctx)
 	if args.ID == "" {
 		return codeworkspace.DiffContent{}, ipcerr.Required("id")
 	}
@@ -577,6 +584,7 @@ type CodeWorkspaceSearchHandle struct {
 // coalescer's terminal flush. It returns the handle immediately — a full-worktree scan takes far
 // longer than an IPC call may (OpenWorkspace's own posture).
 func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspaceSearchArgs) (CodeWorkspaceSearchHandle, error) {
+	ctx = filesCtx(ctx)
 	if args.ID == "" {
 		return CodeWorkspaceSearchHandle{}, ipcerr.Required("id")
 	}

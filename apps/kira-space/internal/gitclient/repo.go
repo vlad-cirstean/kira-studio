@@ -284,7 +284,7 @@ func ResolveHead(ctx context.Context, runner Runner, gitPath, dir string) (HeadS
 	// 2.43), which `status`/`refs.list` never do, desyncing every comparison against their own
 	// plain "<b>" answer (gitsession's own pull/restack-undo lookups among them).
 	symArgs := []string{"symbolic-ref", "-q", "HEAD"}
-	symRes, symErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: symArgs, ReadOnly: true})
+	symRes, symErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: symArgs, ReadOnly: true, OKExits: []int{1}})
 	if symErr != nil {
 		return HeadState{}, Classify(ctx, symArgs, symRes, symErr)
 	}
@@ -292,7 +292,7 @@ func ResolveHead(ctx context.Context, runner Runner, gitPath, dir string) (HeadS
 	if symRes.ExitCode == 0 {
 		name := strings.TrimPrefix(strings.TrimSpace(string(symRes.Stdout)), "refs/heads/")
 		verifyArgs := []string{"rev-parse", "-q", "--verify", "HEAD"}
-		verifyRes, verifyErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: verifyArgs, ReadOnly: true})
+		verifyRes, verifyErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: verifyArgs, ReadOnly: true, OKExits: []int{1}})
 		if verifyErr != nil {
 			return HeadState{}, Classify(ctx, verifyArgs, verifyRes, verifyErr)
 		}

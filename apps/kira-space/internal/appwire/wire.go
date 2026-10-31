@@ -305,15 +305,34 @@ func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 	}
 }
 
+// newOpLog opens the persisted op log: interrupted rows become errors, old rows are pruned, the
+// foreground lane is seeded from disk. A storage failure leaves a memory-only log.
+func newOpLog(repositories *repos.Repos) *oplog.Log {
+	store := repositories.OpLog
+	if err := store.ReconcileInterrupted("Kira Space quit while this ran."); err != nil {
+		slog.Warn("op log: reconcile", "scope", "startup", "err", err)
+	}
+	if err := store.Prune(time.Now().Add(-oplog.Retention), oplog.MaxRows); err != nil {
+		slog.Warn("op log: prune", "scope", "startup", "err", err)
+	}
+	l := oplog.New(oplog.WithStore(store))
+	recent, err := store.Recent(oplog.FgCapacity)
+	if err != nil {
+		slog.Warn("op log: load", "scope", "startup", "err", err)
+	}
+	l.Seed(recent)
+	return l
+}
+
 // wireGit builds the git runner, discovery (over locator), session registry and router.
 func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githost.Registry, crSync gitsession.CRSyncConfig) gitWired {
-	gitRunner := gitclient.NewExecRunner()
+	opLog := newOpLog(repositories)
+	gitRunner := oplog.NewRecordingRunner(gitclient.NewExecRunner(), opLog)
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
 	if hosts != nil {
 		gitRegistry.Hosts = githost.Selector{Registry: hosts}
 	}
-	opLog := oplog.New()
 	gitRegistry.OpLog = opLog
 	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
 		s, err := repositories.Settings.GetAll()

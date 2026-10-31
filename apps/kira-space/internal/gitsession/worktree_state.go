@@ -84,7 +84,7 @@ func (e *RepoEntry) WorktreeAbort(ctx context.Context, path string) error {
 func (e *RepoEntry) runInDirAllowing(ctx context.Context, dir string, args []string, ok ...int) (gitclient.Result, error) {
 	var res gitclient.Result
 	err := e.Repo.Read(ctx, func(ctx context.Context) error {
-		r, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{Dir: dir, Args: args, ReadOnly: true})
+		r, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{Dir: dir, Args: args, ReadOnly: true, OKExits: ok})
 		res = r
 		if rerr != nil {
 			return gitclient.Classify(ctx, args, r, rerr)

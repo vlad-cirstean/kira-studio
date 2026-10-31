@@ -81,6 +81,7 @@ const (
 	// P132 Part 2's hoist: Space's op log dock shares Studio's toggle channel and update push.
 	ChannelToggleOperationsPanel = "kira:menu:toggleOperationsPanel"
 	ChannelOpUpdate              = "kira:op:update"
+	ChannelOpBatch               = "kira:op:batch"
 	// P246: the routed popup list (broadcast) and a reveal for one window.
 	ChannelPromptsChanged = "kira:prompts:changed"
 	ChannelPromptsReveal  = "kira:prompts:reveal"

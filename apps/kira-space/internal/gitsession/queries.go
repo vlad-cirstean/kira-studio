@@ -73,7 +73,7 @@ func (e *RepoEntry) runAllowingExit(ctx context.Context, args []string, ok ...in
 	var res gitclient.Result
 	err := e.Repo.Read(ctx, func(ctx context.Context) error {
 		r, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
-			Dir: repoWorkingDir(e.Summary), Args: args, ReadOnly: true,
+			Dir: repoWorkingDir(e.Summary), Args: args, ReadOnly: true, OKExits: ok,
 		})
 		res = r
 		if rerr != nil {
