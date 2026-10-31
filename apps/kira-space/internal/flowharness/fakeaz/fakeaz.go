@@ -152,7 +152,7 @@ func (a *Az) Threads(id int) []string {
 }
 
 // Calls returns every recorded call, in order: "version", "defaults", "project-list", "account",
-// "pr-list:<repo key>", "pr-probe:<repo key>", "pr-show:<id>", "policy:<id>", "vote:<id>:<vote>",
+// "pr-list:<repo key>:<status>", "pr-probe:<repo key>", "pr-show:<id>", "policy:<id>", "vote:<id>:<vote>",
 // "invoke:<resource>:<repo key>".
 func (a *Az) Calls() []string {
 	a.mu.Lock()
@@ -357,7 +357,7 @@ func (a *Az) prList(args []string) ([]byte, error) {
 	if query == "[0].pullRequestId" {
 		a.calls = append(a.calls, "pr-probe:"+key)
 	} else {
-		a.calls = append(a.calls, "pr-list:"+key)
+		a.calls = append(a.calls, "pr-list:"+key+":"+flagValue(args, "--status"))
 	}
 	var rows []PR
 	repoName := flagValue(args, "--repository")

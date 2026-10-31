@@ -4,12 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/clisetup"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeacli"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakeaz"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/azure"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 )
@@ -38,7 +41,10 @@ func purposes(s clisetup.Setup) []string {
 func TestCliTools(t *testing.T) {
 	acli := fakeacli.New("acme.atlassian.net")
 	acli.SetLoggedIn(false)
-	app := flowharness.New(t, flowharness.WithIssueTracker(jira.Options{Locator: acli, Runner: acli}))
+	az := fakeaz.New()
+	az.SetLoggedIn(false)
+	app := flowharness.New(t, flowharness.WithIssueTracker(jira.Options{Locator: acli, Runner: acli}),
+		flowharness.WithAzure(azure.Options{Locator: az, Runner: az}))
 	write := func(name, body string) string {
 		p := filepath.Join(app.FakeDir, name)
 		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
@@ -101,7 +107,42 @@ func TestCliTools(t *testing.T) {
 	}
 	app.Contract(t, "space-cli-tools", "IssueTrackerService.Tools#not-installed", missing, flowharness.Mask("path"))
 
-	// 4. The trackers list names them without probing.
+	// 4. Azure Repos: az is installed with its extension, signed out and with no default organization.
+	azure0 := toolOf(t, first, "azure")
+	if azure0.Label != "Azure Repos" || azure0.CLI != "Azure CLI (az)" || azure0.Kind != "host" {
+		t.Fatalf("azure = %+v", azure0)
+	}
+	if got := purposes(azure0.Setup); !reflect.DeepEqual(got, []string{"install", "extension", "login", "loginToken", "defaults", "check"}) {
+		t.Fatalf("az steps = %v", got)
+	}
+	if st := azure0.Status; st.Kind != "unauthenticated" || !strings.Contains(st.Reason, "az devops configure") {
+		t.Fatalf("az without defaults = %+v, want unauthenticated naming az devops configure", st)
+	}
+	app.Contract(t, "space-cli-tools", "IssueTrackerService.Tools#azure-no-defaults", first, flowharness.Mask("path"))
+
+	az.SetDefaults("https://dev.azure.com/acme", "Web App")
+	app.Contract(t, "space-cli-tools", "args:IssueTrackerService.Tools#azure-refresh", bridge.ToolsArgs{Refresh: true})
+	if st := toolOf(t, tools(true), "azure").Status; st.Kind != "unauthenticated" || !strings.Contains(st.Reason, "az login") || st.Site != "https://dev.azure.com/acme" {
+		t.Fatalf("az signed out = %+v, want unauthenticated naming az login", st)
+	}
+	az.SetLoggedIn(true)
+	if st := toolOf(t, tools(false), "azure").Status; st.Kind != "unauthenticated" {
+		t.Fatalf("cached az status = %+v, want the signed-out probe", st)
+	}
+	azReady := tools(true)
+	if st := toolOf(t, azReady, "azure").Status; st.Kind != "ok" || st.Site != "https://dev.azure.com/acme" || st.Account != "me@acme.test" || st.Version != "2.91.0 (azure-devops 1.0.10)" {
+		t.Fatalf("az refreshed = %+v", st)
+	}
+	app.Contract(t, "space-cli-tools", "IssueTrackerService.Tools#azure-ready", azReady, flowharness.Mask("path"))
+
+	az.SetExtension(false)
+	noExt := tools(true)
+	if st := toolOf(t, noExt, "azure").Status; st.Kind != "notFound" || !strings.Contains(st.Reason, "az extension add") {
+		t.Fatalf("az without the extension = %+v, want notFound naming az extension add", st)
+	}
+	app.Contract(t, "space-cli-tools", "IssueTrackerService.Tools#azure-no-extension", noExt, flowharness.Mask("path"))
+
+	// 5. The trackers list names them without probing.
 	calls := acli.Count("")
 	res := app.W.IssueTracker.Trackers()
 	if len(res.Trackers) != 1 || res.Trackers[0].ID != "jira" || res.Trackers[0].Label != "Jira" || acli.Count("") != calls {

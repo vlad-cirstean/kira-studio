@@ -12,7 +12,8 @@ import (
 // the delta walk stops at the first pull request older than its watermark, so every pull request
 // created since the last run is above it and none is missed. State, head, review and checks
 // changes of an open pull request come from Checks, which crsync runs for every open row on its
-// sweep. A pull request that left active is read by id and its new state stored. An abandoned pull
+// sweep. A listing carries no policy results (one spawn per pull request), so Page marks an open
+// pull request EXPECTED, which crsync refreshes on its next focused pending pass. A pull request that left active is read by id and its new state stored. An abandoned pull
 // request that is reactivated stays closed in the index until a re-backfill.
 
 // Page reads pull requests, closed ones included, newest created first. cursor is the skip offset.
@@ -32,8 +33,14 @@ func (p *Provider) Page(ctx context.Context, r githost.Repo, cursor string, firs
 	if !st.OK() {
 		return githost.ChangeRequestPage{}, st
 	}
+	items := mapPRs(r, raw)
+	for i := range items {
+		if items[i].State == "open" {
+			items[i].ChecksState = "EXPECTED" // policies are read by Checks, which crsync runs for these next
+		}
+	}
 	return githost.ChangeRequestPage{
-		Items: mapPRs(r, raw), EndCursor: strconv.Itoa(skip + len(raw)), HasNext: len(raw) == first,
+		Items: items, EndCursor: strconv.Itoa(skip + len(raw)), HasNext: len(raw) == first,
 	}, st
 }
 
