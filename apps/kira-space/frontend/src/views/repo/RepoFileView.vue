@@ -127,7 +127,7 @@ async function mount(): Promise<void> {
   const editor = viewer.createEditor(mod, uri, text);
   if (!editor) return;
   registerEditor(props.tab.id, uri, editor);
-  edit.attach(editor);
+  edit.attach(editor, mod);
   disposeDistill = attachDistillSelection(editor, props.tab.path);
 
   // Attached after the editor exists, guarded on the setting and on whether this window has a git

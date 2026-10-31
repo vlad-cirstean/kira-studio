@@ -10,6 +10,7 @@ import { control } from '../../bridge/control';
 import { useFileTreeStore } from '../../repo/state/fileTree';
 import { useFileEditStore } from '../../state/fileEdit';
 import { useTabsStore } from '../../state/tabs';
+import type { MonacoModule } from './monaco';
 import { EDIT_OPTIONS, READ_OPTIONS } from './useReadonlyFileViewer';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
@@ -112,8 +113,18 @@ export function useFileEdit(o: FileEditOptions) {
 
   /** Called by the view once its editor exists. Re-applies edit options when the tab was already
    *  editing before a tab switch, then re-checks the file on disk. */
-  function attach(e: StandaloneEditor): void {
+  function attach(e: StandaloneEditor, mod: MonacoModule): void {
     editor = e;
+    // Manual completion (Ctrl+Space, Cmd+I) would still open a "No suggestions" widget; a no-op
+    // command on the same chord shadows the built-in binding.
+    const { KeyMod, KeyCode } = mod;
+    for (const chord of [
+      KeyMod.CtrlCmd | KeyCode.Space,
+      KeyMod.WinCtrl | KeyCode.Space,
+      KeyMod.CtrlCmd | KeyCode.KeyI,
+    ]) {
+      e.addCommand(chord, () => {});
+    }
     if (!store.isEditing(o.tabId)) return;
     enterOptions();
     void checkDisk();
