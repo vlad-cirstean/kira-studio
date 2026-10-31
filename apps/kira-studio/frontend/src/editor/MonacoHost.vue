@@ -60,10 +60,18 @@ const props = defineProps<{
   rangeHighlights?: (doc: string) => readonly RangeHighlight[];
   autoCloseBrackets?: boolean;
   keepSelectionOnExternalSync?: boolean;
+  /** Restored once the first content lands (the proof window's saved query scroll). */
+  scrollTop?: number;
 }>();
 
 const docModel = defineModel<string>('doc', { required: true });
-const emit = defineEmits<{ 'update:cursor': [pos: number] }>();
+const emit = defineEmits<{
+  'update:cursor': [pos: number];
+  'update:scrollTop': [top: number];
+  'update:contentHeight': [height: number];
+  /** The first content is in and `scrollTop` is applied and painted. */
+  ready: [];
+}>();
 
 const settingsStore = useSettingsStore();
 
@@ -525,6 +533,18 @@ onMounted(async () => {
   // v-if), so there is never a window with neither showing real content.
   void fillModel(docModel.value, () => {
     previewShown.value = false;
+  }).then(() => {
+    if (!editor) return;
+    editor.layout();
+    if (props.scrollTop) editor.setScrollTop(props.scrollTop);
+    emit('update:contentHeight', editor.getContentHeight());
+    requestAnimationFrame(() => requestAnimationFrame(() => emit('ready')));
+  });
+  editor.onDidScrollChange((e) => {
+    if (e.scrollTopChanged) emit('update:scrollTop', e.scrollTop);
+  });
+  editor.onDidContentSizeChange((e) => {
+    if (e.contentHeightChanged) emit('update:contentHeight', e.contentHeight);
   });
   editor.onDidChangeCursorPosition((e) => {
     if (!model) return;

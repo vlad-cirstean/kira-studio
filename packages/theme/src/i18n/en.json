@@ -13143,6 +13143,37 @@
         "error": "Couldn’t reveal the saved URI."
       }
     },
+    "proof": {
+      "delete": {
+        "body": "Removes {name} and its saved views. This can’t be undone.",
+        "title": "Delete this session"
+      },
+      "history": {
+        "aria": "Validation sessions",
+        "empty": "No validation sessions yet",
+        "unseen": {
+          "aria": "Not opened yet"
+        }
+      },
+      "pending": {
+        "label": "Edit pending"
+      },
+      "resize": {
+        "label": "Resize sessions list"
+      },
+      "session": {
+        "aria": "Proof",
+        "empty": {
+          "emptyHint": "Select a session on the left."
+        },
+        "steps": {
+          "label": "{count} step | {count} steps"
+        }
+      },
+      "tabs": {
+        "aria": "Proof steps"
+      }
+    },
     "savedList": {
       "pin": {
         "tooltip": "Pin"

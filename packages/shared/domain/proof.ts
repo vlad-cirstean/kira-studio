@@ -115,6 +115,7 @@ export const proofViewStateEntrySchema = /*#__PURE__*/ z.object({
   ordinal: z.number().int(),
   state: proofViewStateSchema,
 });
+export type ProofViewStateEntry = z.infer<typeof proofViewStateEntrySchema>;
 
 export const proofOpenResultSchema = /*#__PURE__*/ z.object({
   key: z.string(),
@@ -125,7 +126,12 @@ export const proofSavePngResultSchema = /*#__PURE__*/ z.object({
   saved: z.boolean(),
   path: z.string().nullable(),
 });
+export type ProofOpenResult = z.infer<typeof proofOpenResultSchema>;
+export type ProofWindowTarget = z.infer<typeof proofWindowTargetSchema>;
+export type ProofSavePngResult = z.infer<typeof proofSavePngResultSchema>;
 
 // kira:proof:changed and kira:proof:select payloads.
 export const proofChangedSchema = /*#__PURE__*/ z.object({ sessionId: z.string() });
 export const proofSelectSchema = /*#__PURE__*/ z.object({ sessionId: z.string() });
+export type ProofChanged = z.infer<typeof proofChangedSchema>;
+export type ProofSelect = z.infer<typeof proofSelectSchema>;
