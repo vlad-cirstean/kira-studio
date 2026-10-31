@@ -360,3 +360,11 @@ Consequences named so no stream drifts across:
 4. P426: "Elastic brings visualisations": generic charts the agent fills from any data (assumed), or rendering Kibana's
    own saved visualisations?
 5. P432: confirm the overhaul applies to both apps (the panel component is shared), not Kira Space only.
+
+## Decisions (orchestrator, user said work autonomously)
+
+1. Kibana HTTP API (data views, KQL and Lucene). ES|QL out of scope.
+2. Saved queries live in Kira, local, per connection.
+3. Attachments on Azure and Jira only. GitHub shows unsupported.
+4. Generic agent-filled charts, not Kibana saved visualisations.
+5. Overhaul applies to both apps (shared panel).
