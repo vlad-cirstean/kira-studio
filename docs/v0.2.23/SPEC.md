@@ -12,7 +12,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P407 | Stage handover: session context notes and stage-change dialogs | Done |
 | P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Done |
 | P409 | Finishing a task returns every artifact via MCP | Done |
-| P410 | Task plus button: terminal or ad hoc Claude session in worktree | Todo |
+| P410 | Task plus button: terminal or ad hoc Claude session in worktree | Done |
 | P411 | Task statuses: move to Workflow page, fully customizable | Todo |
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Todo |
 | P413 | Review comment dialog: fix overflow and editing, compact gutter | Todo |
@@ -80,6 +80,8 @@ Finish returns all artifacts created: PRs, Jira, docs, deployments, everything.
 ### P410 Task plus button: terminal or ad hoc Claude session in worktree
 
 Task gets a plus button. It starts a terminal or an ad hoc Claude session in that task's worktree.
+
+**Result.** `AdeTaskService.StartAdHoc(branchId)` opens an agent TUI on a branch worktree with no first message; it shares `StartBranch`'s rules and grant (`startBranch` helper). Plus menu `sessions/AdeTaskLaunchMenu.vue` on the card head and the Sessions tab bar: per worktree a Terminal (Git module tab via `openRepoTerminalTab`) or an agent session; disabled items show the reason inline. Tests: flows/adeflow `TestAdHocSession` (contract `ade-adhoc`), tests/ui/ade-v2-task-launch.spec.ts, real `TestAdeAdHocSession` (in the ADE row). Full Go, unit, ui (814), mobile, visual (plan-branches snapshot re-recorded for the new icon), lint, lint:dead, lint:go, lint:claude and the ADE `claude` row pass. Dropdown items are picked by keyboard in the UI spec (the menu floats off-screen in the mock runtime). `httpclient` and `appupdate` tests failed once under concurrent load, pass alone; adeflow `-race` needs `-timeout 25m` under load.
 
 ### P411 Task statuses: move to Workflow page, fully customizable
 
