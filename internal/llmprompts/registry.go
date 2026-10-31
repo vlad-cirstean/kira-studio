@@ -1357,3 +1357,57 @@ var (
 	_ = arg(DbmcpToolExplainQuery.id, "path", studioApp, NextCall, `Encoded database path from list_children. Required on postgres, mysql, mariadb and mongodb; pass "" on other engines.`, NoVars{})
 	_ = arg(DbmcpToolExplainQuery.id, "includeRaw", studioApp, NextCall, `Also return the server's raw EXPLAIN text. Default false: can be tens of kilobytes; the parsed plan is the point.`, NoVars{})
 )
+
+// DbmcpToolProofStartSession describes the proof_start_session tool.
+var DbmcpToolProofStartSession = define(Entry{
+	ID: "dbmcp.tool.proof_start_session", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_start_session",
+	Default: "Start a validation proof session: an ordered record of the checks that show your work is correct, which the user reviews in a window once you close it. Returns a draftId for proof_add_step. Names are unique, ignoring case and outer spaces. Touches no connection.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolProofStartSession.id, "name", studioApp, NextCall, `Unique session name, 1-80 characters.`, NoVars{})
+	_ = arg(DbmcpToolProofStartSession.id, "summary", studioApp, NextCall, `What the session proves, up to 500 characters. Optional.`, NoVars{})
+)
+
+// DbmcpToolProofEditSession describes the proof_edit_session tool.
+var DbmcpToolProofEditSession = define(Entry{
+	ID: "dbmcp.tool.proof_edit_session", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_edit_session",
+	Default: "Change a closed proof session. Returns a draftId and the current steps. Rebuild the full step list with proof_add_step: keepOrdinal reuses an old step unchanged, replacesOrdinal marks a changed version of one, neither adds a new step, and an old step you leave out is removed. The user sees old and new side by side and accepts or rejects.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolProofEditSession.id, "name", studioApp, NextCall, `Name of a closed session, as proof_list_sessions returns it.`, NoVars{})
+	_ = arg(DbmcpToolProofEditSession.id, "reason", studioApp, NextCall, `What changes and why, up to 500 characters.`, NoVars{})
+)
+
+// DbmcpToolProofAddStep describes the proof_add_step tool.
+var DbmcpToolProofAddStep = define(Entry{
+	ID: "dbmcp.tool.proof_add_step", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_add_step",
+	Default: "Add the next step to a draft. Steps show in the order added; the call returns the step's ordinal. The data can come from any tool you used: pick the view that shows it best. Every value is validated and rejected with the field and limit when it does not fit.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolProofAddStep.id, "draftId", studioApp, NextCall, `Draft id from proof_start_session or proof_edit_session.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "description", studioApp, NextCall, `One line, up to 200 characters, saying what this step shows. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "query", studioApp, NextCall, `The query or command you ran, up to 64 KiB. Shown above the data.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "language", studioApp, NextCall, `Highlighting for query: sql, json, shell or text. Default text.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "source", studioApp, NextCall, `Short label of the tool that produced the data, such as elasticsearch. Up to 64 characters.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "view", studioApp, NextCall, `table, document or keyvalue. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "data", studioApp, NextCall, `table: {columns:[{name,type?}],rows:[[cell,...]]} with type number, text, boolean, temporal, json or other (inferred when omitted). document: {documents:[{id?,body:{...}}]}. keyvalue: {entries:[{field,value}]}. Limits: 10000 rows or documents, 64 KiB per cell, 4 MiB per step. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "keepOrdinal", studioApp, NextCall, `Edit drafts only: reuse the old step with this ordinal unchanged. Pass no other step field.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "replacesOrdinal", studioApp, NextCall, `Edit drafts only: this step is a changed version of the old step with this ordinal.`, NoVars{})
+)
+
+// DbmcpToolProofCloseSession describes the proof_close_session tool.
+var DbmcpToolProofCloseSession = define(Entry{
+	ID: "dbmcp.tool.proof_close_session", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_close_session",
+	Default: "Finish a draft and notify the user. Needs at least one step. A new session returns status closed; an edit returns pending_review until the user accepts or rejects it. The draftId is spent.",
+}, NoVars{})
+
+var _ = arg(DbmcpToolProofCloseSession.id, "draftId", studioApp, NextCall, `Draft id from proof_start_session or proof_edit_session.`, NoVars{})
+
+// DbmcpToolProofListSessions describes the proof_list_sessions tool.
+var DbmcpToolProofListSessions = define(Entry{
+	ID: "dbmcp.tool.proof_list_sessions", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_list_sessions",
+	Default: "List closed proof sessions, newest first, with step count and whether an edit waits for review. Use it to find the name proof_edit_session needs. The app keeps the newest 30.",
+}, NoVars{})

@@ -47,6 +47,17 @@ func withRequestContext(next http.Handler) http.Handler {
 	})
 }
 
+// maxRequestBytes caps one MCP request body: a proof step carries up to 4 MiB of data plus the
+// JSON-RPC envelope; every other tool sends kilobytes.
+const maxRequestBytes = 8 << 20
+
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // bindRequestCancellation returns ctx cancelled when the HTTP request stored by
 // withRequestContext ends (client gone). Without a stored request context it is a plain child.
 func bindRequestCancellation(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -90,7 +101,7 @@ func (s *Server) bindHTTP() error {
 		// TokenInfo.Expiration (deliberately left empty, see tokenVerifier below) and produce its
 		// own flat "token missing expiration" body instead, so that check stays opted out here.
 		AllowMissingExpiration: true,
-	})(withRequestContext(handler))
+	})(withRequestContext(limitBody(handler)))
 
 	// The go-sdk applies DNS-rebinding protection by default but explicitly does not apply
 	// cross-origin protection unless the caller wraps the handler itself: a browser tab on an
