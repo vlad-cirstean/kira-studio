@@ -1,6 +1,7 @@
 package adeflow_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakehost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
@@ -232,5 +234,32 @@ func TestTaskIssueTracker(t *testing.T) {
 	// 8. A task without a link has no tracker.
 	if ti := issueOf(t, app, createTask(t, app, "Plain", "flow").ID); ti.Reason != "noTracker" {
 		t.Fatalf("TaskIssue without a link = %+v", ti)
+	}
+
+	// 9. Every acli call is a background row of the op log; the failed sign-in probe of step 6 shows as an error.
+	rows, err := app.W.Ops.Recent(bridge.OpsRecentArgs{Limit: 200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops := map[string]string{}
+	for _, r := range rows {
+		if r.Category != oplog.CategoryTracker {
+			continue
+		}
+		if !r.Background || r.Source != "Jira" || r.Command == nil || !strings.HasPrefix(*r.Command, "acli ") {
+			t.Fatalf("tracker row = %+v, command %v", r, *r.Command)
+		}
+		if r.Status == oplog.StatusError {
+			ops[r.Kind+"!"] = *r.Command
+		}
+		ops[r.Kind] = *r.Command
+	}
+	for _, kind := range []string{"version", "auth status", "workitem view", "auth status!"} {
+		if ops[kind] == "" {
+			t.Fatalf("no %q tracker row in %+v", kind, ops)
+		}
+	}
+	if !strings.Contains(ops["workitem view"], "workitem view KIRA-") {
+		t.Fatalf("view command = %q", ops["workitem view"])
 	}
 }

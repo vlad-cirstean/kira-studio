@@ -14,6 +14,9 @@ import (
 // ProviderID is the registry key of this provider.
 const ProviderID = "jira"
 
+// ProviderLabel is the name shown to the user and the source of its op log rows.
+const ProviderLabel = "Jira"
+
 const docsURL = "https://developer.atlassian.com/cloud/acli/guides/introduction/"
 
 // Clock is the time seam of the caches.
@@ -59,7 +62,7 @@ func New(o Options) *Provider {
 func (p *Provider) ID() string { return ProviderID }
 
 func (p *Provider) Terms() issuetracker.Terms {
-	return issuetracker.Terms{Label: "Jira", Issue: "Work item", CLI: "Atlassian CLI (acli)"}
+	return issuetracker.Terms{Label: ProviderLabel, Issue: "Work item", CLI: "Atlassian CLI (acli)"}
 }
 
 func (p *Provider) Setup() clisetup.Setup {

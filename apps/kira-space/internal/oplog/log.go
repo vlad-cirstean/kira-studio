@@ -557,9 +557,11 @@ func (s *StepRef) End(status string, exit *int, stderr string) {
 	}
 }
 
-func renderCommand(argv []string) string {
+func renderCommand(argv []string) string { return renderTool("git", argv) }
+
+func renderTool(name string, argv []string) string {
 	var b strings.Builder
-	b.WriteString("git")
+	b.WriteString(name)
 	for _, a := range argv {
 		b.WriteByte(' ')
 		b.WriteString(quoteArg(a))

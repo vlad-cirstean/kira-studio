@@ -5,6 +5,7 @@ const (
 	CategoryGit     = "git"
 	CategorySession = "session"
 	CategoryMCP     = "mcp"
+	CategoryTracker = "tracker"
 )
 
 // Modules that originate an operation.

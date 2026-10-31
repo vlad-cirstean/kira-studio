@@ -207,7 +207,7 @@ func Build(opts Options) *Wired {
 	w.Windows = shell.NewWindowRegistry()
 	w.SetAppFocused(w.Windows.AnyFocused)
 	git := wireGit(repositories, opts.Locator, opts.GitHosts, opts.ChangeRequestSync)
-	git.trackers = wireTrackers(repositories, git.registry.Hosts.Registry, opts.IssueTracker)
+	git.trackers = wireTrackers(repositories, git.registry.Hosts.Registry, git.opLog, opts.IssueTracker)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
