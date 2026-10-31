@@ -39,7 +39,7 @@ var mobileAssets embed.FS
 
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout ->
 // logging.Init/Sweep -> storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry,
-// ADE tracker with the Claude Code hooks, task board, keep-awake, the 28 bound services) ->
+// ADE tracker with the Claude Code hooks, task board, keep-awake, the 30 bound services) ->
 // application.New (the bound services plus the git stream registration) -> the menu -> the
 // startup window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP:
 // not this app's module.
@@ -154,10 +154,16 @@ func main() {
 		WindowDeps: shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt},
 		Windows:    windows, CloseFlush: wired.CloseFlush, Quitter: quitter,
 		Terminal: wired.Terminal.Registry, Repo: repositories.Windows,
-		Cfg:       shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
-		Ephemeral: func(key string) bool { ok, _ := repositories.AdeReview.IsReviewKey(key); return ok },
+		Cfg: shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
+		Ephemeral: func(key string) bool {
+			if bridge.IsHostViewKey(key) {
+				return true
+			}
+			ok, _ := repositories.AdeReview.IsReviewKey(key)
+			return ok
+		},
 	}
-	winDeps.OnWindowClosing = append(winDeps.OnWindowClosing, wired.OpenedFiles.Forget)
+	winDeps.OnWindowClosing = append(winDeps.OnWindowClosing, wired.OpenedFiles.Forget, wired.HostView.Targets.Forget)
 	openNew := func() { shell.OpenNewWindow(winDeps) }
 	// OpenNewWindow is the title bar's "New window" button (P116 G6) — the same action the ⇧⌘N
 	// menu command below ties to.
@@ -187,6 +193,7 @@ func main() {
 	}))
 
 	purgeReviewWindows(repositories)
+	purgeHostViewWindows(repositories)
 	records, err := repositories.Windows.List()
 	if err != nil {
 		reporter.Fatal(startupfail.StepWindowList, err)
@@ -238,5 +245,22 @@ func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
 func purgeReviewWindows(repositories *repos.Repos) {
 	if err := repositories.AdeReview.PurgeAll(); err != nil {
 		slog.Warn("ade: purge review windows", "scope", "ade", "err", err)
+	}
+}
+
+// purgeHostViewWindows drops host view window rows a previous run left behind: they are never restored.
+func purgeHostViewWindows(repositories *repos.Repos) {
+	records, err := repositories.Windows.List()
+	if err != nil {
+		slog.Warn("hostview: list windows to purge", "scope", "hostview", "err", err)
+		return
+	}
+	for _, r := range records {
+		if !bridge.IsHostViewKey(r.Key) {
+			continue
+		}
+		if err := repositories.Windows.Delete(r.Key); err != nil {
+			slog.Warn("hostview: purge window", "scope", "hostview", "key", r.Key, "err", err)
+		}
 	}
 }

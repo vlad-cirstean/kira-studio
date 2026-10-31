@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 28 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 30 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -149,6 +149,7 @@ type Wired struct {
 
 	GitCredential   *bridge.GitCredentialService
 	GitHost         *bridge.GitHostService
+	HostView        *bridge.HostViewService
 	IssueTracker    *bridge.IssueTrackerService
 	Link            *bridge.LinkService
 	Files           *bridge.FilesService
@@ -263,6 +264,10 @@ func Build(opts Options) *Wired {
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
 	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
 	w.GitHost = &bridge.GitHostService{Deps: deps, Browser: opts.Browser}
+	w.HostView = &bridge.HostViewService{Deps: deps, Windows: repositories.Windows, Targets: &bridge.HostViewTargets{}}
+	if opts.Clock != nil {
+		w.HostView.Now = opts.Clock.Now
+	}
 	w.Link = &bridge.LinkService{Browser: opts.Browser}
 	w.Settings = &bridge.SettingsService{Deps: deps}
 	w.Layout = &bridge.LayoutService{Deps: deps}
@@ -425,6 +430,9 @@ func (w *Wired) BindShell(h ShellHooks) {
 	w.AdeTask.CloseWindow = closeWindow
 	w.AdeTask.FocusWindow = focusWindow
 	w.AdeTask.SetWindowTitle = setTitle
+	w.HostView.OpenWindow = h.OpenWindow
+	w.HostView.FocusWindow = focusWindow
+	w.HostView.SetWindowTitle = setTitle
 	w.WindowsSvc.OpenNewWindow = h.OpenNewWindow
 	w.OpenedFiles.OpenWindow = h.OpenNewWindowKeyed
 }
@@ -444,11 +452,11 @@ func (w *Wired) reopenWindow() {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 26 bound services in registration order.
+// Bound returns the 30 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
-		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.IssueTracker), application.NewService(w.Link),
+		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.HostView), application.NewService(w.IssueTracker), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),

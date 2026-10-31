@@ -1291,6 +1291,17 @@
         },
         "notLink": {
           "error": "Not a {links}."
+        },
+        "view": {
+          "notChangeRequest": {
+            "body": "The PR view opens a {changeRequests} only."
+          },
+          "unavailable": {
+            "body": "The pull request view is not available."
+          },
+          "window": {
+            "title": "{short} #{number} · {repo}"
+          }
         }
       },
       "gitrpc": {
