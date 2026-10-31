@@ -1987,9 +1987,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 
 ### Git host abstraction (P318)
 
-- internal/githost is the neutral contract. A Provider composes four roles: Remotes (ParseRemote, Claims), Auth (Status, Account), ChangeRequests (ForCommit, ForBranch, Open) and URLs (ChangeRequestURL, RepoURL, BranchURL, IsChangeRequestURL, ParseLink). Callers depend on the narrowest role.
+- internal/githost is the neutral contract. A Provider composes four roles: Remotes (ParseRemote, Claims), Auth (Status, Account; both take the Repo, since Azure signs in per organization), ChangeRequests (ForCommit, ForBranch, Open) and URLs (ChangeRequestURL, RepoURL, BranchURL, IsChangeRequestURL, ParseLink). Callers depend on the narrowest role.
 - "Change request" is the neutral name for a pull or merge request. A provider supplies Terms (label, change request, noun, short, CLI); the UI reads them from githost.Info. No neutral caller holds a provider word.
-- providers.New builds the Registry: github first, then extras. appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
+- providers.New builds the Registry: github first, then extras. appwire default is github then azure; flowharness order is github, azure, extras (`WithAzure` swaps the az runner). `githost.Status.Site` carries the account scope (Azure organization URL). appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
 - Selector.Resolve(setting, remoteURL) picks the provider. Setting kiraSpace.gitHost.provider (per repo) is auto, off or a provider id. auto picks the first provider that parses the origin remote and Claims its host. An unknown id logs a warning and falls back to auto. A pinned id that does not parse the remote resolves to none.
 - The server composes every link (changeRequest.browserUrl, ChangeRequestsResult.BranchURLs, HostLink on tasks); the renderer never builds a host URL. Only URLs a provider approves via IsChangeRequestURL open. Contract 53 drops GitHostInfo.fileReviewSync (P369). Contract 54 adds changeRequest.reviewState, changeRequest.submitReview and changeRequest.comment (P370). Contract 55 adds optional number on changeRequest.reviewState (P392).
 - git-ipc adds gitHost.info (the repo's resolved host, null for none) and gitHost.providers. Space adds GitHostService.Providers and AdeTaskService.HostProviders (phone). Contract version 50 renames the PR-named requests and fields to change request names. Contract 51 adds branch.changeRequestIndex, branch.syncChangeRequests and the changeRequestsChanged event kind.
@@ -2007,6 +2007,17 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
 - BranchLinks (P383) is an optional role: ParseBranchLink (pull, tree, issue links on a claimed host; no host call), ChangeRequestHead (fresh head, author) and ChangeRequestRef (refs/pull/<n>/head on GitHub). ADE ResolveHostLink is read only; AddHostLink re-resolves, fetches one refspec (fork or closed PR: the change-request ref into <owner>/<head>; same-repo open PR: the head into its tracking ref) and attaches through the AddExistingBranch path, so kind follows the tip-author rule. Repo match walks every remote, origin first. Issue links are refused.
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
+
+#### Azure Repos (P423)
+
+- `githost/azure` is the `az` provider with `az devops` (extension azure-devops). Same roles as GitHub: Remotes, Auth, ChangeRequests, URLs, ChangeRequestSync, ChangeRequestReviews, BranchLinks, ChangeRequestSearch, CLISetup.
+- Repo mapping: `Repo{Host: "dev.azure.com", Owner: "<org>/<project>", Name: "<repo>"}`. Remotes parsed: `dev.azure.com`, `{org}.visualstudio.com` (optional collection segment), ssh `v3/` forms. Links parsed: PR, work item, `?version=GB<branch>`.
+- Every org-scoped call goes through one `argv()` helper: `--org <url> --detect false --only-show-errors -o json`. Env sets `AZURE_EXTENSION_USE_DYNAMIC_INSTALL=no` and `AZURE_CORE_ONLY_SHOW_ERRORS=true`. `--detect false` stops az reading the cwd git remote.
+- Discovery: tool probe (az version and extension) cached apart from the per-org probe (`az devops project list --top 1`) and the cached `az devops configure --list` defaults. TTL 5 min when ok, 30 s when not. A refresh forgets the defaults.
+- Sync: Azure gives no PR update time. `UpdatedAt` is the creation time; Page orders by id descending; Probe uses the newest PR id as etag. Page marks open rows `ChecksState=EXPECTED`, so the pending checks pass reads their policies in the same run. Checks lists active PRs and runs `az repos pr policy list` per PR (limit 4); a PR that left active is read with `pr show`; a gone PR is omitted.
+- Reviews: the body posts as a new thread through `az devops invoke` (git, pullRequestThreads, API 7.1) from a 0600 temp file, then `set-vote` (approve to approve, requestChanges to wait-for-author, comment to no vote). `ForCommit` uses the pullRequestQuery resource.
+- Azure serves no PR head ref. `ChangeRequestRef` is `refs/pull/<n>/merge`, so ADE fetches the merge ref.
+- Differs from the GitHub op log: `az` calls are not in the op log. Flows use the in-process `flowharness/fakeaz`, not the binary.
 
 ## Agent harness (P316)
 
@@ -3215,6 +3226,11 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Kibana search uses an internal route (P424).** `POST /internal/search/es` is not a public API; a Kibana upgrade can change its body or headers. The conformance suite runs against 9.5.3 and the 8.19 floor via `KIRA_COMPAT_IMAGE_KIBANA`.
+- **Azure Repos search covers the default project only (P423).** `SearchChangeRequests` reads 2 pages of 100 in the configured default organization and project. A PR elsewhere is not found by issue key.
+- **A reactivated Azure PR stays closed in the index (P423).** Azure has no update time, so the delta walk never revisits it. A re-backfill (account change or schema bump) fixes it.
+- **Azure serves no PR head ref (P423).** ADE fetches `refs/pull/<n>/merge` for fork and closed PRs. It is a merge preview and disappears once the PR closes.
+- **`az` calls are not in the op log (P423).** Like `gh`. Needs a host category in `oplog`.
+- **`ade.changeRequestRepo` has no Azure URL form (P423).** Title-search hits on Azure show no repo label.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.

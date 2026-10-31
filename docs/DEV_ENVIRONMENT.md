@@ -459,6 +459,13 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 - Refresh by hand against a real site: `acli jira workitem view KEY --json --fields '*all,-comment,-attachment,-worklog,-description'`, then redact. Keep both Development field forms (string and object).
 - Flow tests use `flowharness/fakeacli`; no test needs `acli` installed.
 
+## `az` fixtures (P423)
+
+- Install for captures: `python3 -m venv /tmp/azenv && /tmp/azenv/bin/pip install azure-cli && AZURE_CONFIG_DIR=/tmp/azcfg /tmp/azenv/bin/az extension add --name azure-devops`. Keep `AZURE_CONFIG_DIR` in scratch.
+- `githost/azure/testdata`: version, configure-list and stderr files are captured from real `az`. PR, policy, query and thread JSON are hand-written from the documented shape and await confirmation against a real org (`testdata/README`). No org was reachable in the sandbox.
+- Refresh PR JSON: `az repos pr list --org https://dev.azure.com/<org> --project <p> --repository <r> --detect false -o json`, then redact.
+- Flow tests use `flowharness/fakeaz`; no test needs `az` installed.
+
 ## Kira Space flow suites (P231)
 
 - Go flows: `bun run test:flows:space`. Complete suite: `bun run test:flows:space:complete`
@@ -467,7 +474,7 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 - Fake `claude`/`gh`: the test binary or `fakeclaude` symlinked as `claude`/`gh`. Scenario JSON
   path in `KIRA_FAKE_SCEN`, call records (`.args`, `.cwd`, `.prompt`) in `KIRA_FAKE_DIR`.
 - Second code host: `flowharness.WithGitHost(fakehost.New())` registers an in-process `forge.test` host
-  (merge requests) after GitHub. No CLI, no PATH. Use `WithoutGh()` to prove no step reaches `gh`. It records reviews and comments (`SetAuthor`, `Reviews`, `Comments`) and refuses approving your own merge request.
+  (merge requests) after GitHub. No CLI, no PATH. Azure registers in every harness through an in-process `fakeaz`; `WithAzure` seeds PRs and auth state, and the default harness has no az. Use `WithoutGh()` to prove no step reaches `gh`. It records reviews and comments (`SetAuthor`, `Reviews`, `Comments`) and refuses approving your own merge request.
   Flow: `flows/githostflow`; UI half
   `tests/ui/git-host-provider.spec.ts`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
