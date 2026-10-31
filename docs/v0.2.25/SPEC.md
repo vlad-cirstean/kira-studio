@@ -8,7 +8,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 |---|---|---|
 | P436 | ADE session tab context menu: close and restart a Claude session | Todo |
 | P437 | ADE sessions dropdown redesign | Todo |
-| P438 | Rename Automations to Runs | Todo |
+| P438 | Rename Automations to Runs; icon-only module tabs | Todo |
 | P439 | Code review (2 rounds) | Todo |
 | P440 | Close chapter v0.2.25 | Todo |
 
@@ -22,7 +22,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 - The sessions dropdown looks ugly and works clunkily. Redesign both looks and interactions.
 
-### P438 Rename Automations to Runs
+### P438 Rename Automations to Runs; icon-only module tabs
+
+- Module tabs (the mode strip, both apps) show icons only, no labels, to leave room for more modules. Each icon keeps an accessible name and a tooltip with the module name (and shortcut if any); active and attention states stay visible.
 
 - The Automations module is renamed Runs everywhere the user sees it: mode label, tab, panel, dialogs, menus, palette commands, Settings, tooltips, docs.
 - Internal identifiers (mode key `automations`, `<app home>/automations/<id>` folders, DB columns, i18n namespace) stay unless the plan finds a safe, worthwhile rename; the plan decides and justifies each.
