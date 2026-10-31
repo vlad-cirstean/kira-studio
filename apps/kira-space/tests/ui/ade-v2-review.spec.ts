@@ -1167,8 +1167,12 @@ reviewTest(
   async ({ relaunch }) => {
     const { page, modified } = await openHunkDiff(relaunch, { comments: [] });
     await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
-    await renderedLine(modified, 'CHANGED 100').click({ button: 'right' });
-    await page.getByRole('menuitem', { name: 'Add review comment' }).click();
-    await expect(page.locator(t('review-thread'))).toBeVisible({ timeout: 15_000 });
+    // The diff relays out while hunks settle; a right-click that lands mid-layout targets another
+    // line, so the whole gesture retries until the thread opens.
+    await expect(async () => {
+      await renderedLine(modified, 'CHANGED 100').click({ button: 'right' });
+      await page.getByRole('menuitem', { name: 'Add review comment' }).click();
+      await expect(page.locator(t('review-thread'))).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 20_000 });
   },
 );
