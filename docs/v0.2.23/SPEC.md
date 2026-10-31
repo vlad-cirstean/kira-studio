@@ -21,7 +21,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Done |
 | P416 | Move automation runs into Operations panel | Done |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
-| P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
+| P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Done |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Done |
 | P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Todo |
 | P420 Part 2 | Kira Studio validation proof: window UI, view-state persistence, screenshot, UI spec, visual baselines, docs | Todo |
@@ -158,6 +158,8 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - Review window also shows uncommitted changes, and they can be reviewed (comments, hunk checks) like committed ones.
 - Clear separation between committed and uncommitted work.
 - Agent panel in the review window is off by default.
+
+**Result.** Review window reviews uncommitted work like committed. review.db gains `review_working_file`, `review_working_range` (gitreview 0005) and `origin` plus `anchor_content` on `review_comment`. Working records store a sha256-hashed snapshot (text up to 1 MiB; binary, too-large, absent files take whole-file marks only) and project through shared `gitsession.contentDelta`. Working comments anchor exact, projected or removed; against a commit they show as `uncommitted`. `PromoteWorkingReview` (per path, under store lock, idempotent) moves marks and comments for lines a commit landed onto the committed review; runs on `ReviewWorking`, mark/comment calls, `OpenReviewWindow`, forward. `AdeTaskService` gains `ReviewWorkingFile`, `ReviewWorkingMark`, `ReviewWorkingComments`, `ReviewWorkingCommentAdd`; git-ipc contract v57 (additive). Agent prompts mark uncommitted comments. `reviewDecorations` runs over a `ReviewSource` (committed or working); files pane splits into Committed and Uncommitted with reviewed counts; Uncommitted badge on tabs and comments. Agent panel off by default (`kira.ade.review.agentPanel`). Tests: gitsession units, `TestReviewWorkingReview` (contract `ade-review-working-review`), `ade-v2-review-working.spec.ts` 6, one visual baseline re-recorded; Go, Space UI 877, mobile 83, visual 24, lint pass. Fixed on the way: stale `graphChunkFrame` fixtures, flaky and vacuous assertions in `ade-v2-review.spec.ts`. No real `claude` row run: prompts changed text only.
 
 ### P419 Git module: editable files (read only by default, Edit button, save button or shortcut)
 
