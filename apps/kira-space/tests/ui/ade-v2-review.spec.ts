@@ -792,10 +792,10 @@ reviewTest('arrow keys on a pane handle resize and store the left width', async 
 });
 
 const ACTIONS = 'ade-review-actions';
-const actionsGit = (own = false) => ({
+const actionsGit = (own = false, state = '') => ({
   'changeRequest.reviewState': contract(
     ACTIONS,
-    `git:changeRequest.reviewState${own ? '#own' : ''}`,
+    `git:changeRequest.reviewState${own ? '#own' : state}`,
   ),
   'changeRequest.submitReview': contract(
     ACTIONS,
@@ -804,6 +804,8 @@ const actionsGit = (own = false) => ({
   'changeRequest.comment': contract(ACTIONS, 'git:changeRequest.comment'),
 });
 const actionsHead = (contract(ACTIONS, 'git:changeRequest.reviewState') as { headSha: string })
+  .headSha;
+const staleHead = (contract(ACTIONS, 'git:changeRequest.reviewState#stale') as { headSha: string })
   .headSha;
 
 reviewTest('contract: approving a change request submits the review', async ({ relaunch }) => {
@@ -817,6 +819,58 @@ reviewTest('contract: approving a change request submits the review', async ({ r
   expect(await gitStreamParams(page, 'changeRequest.submitReview')).toEqual([
     { repoId: target.gitRepoId, number: 7, event: 'approve', body: 'LGTM', headSha: actionsHead },
   ]);
+});
+
+// Contract ade-review-actions, backend half: githostflow TestChangeRequestReviewActions.
+reviewTest(
+  'contract: the title bar shows the local branch at the host head',
+  async ({ relaunch }) => {
+    const page = await openReview(relaunch, [], actionsGit());
+    const badge = page.locator(t('ade-review-head'));
+    await expect(badge).toHaveAttribute('data-head', 'current');
+    await expect(badge).toHaveText('At MR head');
+    await badge.focus();
+    await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+      actionsHead.slice(0, 7),
+    );
+  },
+);
+
+reviewTest(
+  'contract: the title bar flags a stale head and the dialog agrees',
+  async ({ relaunch }) => {
+    const page = await openReview(relaunch, [], actionsGit(false, '#stale'));
+    const badge = page.locator(t('ade-review-head'));
+    await expect(badge).toHaveAttribute('data-head', 'stale');
+    await expect(badge).toHaveText('Stale');
+    await badge.focus();
+    const tip = page.locator('[data-slot="tooltip-content"]').first();
+    await expect(tip).toContainText('is not at the MR head');
+    await expect(tip).toContainText(actionsHead.slice(0, 7));
+    await expect(tip).toContainText(staleHead.slice(0, 7));
+    await page.locator(t('ade-review-actions-trigger')).click();
+    await page.locator(t('ade-review-action-approve')).click();
+    await expect(page.locator(t('ade-review-submit-head'))).toBeVisible();
+  },
+);
+
+reviewTest('a ref change of the repo rechecks the head', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit());
+  const checks = async () =>
+    (await gitStreamRequests(page)).filter((r) => r === 'changeRequest.reviewState').length;
+  await expect(page.locator(t('ade-review-head'))).toBeVisible();
+  const before = await checks();
+  await gitStreamEmit(page, 'repo.changed', { repoId: 'other-repo', kind: 'refsChanged' });
+  await page.waitForTimeout(600);
+  expect(await checks()).toBe(before);
+  await gitStreamEmit(page, 'repo.changed', { repoId: target.gitRepoId, kind: 'refsChanged' });
+  await expect.poll(checks).toBeGreaterThan(before);
+});
+
+reviewTest('no head indicator without a change request', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], { 'changeRequest.reviewState': { kind: 'none' } });
+  await expect(page.locator(t('ade-review-actions-trigger'))).toBeVisible();
+  await expect(page.locator(t('ade-review-head'))).toHaveCount(0);
 });
 
 reviewTest('contract: a change request comment posts to the conversation', async ({ relaunch }) => {

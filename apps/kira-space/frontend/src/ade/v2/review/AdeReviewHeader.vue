@@ -79,7 +79,7 @@ const headHint = computed(() => {
             tabindex="0"
             class="wails-no-drag shrink-0"
             :aria-label="headHint"
-            :data-state="head.state"
+            :data-head="head.state"
             data-testid="ade-review-head"
           >
             <template v-if="head.state === 'stale'">{{ t('common.stale.status') }}</template>
