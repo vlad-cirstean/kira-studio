@@ -26,7 +26,10 @@ const ID = "fake"
 type StructuredCall struct{ Model, System string }
 
 // HeadlessCall is one recorded headless run.
-type HeadlessCall struct{ Model, Prompt, SessionID, Resume string }
+type HeadlessCall struct {
+	Model, Prompt, SessionID, Resume string
+	Stage                            harness.StageValues
+}
 
 // Provider is the fake. Answers maps a substring of a structured call's system prompt to the output
 // it returns; the first match answers.
@@ -82,6 +85,9 @@ func (p *Provider) HeadlessLabel() string { return fakeagent.Persona + " headles
 
 func (p *Provider) ModelLabel(alias string) string { return alias }
 
+// StageSettings: the fake takes none, so a step's values always fall to provider defaults.
+func (p *Provider) StageSettings() []harness.StageSetting { return nil }
+
 func (p *Provider) Models() harness.Catalog {
 	return harness.Catalog{Aliases: []string{"fast", "deep"}, Default: "fast"}
 }
@@ -110,7 +116,7 @@ func (p *Provider) RunStructured(_ context.Context, model string, c harness.Stru
 // RunHeadless records the spec, prints one line and ends the step through its MCP grant.
 func (p *Provider) RunHeadless(_ context.Context, s harness.HeadlessSpec, h harness.Handler) (harness.Exit, error) {
 	p.mu.Lock()
-	p.headless = append(p.headless, HeadlessCall{Model: s.Model, Prompt: s.Prompt, SessionID: s.SessionID, Resume: s.Resume})
+	p.headless = append(p.headless, HeadlessCall{Model: s.Model, Prompt: s.Prompt, SessionID: s.SessionID, Resume: s.Resume, Stage: s.Stage})
 	p.mu.Unlock()
 	if h.OnLine != nil {
 		h.OnLine(harness.Line{Stream: harness.StreamStdout, Text: "fake agent at work"})

@@ -13,6 +13,25 @@ func New(extra ...harness.Provider) *harness.Registry {
 	return harness.NewRegistry(append([]harness.Provider{claude.New()}, extra...)...)
 }
 
+// StageSet is one provider's stage settings.
+type StageSet struct {
+	ID, Label string
+	Settings  []harness.StageSetting
+}
+
+// StageCatalog lists every registered provider's stage settings in registration order; providers with none are left out.
+func StageCatalog() []StageSet {
+	var out []StageSet
+	reg := New()
+	for _, id := range reg.IDs() {
+		p, _ := reg.Get(id)
+		if s := p.StageSettings(); len(s) > 0 {
+			out = append(out, StageSet{ID: id, Label: p.Label(), Settings: s})
+		}
+	}
+	return out
+}
+
 // ConfigDirs are the home config folder names (".claude") of every registered provider. The set is
 // static, so validation that runs without a registry can guard them.
 func ConfigDirs() []string {

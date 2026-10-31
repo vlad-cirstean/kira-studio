@@ -30,6 +30,8 @@ type Provider interface {
 	ModelLabel(alias string) string
 	// Models is the provider's model aliases.
 	Models() Catalog
+	// StageSettings are the per-stage settings the provider takes; empty means none.
+	StageSettings() []StageSetting
 	Locator
 	Structured
 	Headless

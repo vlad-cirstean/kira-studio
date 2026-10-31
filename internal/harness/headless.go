@@ -48,6 +48,8 @@ type HeadlessSpec struct {
 	Env []string
 	// Sandbox wraps the agent in a sandbox runner; nil runs it plain.
 	Sandbox *SandboxExec
+	// Stage is the step's values for this provider; nil = defaults.
+	Stage   StageValues
 	Timeout time.Duration
 }
 
