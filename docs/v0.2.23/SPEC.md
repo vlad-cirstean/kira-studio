@@ -11,7 +11,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P406 | Nanoid branch names for agent-created worktrees | Done |
 | P407 | Stage handover: session context notes and stage-change dialogs | Done |
 | P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Done |
-| P409 | Finishing a task returns every artifact via MCP | Todo |
+| P409 | Finishing a task returns every artifact via MCP | Done |
 | P410 | Task plus button: terminal or ad hoc Claude session in worktree | Todo |
 | P411 | Task statuses: move to Workflow page, fully customizable | Todo |
 | P412 | Review: stale-changes indicator, PR link in review agent prompt | Todo |
@@ -74,6 +74,8 @@ Worktrees the agent creates use a nanoid as branch name. Agent-chosen names caus
 ### P409 Finishing a task returns every artifact via MCP
 
 Finish returns all artifacts created: PRs, Jira, docs, deployments, everything.
+
+**Result.** Table `ade_task_artifacts` (migration 0058) stores agent and user reports; detected ones (tracker link, branches, commits, change requests, deployments) derive on read. Aggregator `ade/artifacts.go`: `ArtifactSource` seam (`TaskBoardDeps.ArtifactSources`, P417 plugs in), 5 s per source, failure becomes a gap, dedup by URL or (kind, repo, ref), detected beats stored. MCP `report_artifacts` (20 per call, 200 per task); `finish_step` and `handover(finished:true)` append header plus compact JSON `{"artifacts","gaps"}`, capped at 100. Bridge `Artifacts`, `AddArtifact`, `RemoveArtifact`; Artifacts tab in task and archived panels, list in the Done stage dialog. Tests: flows/adeflow `TestTaskArtifacts` (contract `ade-artifacts`), tests/ui/ade-v2-artifacts.spec.ts, real `TestAdeReportArtifacts`. Full Go, unit, ui (806), mobile, visual, lint, lint:dead, lint:go, lint:claude and the ADE and smart-script `claude` rows pass. Fixed on the way: githostflow Open count (rig keeps forge offline during its run), `ade-automation` contract (new tool).
 
 ### P410 Task plus button: terminal or ad hoc Claude session in worktree
 
