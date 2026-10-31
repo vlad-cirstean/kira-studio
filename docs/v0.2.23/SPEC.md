@@ -23,7 +23,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
 | P420 | Kira Studio: validation proof MCP tool and window | Todo |
-| P421 | Code review (1 round) | Todo |
+| P421 | Code review (2 rounds) | Todo |
 | P422 | Close chapter v0.2.23 | Todo |
 
 ## Rows
@@ -164,9 +164,9 @@ App: Kira Studio (not Kira Space). Dedicated MCP tool for validation proof, shap
 - Screenshot button: one tab or all tabs in order. Dropdown to save to disk; default is copy to clipboard.
 - Scroll position and click-highlighted data persist per tab and match the screenshot exactly.
 
-### P421 Code review (1 round)
+### P421 Code review (2 rounds)
 
-One Opus review over the full diff since `main` (base: the chapter's branch point). Findings file under `plans/`, then one Sonnet fixer.
+Two rounds. Each round: one Opus review over the full diff since `main` (base: the chapter's branch point), findings file under `plans/`, then one Sonnet fixer. Round 2 covers the full diff again, including round-1 fixes.
 
 ### P422 Close chapter v0.2.23
 
