@@ -47,10 +47,12 @@ function ctxWith(sessions: Session[], repoName?: (id: string) => string): Dialog
     openStep: () => 'Metering endpoints',
     currentStep: () => null,
     handoverInto: () => null,
+    spaceNote: SPACE_NOTE,
     handoverLine: HANDOVER_LINE,
   };
 }
 
+const SPACE_NOTE = 'Kira Space tools: task_info, declare_repos, request_branches, branch_status.';
 const HANDOVER_LINE =
   "Call handover with notes for the next stage. Set finished true when this stage's work is done.";
 
@@ -277,6 +279,7 @@ describe('session and start mirror the server defaults', () => {
       '- Repo: web-app · Branch: feat/billing-dashboard · Worktree: ~/wt/web-app/billing-dashboard',
       '- Notes: Reuse line items.',
       'Ask me questions until the spec is clear about Usage-based billing in api, web-app, web-app.',
+      SPACE_NOTE,
       HANDOVER_LINE,
     ]);
     expect(sessionSpec(c, 'T_bill').title).toBe('Spec · interactive Claude Code');
@@ -296,6 +299,7 @@ describe('session and start mirror the server defaults', () => {
       '- Jira: PAY-102 https://acme.atlassian.net/browse/PAY-102',
       '- Repo: api · Branch: feat/usage-metering · Worktree: ~/wt/api/usage-metering',
       'Step: Metering endpoints',
+      SPACE_NOTE,
       HANDOVER_LINE,
     ]);
   });

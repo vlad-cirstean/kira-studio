@@ -13,12 +13,14 @@ export function useDialogCtx() {
   const repos = useRepos();
   const codeRepos = useCodeReposStore();
   const line = useAdePromptPreview('ade.handoverLine', () => ({}));
+  const note = useAdePromptPreview('headless.space.suffix', () => ({}));
 
   return computed((): DialogCtx | null => {
     const m = model.value;
     if (!m) return null;
     const states = new Map<string, RepoState>(m.board.repos.map((r) => [r.codeRepoId, r]));
     return {
+      spaceNote: previewPlain(note.data.value?.parts ?? []),
       handoverLine: previewPlain(line.data.value?.parts ?? []),
       graph: m.view.graph,
       sessions: sessions.value,

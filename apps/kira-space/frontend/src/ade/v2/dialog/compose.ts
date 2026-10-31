@@ -79,6 +79,8 @@ export interface DialogCtx {
   currentStep: (taskId: string) => { name: string; prompt: string } | null;
   /** What the last stage move left for the task's current step; `null` when it went elsewhere. */
   handoverInto: (taskId: string) => { from: string; body: string } | null;
+  /** The Kira Space note (`headless.space.suffix`, rendered in Go) that precedes the tool line. */
+  spaceNote: string;
   /** The tool line (`ade.handoverLine`, rendered in Go) that ends a launch message. */
   handoverLine: string;
 }
@@ -309,11 +311,12 @@ function repoLine(ctx: DialogCtx, b: Branch): string {
     : `- Repo: ${repo.nick} (read only, in ${repo.root})`;
 }
 
-/** The handover block and the tool line that end a launch message, as `ade.handoverBlock` and `ade.handoverLine` render. */
+/** The handover block, Kira Space note and tool line that end a launch message, as `ade.handoverBlock`, `headless.space.suffix` and `ade.handoverLine` render. */
 function handoverLines(ctx: DialogCtx, taskId: string): string[] {
   const h = ctx.handoverInto(taskId);
   return [
     ...(h ? [`Handover from ${h.from}:\n${h.body}`] : []),
+    ...(ctx.spaceNote ? [ctx.spaceNote] : []),
     ...(ctx.handoverLine ? [ctx.handoverLine] : []),
   ];
 }

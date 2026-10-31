@@ -1045,6 +1045,7 @@ var AdeManualMessage = define(Entry{
 - Notes: {{.Notes}}{{end}}{{if .StepPrompt}}
 {{.StepPrompt}}{{end}}{{if .Handover}}
 {{template "ade.handoverBlock" .}}{{end}}
+{{template "headless.space.suffix"}}
 {{template "ade.handoverLine"}}`,
 }, ManualVars{
 	StepName: "Review", Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
@@ -1068,6 +1069,7 @@ var AdeReviewMessage = define(Entry{
 {{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{end}}
 I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.{{if .Handover}}
 {{template "ade.handoverBlock" .}}{{end}}
+{{template "headless.space.suffix"}}
 {{template "ade.handoverLine"}}`,
 }, ReviewVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
@@ -1150,6 +1152,7 @@ var AdeStartMessage = define(Entry{
 Step: {{.StepName}}{{end}}{{range .Context}}
 {{.}}{{end}}{{if .Handover}}
 {{template "ade.handoverBlock" .}}{{end}}
+{{template "headless.space.suffix"}}
 {{template "ade.handoverLine"}}`,
 }, StartVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",

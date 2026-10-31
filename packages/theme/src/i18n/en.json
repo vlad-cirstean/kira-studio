@@ -5585,17 +5585,17 @@
         }
       },
       "headlessSpaceInstructions": {
-        "description": "Tells the agent the order to use the Kira Space tools. It reads the task, declares repositories, then branches.",
+        "description": "Tells the agent the order to use the Kira Space tools. It reads the task, declares repositories, then asks the user for branches.",
         "title": "Kira Space tools instructions",
         "usedBy": {
           "body": "Sent to {agent} when a run connects to the Kira Space tools server."
         }
       },
       "headlessSpaceSuffix": {
-        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branches.",
+        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branches, which the user approves.",
         "title": "Kira Space tools notice",
         "usedBy": {
-          "body": "Added before the finish instruction when a workflow turns the Kira Space tools on."
+          "body": "Added before the finish instruction of every agent step and smart step, and to the first message of manual, review and start sessions."
         }
       },
       "memoryDataHygiene": {
