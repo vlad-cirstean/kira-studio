@@ -8,6 +8,7 @@ import StatusBarBase from '@workbench/components/StatusBar.vue';
 import StatusBarItem from '@workbench/components/StatusBarItem.vue';
 import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
 import { computed } from 'vue';
+import AdeAgentsStatusItem from '../ade/v2/status/AdeAgentsStatusItem.vue';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';
 import { useBlameStatusStore } from '../state/blameStatus';
@@ -71,6 +72,7 @@ function onRevealBlameCommit(): void {
       />
     </template>
     <template #right>
+      <AdeAgentsStatusItem />
       <RunsStatusItem />
       <UpdateAvailableItem
         v-if="appUpdateStore.available"

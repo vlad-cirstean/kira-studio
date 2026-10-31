@@ -9763,6 +9763,18 @@
           "label": "Show or hide repositories"
         }
       }
+    },
+    "statusBar": {
+      "agents": {
+        "label": "{count} agent | {count} agents",
+        "list": {
+          "hint": "Click to list them."
+        },
+        "rowMeta": {
+          "label": "{where}, {activity}, {ago}"
+        },
+        "tooltip": "Running agents"
+      }
     }
   },
   "studio": {
