@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeFixture, bandOf, FIXED_NOW, openPlan } from './support/adeV2';
+import { adeBoard, adeFixture, bandOf, FIXED_NOW, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 
@@ -20,22 +20,97 @@ test('shows the first 10 items, loads all and collapses back', async ({ relaunch
   const tasks = page.locator('[data-testid="ade-task"]');
   await expect(tasks).toHaveCount(10);
   await page.locator('[data-testid="ade-load-all"]').click();
-  await expect(tasks).toHaveCount(13);
+  await expect(tasks).toHaveCount(12);
   await expect(page.locator('[data-testid="ade-load-all"]')).toHaveCount(0);
   await page.locator('[data-testid="ade-collapse"]').click();
   await expect(tasks).toHaveCount(10);
   await expect(page.locator('[data-testid="ade-load-all"]')).toContainText(
-    'Load all items · 3 more',
+    'Load all items · 2 more',
   );
 });
 
 test('loads the archived history into the day bands', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const load = page.locator('[data-testid="ade-load-history"]');
-  await expect(load).toContainText('Load history · 5 archived tasks in the last 2 weeks');
+  await expect(load).toContainText('History');
+  await load.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    '5 archived tasks in the last 2 weeks',
+  );
   await load.click();
   await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(5);
-  await expect(load).toHaveCount(0);
+  await expect(load).toContainText('Hide history');
+  await load.click();
+  await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(0);
+});
+
+test('a task archived today lists in the Today band without Load history, name first', async ({
+  relaunch,
+}) => {
+  const board = adeBoard((b) => {
+    const h = (b.history as { taskId: string; archivedAt: number }[]).find(
+      (e) => e.taskId === 'H_1',
+    );
+    if (h) h.archivedAt = FIXED_NOW - 36e5;
+  });
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+  ]);
+  const row = page.locator('[data-testid="ade-history-row"][data-task-id="H_1"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Audit log for admin actions');
+  await expect(page.locator('[data-testid="ade-history-row"]')).toHaveCount(1);
+  expect(await bandOf(page, 0).locator('[data-testid="ade-history-row"]').count()).toBe(1);
+  const box = await row.locator('span.font-medium').boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(80);
+});
+
+test('weekend bands carry the hatched pattern; workdays do not', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const weekend = page.locator('[data-testid="ade-day-band"][data-weekend]');
+  expect(await weekend.count()).toBeGreaterThan(0);
+  const image = (band: ReturnType<Page['locator']>) =>
+    band
+      .locator('[data-testid="ade-band-drop"]')
+      .evaluate((el) => getComputedStyle(el).backgroundImage);
+  expect(await image(weekend.first())).toContain('repeating-linear-gradient');
+  expect(await image(bandOf(page, 0))).toBe('none');
+});
+
+test('branch status tags keep their tones', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-load-all"]').click();
+  const tags = await page
+    .locator(
+      '[data-testid="ade-task-cells"] [data-testid="ade-action-cell"]:not(:first-child) [data-testid="ade-tag"]',
+    )
+    .evaluateAll((els) =>
+      els.map((el) => ({
+        text: (el.textContent ?? '').trim(),
+        tone: el.getAttribute('data-tone'),
+      })),
+    );
+  const toneOf = (text: string) => tags.filter((x) => x.text === text).map((x) => x.tone);
+  expect(toneOf('Merged').length).toBeGreaterThan(0);
+  expect(new Set(toneOf('Merged'))).toEqual(new Set(['purple']));
+  expect(toneOf('Clean').length).toBeGreaterThan(0);
+  expect(new Set(toneOf('Clean'))).toEqual(new Set(['green']));
+  expect(tags.some((x) => x.tone === 'blue')).toBe(true);
+});
+
+test('a card shows its agent sessions as one state; click opens the Sessions tab', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  const state = (id: string) => card(page, id).locator('[data-testid="ade-card-sessions"]');
+  await expect(state('T_bill')).toHaveAttribute('data-state', 'input');
+  await expect(state('T_hooks')).toHaveAttribute('data-state', 'running');
+  await expect(state('T_hooks')).toContainText('2');
+  await expect(state('T_notif')).toHaveAttribute('data-state', 'running');
+  await expect(state('T_notif')).not.toContainText('1');
+  await expect(state('T_cart')).toHaveAttribute('data-state', 'finished');
+  await state('T_hooks').click();
+  await expect(page.locator('[data-testid="ade-sessions-tab"]')).toBeVisible();
 });
 
 test('a card shows its step, progress, span and clamped title', async ({ relaunch }) => {

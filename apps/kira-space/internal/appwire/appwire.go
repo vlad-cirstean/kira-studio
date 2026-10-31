@@ -29,6 +29,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
@@ -78,11 +79,17 @@ type Options struct {
 	MobilePoll   time.Duration
 	// GitHosts are the registered code-host providers; nil means the real GitHub provider alone.
 	GitHosts *githost.Registry
+	// IssueTracker seams the Jira provider's acli locator, runner and clock; the zero value is production's
+	// (a flow-test seam). Its ChangeRequests is set by the wiring.
+	IssueTracker jira.Options
 	// TrackerGrace is how long the ADE tracker waits before it reads a spawned TUI session as
 	// stopped; zero means the tracker default.
 	TrackerGrace time.Duration
 	// RebaseTimeout bounds one ADE rebase run; 0 keeps the default (20 minutes).
 	RebaseTimeout time.Duration
+	// BranchRequestWait is how long an agent's branch request waits for the user; 0 keeps the default
+	// (30 minutes).
+	BranchRequestWait time.Duration
 	// Sandbox confines headless agents; nil uses the OS enforcer (a flow-test seam).
 	Sandbox agentsandbox.Enforcer
 	// SmartTimeout replaces every smart script's own timeout (a flow-test seam); 0 keeps each script's.
@@ -139,6 +146,7 @@ type Wired struct {
 
 	GitCredential   *bridge.GitCredentialService
 	GitHost         *bridge.GitHostService
+	IssueTracker    *bridge.IssueTrackerService
 	Link            *bridge.LinkService
 	Files           *bridge.FilesService
 	Settings        *bridge.SettingsService
@@ -199,6 +207,7 @@ func Build(opts Options) *Wired {
 	w.Windows = shell.NewWindowRegistry()
 	w.SetAppFocused(w.Windows.AnyFocused)
 	git := wireGit(repositories, opts.Locator, opts.GitHosts, opts.ChangeRequestSync)
+	git.trackers = wireTrackers(repositories, git.registry.Hosts.Registry, git.opLog, opts.IssueTracker)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
@@ -327,10 +336,11 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, runs, w.Agents)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, opts.BranchRequestWait, runs, w.Agents, w.Prompts)
 	runs.ADE = w.AdeBoard
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()
+	w.IssueTracker = &bridge.IssueTrackerService{Engine: w.AdeBoard, Hosts: git.registry.Hosts.Registry, Providers: git.trackers}
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter, Hosts: git.registry.Hosts.Registry}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -431,7 +441,7 @@ func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
-		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.Link),
+		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.IssueTracker), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
@@ -476,6 +486,7 @@ func (w *Wired) teardown(db io.Closer) {
 	w.detachMobile()
 	// Ends entries, watchers, auto-fetch timers and review.db.
 	w.Git.registry.Close()
+	w.Git.opLog.Close()
 	if w.Git.askpassBroker != nil {
 		if err := w.Git.askpassBroker.Close(); err != nil {
 			slog.Warn("close askpass broker", "scope", "shutdown", "err", err)

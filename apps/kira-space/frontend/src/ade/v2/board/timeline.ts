@@ -17,13 +17,14 @@ import {
   parseEst,
   spanDays,
 } from './calendar';
+import { shelfOf } from './shelf';
 
 // Pure port of mockup v2 `renderVals()` lines 1527-1572 (task order) and 1864-1985 (first-10 cap,
 // hours, bands) on the wire types. No clock read: `today` and `localDayOf` are inputs.
 
 /** SPEC2 §4: only the first 10 work items are shown until the user loads the rest. */
 export const ITEM_LIMIT = 10;
-/** P401: day bands shown from today; later work sits in Later. */
+/** P401: day bands shown from today; work dated further out sits in the tail band. */
 export const WINDOW_DAYS = 7;
 
 const bandKey = (e: TimelineEntry): number =>
@@ -49,7 +50,7 @@ export interface TimelineInput {
 export interface TimelineEntry {
   taskId: string;
   kind: Task['kind'];
-  /** Start day offset from today, `LATER` when unplanned. A review item with no plan day takes its placer's day. */
+  /** Start day offset from today, `LATER` when undated (shelved, or an unplaced review item). A review item with no plan day takes its placer's day. */
   day: number;
   /** Merge day (last working day of the span). */
   end: number;
@@ -118,8 +119,10 @@ export interface TimelineView {
   /** Branch rows of a task in display order: repo, then stacked children indented. */
   branchRows(taskId: string): { id: string; depth: number }[];
   bands: TimelineBand[];
+  /** Every archived task, newest first, with its day offset (`< 0` = before today). */
+  history: TimelineHistoryItem[];
   historyCount: number;
-  historyButtonLabel: string;
+  historyTip: string;
   moreButtonLabel: string;
   graph: BranchGraph;
 }
@@ -358,7 +361,7 @@ function buildBand(ctx: BandCtx, dk: number, label: string): TimelineBand {
     hours,
     taskIds: ctx.shownTaskIds.filter((id) => bandKey(ctx.entries.get(id) as TimelineEntry) === dk),
     spans: spansOn(ctx, dk),
-    history: ctx.showHistory ? ctx.history.filter((h) => h.day === dk) : [],
+    history: ctx.showHistory || dk >= 0 ? ctx.history.filter((h) => h.day === dk) : [],
     isToday: dk === 0,
     isPast,
     weekend,
@@ -375,6 +378,7 @@ function buildBand(ctx: BandCtx, dk: number, label: string): TimelineBand {
 function bandLabels(cal: Calendar, dayKeys: readonly number[]): string[] {
   let prevMonth: number | null = null;
   return dayKeys.map((dk) => {
+    if (dk === LATER) return t('space.ade.plan.band.further.label');
     let label = dayLabel(cal, dk);
     if (dk === 0) {
       prevMonth = dateParts(cal, 0).month;
@@ -409,8 +413,7 @@ function collectDayKeys(
     if (k >= 0 && k < WINDOW_DAYS) keys.add(k);
   }
   const dayKeys = [...keys].sort((a, b) => a - b);
-  if (!hiddenCount || seq.some((e) => shown.has(e.taskId) && bandKey(e) === LATER))
-    dayKeys.push(LATER);
+  if (seq.some((e) => shown.has(e.taskId) && bandKey(e) === LATER)) dayKeys.push(LATER);
   return dayKeys;
 }
 
@@ -419,12 +422,16 @@ export function buildTimeline(input: TimelineInput): TimelineView {
   const graph = buildBranchGraph(board);
   const cal = buildCalendar(today, settings);
 
-  const mine = buildMineEntries(input, graph, cal);
+  const mineAll = buildMineEntries(input, graph, cal);
+  // Shelved tasks (Later, Backlog) leave the Plan sequence but keep an entry for the panel and menu.
+  const onPlan = (e: TimelineEntry): boolean => shelfOf(board, e.taskId) === 'plan';
+  const mine = mineAll.filter(onPlan);
   const reviews = board.tasks.filter(
     (t) => t.kind === 'review' && board.plan.day[t.id] === undefined,
   );
   const seq = placeReviews(mine, reviews, graph);
   const entries = new Map<string, TimelineEntry>();
+  for (const e of mineAll) entries.set(e.taskId, e);
   for (const e of seq) entries.set(e.taskId, e);
 
   const mergeOrder = new Map<string, number>();
@@ -477,8 +484,9 @@ export function buildTimeline(input: TimelineInput): TimelineView {
     after,
     branchRows,
     bands,
+    history,
     historyCount,
-    historyButtonLabel: historyLabel(historyCount, settings.historyDays),
+    historyTip: historyLabel(historyCount, settings.historyDays),
     moreButtonLabel: t('space.ade.plan.view.loadAll.label', { count: hiddenCount }),
     graph,
   };
@@ -487,8 +495,8 @@ export function buildTimeline(input: TimelineInput): TimelineView {
 function historyLabel(count: number, days: number): string {
   const tasks = t('space.ade.plan.view.archivedTasks.label', { count });
   return days % 7 === 0
-    ? t('space.ade.plan.view.loadHistoryWeeks.label', { tasks, count: days / 7 })
-    : t('space.ade.plan.view.loadHistoryDays.label', { tasks, count: days });
+    ? t('space.ade.plan.view.historyWeeks.tooltip', { tasks, count: days / 7 })
+    : t('space.ade.plan.view.historyDays.tooltip', { tasks, count: days });
 }
 
 function historyItems(

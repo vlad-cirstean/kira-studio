@@ -1,0 +1,51 @@
+{
+  "git:review.comment.edit#ok": {
+    "changed": true
+  },
+  "git:review.comment.list#before": {
+    "at": "<masked>",
+    "comments": [
+      {
+        "anchor": "exact",
+        "anchorSha": "<masked>",
+        "body": "rename this",
+        "createdAt": 0,
+        "id": 1,
+        "kind": "change",
+        "origin": "commit",
+        "path": "a.txt",
+        "range": {
+          "end": 1,
+          "start": 1
+        },
+        "repliedAt": null,
+        "reply": "",
+        "sentAt": null,
+        "state": "open"
+      }
+    ]
+  },
+  "git:review.comment.list#edited": {
+    "at": "<masked>",
+    "comments": [
+      {
+        "anchor": "exact",
+        "anchorSha": "<masked>",
+        "body": "why?\nsecond",
+        "createdAt": 0,
+        "id": 1,
+        "kind": "question",
+        "origin": "commit",
+        "path": "a.txt",
+        "range": {
+          "end": 1,
+          "start": 1
+        },
+        "repliedAt": null,
+        "reply": "",
+        "sentAt": null,
+        "state": "open"
+      }
+    ]
+  }
+}

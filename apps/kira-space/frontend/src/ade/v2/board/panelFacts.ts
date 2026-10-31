@@ -1,28 +1,15 @@
 import { t } from '@theme/i18n';
-import type {
-  BacklogPatch,
-  MergedInto,
-  RemoteOpError,
-  RepoRefresh,
-  Task,
-  TaskPatch,
-  TaskStatusDef,
-} from '../wire';
+import type { MergedInto, RemoteOpError, RepoRefresh, Task, TaskPatch } from '../wire';
 import type { TaskProgress } from './progress';
 
 /** Why the status chip reads as it does: the user set it, or the workflow position did. */
-export function statusWhy(
-  task: Task,
-  status: TaskStatusDef,
-  blocked: boolean,
-  progress: TaskProgress,
-): string {
+export function statusWhy(task: Task, blocked: boolean, progress: TaskProgress): string {
   if (task.kind === 'review') return t('space.ade.board.branchTag.review.tooltip');
   if (task.kind === 'parked') return t('space.ade.board.branchTag.parked.tooltip');
   if (task.statusBy === 'user') return t('space.ade.panelFacts.why.manual.hint');
   if (progress.finished) return t('space.ade.panelFacts.why.finished.hint');
   if (blocked) return t('space.ade.panelFacts.why.stuck.hint');
-  if (status.category === 'todo') return t('space.ade.panelFacts.why.notStarted.hint');
+  if (task.statusStep === '') return t('space.ade.panelFacts.why.notStarted.hint');
   return progress.step ? t('space.ade.panelFacts.why.step.hint', { step: progress.step.name }) : '';
 }
 
@@ -82,8 +69,4 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
     statusId: null,
     ...over,
   };
-}
-
-export function backlogPatch(over: Partial<BacklogPatch>): BacklogPatch {
-  return { text: null, jira: null, clearJira: false, hostUrl: null, notes: null, ...over };
 }

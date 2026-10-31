@@ -232,7 +232,7 @@ func (b *TaskBoard) agentIDOfSession(sessionID string) string {
 // queue starts the loop's run; the task mutex is held.
 func (l *pendingLoop) queue(b *TaskBoard) {
 	if l.entry != "" {
-		if err := b.deps.Tasks.SetEntryStep(l.tc.task.ID, l.entry, nil); err != nil {
+		if err := b.deps.Tasks.SetEntryStep(l.tc.task.ID, l.entry, nil, nil); err != nil {
 			slog.Warn("ade: re-enter at loop target", "scope", "ade", "task", l.tc.task.ID, "err", err)
 			return
 		}

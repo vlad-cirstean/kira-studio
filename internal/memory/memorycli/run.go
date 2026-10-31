@@ -15,15 +15,20 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/mcpcall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 	"github.com/kirathecat/kira-studio/internal/memory/mcpserver"
 )
 
+// OpsRecorder builds the tools/call hook for a server of project (import mode when importMode), plus
+// the func that releases it. A nil hook records nothing.
+type OpsRecorder func(project string, importMode bool) (mcpcall.Hook, func())
+
 // Run returns the process exit code. promptsPath is the app's llm-prompts.json: the gate, reconcile
 // and server texts it overrides apply here too. agents picks the provider and models its model per call. Diagnostics go to stderr: stdout is the protocol.
-func Run(args []string, promptsPath string, agents harness.Selector, models memory.ModelSource) int {
+func Run(args []string, promptsPath string, agents harness.Selector, models memory.ModelSource, ops OpsRecorder) int {
 	fs := flag.NewFlagSet("memory-mcp", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	importRef := fs.String("import-ref", "", "attribute every stored memory to this bulk-import file id")
@@ -51,6 +56,11 @@ func Run(args []string, promptsPath string, agents harness.Selector, models memo
 	svc := memory.NewService(store, agent, memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
 	defer svc.Close()
 	opts := mcpserver.Options{ImportRef: *importRef, Prompts: prompts, Project: detectProject(ctx)}
+	if ops != nil {
+		hook, closeOps := ops(opts.Project, *importRef != "")
+		defer closeOps()
+		opts.OnToolCall = hook
+	}
 	if *importRef == "" {
 		opts.Distill = importer.Distiller{Runner: agent, Prompts: prompts}
 		if ing, err := openIngest(store, agent.Available); err != nil {

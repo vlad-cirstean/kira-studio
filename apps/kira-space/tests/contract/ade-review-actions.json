@@ -40,6 +40,25 @@
     "title": "Fix login",
     "viewer": "forger"
   },
+  "git:changeRequest.reviewState#stale": {
+    "author": "alice",
+    "headSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "host": {
+      "changeRequest": "Merge request",
+      "changeRequestNoun": "merge request",
+      "changeRequestShort": "MR",
+      "cli": "Forge CLI",
+      "id": "forge",
+      "label": "Forge"
+    },
+    "kind": "ok",
+    "localHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "number": 7,
+    "own": false,
+    "state": "open",
+    "title": "Fix login",
+    "viewer": "forger"
+  },
   "git:changeRequest.submitReview": {
     "kind": "ok"
   },

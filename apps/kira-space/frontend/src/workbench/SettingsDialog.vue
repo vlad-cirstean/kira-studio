@@ -13,11 +13,11 @@ import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AgentPane from './settings/AgentPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
+import CliToolsPane from './settings/CliToolsPane.vue';
 import FileTypesPane from './settings/FileTypesPane.vue';
 import GitPane from './settings/GitPane.vue';
 import MemoryPane from './settings/MemoryPane.vue';
 import MobileAccessPane from './settings/MobileAccessPane.vue';
-import TaskStatusesPane from './settings/TaskStatusesPane.vue';
 
 // Kira Studio's own workbench/SettingsDialog.vue — only the sections still relevant to a repo-only
 // workbench (state/settings.ts's own `sections`).
@@ -36,10 +36,10 @@ const { info: agentInfo } = useAgentInfo();
 const sectionLabels = computed<Record<Section, string>>(() => ({
   Appearance: t('common.appearance.label'),
   Git: t('common.module.git.label'),
+  'CLI tools': t('space.settings.nav.cliTools.label'),
   'File types': t('space.settings.nav.fileTypes.label'),
   'Mobile access': t('space.settings.nav.mobileAccess.label'),
   Agent: agentInfo.value.productLabel,
-  'Task statuses': t('space.settings.nav.taskStatuses.label'),
   Memory: t('common.module.memory.label'),
   Prompts: t('llmPrompts.nav.label'),
   Advanced: t('common.advanced.label'),
@@ -98,6 +98,13 @@ async function save(patch: SettingsPatch): Promise<void> {
         :reset-leaf="s.resetLeaf"
         :register-field-error="s.registerFieldError"
       />
+      <CliToolsPane
+        :active="s.activeSection === 'CLI tools'"
+        :draft="s.draft"
+        :is-at-default="s.isAtDefault"
+        :reset-leaf="s.resetLeaf"
+        :register-field-error="s.registerFieldError"
+      />
       <FileTypesPane
         :active="s.activeSection === 'File types'"
         :draft="s.draft"
@@ -114,13 +121,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <AgentPane
         :active="s.activeSection === 'Agent'"
-        :draft="s.draft"
-        :is-at-default="s.isAtDefault"
-        :reset-leaf="s.resetLeaf"
-        :register-field-error="s.registerFieldError"
-      />
-      <TaskStatusesPane
-        :active="s.activeSection === 'Task statuses'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

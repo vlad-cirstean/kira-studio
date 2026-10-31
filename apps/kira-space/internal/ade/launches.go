@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
@@ -55,7 +56,7 @@ func (b *TaskBoard) launchGate(ctx context.Context, tc *taskCtx, sb model.AdeTas
 	if rec == nil {
 		return "", invalid("code repo %s not found", sb.CodeRepoID)
 	}
-	res, err := b.ensureWorktree(ctx, taskTitle(tc.task, tc.branches), *rec, sb, "")
+	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{title: taskTitle(tc.task, tc.branches)})
 	if err != nil {
 		return "", err
 	}
@@ -141,11 +142,11 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	mu := b.taskMu(rec.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
-	return b.takeOverLocked(ctx, tr, rec)
+	return b.takeOverLocked(ctx, tr, rec, opTakeOver)
 }
 
 // takeOverLocked opens the row's conversation in a TUI. The task lock is held.
-func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.AdeSession) (adewire.Launch, error) {
+func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.AdeSession, kind string) (adewire.Launch, error) {
 	// The check in takeOverSession ran before the lock, so a concurrent call may have opened it since.
 	if err := b.ensureNotOpen(tr, rec); err != nil {
 		return adewire.Launch{}, err
@@ -178,7 +179,7 @@ func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.
 	if rec.Mode == model.AdeSessionModeHeadless {
 		runID = b.finishableRun(tc, rec)
 	}
-	return b.prepareWithGrant(tr, tc, pa, runID)
+	return b.prepareWithGrant(ctx, tr, tc, pa, kind, runID, rec.StepID)
 }
 
 // RestartSession closes a running interactive session and resumes its conversation, as Take over
@@ -232,7 +233,7 @@ func (b *TaskBoard) RestartSession(ctx context.Context, args adewire.RestartSess
 	if rec, err = b.deps.Sessions.Get(rec.ID); err != nil {
 		return adewire.Launch{}, err
 	}
-	return b.takeOverLocked(ctx, tr, rec)
+	return b.takeOverLocked(ctx, tr, rec, opRestart)
 }
 
 // ensureNotOpen rejects a session whose conversation runs in a TUI or has one prepared and not yet
@@ -334,55 +335,47 @@ func (b *TaskBoard) finishableRun(tc *taskCtx, rec *model.AdeSession) string {
 	return run.ID
 }
 
-// spaceEnabled reports whether the task's workflow turns the Kira Space tools on; a started task
-// keeps the flag of its snapshot.
-func (b *TaskBoard) spaceEnabled(task model.AdeTask) bool {
-	wf, ok := b.taskWorkflow(task)
-	return ok && wf.KiraSpaceMcp
-}
-
-// prepareWithGrant registers the agent MCP grant a TUI launch needs (finish_step for a taken-over run,
-// the Space tools when the workflow enables them) and prepares the launch with its flags. The grant
+// prepareWithGrant registers the agent MCP grant every task TUI launch carries (handover, run_outcome;
+// finish_step for a taken-over run; the Space tools) and prepares the
+// launch with its flags. grantStep is the stage the session opens for, "" when it has none. The grant
 // lives until the record stops or its launch expires.
-func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, runID string) (adewire.Launch, error) {
-	space := b.spaceEnabled(tc.task)
-	var release func()
-	if runID != "" || space {
-		agent, err := b.agentFor(pa.Provider)
-		if err != nil {
-			return adewire.Launch{}, err
-		}
-		pa.Provider = agent.ID()
-		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
-		if runID != "" {
-			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
-		}
-		cfg, rel, err := b.agent.Register(grant)
-		if err != nil {
-			return adewire.Launch{}, err
-		}
-		release = rel
-		var ids []harness.MCPTool
-		if runID != "" {
-			ids = append(ids, agentmcp.FinishStep)
-		}
-		ids = append(ids, agentmcp.RunOutcome)
-		if space {
-			ids = append(ids, agentmcp.SpaceToolIDs...)
-		}
-		tools := harness.ToolNames(agent, ids...)
-		pa.MCPConfig, pa.AllowedTools = cfg, tools
-	}
-	res, err := tr.Prepare(pa)
+func (b *TaskBoard) prepareWithGrant(ctx context.Context, tr *Tracker, tc *taskCtx, pa PrepareArgs, kind, runID, grantStep string) (_ adewire.Launch, err error) {
+	agent, err := b.agentFor(pa.Provider)
 	if err != nil {
-		if release != nil {
-			release()
-		}
 		return adewire.Launch{}, err
 	}
-	if release != nil {
-		b.bindTUI(res.RecordID, runID, release)
+	pa.Provider = agent.ID()
+	pa.Op = b.startSessionOp(ctx, kind, tc.task.ID, agent.Label(), "")
+	defer func() {
+		if err != nil {
+			pa.Op.Finish(oplog.StatusError, err.Error())
+		}
+	}()
+	grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: true, Agent: agent}
+	var ids []harness.MCPTool
+	if runID != "" {
+		grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
+		ids = append(ids, agentmcp.FinishStep)
+	} else {
+		grant.StepID = grantStep
 	}
+	cfg, release, err := b.agent.Register(grant)
+	if err != nil {
+		return adewire.Launch{}, err
+	}
+	ids = append(ids, agentmcp.RunOutcome)
+	if runID == "" {
+		ids = append(ids, agentmcp.Handover)
+	}
+	ids = append(ids, agentmcp.SpaceToolIDs...)
+	pa.MCPConfig, pa.AllowedTools = cfg, harness.ToolNames(agent, ids...)
+	res, err := tr.Prepare(pa)
+	if err != nil {
+		release()
+		return adewire.Launch{}, err
+	}
+	pa.Op.SetCommand(res.Command)
+	b.bindTUI(res.RecordID, runID, release)
 	return launchOf(res), nil
 }
 
@@ -539,13 +532,13 @@ func (b *TaskBoard) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs)
 	}
 	message := args.Message
 	if message == "" {
-		message = composeManualMessage(b.prompts(), step, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines)
+		message = composeManualMessage(b.prompts(), step, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines, b.handoverFor(tc, step.ID))
 	}
 	pa := PrepareArgs{TaskID: tc.task.ID, StepID: step.ID, Cwd: cwd, Message: message}
 	if len(extra) > 0 {
 		pa.AddDirs = extra
 	}
-	return b.prepareWithGrant(tr, tc, pa, "")
+	return b.prepareWithGrant(ctx, tr, tc, pa, opManual, "", step.ID)
 }
 
 // launchDirs gathers the repos of a task-level session: the first writable branch's worktree is the
@@ -560,7 +553,7 @@ func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLi
 			if err != nil {
 				return nil, "", nil, err
 			}
-			lines = append(lines, repoLine{Nick: nick, Branch: sb.Name, Base: sb.Base, Worktree: path})
+			lines = append(lines, repoLine{Nick: nick, Branch: sb.Name, Base: sb.Base, Worktree: path, BranchID: sb.ID})
 			if firstOwn < 0 {
 				firstOwn = len(dirs)
 			}
@@ -574,7 +567,7 @@ func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLi
 		if rec == nil {
 			return nil, "", nil, invalid("code repo %s not found", sb.CodeRepoID)
 		}
-		lines = append(lines, repoLine{Nick: nick, ReadOnlyRoot: rec.Root})
+		lines = append(lines, repoLine{Nick: nick, ReadOnlyRoot: rec.Root, BranchID: sb.ID})
 		dirs = append(dirs, rec.Root)
 	}
 	if len(dirs) == 0 {
@@ -594,11 +587,27 @@ func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLi
 
 // StartBranch opens an interactive session on one branch's worktree (R16).
 func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArgs) (adewire.Launch, error) {
+	return b.startBranch(ctx, args.BranchID, opStart, func(tc *taskCtx, sb model.AdeTaskBranch, path string) string {
+		if args.Message != "" {
+			return args.Message
+		}
+		return composeStartMessage(b.prompts(), taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
+			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc), b.handoverFor(tc, b.currentStepID(tc)))
+	})
+}
+
+// StartAdHoc opens an agent session on the branch's worktree with no first message.
+func (b *TaskBoard) StartAdHoc(ctx context.Context, args adewire.BranchArgs) (adewire.Launch, error) {
+	return b.startBranch(ctx, args.BranchID, opAdHoc, func(*taskCtx, model.AdeTaskBranch, string) string { return "" })
+}
+
+// startBranch holds every Start rule; message supplies the first prompt once the worktree is ready.
+func (b *TaskBoard) startBranch(ctx context.Context, branchID, kind string, message func(tc *taskCtx, sb model.AdeTaskBranch, path string) string) (adewire.Launch, error) {
 	tr, err := b.tracker()
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	sb, err := b.deps.Tasks.GetBranch(args.BranchID)
+	sb, err := b.deps.Tasks.GetBranch(branchID)
 	if err != nil {
 		return adewire.Launch{}, err
 	}
@@ -609,8 +618,8 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	if sb, _ = tc.branch(args.BranchID); sb.ID == "" {
-		return adewire.Launch{}, invalid("branch %s is not on a live task", args.BranchID)
+	if sb, _ = tc.branch(branchID); sb.ID == "" {
+		return adewire.Launch{}, invalid("branch %s is not on a live task", branchID)
 	}
 	if sb.Name == "" {
 		return adewire.Launch{}, invalid("the branch is not created yet")
@@ -637,12 +646,7 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	if err := b.checkNoBackgroundRun(sb); err != nil {
 		return adewire.Launch{}, err
 	}
-	message := args.Message
-	if message == "" {
-		message = composeStartMessage(b.prompts(), taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
-			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc))
-	}
-	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "")
+	return b.prepareWithGrant(ctx, tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message(tc, sb, path)}, kind, "", "")
 }
 
 // checkNoBackgroundRun refuses a session on a worktree a run or a rebase is working in.

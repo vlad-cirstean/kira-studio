@@ -99,6 +99,9 @@ func TestScriptRunLifecycle(t *testing.T) {
 	if done.Outcome == nil || done.Outcome.Status != "done" || done.Outcome.ExitCode == nil || *done.Outcome.ExitCode != 0 || done.FinishedAt == nil {
 		t.Fatalf("finished run = %+v", done)
 	}
+	if done.Outcome.OutputTail != "" {
+		t.Fatalf("done run kept an output tail: %q", done.Outcome.OutputTail)
+	}
 	if _, err := app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: "missing"}); err == nil {
 		t.Fatal("Get of an unknown run succeeded")
 	}
@@ -137,13 +140,23 @@ func TestScriptRunTwice(t *testing.T) {
 
 func TestScriptRunNonZeroExit(t *testing.T) {
 	app := flowharness.New(t)
-	rec := newScript(t, app, scripts.CustomScriptFields{Command: "echo boom >&2; exit 3"})
+	rec := newScript(t, app, scripts.CustomScriptFields{Command: "printf '\\033[31mboom\\033[0m\\r\\n' >&2; exit 3"})
 	openScript(t, app, window, "bad", rec.ID)
 	r := waitRun(t, app, "bad", "failed")
 	app.Contract(t, "automations", "CustomScriptsService.Create#failed", rec)
-	app.Contract(t, "automations", "ScriptRunsService.Get#failed", r, flowharness.Mask("createdAt", "startedAt", "finishedAt"))
+	app.Contract(t, "automations", "ScriptRunsService.Get#failed", r, flowharness.Mask("createdAt", "startedAt", "finishedAt"), flowharness.Replace("\nlogout", ""))
 	if r.Outcome.Reason != "exited with status 3" || r.Outcome.Source != "exit" || *r.Outcome.ExitCode != 3 {
 		t.Fatalf("outcome = %+v, want exit 3", r.Outcome)
+	}
+	// Backend half of tests/ui/automations-ops.spec.ts: the stored tail is plain text and survives a restart.
+	// A login shell may print "logout" after the command.
+	if tail := r.Outcome.OutputTail; !strings.Contains(tail, "boom") || strings.ContainsAny(tail, "\x1b\r") {
+		t.Fatalf("outputTail = %q, want boom with no escapes", tail)
+	}
+	app.Restart()
+	again, err := app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: r.ID})
+	if err != nil || again.Outcome == nil || again.Outcome.OutputTail != r.Outcome.OutputTail {
+		t.Fatalf("after restart = %+v, %v, want outputTail unchanged", again.Outcome, err)
 	}
 }
 
@@ -156,7 +169,7 @@ func TestScriptRunStopAndClose(t *testing.T) {
 	if err := app.W.Terminal.Close(terminal.CloseArgs{TerminalID: "a"}); err != nil {
 		t.Fatal(err)
 	}
-	if r := waitRun(t, app, "a", "cancelled"); r.Outcome.Reason != "stopped by you" || r.Outcome.Source != "user" {
+	if r := waitRun(t, app, "a", "cancelled"); r.Outcome.Reason != "stopped by you" || r.Outcome.Source != "user" || r.Outcome.OutputTail != "" {
 		t.Fatalf("Close outcome = %+v", r.Outcome)
 	}
 

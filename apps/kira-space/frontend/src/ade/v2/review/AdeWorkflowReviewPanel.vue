@@ -31,7 +31,7 @@ import { useReviewComments } from './useReviewComments';
 // The review step of this window's branch: comments, the route to an agent, the round in flight and
 // the finish buttons. The workflow waits on the run in state `review` until Finish.
 const props = defineProps<{ target: ReviewWindowTarget }>();
-const emit = defineEmits<{ openFile: [path: string] }>();
+const emit = defineEmits<{ openFile: [path: string, origin: ReviewComment['origin']] }>();
 
 const step = useReviewStep(() => props.target.branchId);
 const state = computed(() => step.data.value ?? null);
@@ -195,11 +195,17 @@ const stateLabel = (c: ReviewComment): string =>
             size="inline"
             class="font-data text-kira-sm text-muted-foreground"
             data-testid="ade-review-comment-path"
-            @click="emit('openFile', c.path)"
+            @click="emit('openFile', c.path, c.origin)"
             >{{
               lineLabel(c)
             }}</Button
           >
+          <AdeChip
+            v-if="c.origin === 'working'"
+            :label="t('space.ade.changes.uncommitted.label')"
+            tone="amber"
+            data-testid="ade-review-comment-uncommitted"
+          />
           <AdeChip :label="kindLabel(c)" :tone="c.kind === 'question' ? 'purple' : 'blue'" />
           <AdeChip :label="stateLabel(c)" :tone="c.state === 'addressed' ? 'green' : 'amber'" />
           <Button

@@ -43,7 +43,7 @@ func newBoardHarness(t *testing.T) *boardHarness {
 	h.board = NewTaskBoard(TaskBoardDeps{
 		Agent:       testAgents,
 		Credentials: gitcred.New(),
-		Tasks:       r.AdeTasks, Statuses: r.AdeStatuses, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos, Runner: gitclient.NewExecRunner(),
+		Tasks:       r.AdeTasks, Statuses: r.AdeStatuses, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos, Runner: gitclient.NewExecRunner(),
 		Registry:  registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return h.status.Load().(gitclient.GitStatus) },
 		Workflows: &adeflow.Reader{Dir: t.TempDir(), Store: r.AdeTasks},

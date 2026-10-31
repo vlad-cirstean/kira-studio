@@ -15,6 +15,8 @@ import {
 } from './monaco';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
+type EditorOptions = import('monaco-editor').editor.IEditorOptions &
+  import('monaco-editor').editor.IGlobalEditorOptions;
 
 // A tab switch destroys and remounts the view (MainView's own v-if), which would re-run
 // markdown-it and rebuild the DOM every time. Cached by tab id at module level so it survives the
@@ -24,6 +26,39 @@ const markdownHtmlByTabId = new Map<string, { content: string; html: string }>()
 registerTabRuntimeCleanup((tabId) => {
   markdownHtmlByTabId.delete(tabId);
 });
+
+/** Options for the default read-only state. */
+export const READ_OPTIONS: EditorOptions = { readOnly: true, domReadOnly: true };
+
+/** Options for edit mode: writable, with every editor extra off (no completion, hints, hover,
+ *  auto-closing, formatting or validation). Plain indentation, undo/redo and find stay. */
+export const EDIT_OPTIONS: EditorOptions = {
+  readOnly: false,
+  domReadOnly: false,
+  quickSuggestions: false,
+  suggestOnTriggerCharacters: false,
+  wordBasedSuggestions: 'off',
+  snippetSuggestions: 'none',
+  tabCompletion: 'off',
+  acceptSuggestionOnEnter: 'off',
+  inlineSuggest: { enabled: false },
+  parameterHints: { enabled: false },
+  hover: { enabled: 'off' },
+  lightbulb: { enabled: 'off' as import('monaco-editor').editor.ShowLightbulbIconMode },
+  codeLens: false,
+  links: false,
+  colorDecorators: false,
+  occurrencesHighlight: 'off',
+  formatOnType: false,
+  formatOnPaste: false,
+  autoClosingBrackets: 'never',
+  autoClosingQuotes: 'never',
+  autoClosingDelete: 'never',
+  autoClosingOvertype: 'never',
+  autoSurround: 'never',
+  autoIndent: 'keep',
+  renderValidationDecorations: 'off',
+};
 
 export interface ReadonlyViewerOptions {
   tabId: string;
@@ -106,6 +141,7 @@ export function useReadonlyFileViewer(o: ReadonlyViewerOptions) {
 
   /** Records the file text and, for markdown opened on Reading, starts rendering it. */
   function setText(text: string): void {
+    if (text !== fileText.value) renderedHtml.value = null;
     fileText.value = text;
     if (isMarkdown.value && view.value === 'reading') void ensureMarkdownRendered();
   }
@@ -119,8 +155,7 @@ export function useReadonlyFileViewer(o: ReadonlyViewerOptions) {
     const created = mod.editor.create(container.value, {
       model,
       theme: KIRA_EDITOR_THEME,
-      readOnly: true,
-      domReadOnly: true,
+      ...READ_OPTIONS,
       automaticLayout: true,
       minimap: { enabled: false },
       quickSuggestions: false,

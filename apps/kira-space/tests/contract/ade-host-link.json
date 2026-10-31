@@ -35,10 +35,13 @@
     },
     "task": {
       "branchIds": [],
+      "branchRequestId": "",
       "color": 0,
       "createdAt": 0,
       "entryStepId": "",
       "est": "",
+      "handoverDrafts": [],
+      "handoverIn": null,
       "hostLink": {
         "kind": "changeRequest",
         "provider": "github",
@@ -54,6 +57,7 @@
       "since": {},
       "statusBy": "auto",
       "statusId": "todo",
+      "statusStep": "",
       "title": "Fix login",
       "workflow": null,
       "workflowId": "",

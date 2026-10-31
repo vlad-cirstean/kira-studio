@@ -509,6 +509,20 @@ type ReviewCommentSetStateResult struct {
 	Changed bool `json:"changed"`
 }
 
+// ReviewCommentEditParams is review.comment.edit's request (P413).
+type ReviewCommentEditParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	ID     int64  `json:"id"`
+	Body   string `json:"body"`
+	Kind   string `json:"kind"` // change | question
+}
+
+// ReviewCommentEditResult is false when the id matches nothing.
+type ReviewCommentEditResult struct {
+	Changed bool `json:"changed"`
+}
+
 // ReviewCommentAddResult carries the whole new comment, id included, so the extension can render
 // its thread from the response instead of re-listing (D11).
 type ReviewCommentAddResult struct {

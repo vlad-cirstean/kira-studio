@@ -187,7 +187,7 @@ func (r *Reader) New(name string) (adewire.WorkflowEntry, error) {
 		id = fmt.Sprintf("%s-%d", base, n)
 	}
 	wf := adewire.Workflow{ID: id, Name: name, Steps: []adewire.WorkflowStep{
-		{ID: "work", Name: "Work", Kind: adewire.KindManual, Status: adewire.DefaultStatus(adewire.KindManual), Results: []adewire.StepResult{}},
+		{ID: "work", Name: "Work", Kind: adewire.KindManual, Results: []adewire.StepResult{}},
 	}}
 	out, err := encodeWorkflow(&yaml.Node{}, wf)
 	if err != nil {
@@ -315,7 +315,7 @@ const (
 )
 
 var (
-	topOrder    = []string{"id", "name", "kira_space_mcp", "steps"}
+	topOrder    = []string{"id", "name", "steps"}
 	resultOrder = []string{"id", "ok", "description", "next"}
 	stepOrder   = []string{"id", "name", "kind", "status", "skip", "session", "runs_on", "before", "results", "max_returns", "timeout", "command", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
 )
@@ -482,9 +482,7 @@ func syncItems(old *yaml.Node, ids []string, apply func(i int, item *yaml.Node))
 func applyWorkflow(root *yaml.Node, wf adewire.Workflow) {
 	setScalar(root, "id", kText, wf.ID, true, topOrder)
 	setScalar(root, "name", kText, wf.Name, true, topOrder)
-	if wf.KiraSpaceMcp {
-		setScalar(root, "kira_space_mcp", kBool, "true", true, topOrder)
-	} else if i, _ := find(root, "kira_space_mcp"); i >= 0 {
+	if i, _ := find(root, "kira_space_mcp"); i >= 0 { // legacy switch (P408)
 		root.Content = append(root.Content[:i], root.Content[i+2:]...)
 	}
 	ids := make([]string, len(wf.Steps))
@@ -500,8 +498,7 @@ func applyStep(m *yaml.Node, s adewire.WorkflowStep) {
 	setScalar(m, "id", kText, s.ID, true, stepOrder)
 	setScalar(m, "name", kText, s.Name, true, stepOrder)
 	setScalar(m, "kind", kText, s.Kind, true, stepOrder)
-	def := adewire.DefaultStatus(s.Kind)
-	setScalar(m, "status", kText, defaultStr(s.Status, def), s.Status != "" && s.Status != def, stepOrder)
+	setScalar(m, "status", kText, s.Status, s.Status != "", stepOrder)
 	if s.Skip {
 		setScalar(m, "skip", kBool, "true", true, stepOrder)
 	} else {

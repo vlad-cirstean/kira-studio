@@ -7,7 +7,6 @@
     "usedBy": 1,
     "workflow": {
       "id": "flow",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -47,7 +46,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -87,7 +86,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -98,7 +97,6 @@
     "fileName": "flow.yaml",
     "workflow": {
       "id": "flow",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -138,7 +136,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -178,7 +176,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]

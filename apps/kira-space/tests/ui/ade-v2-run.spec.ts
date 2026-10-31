@@ -68,15 +68,16 @@ test('the Run dialog shows the default message and the read-only suffix', async 
   const dialog = page.locator(t('ade-run-dialog'));
   await expect(dialog).toContainText('Run Plan from spec in the background');
   await expect(dialog.locator(t('ade-run-branch'))).toHaveCount(2);
+  const suffixText = `${previewText('space')}\n\n${previewText('finish')}`;
   const msg = dialog.locator(t('ade-run-message'));
   await expect(msg).toHaveValue(
     /^Task: .*\n- Jira: PAY-130 \S+\n- Repo: \{repo\} · Branch: \{branch\} · Worktree: \{worktree\}\nStep 1\/6: Plan from spec\n/,
   );
-  await expect(dialog.locator(t('ade-run-suffix'))).toHaveText(previewText('finish'));
+  await expect(dialog.locator(t('ade-run-suffix'))).toHaveText(suffixText);
   await expect(dialog.locator(t('ade-run-suffix'))).toContainText('call finish_step');
   await expect(msg).not.toHaveValue(/finish_step/);
   // The message is the backend render without the finish instruction the dialog shows apart.
-  await expect(msg).toHaveValue(previewText('step').replace(`\n\n${previewText('finish')}\n`, ''));
+  await expect(msg).toHaveValue(previewText('step').replace(`\n\n${suffixText}\n`, ''));
 
   await dialog.locator(t('ade-run-branch')).nth(1).fill('feat/alerts-web');
   await dialog.locator(t('ade-run-send')).click();
@@ -89,25 +90,21 @@ test('the Run dialog shows the default message and the read-only suffix', async 
   await expect(dialog).toBeHidden();
 });
 
-test('the Run dialog asks no branch names when the workflow has Kira Space tools', async ({
-  relaunch,
-}) => {
-  const wfs = adeFixture<{ workflows: { workflow: { kiraSpaceMcp: boolean } }[] }>('workflows');
-  for (const w of wfs.workflows) if (w.workflow) w.workflow.kiraSpaceMcp = true;
-  const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskBoard, response: adeBoard(alertsInPlan) },
-    { channel: IPC.adeTaskWorkflows, response: wfs },
-    ...runPreviewSnapshots(),
-  ]);
+test('an agent step leaves the branch name to the agent', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInPlan));
   await page.locator(cellAction('T_alerts', 'run')).click();
   const dialog = page.locator(t('ade-run-dialog'));
-  await expect(dialog.locator(t('ade-run-message'))).toBeVisible();
-  await expect(dialog.locator(t('ade-run-branch'))).toHaveCount(0);
+  const inputs = dialog.locator(t('ade-run-branch'));
+  await expect(inputs).toHaveCount(2);
+  await expect(inputs.first()).toHaveAttribute(
+    'placeholder',
+    'Empty means the agent asks you for one',
+  );
   await dialog.locator(t('ade-run-send')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStartRun)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskStartRun)[0]?.args).toEqual({
     taskId: 'T_alerts',
-    branchNames: {},
+    branchNames: { d_alerts_api: '', d_alerts_web: '' },
     message: '',
   });
 });
@@ -219,9 +216,11 @@ test('Done and Finish call StepDone', async ({ relaunch }) => {
     }),
   ]);
   await page.locator(cellAction('T_hooks', 'done')).click();
+  await page.locator(t('ade-stage-move')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskStepDone)[0]?.args).toEqual({ taskId: 'T_hooks' });
   await page.locator(cellAction('T_cart', 'finish')).click();
+  await page.locator(t('ade-stage-move')).click();
   await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(2);
   expect(calls(control, IPC.adeTaskStepDone)[1]?.args).toEqual({ taskId: 'T_cart' });
 });

@@ -13,10 +13,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
+	"github.com/kirathecat/kira-studio/internal/shortid"
 )
 
 // setup.go creates the worktrees a run needs and runs each repo's prepare script in a new one. The
@@ -131,9 +133,8 @@ type worktreeResult struct {
 // ensureWorktree makes the branch's worktree exist: a branch checked out anywhere, the repo root
 // included, runs there as is; a created branch without one gets an existingBranch worktree (a
 // remote-only one a newBranch tracking it); a not-created branch gets its name, then a newBranch
-// worktree from its base. wanted is the caller's name for a not-created branch ("" = derived from
-// the task title).
-func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.CodeRepo, sb model.AdeTaskBranch, wanted string) (worktreeResult, error) {
+// worktree from its base. naming says how a not-created branch gets its name.
+func (b *TaskBoard) ensureWorktree(ctx context.Context, rec model.CodeRepo, sb model.AdeTaskBranch, naming newBranchName) (worktreeResult, error) {
 	if err := b.checkNotArchiving(sb.TaskID); err != nil {
 		return worktreeResult{}, err
 	}
@@ -170,7 +171,7 @@ func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.
 	if err != nil {
 		return worktreeResult{}, err
 	}
-	name, err := b.claimBranchName(sb, title, wanted, inv)
+	name, err := b.claimBranchName(sb, naming, inv)
 	if err != nil {
 		return worktreeResult{}, err
 	}
@@ -185,23 +186,56 @@ func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.
 	return worktreeResult{Path: path, Name: name, Fresh: true}, nil
 }
 
+const (
+	agentBranchPrefix     = "kira/"
+	agentBranchIDLen      = 10
+	maxGeneratedNameTries = 5
+)
+
+// newBranchName is how a not-created branch gets its name: wanted as given, generated, else derived from title.
+type newBranchName struct {
+	title, wanted string
+	generated     bool
+}
+
 // claimBranchName stores the branch's name before git runs, so the board shows it. An explicit name
-// that already exists is refused; a derived one gets -2, -3... until free.
-func (b *TaskBoard) claimBranchName(sb model.AdeTaskBranch, title, wanted string, inv []porcelain.InventoryRef) (string, error) {
-	if wanted != "" {
-		if branchExists(inv, wanted) {
-			return "", invalid("branch %s already exists", wanted)
+// that already exists is refused; a generated one is kira/<nanoid>; a derived one gets -2, -3...
+// until free.
+func (b *TaskBoard) claimBranchName(sb model.AdeTaskBranch, n newBranchName, inv []porcelain.InventoryRef) (string, error) {
+	if n.wanted != "" {
+		if branchExists(inv, n.wanted) {
+			return "", invalid("branch %s already exists", n.wanted)
 		}
-		if err := b.deps.Tasks.SetBranchName(sb.ID, wanted); err != nil {
-			return "", branchNameErr(err, wanted)
+		if err := b.deps.Tasks.SetBranchName(sb.ID, n.wanted); err != nil {
+			return "", branchNameErr(err, n.wanted)
 		}
-		return wanted, nil
+		return n.wanted, nil
 	}
-	base := "feat/" + slug(title)
-	for n := 1; ; n++ {
+	if n.generated {
+		for range maxGeneratedNameTries {
+			id, err := shortid.New(agentBranchIDLen)
+			if err != nil {
+				return "", err
+			}
+			name := agentBranchPrefix + id
+			if branchExists(inv, name) {
+				continue
+			}
+			err = b.deps.Tasks.SetBranchName(sb.ID, name)
+			if err == nil {
+				return name, nil
+			}
+			if !errors.Is(err, repos.ErrBranchNameTaken) {
+				return "", err
+			}
+		}
+		return "", fmt.Errorf("ade: no free generated branch name after %d tries", maxGeneratedNameTries)
+	}
+	base := "feat/" + slug(n.title)
+	for i := 1; ; i++ {
 		name := base
-		if n > 1 {
-			name = fmt.Sprintf("%s-%d", base, n)
+		if i > 1 {
+			name = fmt.Sprintf("%s-%d", base, i)
 		}
 		if branchExists(inv, name) {
 			continue
@@ -223,24 +257,41 @@ func branchNameErr(err error, name string) error {
 	return err
 }
 
-// startPoint is the ref a new branch starts from: its resolved base (remote-first), else the repo's
-// main. A base that is not created yet or no longer exists refuses the start.
-func (b *TaskBoard) startPoint(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (string, error) {
+// newBranchBase resolves where a new branch of sb starts. full is the ref git takes ("" = the repo's
+// default start), display the base's name for the user ("" when it is the repo's main branch). A base that
+// is not created yet or no longer exists comes back as refusal text.
+func (b *TaskBoard) newBranchBase(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (full, display, refusal string, err error) {
 	sc, err := b.baseCtxFor(ctx, entry, sb.CodeRepoID)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 	br := sc.resolveBase(sb)
 	switch br.reason {
 	case baseParentDraft:
-		return "", invalid("base %s is not created yet: start its task first", cmpNonEmpty(sc.byID[sb.BaseBranchID].Name, "branch"))
+		return "", "", fmt.Sprintf("base %s is not created yet: start its task first", cmpNonEmpty(sc.byID[sb.BaseBranchID].Name, "branch")), nil
 	case baseMissing:
-		return "", invalid("base %s no longer exists", br.name)
+		return "", "", fmt.Sprintf("base %s no longer exists", br.name), nil
 	}
 	if !br.ok {
-		return "", nil
+		return "", "", "", nil
 	}
-	return br.full, nil
+	if br.name != sc.mainName {
+		display = br.name
+	}
+	return br.full, display, "", nil
+}
+
+// startPoint is the ref a new branch starts from: its resolved base (remote-first), else the repo's
+// main. A base that is not created yet or no longer exists refuses the start.
+func (b *TaskBoard) startPoint(ctx context.Context, entry *gitsession.RepoEntry, sb model.AdeTaskBranch) (string, error) {
+	full, _, refusal, err := b.newBranchBase(ctx, entry, sb)
+	if err != nil {
+		return "", err
+	}
+	if refusal != "" {
+		return "", invalid("%s", refusal)
+	}
+	return full, nil
 }
 
 func (b *TaskBoard) addWorktree(ctx context.Context, entry *gitsession.RepoEntry, req gitsession.OpRequest) error {
@@ -350,6 +401,8 @@ func (b *TaskBoard) claimSetup(branchID string) (context.Context, func(), bool) 
 }
 
 func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.AdeTaskBranch, name, path, script string, timeout time.Duration, timeoutText string, sink *logSink, startedAt int64, onReady func(string)) {
+	op := b.startSessionOp(ctx, opSetup, sb.TaskID, "", script)
+	op.SetCancel(func() bool { return b.cancelLive(b.setupLive, sb.ID, errStopped) != nil })
 	commonDir := rec.Root
 	if entry, err := b.openRepo(ctx, sb.CodeRepoID); err == nil {
 		commonDir = entry.Summary.CommonDir
@@ -372,6 +425,7 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 	switch {
 	case res.Cancelled && err == nil && b.ctx.Err() != nil:
 		sink.flush()
+		op.Finish(oplog.StatusCancelled, "")
 		return // app quit: the row stays running (R18)
 	case res.Cancelled && err == nil:
 		fail("cancelled: " + context.Cause(ctx).Error())
@@ -383,6 +437,14 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 		fail(runoutcome.ForProcess(runoutcome.Process{ExitCode: res.ExitCode}).Reason)
 	}
 	sink.flush()
+	switch {
+	case res.Cancelled:
+		op.Finish(oplog.StatusCancelled, "")
+	case state == model.AdeSetupFailed:
+		op.Finish(oplog.StatusError, note)
+	default:
+		op.Finish(oplog.StatusOK, "")
+	}
 	finished := b.deps.Now().UnixMilli()
 	row := model.AdeWorktreeSetup{BranchID: sb.ID, State: state, StartedAt: startedAt, FinishedAt: &finished, ExitCode: &exit, Note: note}
 	if err := b.deps.Tasks.UpsertSetup(row); err != nil {

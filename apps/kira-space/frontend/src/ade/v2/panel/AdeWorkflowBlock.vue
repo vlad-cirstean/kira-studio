@@ -9,7 +9,7 @@ import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
-import { useSetTaskWorkflow, useSpaceTools, useWorkflows } from '../queries';
+import { useSetTaskWorkflow, useWorkflows } from '../queries';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import AdeStepBlock from './AdeStepBlock.vue';
@@ -27,7 +27,6 @@ const valid = computed(() =>
     e.workflow ? [{ file: e.fileName, wf: e.workflow }] : [],
   ),
 );
-const spaceTools = useSpaceTools(() => props.card.task.workflowId);
 
 async function pick(value: unknown): Promise<void> {
   error.value = '';
@@ -70,14 +69,6 @@ function edit(): void {
           }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ t('space.ade.workflowBlock.outdatedHint.hint') }}</TooltipContent>
-      </Tooltip>
-      <Tooltip v-if="spaceTools">
-        <TooltipTrigger as-child>
-          <Badge variant="info" data-testid="ade-workflow-space">{{
-            t('space.ade.workflowBlock.spaceTools.label')
-          }}</Badge>
-        </TooltipTrigger>
-        <TooltipContent>{{ t('space.ade.workflowBlock.spaceToolsHint.hint') }}</TooltipContent>
       </Tooltip>
       <Button variant="link" size="inline" data-testid="ade-edit-workflows" @click="edit">
         {{ t('space.ade.workflowBlock.edit.label') }}

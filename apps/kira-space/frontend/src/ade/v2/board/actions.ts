@@ -1,7 +1,7 @@
 import { type MessageKey, t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import { formatCompactDuration } from '@workbench/behaviour/format';
-import type { Branch, Plan, Run, Session, Task, TaskStatusDef } from '../wire';
+import type { Branch, Plan, Run, Session, StatusColor, Task, TaskStatusDef } from '../wire';
 import { type BranchGraph, shortBranchName } from './branchGraph';
 import { branchParts } from './catalogParts';
 import type { TaskProgress } from './progress';
@@ -36,7 +36,7 @@ export interface TaskAction {
 }
 
 export interface TaskCell {
-  tag: { label: string; tone: Tone; tip: string };
+  tag: { label: string; tone?: Tone; color?: StatusColor; tip: string };
   action: TaskAction | null;
 }
 
@@ -194,7 +194,7 @@ export function taskCell(i: TaskCellInput): TaskCell | null {
   return {
     tag: {
       label: i.blocked ? t('space.common.status.blocked.status') : i.status.name,
-      tone: i.blocked ? 'red' : i.status.tone,
+      ...(i.blocked ? { tone: 'red' as const } : { color: i.status.color }),
       tip: t('space.ade.board.taskStatus.tooltip'),
     },
     action: stepAction(i),

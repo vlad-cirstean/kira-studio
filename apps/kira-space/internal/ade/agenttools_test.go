@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 )
@@ -55,6 +57,43 @@ func TestSpaceTools_declareIsAdditiveAndIdempotent(t *testing.T) {
 	}
 }
 
+// requestBranch asks for one repo's branch, approves the request when one opens, and returns the result.
+func requestBranch(ctx context.Context, b *TaskBoard, taskID, repo string) (agentmcp.BranchInfo, error) {
+	type answer struct {
+		res agentmcp.RequestBranchesResult
+		err error
+	}
+	done := make(chan answer, 1)
+	go func() {
+		res, err := b.RequestBranches(ctx, agentmcp.SpaceCall{TaskID: taskID}, []string{repo})
+		done <- answer{res, err}
+	}()
+	for {
+		select {
+		case a := <-done:
+			if a.err != nil {
+				return agentmcp.BranchInfo{}, a.err
+			}
+			if len(a.res.Branches) != 1 || a.res.Branches[0].Outcome == agentmcp.BranchFailed {
+				return agentmcp.BranchInfo{}, errors.New("request failed: " + a.res.Branches[0].Next)
+			}
+			return a.res.Branches[0].BranchInfo, nil
+		case <-time.After(10 * time.Millisecond):
+			if id := b.branchRequestOf(taskID); id != "" {
+				if req, err := b.BranchRequest(id); err == nil {
+					ids := make([]string, len(req.Items))
+					for i, it := range req.Items {
+						ids[i] = it.CodeRepoID
+					}
+					_, _ = b.ApproveBranchRequest(id, ids)
+				}
+			}
+		}
+	}
+}
+
+var generatedBranch = regexp.MustCompile(`^kira/[0-9a-hjkmnp-tv-z]{10}$`)
+
 func TestSpaceTools_requestBranch(t *testing.T) {
 	e := newEngine(t, nil)
 	e.repo("api")
@@ -65,18 +104,15 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 	other := e.task("web")
 	ctx := context.Background()
 
-	if _, err := e.board.RequestBranch(ctx, id, "web", "feat/x"); err == nil || !strings.Contains(toolErrText(t, err), "declare_repos") {
-		t.Fatalf("branch in an undeclared repo: %v", err)
-	}
-	info, err := e.board.RequestBranch(ctx, id, "api", "feat/agent-login")
+	info, err := requestBranch(ctx, e.board, id, "api")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Branch != "feat/agent-login" || info.Worktree == "" || info.Setup.State == "none" {
+	if !generatedBranch.MatchString(info.Branch) || info.Worktree == "" || info.Setup.State == "none" {
 		t.Fatalf("info = %+v", info)
 	}
 	sb := e.branch(t, id, "api")
-	if sb.Origin != model.AdeBranchOriginAgent || sb.Name != "feat/agent-login" {
+	if sb.Origin != model.AdeBranchOriginAgent || sb.Name != info.Branch {
 		t.Fatalf("stored branch = %+v", sb)
 	}
 	waitUntil(t, "setup ready", func() bool {
@@ -84,53 +120,13 @@ func TestSpaceTools_requestBranch(t *testing.T) {
 		return s != nil && s.State == model.AdeSetupReady
 	})
 
-	again, err := e.board.RequestBranch(ctx, id, "api", "feat/agent-login")
-	if err != nil || again.Worktree != info.Worktree {
+	again, err := requestBranch(ctx, e.board, id, "api")
+	if err != nil || again.Worktree != info.Worktree || again.Branch != info.Branch {
 		t.Fatalf("idempotent re-request: %+v, %v", again, err)
 	}
-	if _, err := e.board.RequestBranch(ctx, id, "api", "feat/other"); err == nil || !strings.Contains(toolErrText(t, err), "cannot be renamed") {
-		t.Fatalf("rename of a created branch: %v", err)
-	}
-	if _, err := e.board.RequestBranch(ctx, other, "web", "feat/agent-login"); err != nil {
-		t.Fatalf("same name in another repo: %v", err)
-	}
-}
-
-func TestSpaceTools_requestBranchRefusals(t *testing.T) {
-	e := newEngine(t, nil)
-	e.repo("api")
-	e.workflow(flowYAML(agentStep("first", "")))
-	id := e.task("api")
-	ctx := context.Background()
-	main := e.board.mainShortName(ctx, "api")
-	if main == "" {
-		t.Fatal("no main branch")
-	}
-	for name, want := range map[string]string{
-		main:                     "main branch",
-		"bad name":               "not a valid",
-		"-x":                     "not a valid",
-		"a..b":                   "not a valid",
-		"HEAD":                   "not a valid",
-		strings.Repeat("a", 256): "longer than",
-	} {
-		_, err := e.board.RequestBranch(ctx, id, "api", name)
-		if msg := toolErrText(t, err); !strings.Contains(msg, want) {
-			t.Errorf("RequestBranch(%q) = %q; want %q", name, msg, want)
-		}
-	}
-	if sb := e.branch(t, id, "api"); sb.Name != "" {
-		t.Fatalf("a refused request left name %q", sb.Name)
-	}
-
-	if _, err := e.board.RequestBranch(ctx, id, "api", "feat/held"); err != nil {
-		t.Fatal(err)
-	}
-	second := e.task("api")
-	if _, err := e.board.RequestBranch(ctx, second, "api", "feat/held"); err == nil {
-		t.Fatal("a name held by another task was accepted")
-	} else if msg := toolErrText(t, err); !strings.Contains(msg, "already") {
-		t.Fatalf("message = %q", msg)
+	second, err := requestBranch(ctx, e.board, other, "web")
+	if err != nil || !generatedBranch.MatchString(second.Branch) || second.Branch == info.Branch {
+		t.Fatalf("second task branch = %+v, %v; want a different generated name", second, err)
 	}
 }
 
@@ -147,7 +143,7 @@ func TestSpaceTools_archivedAndBranchStatus(t *testing.T) {
 	if err != nil || st.Setup.State != "none" || st.Next == "" {
 		t.Fatalf("status before branch = %+v, %v", st, err)
 	}
-	if _, err := e.board.RequestBranch(ctx, id, "api", "feat/slow"); err != nil {
+	if _, err := requestBranch(ctx, e.board, id, "api"); err != nil {
 		t.Fatal(err)
 	}
 	st, err = e.board.BranchStatus(ctx, id, "api", 0)
@@ -173,7 +169,7 @@ func TestSpaceTools_archivedAndBranchStatus(t *testing.T) {
 	if _, err := e.board.TaskInfo(ctx, id); err == nil || !strings.Contains(toolErrText(t, err), "archived") {
 		t.Fatalf("TaskInfo of an archived task: %v", err)
 	}
-	if _, err := e.board.RequestBranch(ctx, id, "api", "feat/late"); err == nil {
+	if _, err := requestBranch(ctx, e.board, id, "api"); err == nil {
 		t.Fatal("archived task accepted a branch")
 	}
 }
@@ -190,15 +186,17 @@ func (e *engine) branch(t *testing.T, taskID, repo string) model.AdeTaskBranch {
 func TestSpaceTools_startRunCreatesNoBranch(t *testing.T) {
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
-	e.workflow("id: flow\nname: Flow\nkira_space_mcp: true\nsteps:\n" + agentStep("first", ""))
+	e.workflow("id: flow\nname: Flow\nsteps:\n" + agentStep("first", ""))
 	id := e.task("api")
-	e.start(id)
+	if _, err := e.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: id}); err != nil {
+		t.Fatal(err)
+	}
 	e.waitRun(id, "first/api", model.AdeRunDone)
 	if sb := e.branch(t, id, "api"); sb.Name != "" {
 		t.Fatalf("StartRun created branch %q; want none", sb.Name)
 	}
-	info, err := e.board.RequestBranch(context.Background(), id, "api", "feat/mine")
-	if err != nil || info.Branch != "feat/mine" {
-		t.Fatalf("request_branch after start: %+v, %v", info, err)
+	info, err := requestBranch(context.Background(), e.board, id, "api")
+	if err != nil || !generatedBranch.MatchString(info.Branch) {
+		t.Fatalf("request_branches after start: %+v, %v", info, err)
 	}
 }

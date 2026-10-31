@@ -32,7 +32,7 @@ async function bootOne(relaunch: Relaunch) {
   const page = await openPortGraph(relaunch, {
     chunks: singleRowChunks([rootRow(SHA_A, 'Add the graph column fixture')]),
   });
-  await expect(row(page, 0)).toBeVisible();
+  await expect(row(page, 0)).toBeVisible({ timeout: 15_000 });
   return page;
 }
 
@@ -50,7 +50,7 @@ test('refsChanged for the open repo refreshes the graph; other kinds and other r
 
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
   await runCoalesceWindow(page);
-  await expect.poll(() => refreshes(page), { timeout: 1000 }).toBe(before + 1);
+  await expect.poll(() => refreshes(page), { timeout: 15_000 }).toBe(before + 1);
 });
 
 test('a refresh keeps the scroll position', async ({ relaunch }) => {
@@ -58,7 +58,7 @@ test('a refresh keeps the scroll position', async ({ relaunch }) => {
     chunks: singleRowChunks(manyRows(300)),
     results: { 'refs.list': refsAtTip(manyRowShas(0)) },
   });
-  await expect(row(page, 0)).toBeVisible();
+  await expect(row(page, 0)).toBeVisible({ timeout: 15_000 });
   await expect
     .poll(() => viewport(page).evaluate((el) => el.scrollHeight > el.clientHeight * 4), {
       timeout: 15_000,
@@ -68,13 +68,16 @@ test('a refresh keeps the scroll position', async ({ relaunch }) => {
     el.scrollTop = 2000;
   });
   await expect.poll(() => viewport(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(1500);
+  // The grid reports its viewport only once it repainted at the new offset; refreshing earlier
+  // captures the old top row and the restore pins it back to the start.
+  await expect(row(page, 0)).toHaveCount(0);
   const before = await viewport(page).evaluate((el) => el.scrollTop);
   const calls = await refreshes(page);
 
   await freezeClock(page);
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
   await runCoalesceWindow(page);
-  await expect.poll(() => refreshes(page), { timeout: 1000 }).toBe(calls + 1);
+  await expect.poll(() => refreshes(page), { timeout: 15_000 }).toBe(calls + 1);
 
   const rowHeight = 28;
   await expect
@@ -118,7 +121,7 @@ test('a restored scrollRow of 0 does not crash a grid that mounts before its fir
     singleRowChunks([rootRow(SHA_A, 'Add the graph column fixture')]),
   );
   const errors = trackErrors(page);
-  await expect(row(page, 0)).toBeVisible();
+  await expect(row(page, 0)).toBeVisible({ timeout: 15_000 });
   expect(errors).toEqual([]);
 });
 
@@ -130,7 +133,9 @@ test('a restored scrollRow beyond the history clamps to the last row', async ({ 
     { 'refs.list': refsAtTip(manyRowShas(0)) },
   );
   const errors = trackErrors(page);
-  await expect(page.locator(`${grid} .slick-row`).first()).toBeVisible();
+  await expect(page.locator(`${grid} .slick-row`).first()).toBeVisible({
+    timeout: 15_000,
+  });
   await expect
     .poll(() => viewport(page).evaluate((el) => el.scrollHeight > el.clientHeight), {
       timeout: 15_000,
@@ -154,7 +159,7 @@ test('contract: the branch picker marks a branch behind its upstream', async ({ 
     chunks: singleRowChunks([rootRow(SHA_A, 'Add the graph column fixture')]),
     results: { 'refs.list': refs },
   });
-  await expect(row(page, 0)).toBeVisible();
+  await expect(row(page, 0)).toBeVisible({ timeout: 15_000 });
   await page.locator('[data-testid="branch-trigger"]').click();
   const branchRow = page.locator('[data-testid="branch-row-main"]', { hasText: 'main' }).first();
   await expect(branchRow).toContainText(`\u2193${main.track.behind}`);

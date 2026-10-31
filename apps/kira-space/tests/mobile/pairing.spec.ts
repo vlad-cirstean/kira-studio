@@ -42,7 +42,7 @@ test('contract: approval lands on the app and shows the three tabs', async ({
   server.resolvePair('approve');
   await expect(page.locator(t('app-shell'))).toBeVisible();
   await expect(page).toHaveURL(/\/needs$/);
-  for (const tab of ['backlog', 'needs', 'plan'])
+  for (const tab of ['needs', 'plan', 'later'])
     await expect(page.locator(t(`tab-${tab}`))).toBeVisible();
 });
 

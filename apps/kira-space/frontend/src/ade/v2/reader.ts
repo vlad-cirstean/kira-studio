@@ -2,7 +2,6 @@ import type { InjectionKey } from 'vue';
 import { inject } from 'vue';
 import type {
   ArchivedTask,
-  BacklogResult,
   Board,
   ChangeRequestsResult,
   HostProviders,
@@ -24,7 +23,6 @@ export interface AdeReader {
   changeRequests(): Promise<ChangeRequestsResult>;
   sessions(): Promise<SessionsResult>;
   workflows(): Promise<WorkflowsResult>;
-  backlog(): Promise<BacklogResult>;
   repos(): Promise<{ repos: RepoName[] }>;
   readLog(args: ReadLogArgs): Promise<LogPage>;
   hostProviders(): Promise<HostProviders>;

@@ -24,12 +24,14 @@ import { changeBaseChoices } from '../board/changeBase';
 import { taskReviewTip } from '../board/reviewCode';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
+import AdeTaskLaunchMenu from '../sessions/AdeTaskLaunchMenu.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchRow from './AdeBranchRow.vue';
+import AdeTaskSessions from './AdeTaskSessions.vue';
 import { type BranchRowModel, type CardModel, usePlanModel } from './usePlanModel';
 import { useTaskMenu } from './useTaskMenu';
 
@@ -188,6 +190,7 @@ const boxClass = computed(() => {
               </span>
             </AdeTip>
           </template>
+          <AdeTaskSessions v-if="card.sessions" :task-id="card.task.id" :sessions="card.sessions" />
           <AdeAttention v-if="card.attention" :tip="card.attention" :item="card.attentionItem" />
           <AdeAutomationChip :task-id="card.task.id" />
           <AdeTip :text="card.meta">
@@ -251,6 +254,11 @@ const boxClass = computed(() => {
             <VarText :parts="reviewTip" />
             <Kbd>{{ formatShortcut('ade.reviewCode') }}</Kbd>
           </TooltipIconButton>
+          <AdeTaskLaunchMenu
+            v-if="card.rows.some((r) => r.branch.name !== '')"
+            :task-id="card.task.id"
+            size="card"
+          />
         </div>
         <AdeTip :text="card.title">
           <Button

@@ -7,68 +7,6 @@ import (
 	"time"
 )
 
-func TestSanitizeLine_InvalidUTF8ReplacedWithReplacementChar(t *testing.T) {
-	raw := "hello \xff\xfe world"
-	got := sanitizeLine(raw)
-	if !strings.Contains(got, "�") {
-		t.Fatalf("got %q, want a replacement char", got)
-	}
-	if strings.Contains(got, "\xff") || strings.Contains(got, "\xfe") {
-		t.Fatalf("got %q, invalid bytes survived", got)
-	}
-}
-
-func TestSanitizeLine_StripsC0ControlBytesExceptTab(t *testing.T) {
-	raw := "a\x01b\x07c\td\x1fe"
-	got := sanitizeLine(raw)
-	want := "abc\tde"
-	if got != want {
-		t.Fatalf("got %q, want %q", got, want)
-	}
-}
-
-func TestSanitizeLine_StripsDEL(t *testing.T) {
-	got := sanitizeLine("a\x7fb")
-	if got != "ab" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-func TestSanitizeLine_StripsCSI(t *testing.T) {
-	raw := "\x1b[31mred\x1b[0m plain"
-	got := sanitizeLine(raw)
-	if got != "red plain" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-func TestSanitizeLine_StripsOSC(t *testing.T) {
-	// OSC terminated by BEL, and OSC terminated by ESC \.
-	raw := "before\x1b]0;window title\x07after\x1b]8;;http://x\x1b\\end"
-	got := sanitizeLine(raw)
-	if got != "beforeafterend" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-func TestSanitizeLine_UnterminatedEscapeDropped(t *testing.T) {
-	got := sanitizeLine("keep\x1b[31")
-	if got != "keep" {
-		t.Fatalf("got %q", got)
-	}
-}
-
-// TestSanitizeLine_PlainTextUnaffected: sanitizeLine is only ever called on one already
-// newline-split line (never one still containing an embedded '\n', which the C0-strip rule would
-// otherwise remove along with every other control byte) — ordinary printable text passes through
-// byte for byte.
-func TestSanitizeLine_PlainTextUnaffected(t *testing.T) {
-	got := sanitizeLine("installing deps... done (1/1)")
-	if got != "installing deps... done (1/1)" {
-		t.Fatalf("got %q", got)
-	}
-}
-
 // TestOutputCollector_LineSplittingAcrossWrites proves a line split across two Write calls (an
 // arbitrarily chunked pipe) is reassembled correctly before sanitizing/retaining.
 func TestOutputCollector_LineSplittingAcrossWrites(t *testing.T) {

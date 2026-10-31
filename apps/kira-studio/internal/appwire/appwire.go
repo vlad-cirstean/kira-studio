@@ -1,4 +1,4 @@
-// Package appwire is Kira Studio's composition root: it builds the 31 bound services, the adapter
+// Package appwire is Kira Studio's composition root: it builds the 33 bound services, the adapter
 // router, the embedded modules and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/proof"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
@@ -120,10 +121,14 @@ type Wired struct {
 	Lifecycle       *bridge.LifecycleService
 	PromptsSvc      *bridge.PromptsService
 	LlmPromptsSvc   *bridge.LlmPromptsService
+	Proof           *bridge.ProofService
+	// ProofStore is the validation-proof store behind Proof and the DB MCP proof tools.
+	ProofStore *proof.Service
 	// Agents resolves the active agent provider per call.
 	Agents   harness.Selector
 	AgentSvc *bridge.AgentService
 
+	proofShell      *registryShell
 	reopen          func()
 	beforeFlushOnce func()
 	teardownOnce    func()
@@ -194,14 +199,27 @@ func Build(opts Options) (*Wired, error) {
 
 	w := &Wired{}
 	windows := shell.NewWindowRegistry()
+	shellForProof := &registryShell{windows: windows}
 	promptRouter := newPromptRouter(windows, repositories, opts, w.reopenWindow)
 	windows.OnChange = promptRouter.Reroute
+
+	proofDeps := proof.Deps{
+		Repo: repositories.Proof, Prompts: promptRouter,
+		Emit: func(channel string, payload any) { opts.Emitter.Emit(channel, payload) },
+	}
+	if opts.Clock != nil {
+		proofDeps.Now = opts.Clock.Now
+	}
+	proofSvc := proof.New(proofDeps)
+	proofSvc.PurgeStale()
+	proofSvc.RaiseUnreviewed()
+	proofTargets := &bridge.ProofWindowTargets{}
 
 	installer := opts.McpInstaller
 	if installer == nil {
 		installer = harness.ActiveInstaller(agents)
 	}
-	embedded := wireEmbeddedServices(deps, installer, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, opts)
+	embedded := wireEmbeddedServices(deps, installer, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, proofSvc, opts)
 	lifecycle := wireLifecycle(windows, embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
 		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, embedded.dockerSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.sched.Start()
@@ -226,7 +244,7 @@ func Build(opts Options) (*Wired, error) {
 		TerminalRegistry: embedded.terminalSvc.Registry,
 		OnWindowClosing: []func(string){func(key string) {
 			docker.CloseWindowBound(embedded.dockerSvc.BoundService, key)
-		}},
+		}, proofTargets.Forget},
 
 		App:             &bridge.AppService{Deps: deps},
 		Settings:        &bridge.SettingsService{Deps: deps},
@@ -260,14 +278,40 @@ func Build(opts Options) (*Wired, error) {
 		},
 		Lifecycle: &bridge.LifecycleService{Flusher: lifecycle.quitter, WindowFlusher: lifecycle.closeFlush, Quit: lifecycle.quitter, Live: live},
 
+		ProofStore: proofSvc,
+		Proof: &bridge.ProofService{
+			Svc: proofSvc, Dialogs: opts.Dialogs, Windows: repositories.Windows, Events: opts.Emitter, Targets: proofTargets,
+			Shell: shellForProof,
+		},
+
 		Agents:   agents,
 		AgentSvc: &bridge.AgentService{Service: &agentsvc.Service{Agents: agents}},
 
+		proofShell:      shellForProof,
 		beforeFlushOnce: lifecycle.beforeFlush,
 		teardownOnce:    lifecycle.teardown,
 	}
 	return w, nil
 }
+
+// registryShell drives the proof window through the window registry; main binds Open once the
+// shell exists.
+type registryShell struct {
+	windows *shell.WindowRegistry
+	open    func(shell.WindowRecord)
+}
+
+func (r *registryShell) Keys() []string              { return r.windows.Keys() }
+func (r *registryShell) Focus(key string) bool       { return r.windows.Focus(key) }
+func (r *registryShell) SetTitle(key, t string) bool { return r.windows.SetTitle(key, t) }
+func (r *registryShell) Open(rec shell.WindowRecord) {
+	if r.open != nil {
+		r.open(rec)
+	}
+}
+
+// BindProofShell sets how the proof window is opened, once the shell exists.
+func (w *Wired) BindProofShell(open func(shell.WindowRecord)) { w.proofShell.open = open }
 
 // SetReopen sets what a notification click runs when no window is open (main owns the opener deps).
 func (w *Wired) SetReopen(fn func()) { w.reopen = fn }
@@ -278,7 +322,7 @@ func (w *Wired) reopenWindow() {
 	}
 }
 
-// Bound returns the 32 bound services in registration order.
+// Bound returns the 33 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -290,7 +334,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
 		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker), application.NewService(w.Link),
-		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc),
+		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc), application.NewService(w.Proof),
 	}
 }
 

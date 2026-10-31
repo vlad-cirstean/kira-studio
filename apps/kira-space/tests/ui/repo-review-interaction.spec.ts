@@ -133,13 +133,16 @@ test('the focused commit row stays mounted and keyboard navigation works after a
   await expect(first).toHaveAttribute('aria-posinset', '1');
 
   await first.focus();
-  await page
-    .locator('[role="tree"][aria-label="Commits"]')
-    .first()
-    .evaluate((el) => {
-      el.scrollTop = 20000;
-    });
-  await expect(reviewRow(page, manyRowShas(455))).toBeAttached();
+  // Under load the list can lay out after the first scroll and clamp it; scroll again until the row renders.
+  await expect(async () => {
+    await page
+      .locator('[role="tree"][aria-label="Commits"]')
+      .first()
+      .evaluate((el) => {
+        el.scrollTop = 20000;
+      });
+    await expect(reviewRow(page, manyRowShas(455))).toBeAttached({ timeout: 500 });
+  }).toPass();
   await expect(first).toBeFocused();
 
   await page.keyboard.press('ArrowDown');

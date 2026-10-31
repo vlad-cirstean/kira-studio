@@ -1,17 +1,13 @@
 import type { Branch, Task, TaskStatusDef } from '../wire';
 import type { TaskProgress } from './progress';
 
-/** The task's stored status; an id missing from the set shows as the first status of the kind's default category. */
+/** The task's stored status; an id missing from the set (a transient cache state) shows as its id in grey. */
 export function statusOf(task: Task, statuses: readonly TaskStatusDef[]): TaskStatusDef {
-  const found = statuses.find((s) => s.id === task.statusId);
-  if (found) return found;
-  const category = task.kind === 'review' ? 'review' : 'todo';
   return (
-    statuses.find((s) => s.category === category) ?? {
+    statuses.find((s) => s.id === task.statusId) ?? {
       id: task.statusId,
       name: task.statusId,
-      tone: 'grey',
-      category,
+      color: 'grey',
     }
   );
 }

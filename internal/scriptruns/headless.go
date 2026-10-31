@@ -114,7 +114,11 @@ func (s *Service) startHeadless(p *planned, run Run, existing bool) (Started, er
 		defer s.bgWait.Done()
 		out, sink := s.runHeadless(ctx, br, p, run.ID, timeout, timeoutText)
 		cancel()
-		done, ferr := s.Runs.FinishByRun(run.ID, out.WithLastError(sink.lastStderr()), s.now())
+		out = out.WithLastError(sink.lastStderr())
+		if out.Status == runoutcome.StatusFailed {
+			out = out.WithOutputTail(sink.outputTail())
+		}
+		done, ferr := s.Runs.FinishByRun(run.ID, out, s.now())
 		if p.release != nil {
 			p.release()
 		}

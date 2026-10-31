@@ -10,10 +10,10 @@ import { defaultSettings, type Settings, type SettingsPatch } from './settingsDo
 export const sections = [
   'Appearance',
   'Git',
+  'CLI tools',
   'File types',
   'Mobile access',
   'Agent',
-  'Task statuses',
   'Memory',
   'Prompts',
   'Advanced',

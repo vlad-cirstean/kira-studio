@@ -16,20 +16,20 @@ func TestIdempotency_ReplayMismatchInFlightAndExpiry(t *testing.T) {
 	s, store, _ := newTestServer(t)
 	writer := s.cfg.Writer.(*fakeWriter)
 	cookie := store.addDeviceWith(t, "dev1", true, false)
-	move := `{"id":"b1","toIndex":2}`
+	move := `{"taskId":"b1","shelf":"backlog","beforeId":""}`
 
-	first := postJSON(s, "/api/ade/backlog/move", cookie, idemA, move)
-	replay := postJSON(s, "/api/ade/backlog/move", cookie, idemA, move)
+	first := postJSON(s, "/api/ade/shelf/move", cookie, idemA, move)
+	replay := postJSON(s, "/api/ade/shelf/move", cookie, idemA, move)
 	if first.Code != 200 || replay.Code != 200 || replay.Header().Get("Idempotent-Replay") != "true" {
 		t.Fatalf("first %d, replay %d %v", first.Code, replay.Code, replay.Header())
 	}
 	if writer.count() != 1 {
 		t.Fatalf("a replayed key ran the move %d times", writer.count())
 	}
-	if rec := postJSON(s, "/api/ade/backlog/items", cookie, idemA, `{"text":"x"}`); rec.Code != http.StatusUnprocessableEntity || errCode(t, rec) != "E_IDEMPOTENCY_MISMATCH" {
+	if rec := postJSON(s, "/api/ade/later/items", cookie, idemA, `{"title":"x"}`); rec.Code != http.StatusUnprocessableEntity || errCode(t, rec) != "E_IDEMPOTENCY_MISMATCH" {
 		t.Errorf("same key on another path: %d %s", rec.Code, rec.Body)
 	}
-	if rec := postJSON(s, "/api/ade/backlog/move", store.addDeviceWith(t, "dev2", true, false), idemA, move); rec.Code != 200 || writer.count() != 2 {
+	if rec := postJSON(s, "/api/ade/shelf/move", store.addDeviceWith(t, "dev2", true, false), idemA, move); rec.Code != 200 || writer.count() != 2 {
 		t.Errorf("keys are per device: %d, %d calls", rec.Code, writer.count())
 	}
 
@@ -38,13 +38,13 @@ func TestIdempotency_ReplayMismatchInFlightAndExpiry(t *testing.T) {
 	writer.err = errors.New("boom")
 	writer.mu.Unlock()
 	key := uuid.NewString()
-	if rec := postJSON(s, "/api/ade/backlog/move", cookie, key, move); rec.Code != 500 {
+	if rec := postJSON(s, "/api/ade/shelf/move", cookie, key, move); rec.Code != 500 {
 		t.Fatalf("service failure: %d", rec.Code)
 	}
 	writer.mu.Lock()
 	writer.err = nil
 	writer.mu.Unlock()
-	if rec := postJSON(s, "/api/ade/backlog/move", cookie, key, move); rec.Code != 200 || writer.count() != 4 {
+	if rec := postJSON(s, "/api/ade/shelf/move", cookie, key, move); rec.Code != 200 || writer.count() != 4 {
 		t.Errorf("retry after 5xx: %d, %d calls", rec.Code, writer.count())
 	}
 
@@ -54,7 +54,7 @@ func TestIdempotency_ReplayMismatchInFlightAndExpiry(t *testing.T) {
 	writer.mu.Unlock()
 	stale := uuid.NewString()
 	for range 2 {
-		if rec := postJSON(s, "/api/ade/backlog/move", cookie, stale, move); rec.Code != http.StatusConflict {
+		if rec := postJSON(s, "/api/ade/shelf/move", cookie, stale, move); rec.Code != http.StatusConflict {
 			t.Errorf("stale: %d", rec.Code)
 		}
 	}
@@ -101,7 +101,7 @@ func TestIdempotency_ConcurrentSameKeyRunsOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			codes[i] = postJSON(s, "/api/ade/backlog/move", cookie, idemA, `{"id":"b1","toIndex":1}`).Code
+			codes[i] = postJSON(s, "/api/ade/shelf/move", cookie, idemA, `{"taskId":"b1","shelf":"backlog","beforeId":""}`).Code
 		}()
 	}
 	wg.Wait()

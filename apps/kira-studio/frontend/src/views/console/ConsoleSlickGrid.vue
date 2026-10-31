@@ -65,6 +65,7 @@ import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './menu';
 import { cell, getPage, setVisibleWindow } from './resultPages';
+import type { ResultViewState } from './resultViewState';
 import { type Match, matchedRows, searchState } from './search';
 import { useConsoleViewStore } from './state';
 
@@ -102,8 +103,15 @@ const props = defineProps<{
   tabId: string;
   connectionId: string | null;
   path: string;
+  /** Opt-in view-state persistence (the proof window): restored on mount, reported on every
+   *  scroll, selection and column resize. `undefined` for the console, which keeps none. */
+  viewState?: ResultViewState | null;
 }>();
-const emit = defineEmits<{ copyError: [message: string] }>();
+const emit = defineEmits<{
+  copyError: [message: string];
+  'update:viewState': [state: ResultViewState];
+  ready: [];
+}>();
 const onCopyError = (message: string): void => emit('copyError', message);
 
 // Column<T>'s own `field` type can't be satisfied by RowHandle's shape (arbitrary db column
@@ -268,6 +276,23 @@ function onViewportScroll(): void {
   if (!el) return;
   scrollEventSeq++;
   scrollVelocityTracker.recordOffsetSample(el.scrollTop, performance.now());
+  emitViewState();
+}
+
+// Set while a saved state is applied, so the scroll and selection events it causes are not
+// reported back as the user's own.
+let restoring = false;
+
+function emitViewState(): void {
+  if (props.viewState === undefined || restoring) return;
+  emit('update:viewState', {
+    resultScrollTop: viewportEl?.scrollTop ?? 0,
+    resultScrollLeft: viewportEl?.scrollLeft ?? 0,
+    selection: currentSelection,
+    selectedRow: null,
+    expanded: [],
+    columnWidths: { ...consoleViewStore.consoleColumnWidths(props.tabId) },
+  });
 }
 
 // The one per-render DOM pass this migration still needs: a row's own `data-row` (SlickGrid writes
@@ -378,6 +403,7 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   pendingSelectionKind = null;
   const posSel = selectionFromRanges(ranges, rowMode, kind);
   currentSelection = posSel ? toPageRowSelection(posSel) : null;
+  emitViewState();
 }
 
 // Mirrors SlickGridHost.vue's own onColumnsResized: SlickGrid drags the
@@ -394,6 +420,7 @@ function onColumnsResized(): void {
     widths[String(col.name)] = col.width;
   }
   consoleViewStore.setConsoleColumnWidths(props.tabId, widths);
+  emitViewState();
 }
 
 // F15: no `.header-select-zone`, no `onHeaderCellRendered` subscription — a console result has no
@@ -648,6 +675,10 @@ onMounted(() => {
   page = p;
 
   dataSource = createGridDataSource(dataSourceState());
+  const saved = props.viewState;
+  if (saved && Object.keys(saved.columnWidths).length > 0) {
+    consoleViewStore.setConsoleColumnWidths(props.tabId, { ...saved.columnWidths });
+  }
 
   el.style.setProperty('--kira-header-row-height', `${rowHeight.value}px`);
 
@@ -720,7 +751,48 @@ onMounted(() => {
 
   resizeObserver = new ResizeObserver(() => grid?.resizeCanvas());
   resizeObserver.observe(el);
+  restoreViewState(saved);
 });
+
+// The selection must fit the page: a stale index would paint nothing or throw in SlickGrid.
+function selectionFits(sel: Selection, rowCount: number, colCount: number): boolean {
+  switch (sel.kind) {
+    case 'cell':
+      return sel.row < rowCount && sel.col < colCount;
+    case 'range':
+      return (
+        Math.max(sel.row, sel.anchorRow) < rowCount && Math.max(sel.col, sel.anchorCol) < colCount
+      );
+    case 'row':
+      return sel.rows.every((r) => r < rowCount);
+    default:
+      return sel.cols.every((c) => c < colCount);
+  }
+}
+
+// Applies the saved selection, then the scroll offsets, and reports `ready` once SlickGrid has
+// mounted the rows at that offset: the strictly visible rows always render in the one synchronous
+// pass below, and the two frames let a queued chase settle before a screenshot reads the DOM.
+function restoreViewState(saved: ResultViewState | null | undefined): void {
+  if (saved && grid && viewportEl && selectionModel && page) {
+    restoring = true;
+    try {
+      const colCount = grid.getColumns().length - 1;
+      const sel = saved.selection;
+      if (sel && selectionFits(sel, page.rowCount, colCount)) {
+        if (sel.kind === 'column') pendingSelectionKind = 'column';
+        selectionModel.setSelectedRanges(rangesFromSelection(sel, page.rowCount, colCount));
+        currentSelection = sel;
+      }
+      viewportEl.scrollTop = saved.resultScrollTop;
+      viewportEl.scrollLeft = saved.resultScrollLeft;
+      grid.syncToViewportScroll();
+    } finally {
+      restoring = false;
+    }
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => emit('ready')));
+}
 
 onUnmounted(() => {
   resizeObserver?.disconnect();

@@ -10,11 +10,10 @@
  * this module places a decoration at `comment.range.start` and renders `anchor` as a label, the
  * same two lines of logic `reviewComments.ts:63-74` already uses.
  *
- * Two decoration lanes keep a hunk glyph and a comment glyph from colliding on the same line:
- * hunk state renders in `GlyphMarginLane.Right`, comment/add-comment glyphs in
- * `GlyphMarginLane.Left`. Monaco lays lanes out per line, so both persist (`persistLane`) and
- * `laneCollection` reserves Left up front: the margin is always two lanes wide and hovering a
- * line never shifts a glyph.
+ * The gutter has no glyph margin. The hovered line's number turns into the add mark and a commented
+ * line's number is tinted (`lineNumberClassName`); a click on either number opens the composer or
+ * the thread. Each hunk gets a one-line view zone above its first changed line whose margin node
+ * holds the reviewed mark. View zones are not model lines, so every line coordinate stays put.
  */
 
 import {
@@ -28,24 +27,24 @@ import type {
   DiffHunk,
   FileDiffBody,
   LineRange,
-  ResultOf,
   ReviewComment,
   ReviewCommentKind,
   ReviewCommentState,
-  Transport,
 } from '@kira/git-ipc';
 import { i18n, t } from '@theme/i18n';
 import { logError } from '@workbench/bridge/log';
-import { type App, createApp, nextTick } from 'vue';
-import { onReviewRepaint } from '../../repo/git/transport';
+import { type App, createApp, shallowRef } from 'vue';
 import type { MonacoModule } from './monaco';
 import ReviewBanner from './ReviewBanner.vue';
+import ReviewHunkMark from './ReviewHunkMark.vue';
 import ReviewThread from './ReviewThread.vue';
+import type { ReviewSource } from './reviewSource';
 
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 type ModifiedEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type DeltaDecoration = import('monaco-editor').editor.IModelDeltaDecoration;
 type ViewZone = import('monaco-editor').editor.IViewZone;
+type OverlayWidget = import('monaco-editor').editor.IOverlayWidget;
 
 // Pinned monaco-editor@0.56.0's own `view.js` appends `.view-zones` BEFORE `.view-lines` in
 // `.lines-content`, and `viewLines.js` sizes `.view-lines` to the full scroll width/height with no
@@ -54,62 +53,16 @@ type ViewZone = import('monaco-editor').editor.IViewZone;
 // widgets it mounts the same way; without it, a zone paints but nothing in it can ever be clicked.
 const VIEW_ZONE_Z_INDEX = '10';
 
-export interface ReviewDecorationsDeps {
-  readonly transport: Transport;
-  readonly gitRepoId: string;
-  readonly path: string;
-  /** `repoDiffTabStateSchema.left` — the tab's own leftRev (merge base in `range` mode, the
-   *  file's own `reviewedAtSha` in `sinceReview` mode), compared against a fresh
-   *  `review.fileDiff`'s own `reviewedAtSha` exactly as `reviewMarking.ts:249-276`'s `resolve`
-   *  does, so a tab opened in one mode never silently repaints as the other. */
-  readonly leftRev: string;
-  readonly review: {
-    readonly branch: string;
-    readonly branchTip: string;
-    readonly leftLabel: string;
-  };
-}
+// A thread's height cap: the larger of 12 lines and 80% of the editor, as VS Code's ZoneWidget does.
+const THREAD_MIN_LINES = 12;
+const THREAD_MAX_FRACTION = 0.8;
 
 export interface ReviewDecorationsHandle {
   /** Settles once the first diff and comment load finished (or failed). */
   readonly ready: Promise<void>;
+  /** Re-reads the diff and the comments, e.g. after the file's models were rewritten. */
+  reload(): void;
   dispose(): void;
-}
-
-// reviewMarking.ts:221-241's own memoised resolveBase, ported: review.fileDiff needs `base`, which
-// nothing on the diff tab carries directly (only `leftRev`) — re-resolving here, memoised by
-// (repoId, branch), is the same trade the extension already made rather than threading `base`
-// through the whole tab-open path for a value this module can cheaply ask for itself. Module-level
-// (not per-handle): two review diff tabs for the same branch share one resolution.
-//
-// Only a SUCCESSFUL resolution stays cached. A failure (e.g. a transient index.lock
-// conflict) used to cache `null` forever, with no expiry — every load() thereafter silently
-// early-returned, permanently disabling the whole review layer for that branch until the app
-// restarted. Evicting the entry on failure lets the next call (this editor's own retry, or
-// another editor's load()) try fresh instead of replaying the same rejection from cache forever.
-//
-// A REJECTION is now propagated (not swallowed into a `null` value) so load() can tell it
-// apart from a resolved `base: null` — the legitimate, permanent "no base branch configured for
-// this repository" answer. The collapse of both into the same cached `null` routed a
-// permanent condition to the same "Couldn't load, click Retry" banner built for transient
-// failures — Retry could never succeed there, since re-resolving just returns the same `null`.
-const baseMemo = new Map<string, Promise<string | null>>();
-
-function resolveBase(transport: Transport, repoId: string, branch: string): Promise<string | null> {
-  const key = `${repoId}\0${branch}`;
-  let cached = baseMemo.get(key);
-  if (!cached) {
-    cached = transport
-      .request('review.resolveBase', { repoId, branch }, undefined)
-      .then((r) => r.base)
-      .catch((err) => {
-        baseMemo.delete(key);
-        logError('reviewDecorations', 'review.resolveBase failed', err);
-        throw err;
-      });
-    baseMemo.set(key, cached);
-  }
-  return cached;
 }
 
 function commentHoverMessage(comment: ReviewComment): { value: string } {
@@ -123,12 +76,24 @@ function commentHoverMessage(comment: ReviewComment): { value: string } {
 export function attachReviewDecorations(
   mod: MonacoModule,
   diffEditor: DiffEditor,
-  deps: ReviewDecorationsDeps,
+  source: ReviewSource,
 ): ReviewDecorationsHandle {
   const modifiedEditor: ModifiedEditor = diffEditor.getModifiedEditor();
   // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
-  // rather than depend on either being right in a future Monaco bump.
-  modifiedEditor.updateOptions({ glyphMargin: true });
+  // rather than depend on either being right in a future Monaco bump. A click on a line number
+  // adds or opens a comment, so it must not also select the line.
+  modifiedEditor.updateOptions({ glyphMargin: false, selectOnLineNumbers: false });
+  // Monaco forces a glyph margin onto the original pane side by side; switch it off again.
+  const originalEditor = diffEditor.getOriginalEditor();
+  const keepGlyphMarginOff = (): void => {
+    if (originalEditor.getOption(mod.editor.EditorOption.glyphMargin)) {
+      originalEditor.updateOptions({ glyphMargin: false });
+    }
+  };
+  keepGlyphMarginOff();
+  const glyphMarginDisposable = originalEditor.onDidChangeConfiguration((e) => {
+    if (e.hasChanged(mod.editor.EditorOption.glyphMargin)) keepGlyphMarginOff();
+  });
 
   let disposed = false;
   // Separate counters per resource -- loadDiff and loadComments used to share one loadSeq,
@@ -146,54 +111,87 @@ export function attachReviewDecorations(
   let lineCount = 0;
   let comments: readonly ReviewComment[] = [];
 
-  // Line number -> the hunk block/reviewed state at that line, rebuilt every paint() — what the
-  // click handler looks up instead of re-walking `hunks` on every gutter click.
-  let hunkByLine = new Map<number, { block: LineRange; reviewed: boolean }>();
   let commentByLine = new Map<number, ReviewComment>();
 
   const reviewedLineCollection = modifiedEditor.createDecorationsCollection([]);
-  const hunkCollection = modifiedEditor.createDecorationsCollection([]);
   const commentCollection = modifiedEditor.createDecorationsCollection([]);
   const addGlyphCollection = modifiedEditor.createDecorationsCollection([]);
-  const laneCollection = modifiedEditor.createDecorationsCollection([]);
 
   let hoverLine: number | null = null;
   let openThreadCommentId: number | null = null;
-  let zoneId: string | null = null;
-  let zoneApp: App | null = null;
+  let closeThread: (() => void) | null = null;
+  // The open thread's comment; a repaint swaps in the stored copy so a saved edit shows at once.
+  const openComment = shallowRef<ReviewComment | undefined>();
 
   function closeZone(): void {
-    if (zoneId === null) return;
-    const id = zoneId;
-    modifiedEditor.changeViewZones((accessor) => accessor.removeZone(id));
-    zoneApp?.unmount();
-    zoneApp = null;
-    zoneId = null;
+    const close = closeThread;
+    closeThread = null;
     openThreadCommentId = null;
+    openComment.value = undefined;
+    close?.();
   }
 
-  function openZone(afterLine: number, mount: (container: HTMLElement) => App): void {
+  // VS Code's ZoneWidget mechanics over public API (`ZoneWidget` itself is not exported): an empty
+  // view zone reserves the vertical space, the content lives in an overlay widget outside Monaco's
+  // scrollable element. That keeps the content at the visible editor width, lets the wheel scroll
+  // it, and lets its height be capped to the viewport.
+  let threadSeq = 0;
+  function openZone(
+    afterLine: number,
+    mount: (container: HTMLElement, onResize: (height: number) => void) => App,
+  ): void {
     closeZone();
     const domNode = document.createElement('div');
-    domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
-    const zone: ViewZone = { afterLineNumber: afterLine, heightInPx: 120, domNode };
+    domNode.style.top = '-1000px';
+    const widgetId = `kira.review.thread.${++threadSeq}`;
+    const widget: OverlayWidget = {
+      getId: () => widgetId,
+      getDomNode: () => domNode,
+      getPosition: () => null,
+    };
+    let contentHeight = 0;
+    let zoneId = '';
+    const zone: ViewZone = {
+      afterLineNumber: afterLine,
+      ordinal: 0,
+      // A thread on the last visible line before a collapsed region would otherwise count as hidden.
+      showInHiddenAreas: true,
+      heightInPx: 120,
+      domNode: document.createElement('div'),
+      onDomNodeTop: (top) => {
+        domNode.style.top = `${top}px`;
+      },
+      onComputedHeight: (height) => {
+        domNode.style.height = `${height}px`;
+      },
+    };
+    const layout = (): void => {
+      const info = modifiedEditor.getLayoutInfo();
+      domNode.style.left = '0px';
+      domNode.style.width = `${info.width - info.minimap.minimapWidth - info.verticalScrollbarWidth}px`;
+      const lineHeight = modifiedEditor.getOption(mod.editor.EditorOption.lineHeight);
+      const cap = Math.max(THREAD_MIN_LINES * lineHeight, THREAD_MAX_FRACTION * info.height);
+      const wanted = Math.ceil(Math.min(contentHeight || zone.heightInPx || 0, cap));
+      if (wanted === zone.heightInPx) return;
+      zone.heightInPx = wanted;
+      modifiedEditor.changeViewZones((accessor) => accessor.layoutZone(zoneId));
+    };
+    modifiedEditor.addOverlayWidget(widget);
     modifiedEditor.changeViewZones((accessor) => {
       zoneId = accessor.addZone(zone);
     });
-    zoneApp = mount(domNode);
-    // §3.2: 120 predates the compose form's final shape — measure the mounted app's own root
-    // (`.review-thread`, already `overflow: auto`) once it has rendered and re-lay the zone out,
-    // so a long existing comment scrolls inside its own box instead of being clipped by a guess.
-    const id = zoneId;
-    if (id === null) return; // addZone's own callback ran synchronously just above; defensive only.
-    void nextTick(() => {
-      if (zoneId !== id || disposed) return;
-      const measured = domNode.firstElementChild?.scrollHeight;
-      if (measured && measured !== zone.heightInPx) {
-        zone.heightInPx = measured;
-        modifiedEditor.changeViewZones((accessor) => accessor.layoutZone(id));
-      }
+    const layoutDisposable = modifiedEditor.onDidLayoutChange(layout);
+    layout();
+    const app = mount(domNode, (height) => {
+      contentHeight = height;
+      layout();
     });
+    closeThread = () => {
+      layoutDisposable.dispose();
+      app.unmount();
+      modifiedEditor.removeOverlayWidget(widget);
+      modifiedEditor.changeViewZones((accessor) => accessor.removeZone(zoneId));
+    };
   }
 
   // resolveBase's own failure (a transient index.lock conflict, most likely) used to be
@@ -246,12 +244,58 @@ export function attachReviewDecorations(
       {
         range: new mod.Range(hoverLine, 1, hoverLine, 1),
         options: {
-          glyphMarginClassName: 'codicon codicon-add kira-review-glyph kira-review-glyph-add',
-          glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
-          glyphMarginHoverMessage: { value: t('space.repo.reviewEditor.addComment.tooltip') },
+          lineNumberClassName: 'kira-review-ln kira-review-ln-add',
+          lineNumberHoverMessage: { value: t('space.repo.reviewEditor.addComment.tooltip') },
         },
       },
     ]);
+  }
+
+  // One-line view zone per hunk, above its first changed line; the margin node holds the mark.
+  let hunkRowKey = '';
+  let hunkZoneIds: string[] = [];
+  let hunkApps: App[] = [];
+
+  function clearHunkRows(): void {
+    const ids = hunkZoneIds;
+    hunkZoneIds = [];
+    for (const app of hunkApps) app.unmount();
+    hunkApps = [];
+    hunkRowKey = '';
+    if (ids.length === 0) return;
+    modifiedEditor.changeViewZones((accessor) => {
+      for (const id of ids) accessor.removeZone(id);
+    });
+  }
+
+  function paintHunkRows(rows: readonly { block: LineRange; reviewed: boolean }[]): void {
+    const key = rows.map((r) => `${r.block.start}:${r.reviewed ? 1 : 0}`).join(',');
+    if (key === hunkRowKey) return;
+    clearHunkRows();
+    hunkRowKey = key;
+    if (rows.length === 0) return;
+    modifiedEditor.changeViewZones((accessor) => {
+      for (const { block, reviewed } of rows) {
+        const marginDomNode = document.createElement('div');
+        const app = createApp(ReviewHunkMark, {
+          reviewed,
+          onToggle: () => void mark(block, !reviewed),
+        });
+        app.use(i18n);
+        app.mount(marginDomNode);
+        hunkApps.push(app);
+        hunkZoneIds.push(
+          accessor.addZone({
+            afterLineNumber: block.start - 1,
+            heightInLines: 1,
+            ordinal: 1,
+            domNode: document.createElement('div'),
+            marginDomNode,
+            suppressMouseDown: true,
+          }),
+        );
+      }
+    });
   }
 
   function paint(): void {
@@ -280,32 +324,14 @@ export function attachReviewDecorations(
           ),
     );
 
-    const nextHunkByLine = new Map<number, { block: LineRange; reviewed: boolean }>();
-    const hunkDecorations: DeltaDecoration[] = [];
+    const hunkRows: { block: LineRange; reviewed: boolean }[] = [];
     if (bodyKind === 'text') {
       for (const hunk of hunks) {
         const block = hunkChangeBlock(hunk);
-        if (!block) continue;
-        const reviewed = coverage(block, reviewedRanges) === 'full';
-        nextHunkByLine.set(block.start, { block, reviewed });
-        hunkDecorations.push({
-          range: new mod.Range(block.start, 1, block.start, 1),
-          options: {
-            glyphMarginClassName: reviewed
-              ? 'codicon codicon-pass-filled kira-review-glyph kira-review-glyph-reviewed'
-              : 'codicon codicon-circle-large-outline kira-review-glyph kira-review-glyph-actionable',
-            glyphMargin: { position: mod.editor.GlyphMarginLane.Right, persistLane: true },
-            glyphMarginHoverMessage: {
-              value: reviewed
-                ? t('common.markUnreviewed.tooltip')
-                : t('common.markReviewed.tooltip'),
-            },
-          },
-        });
+        if (block) hunkRows.push({ block, reviewed: coverage(block, reviewedRanges) === 'full' });
       }
     }
-    hunkByLine = nextHunkByLine;
-    hunkCollection.set(hunkDecorations);
+    paintHunkRows(hunkRows);
 
     const nextCommentByLine = new Map<number, ReviewComment>();
     for (const comment of comments) nextCommentByLine.set(comment.range.start, comment);
@@ -315,30 +341,19 @@ export function attachReviewDecorations(
         (c): DeltaDecoration => ({
           range: new mod.Range(c.range.start, 1, c.range.start, 1),
           options: {
-            glyphMarginClassName:
-              'codicon codicon-comment kira-review-glyph kira-review-glyph-comment',
-            glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
-            glyphMarginHoverMessage: commentHoverMessage(c),
+            lineNumberClassName: 'kira-review-ln kira-review-ln-comment',
+            lineNumberHoverMessage: commentHoverMessage(c),
           },
         }),
       ),
     );
     paintAddGlyph();
-    // Monaco drops a decoration with an empty glyph class, so the name must be non-empty.
-    laneCollection.set([
-      {
-        range: new mod.Range(1, 1, 1, 1),
-        options: {
-          glyphMarginClassName: 'kira-review-lane',
-          glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
-        },
-      },
-    ]);
-
     // A repaint can move or remove the line the open thread was anchored to (a mark/comment
     // mutation elsewhere, §7.6) — close it rather than leave it pointing at a stale line.
-    if (openThreadCommentId !== null && !comments.some((c) => c.id === openThreadCommentId)) {
-      closeZone();
+    if (openThreadCommentId !== null) {
+      const fresh = comments.find((c) => c.id === openThreadCommentId);
+      if (fresh) openComment.value = fresh;
+      else closeZone();
     }
   }
 
@@ -361,61 +376,27 @@ export function attachReviewDecorations(
   // banner instead.
   async function loadDiff(): Promise<boolean> {
     const seq = ++diffSeq;
-    let base: string | null;
+    let loaded: Awaited<ReturnType<ReviewSource['loadDiff']>>;
     try {
-      base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
+      loaded = await source.loadDiff();
     } catch (err) {
       if (disposed || seq !== diffSeq) return false;
-      // C13-9: a genuine rejection (a transient index.lock conflict, most likely) — resolveBase
-      // no longer caches this (see baseMemo's own comment), so the banner's own Retry button (or
-      // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
-      logError('reviewDecorations', 'review.resolveBase failed', err);
+      // A transient failure (index.lock, say) is not cached upstream, so Retry can succeed.
+      logError('reviewDecorations', 'review diff load failed', err);
       showLoadError();
       return false;
     }
     if (disposed || seq !== diffSeq) return false;
-    if (base === null) {
-      // C13-9: a SUCCESSFUL resolution to "no base configured" — permanent, not transient, so
-      // Retry (which would just re-resolve the same legitimate null) is actively misleading here.
-      // Distinct message, no Retry button.
+    if (loaded === null) {
+      // Permanent: no base branch configured. Retry would only re-resolve the same answer.
       showNoBaseConfigured();
       return false;
     }
     closeErrorZone();
-
-    let result: ResultOf<'review.fileDiff'>;
-    try {
-      result = await deps.transport.request('review.fileDiff', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        base,
-        path: deps.path,
-        mode: 'sinceReview',
-      });
-      if (disposed || seq !== diffSeq) return false;
-      if (result.reviewedAtSha !== null && result.reviewedAtSha !== deps.leftRev) {
-        result = await deps.transport.request('review.fileDiff', {
-          repoId: deps.gitRepoId,
-          branch: deps.review.branch,
-          base,
-          path: deps.path,
-          mode: 'range',
-        });
-        if (disposed || seq !== diffSeq) return false;
-      }
-    } catch (err) {
-      if (disposed || seq !== diffSeq) return false;
-      // C13-9: previously uncaught — a rejection here left a silently blank review layer and an
-      // unhandled promise rejection in the console, entirely bypassing C12-7's retry-banner
-      // mechanism (unlike the review.comment.list call below, which already had a `.catch`).
-      logError('reviewDecorations', 'review.fileDiff failed', err);
-      showLoadError();
-      return false;
-    }
-    hunks = result.body.kind === 'text' ? result.body.hunks : [];
-    bodyKind = result.body.kind;
-    reviewedRanges = result.reviewedRanges;
-    lineCount = result.lineCount;
+    hunks = loaded.hunks;
+    bodyKind = loaded.bodyKind;
+    reviewedRanges = loaded.reviewedRanges;
+    lineCount = loaded.lineCount;
     paint();
     return true;
   }
@@ -447,27 +428,19 @@ export function attachReviewDecorations(
 
   async function loadComments(): Promise<void> {
     const seq = ++commentsSeq;
-    let commentsResult: Awaited<ReturnType<typeof deps.transport.request<'review.comment.list'>>>;
+    let loaded: readonly ReviewComment[];
     try {
-      commentsResult = await deps.transport.request('review.comment.list', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        at: deps.review.branchTip,
-      });
+      loaded = await source.loadComments();
     } catch (err) {
       if (disposed || seq !== commentsSeq) return;
       // Keep the comments already painted: a transient failure must not look like "all deleted".
-      logError('reviewDecorations', 'review.comment.list failed', err);
+      logError('reviewDecorations', 'review comment load failed', err);
       commentsLoadFailed = true;
       showLoadError();
       return;
     }
     if (disposed || seq !== commentsSeq) return;
-    // review.comment.list is scoped to the whole review SESSION (every file on the
-    // branch), not this editor's own file -- without this filter, a comment on another file could
-    // paint as a phantom glyph/hover/thread here if that file happened to have a line at the same
-    // number.
-    comments = commentsResult.comments.filter((c) => c.path === deps.path);
+    comments = loaded;
     if (commentsLoadFailed) {
       commentsLoadFailed = false;
       closeErrorZone();
@@ -489,23 +462,12 @@ export function attachReviewDecorations(
     const clamped = clampRanges([range], lineCount);
     if (clamped.length === 0) return;
     try {
-      await deps.transport.request('review.mark', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        path: deps.path,
-        reviewed,
-        ranges: clamped,
-      });
+      await source.mark(clamped[0] as LineRange, reviewed);
     } catch (err) {
-      logError('reviewDecorations', 'review.mark failed', err);
-      return;
+      logError('reviewDecorations', 'review mark failed', err);
     }
-    // (reviewMarking.ts:520-521): never predict the stored state locally — reload from the
-    // server's own fresh review.fileDiff. No explicit reload here: transport.ts's own repaint
-    // fan-out is the ONE reload path for every open tab on this (repoId, branch, path),
-    // this editor included — its `onReviewRepaint` filter matches this editor's own deps just
-    // like every other subscriber's (an extra `load()` call here used to double-reload
-    // this same editor, since the fan-out never excluded the tab that made the call).
+    // No local prediction and no explicit reload: the source's repaint event reloads every open
+    // tab on this file, this editor included.
   }
 
   function currentSelectionRange(): LineRange {
@@ -522,29 +484,33 @@ export function attachReviewDecorations(
       closeZone();
       return;
     }
-    openThreadCommentId = comment.id;
-    openZone(comment.range.start, (container) => {
+    openZone(comment.range.start, (container, onResize) => {
       const app = createApp(ReviewThread, {
         mode: 'view' as const,
-        comment,
-        branch: deps.review.branch,
+        comment: openComment,
+        branch: source.branch,
         onClose: () => closeZone(),
-        onDelete: () => void handleDelete(comment),
-        onSetState: (state: ReviewCommentState) => void handleSetState(comment, state),
+        onResize,
+        onEdit: (body: string, kind: ReviewCommentKind) => handleEdit(comment, body, kind),
+        onDelete: () => handleDelete(comment),
+        onSetState: (state: ReviewCommentState) => handleSetState(comment, state),
       });
       app.use(i18n);
       app.mount(container);
       return app;
     });
+    openThreadCommentId = comment.id;
+    openComment.value = comment;
   }
 
   function openCompose(line: number): void {
-    openZone(line, (container) => {
+    openZone(line, (container, onResize) => {
       const app = createApp(ReviewThread, {
         mode: 'compose' as const,
-        branch: deps.review.branch,
+        branch: source.branch,
         onCancel: () => closeZone(),
-        onSubmit: (body: string, kind: ReviewCommentKind) => void handleSubmit(line, body, kind),
+        onResize,
+        onSubmit: (body: string, kind: ReviewCommentKind) => handleSubmit(line, body, kind),
       });
       app.use(i18n);
       app.mount(container);
@@ -552,70 +518,52 @@ export function attachReviewDecorations(
     });
   }
 
-  async function handleSubmit(line: number, body: string, kind: ReviewCommentKind): Promise<void> {
+  /** Runs one thread action. A failure is logged and rethrown for the thread to show inline. */
+  async function runThreadAction(
+    name: string,
+    call: () => Promise<unknown>,
+    closeAfter = true,
+  ): Promise<void> {
     try {
-      await deps.transport.request('review.comment.add', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        path: deps.path,
-        at: deps.review.branchTip,
-        range: { start: line, end: line },
-        body,
-        kind,
-      });
+      await call();
     } catch (err) {
-      logError('reviewDecorations', 'review.comment.add failed', err);
-      return;
+      logError('reviewDecorations', `${name} failed`, err);
+      throw err;
     }
-    closeZone();
+    if (closeAfter) closeZone();
     // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
     // editor already (C12-4).
   }
 
-  async function handleSetState(comment: ReviewComment, state: ReviewCommentState): Promise<void> {
-    try {
-      await deps.transport.request('review.comment.setState', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        id: comment.id,
-        state,
-      });
-    } catch (err) {
-      logError('reviewDecorations', 'review.comment.setState failed', err);
-      return;
-    }
-    closeZone();
+  function handleSubmit(line: number, body: string, kind: ReviewCommentKind): Promise<void> {
+    return runThreadAction('add comment', () =>
+      source.addComment({ start: line, end: line }, body, kind),
+    );
   }
 
-  async function handleDelete(comment: ReviewComment): Promise<void> {
-    try {
-      await deps.transport.request('review.comment.remove', {
-        repoId: deps.gitRepoId,
-        branch: deps.review.branch,
-        id: comment.id,
-      });
-    } catch (err) {
-      logError('reviewDecorations', 'review.comment.remove failed', err);
-      return;
-    }
-    closeZone();
-    // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
-    // editor already (C12-4).
+  function handleEdit(
+    comment: ReviewComment,
+    body: string,
+    kind: ReviewCommentKind,
+  ): Promise<void> {
+    return runThreadAction('edit comment', () => source.editComment(comment.id, body, kind), false);
+  }
+
+  function handleSetState(comment: ReviewComment, state: ReviewCommentState): Promise<void> {
+    return runThreadAction('set comment state', () => source.setCommentState(comment.id, state));
+  }
+
+  function handleDelete(comment: ReviewComment): Promise<void> {
+    return runThreadAction('remove comment', () => source.removeComment(comment.id));
   }
 
   const mouseDownDisposable = modifiedEditor.onMouseDown((e) => {
-    if (e.target.type !== mod.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+    if (e.target.type !== mod.editor.MouseTargetType.GUTTER_LINE_NUMBERS) return;
     const line = e.target.position?.lineNumber;
     if (line === undefined) return;
-    const lane = e.target.detail.glyphMarginLane;
-    if (lane === mod.editor.GlyphMarginLane.Right) {
-      const hunk = hunkByLine.get(line);
-      if (hunk) void mark(hunk.block, !hunk.reviewed);
-    } else if (lane === mod.editor.GlyphMarginLane.Left) {
-      const comment = commentByLine.get(line);
-      if (comment) toggleThread(comment);
-      else if (hoverLine === line) openCompose(line);
-    }
+    const comment = commentByLine.get(line);
+    if (comment) toggleThread(comment);
+    else if (hoverLine === line) openCompose(line);
   });
 
   const mouseMoveDisposable = modifiedEditor.onMouseMove((e) => {
@@ -656,20 +604,12 @@ export function attachReviewDecorations(
     run: () => void mark(currentSelectionRange(), false),
   });
 
-  // The listening side of transport.ts's fan-out — a mutation from either half of the UI (this
-  // editor or the panel's own Comments pane) reloads this editor exactly once it succeeded.
-  // Dispatches by the event's own `kind` rather than always reloading both halves — a `mark`
-  // mutation can only have changed the file diff (reviewed ranges/hunks), a `comments` mutation
-  // only the comment list.
-  const unsubscribeRepaint = onReviewRepaint((event) => {
-    if (event.repoId !== deps.gitRepoId || event.branch !== deps.review.branch) return;
-    if (event.kind === 'mark') {
-      if (!event.paths.includes(deps.path)) return;
-      void loadDiff();
-    } else {
-      void loadComments();
-    }
-  });
+  // A mutation from either half of the UI (this editor or the panel's Comments pane) reloads
+  // only what it could have changed: a mark the diff, a comment change the comments.
+  const unsubscribeRepaint = source.subscribe(
+    () => void loadDiff(),
+    () => void loadComments(),
+  );
 
   // Regions rebuild on every diff compute, which can re-collapse lines revealed earlier.
   const diffUpdateDisposable = diffEditor.onDidUpdateDiff(revealCommentLines);
@@ -680,9 +620,13 @@ export function attachReviewDecorations(
 
   return {
     ready,
+    reload(): void {
+      void load().catch((err: unknown) => logError('reviewDecorations', 'reload failed', err));
+    },
     dispose(): void {
       disposed = true;
       diffUpdateDisposable.dispose();
+      glyphMarginDisposable.dispose();
       unsubscribeRepaint();
       closeZone();
       closeErrorZone();
@@ -693,13 +637,10 @@ export function attachReviewDecorations(
       markReviewedAction.dispose();
       markUnreviewedAction.dispose();
       reviewedLineCollection.clear();
-      hunkCollection.clear();
+      clearHunkRows();
       commentCollection.clear();
       addGlyphCollection.clear();
-      laneCollection.clear();
-      // 7d (P68 review): this module is what leases deps.transport (gitTransportFor, called once
-      // per mount by RepoDiffView.vue) — nothing else holds a reference to release it.
-      deps.transport.dispose();
+      source.dispose();
     },
   };
 }

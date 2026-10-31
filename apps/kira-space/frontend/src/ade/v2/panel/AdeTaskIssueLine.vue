@@ -1,0 +1,106 @@
+<script setup lang="ts">
+import { Skeleton } from '@theme/components/ui/skeleton';
+import { t } from '@theme/i18n';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
+import { computed } from 'vue';
+import { control } from '../../../bridge/control';
+import AdeChip from '../AdeChip.vue';
+import { gapText } from '../artifacts/gapText';
+import { artifactStatusLabel, artifactStatusTone } from '../artifacts/status';
+import type { Tone } from '../board/actions';
+import { useTaskIssue } from '../queries';
+import type { ArtifactGap } from '../wire';
+
+// The linked issue as its tracker reports it: title, status and the pull requests that name its key.
+// The tracker CLI owns the credentials; a failure reads as a line of text, never an error toast.
+const props = defineProps<{ taskId: string; link: string }>();
+const query = useTaskIssue(
+  () => props.taskId,
+  () => props.link,
+);
+
+const issue = computed(() => query.data.value);
+// A task no tracker recognises shows no row at all; nothing shifts when the lookup settles.
+const shown = computed(
+  () => query.isPending.value || (issue.value !== undefined && issue.value.reason !== 'noTracker'),
+);
+const CATEGORY_TONE: Record<string, Tone> = { new: 'grey', indeterminate: 'blue', done: 'green' };
+
+const gap = computed<ArtifactGap | null>(() => {
+  const i = issue.value;
+  if (!i || i.reason === 'noTracker') return null;
+  const source = i.provider;
+  if (i.reason) return { source, repo: '', reason: i.reason };
+  if (i.changeRequestsReason) {
+    const r = i.changeRequestsReason;
+    return { source, repo: '', reason: `changeRequests${r.charAt(0).toUpperCase()}${r.slice(1)}` };
+  }
+  const missing = i.summary.known ? i.summary.count - i.changeRequests.length : 0;
+  return missing > 0 ? { source, repo: '', reason: 'changeRequestsMissing', count: missing } : null;
+});
+
+function open(e: MouseEvent, url: string): void {
+  e.preventDefault();
+  fireAndForget(control.openExternal(url), 'ade.taskIssue');
+}
+</script>
+
+<template>
+  <template v-if="shown">
+    <dt />
+    <dd class="flex min-w-0 flex-col gap-1" data-testid="ade-task-issue">
+      <Skeleton
+        v-if="query.isPending.value"
+        class="h-4 w-48"
+        data-testid="ade-task-issue-loading"
+      />
+      <template v-else-if="issue">
+        <div v-if="issue.title" class="flex min-w-0 items-center gap-2">
+          <span class="min-w-0 truncate text-kira-md" data-testid="ade-task-issue-title">{{
+            issue.title
+          }}</span>
+          <AdeChip
+            v-if="issue.status"
+            :label="issue.status"
+            :tone="CATEGORY_TONE[issue.statusCategory] ?? 'grey'"
+            data-testid="ade-task-issue-status"
+          />
+        </div>
+        <template v-if="!issue.reason">
+          <div class="text-kira-sm text-subtle" data-testid="ade-task-issue-prs">
+            {{
+              issue.summary.known || issue.changeRequests.length > 0
+              ? t('space.ade.taskTab.issueLine.prs.label', {
+                  count: Math.max(issue.summary.count, issue.changeRequests.length),
+                })
+              : t('space.ade.taskTab.issueLine.prsNone.label')
+            }}
+          </div>
+          <ul
+            v-if="issue.changeRequests.length > 0"
+            class="m-0 flex list-none flex-col gap-0.5 p-0"
+          >
+            <li
+              v-for="cr in issue.changeRequests"
+              :key="cr.url"
+              class="flex min-w-0 items-center gap-2 text-kira-md"
+              data-testid="ade-task-issue-pr"
+            >
+              <a :href="cr.url" class="min-w-0 truncate text-info" @click="open($event, cr.url)">{{
+                cr.title
+              }}</a>
+              <span class="shrink-0 text-kira-sm text-subtle">{{ cr.repo }} {{ cr.ref }}</span>
+              <AdeChip
+                :label="artifactStatusLabel(cr.state)"
+                :tone="artifactStatusTone(cr.state)"
+              />
+            </li>
+          </ul>
+        </template>
+        <div v-if="gap" class="text-kira-sm text-tone-amber" data-testid="ade-task-issue-gap">{{
+          gapText(gap)
+        }}</div>
+      </template>
+    </dd>
+  </template>
+</template>

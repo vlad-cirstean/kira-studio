@@ -11,7 +11,6 @@ export const boardKey = ['adetask', 'board'] as const;
 export const changeRequestsKey = ['adetask', 'changeRequests'] as const;
 export const workflowsKey = ['adetask', 'workflows'] as const;
 export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
-export const backlogKey = ['adetask', 'backlog'] as const;
 export const runSandboxKey = ['ade', 'runSandbox'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 export const repoNamesKey = ['adetask', 'repoNames'] as const;
@@ -48,14 +47,6 @@ export function useSessions() {
   return useQuery({
     queryKey: sessionsKey,
     queryFn: () => reader.sessions(),
-  });
-}
-
-export function useBacklog() {
-  const reader = useAdeReader();
-  return useQuery({
-    queryKey: backlogKey,
-    queryFn: () => reader.backlog(),
   });
 }
 

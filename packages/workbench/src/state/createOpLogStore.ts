@@ -1,9 +1,11 @@
 import type { OpLogRecord } from '@shared/domain/ops';
 import { defineStore } from 'pinia';
 import { computed, markRaw, reactive, toRefs } from 'vue';
+import { usePersistedState } from '../behaviour/persisted';
 import { logError } from '../bridge/log';
 
 const MAX_RECORDS = 500;
+const MAX_BACKGROUND = 300;
 const HYDRATE_LIMIT = 200;
 
 // Studio's own state/ops.ts, generalized so Kira Space's git op log can reuse the same
@@ -13,17 +15,37 @@ const HYDRATE_LIMIT = 200;
 export interface OpLogControl<R extends OpLogRecord> {
   recent(limit: number): Promise<R[]>;
   onUpdate(cb: (record: R) => void): () => void;
+  /** Coalesced pushes (Space's background reads); each record applies like an update. */
+  onBatch?(cb: (records: R[]) => void): () => void;
   cancel(id: string): Promise<void>;
+}
+
+/** The panel's one filter: status tab, then the free text over command, kind, error and `extra`. */
+export function opLogMatches(
+  record: OpLogRecord,
+  filterText: string,
+  statusFilter: 'all' | 'running' | 'error',
+  extra = '',
+): boolean {
+  if (statusFilter === 'running' && record.status !== 'running') return false;
+  if (statusFilter === 'error' && record.status !== 'error') return false;
+  const text = filterText.trim().toLowerCase();
+  if (!text) return true;
+  const haystack =
+    `${record.command ?? ''} ${record.kind} ${record.error ?? ''} ${extra}`.toLowerCase();
+  return haystack.includes(text);
 }
 
 export interface OpLogStoreOptions<R extends OpLogRecord> {
   control: OpLogControl<R>;
   /** Extra filter text per record, beyond command/kind/error. */
   searchText?: (record: R) => string;
+  /** Marks high-volume records: a separate 300-row lane, hidden until `showBackground`. */
+  background?: (record: R) => boolean;
 }
 
 export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptions<R>) {
-  const { control, searchText } = options;
+  const { control, searchText, background } = options;
 
   return defineStore('opLog', () => {
     // Vue's own `reactive<T>` return type (`UnwrapNestedRefs<T>`) recomputes a structurally-equal
@@ -34,13 +56,18 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       records: [] as R[], // newest first
       filterText: '',
       statusFilter: 'all' as 'all' | 'running' | 'error',
+      // Rows derived from other stores (automation runs) older than this stay hidden after Clear.
+      clearedAt: 0,
     }) as {
       records: R[];
       filterText: string;
       statusFilter: 'all' | 'running' | 'error';
+      clearedAt: number;
     };
 
+    const showBackground = usePersistedState('kira.ops.showBackground', false);
     let unsubscribe: (() => void) | null = null;
+    let unsubscribeBatch: (() => void) | null = null;
 
     // Shared by the live post-hydration path below and hydrateOps' own buffer replay (F7) — a
     // 'running' row replaced by its finished self, or a brand-new op unshifted newest-first.
@@ -50,7 +77,20 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
         records[idx] = raw;
       } else {
         records.unshift(raw);
-        if (records.length > MAX_RECORDS) records.length = MAX_RECORDS;
+        trimLane(records, background?.(raw) ?? false);
+      }
+    }
+
+    // Drops the oldest row of the lane the new record joined.
+    function trimLane(records: R[], isBackground: boolean): void {
+      const cap = isBackground ? MAX_BACKGROUND : MAX_RECORDS;
+      let count = 0;
+      for (let i = 0; i < records.length; i++) {
+        if ((background?.(records[i] as R) ?? false) !== isBackground) continue;
+        if (++count > cap) {
+          records.splice(i, 1);
+          return;
+        }
       }
     }
 
@@ -73,14 +113,20 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       let hydrated = false;
       const buffered = new Map<string, R>();
       unsubscribe?.();
-      unsubscribe = control.onUpdate((record) => {
+      unsubscribeBatch?.();
+      const receive = (record: R): void => {
         const raw = markRaw(record);
         if (!hydrated) {
           buffered.set(raw.id, raw);
           return;
         }
         applyUpdate(state.records, raw);
-      });
+      };
+      unsubscribe = control.onUpdate(receive);
+      unsubscribeBatch =
+        control.onBatch?.((records) => {
+          for (const record of records) receive(record);
+        }) ?? null;
 
       // A rejected snapshot still flips to live: without it the buffer grows forever and no live
       // update ever applies. The caller still sees the failure.
@@ -97,10 +143,11 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       if (failure !== undefined) throw failure;
     }
 
-    // Clears the in-memory ring only — each app's own clear-hint prop states its own retention
-    // story (Studio: op_log retention is automatic; Space: the log resets on quit).
+    // Clears this window's list only — each app's own clear-hint prop states its own retention
+    // story.
     function clearOps(): void {
       state.records = [];
+      state.clearedAt = Date.now();
     }
 
     async function cancelOp(id: string): Promise<void> {
@@ -112,24 +159,31 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
     }
 
     const visibleOps = computed<R[]>(() => {
-      const text = state.filterText.trim().toLowerCase();
       return state.records.filter((record) => {
-        if (state.statusFilter === 'running' && record.status !== 'running') return false;
-        if (state.statusFilter === 'error' && record.status !== 'error') return false;
-        if (text) {
-          const extra = searchText?.(record) ?? '';
-          const haystack =
-            `${record.command ?? ''} ${record.kind} ${record.error ?? ''} ${extra}`.toLowerCase();
-          if (!haystack.includes(text)) return false;
-        }
-        return true;
+        if (background?.(record) && !showBackground.value) return false;
+        return opLogMatches(
+          record,
+          state.filterText,
+          state.statusFilter,
+          searchText?.(record) ?? '',
+        );
       });
     });
 
     const runningCount = computed(
-      () => state.records.filter((record) => record.status === 'running').length,
+      () =>
+        state.records.filter((record) => record.status === 'running' && !background?.(record))
+          .length,
     );
 
-    return { ...toRefs(state), hydrateOps, clearOps, cancelOp, visibleOps, runningCount };
+    return {
+      ...toRefs(state),
+      showBackground,
+      hydrateOps,
+      clearOps,
+      cancelOp,
+      visibleOps,
+      runningCount,
+    };
   });
 }

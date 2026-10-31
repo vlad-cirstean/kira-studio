@@ -24,6 +24,7 @@ export type TaskMenuCmd =
   | { kind: 'showSessions' }
   | { kind: 'automation'; scriptId: string }
   | { kind: 'plan'; day: number }
+  | { kind: 'shelve'; shelf: 'later' | 'backlog' }
   | { kind: 'park'; parked: boolean }
   | { kind: 'makeTask' }
   | { kind: 'link'; url: string }
@@ -231,13 +232,11 @@ function changeBaseEntry(choices: readonly ChangeBaseChoice[]): TaskMenuEntry[] 
 
 function planEntry(i: TaskMenuInput): TaskMenuEntry {
   const day = i.card.entry.auto ? LATER : i.card.entry.day;
-  const at = (id: string, label: string, to: number): TaskMenuItem => ({
-    id,
-    label,
-    cmd: { kind: 'plan', day: to },
-    checked: day === to,
-    disabled: day === to,
-  });
+  const at = (id: string, label: string, to: number): TaskMenuItem => {
+    // A shelved task has no day: only the Later shelf counts as "on Later", so Backlog tasks can move there.
+    const here = to === LATER ? i.card.shelf === 'later' || i.card.entry.auto : day === to;
+    return { id, label, cmd: { kind: 'plan', day: to }, checked: here, disabled: here };
+  };
   return {
     type: 'submenu',
     id: 'ade-task-plan',
@@ -363,17 +362,30 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
     label: t('common.action.copy.label'),
     items: copy,
   });
-  out.push(
-    { type: 'separator' },
-    {
+  out.push({ type: 'separator' });
+  if (c.shelf === 'backlog') {
+    out.push({
       type: 'item',
-      id: 'ade-task-archive',
-      label: t('space.common.archive.label'),
-      cmd: { kind: 'archive' },
-      danger: true,
-      disabled: i.archivePending,
-    },
-  );
+      id: 'ade-task-later',
+      label: t('space.ade.board.taskMenu.moveLater.label'),
+      cmd: { kind: 'shelve', shelf: 'later' },
+    });
+  } else if (!review) {
+    out.push({
+      type: 'item',
+      id: 'ade-task-backlog',
+      label: t('space.ade.board.taskMenu.moveBacklog.label'),
+      cmd: { kind: 'shelve', shelf: 'backlog' },
+    });
+  }
+  out.push({
+    type: 'item',
+    id: 'ade-task-archive',
+    label: t('space.common.archive.label'),
+    cmd: { kind: 'archive' },
+    danger: true,
+    disabled: i.archivePending,
+  });
   return out;
 }
 

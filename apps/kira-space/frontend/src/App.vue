@@ -24,7 +24,9 @@ import { runCommand } from '@workbench/shortcuts/commands';
 import { providePaletteCommands, usePaletteStore } from '@workbench/shortcuts/palette';
 import { appUpdateStoreKey } from '@workbench/state/createAppUpdateStore';
 import { getCurrentInstance, markRaw, onMounted, onUnmounted, provide } from 'vue';
+import AdeBranchRequestPrompt from './ade/v2/request/AdeBranchRequestPrompt.vue';
 import AdeReviewWindow from './ade/v2/review/AdeReviewWindow.vue';
+import AdeHandoverPrompt from './ade/v2/stage/AdeHandoverPrompt.vue';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { useAdeWorkflowsUiStore } from './ade/v2/state/adeWorkflowsUi';
 import { control } from './bridge/control';
@@ -74,6 +76,8 @@ const promptKinds = {
   'mobile-pairing': markRaw(MobilePairingDialog),
   update: markRaw(UpdatePrompt),
   quit: markRaw(QuitPrompt),
+  handover: markRaw(AdeHandoverPrompt),
+  'branch-request': markRaw(AdeBranchRequestPrompt),
 };
 const reviewWindow = useAdeReviewWindowStore();
 

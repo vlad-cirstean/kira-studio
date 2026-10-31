@@ -1,7 +1,15 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
 // Changing a key, type or value set is a contract change (docs/HISTORY.md (v2.0 P143) rule 1).
 
-import type { FileChange, GitHostInfo } from '@kira/git-ipc';
+import type {
+  FileChange,
+  FileDiffBody,
+  GitHostInfo,
+  LineRange,
+  ReviewComment,
+  ReviewCommentKind,
+  ReviewFileStatus,
+} from '@kira/git-ipc';
 import type { RunOutcome } from '@shared/domain/runOutcome';
 
 // ---- shared
@@ -113,8 +121,6 @@ export interface ReviewStepConfig {
 export interface Workflow {
   id: string;
   name: string;
-  /** Turns on the Kira Space tools (declare repos, request branches) for the work of a task. */
-  kiraSpaceMcp: boolean;
   steps: WorkflowStep[];
 }
 export interface WorkflowError {
@@ -393,19 +399,141 @@ export interface Task {
   statusId: TaskStatus;
   /** Who set the status last: a step change ('auto') or the user. */
   statusBy: 'auto' | 'user';
+  /** The workflow step whose position set the status; '' before the task starts. */
+  statusStep: string;
+  /** The newest handed handover: what the last stage move left for this stage. */
+  handoverIn: Handover | null;
+  /** Open drafts sessions wrote; they become handed on the next stage move. */
+  handoverDrafts: Handover[];
+  /** The open request an agent waits on for this task; '' when none. */
+  branchRequestId: string;
 }
-/** One status of the user's set. `category` decides which status automation picks. */
+/** The text one stage leaves for the next. A draft has `state: 'draft'` and an empty `toStepId`. */
+export interface Handover {
+  id: string;
+  taskId: string;
+  fromStepId: string;
+  fromStepName: string;
+  toStepId: string /* 'done' = past the last step */;
+  toStepName: string;
+  body: string;
+  source: 'agent' | 'run' | 'user';
+  state: 'draft' | 'handed';
+  finished: boolean;
+  dismissed: boolean;
+  edited: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+/** Something a task produced or points at. Detected rows have an empty `id`; stored rows can be removed. */
+export interface Artifact {
+  id: string;
+  kind: 'changeRequest' | 'issue' | 'branch' | 'deployment' | 'doc' | 'link';
+  title: string;
+  url: string;
+  ref: string;
+  status: string;
+  repo: string;
+  source: 'task' | 'host' | 'git' | 'agent' | 'user' | (string & {});
+  createdAt: number;
+}
+/** A source that failed or timed out; the list is partial. */
+export interface ArtifactGap {
+  source: string;
+  repo: string;
+  /** Why a tracker source is partial; '' for the others. */
+  reason?: string;
+  /** Change requests the tracker reports beyond the ones found (changeRequestsMissing). */
+  count?: number;
+}
+interface IssueChangeRequest {
+  title: string;
+  url: string;
+  ref: string;
+  state: string;
+  repo: string;
+}
+/** The issue tracker's view of a task's linked issue. */
+export interface TaskIssue {
+  provider: string;
+  label: string;
+  key: string;
+  url: string;
+  title: string;
+  status: string;
+  statusCategory: 'new' | 'indeterminate' | 'done' | '';
+  summary: { known: boolean; count: number; state: string; providers: string[] };
+  changeRequests: IssueChangeRequest[];
+  /** Why the issue could not be read; '' when it was. noTracker: no tracker recognises the link. */
+  reason: string;
+  /** Set when only the pull request lookup failed. */
+  changeRequestsReason: string;
+}
+export interface ArtifactsResult {
+  artifacts: Artifact[];
+  gaps: ArtifactGap[];
+}
+export interface AddArtifactArgs {
+  taskId: string;
+  kind: 'changeRequest' | 'issue' | 'deployment' | 'doc' | 'link';
+  title: string;
+  url: string;
+  ref: string;
+}
+export interface RemoveArtifactArgs {
+  taskId: string;
+  id: string;
+}
+export interface HandoversResult {
+  handovers: Handover[];
+}
+export interface UpdateHandoverArgs {
+  id: string;
+  /** '' deletes the row. */
+  body: string;
+}
+/** `notes` replaces the stage's draft handover; '' drops it; absent keeps it. */
+export interface StepDoneArgs {
+  taskId: string;
+  notes?: string | null;
+}
+/** The 16 status colours (`--color-status-*`). */
+export type StatusColor =
+  | 'grey'
+  | 'brown'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'yellow'
+  | 'lime'
+  | 'green'
+  | 'teal'
+  | 'cyan'
+  | 'sky'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'purple'
+  | 'pink';
+/** One status of the user's set: a label. Kira reads no meaning into its name, colour or order. */
 export interface TaskStatusDef {
   id: TaskStatus;
   name: string;
-  tone: 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
-  category: 'todo' | 'active' | 'review' | 'done';
+  color: StatusColor;
+}
+/** The status of each automatic change; '' keeps the current status. `new` is required: it is the status of a new task and of a task back at its first step with nothing run. `step` applies when a step with no status of its own starts, `review` when a review step with none starts, `finished` when the workflow finishes. */
+export interface StatusDefaults {
+  new: TaskStatus;
+  step: TaskStatus | '';
+  review: TaskStatus | '';
+  finished: TaskStatus | '';
 }
 export interface Plan {
   day: Record<string, string> /* taskId -> ISO date; absent = Later */;
   order: string[] /* taskIds */;
   queuedAfter: Record<string, string> /* branchId -> branchId */;
   unpushed: Record<string, boolean>;
+  backlog: string[] /* Backlog shelf taskIds in order */;
 }
 export interface HistoryEntry {
   taskId: string;
@@ -423,6 +551,7 @@ export interface RepoState {
 export interface Board {
   tasks: Task[];
   statuses: TaskStatusDef[];
+  statusDefaults: StatusDefaults;
   branches: Branch[];
   plan: Plan;
   pairs: Pair[];
@@ -476,20 +605,6 @@ export interface ChangeRequestsResult {
   repos: RepoHost[];
   branches: Record<string, ChangeRequest> /* branchId */;
   branchUrls: Record<string, string> /* branchId -> web page; absent without a host */;
-}
-
-// ---- backlog (§11.1, O2)
-export interface BacklogItem {
-  id: string;
-  text: string;
-  addedAt: number;
-  jira: Jira | null;
-  hostUrl: string;
-  hostLink: HostLink | null;
-  notes: string;
-}
-export interface BacklogResult {
-  items: BacklogItem[] /* order = priority */;
 }
 
 // ---- add / refresh / archive results
@@ -612,10 +727,44 @@ export interface ReviewWorking {
   worktree: string /* '' = the branch has no worktree */;
   head: string;
   files: FileChange[];
+  reviews: Record<string, ReviewFileStatus> /* uncommitted review status by path */;
+  promoted: string[] /* paths whose uncommitted review moved onto a commit in this call */;
+  contentHashes: Record<string, string> /* worktree content hash by path; echo it on a list mark */;
 }
 export interface ReviewWorkingDiffArgs {
   branchId: string;
   path: string;
+}
+export interface ReviewWorkingFileReview {
+  path: string;
+  body: FileDiffBody;
+  reviewedRanges: LineRange[] /* worktree line numbers */;
+  lineCount: number;
+  contentKind: string /* 'text' | 'binary' | 'tooLarge' | 'absent' */;
+}
+export interface ReviewWorkingMarkArgs {
+  branchId: string;
+  paths: string[];
+  reviewed: boolean;
+  ranges: LineRange[] | null /* one path only; null = the whole file */;
+  contentHashes?: Record<
+    string,
+    string
+  > /* hash the user saw by path; E_CONFLICT, nothing marked, when any changed */;
+}
+export interface ReviewWorkingMarkResult {
+  files: { path: string; review: ReviewFileStatus }[];
+}
+export interface ReviewWorkingCommentsResult {
+  comments: ReviewComment[];
+}
+export interface ReviewWorkingCommentAddArgs {
+  branchId: string;
+  path: string;
+  range: LineRange;
+  body: string;
+  kind: ReviewCommentKind;
+  contentHash?: string /* E_CONFLICT when the file changed since */;
 }
 export interface ReviewAgentState {
   session: Session | null;
@@ -751,13 +900,15 @@ export interface TaskPatch {
   kind: 'task' | 'parked' | null;
   statusId: TaskStatus | null;
 }
-/** `id` '' = a new status. `reassign` maps a removed id to the id its tasks move to; without an entry they go to the first kept status of its category. */
+/** `id` '' = a new status. `reassign` maps every removed id to the id its tasks move to; a `defaults` field naming a removed status moves there too. */
 export interface SaveStatusesArgs {
   statuses: TaskStatusDef[];
+  defaults: StatusDefaults;
   reassign: Record<string, string>;
 }
 export interface SaveStatusesResult {
   statuses: TaskStatusDef[];
+  defaults: StatusDefaults;
 }
 export interface UpdateTaskArgs {
   taskId: string;
@@ -819,26 +970,14 @@ export interface RefreshArgs {
 export interface BranchArgs {
   branchId: string;
 }
-export interface AddBacklogItemArgs {
-  text: string;
+export type Shelf = 'later' | 'backlog';
+export interface ShelveTaskArgs {
+  taskId: string;
+  shelf: Shelf;
+  beforeId: string /* '' = end of the shelf */;
 }
-export interface BacklogPatch {
-  text: string | null;
-  jira: Jira | null;
-  clearJira: boolean;
-  hostUrl: string | null;
-  notes: string | null;
-}
-export interface UpdateBacklogItemArgs {
-  id: string;
-  patch: BacklogPatch;
-}
-export interface BacklogItemArgs {
-  id: string;
-}
-export interface MoveBacklogItemArgs {
-  id: string;
-  toIndex: number;
+export interface CaptureTaskArgs {
+  title: string;
 }
 export interface FileNameArgs {
   fileName: string;
@@ -905,6 +1044,36 @@ export interface RunArgs {
 export interface TaskArgs {
   taskId: string;
 }
+/** One repo an agent asks branch work for: a new `branch` from `base` ('' = main), or a `worktree` for `branch`. */
+export interface BranchRequestItem {
+  codeRepoId: string;
+  repo: string;
+  kind: 'branch' | 'worktree';
+  branch: string;
+  base: string;
+}
+/** An agent's open request for branches and worktrees. `expiresAt` is unix millis. */
+export interface BranchRequest {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  source: 'run' | 'session' | 'automation';
+  stepName: string;
+  items: BranchRequestItem[];
+  createdAt: number;
+  expiresAt: number;
+}
+export interface BranchRequestArgs {
+  id: string;
+}
+export interface ApproveBranchRequestArgs {
+  id: string;
+  codeRepoIds: string[];
+}
+/** `resolved` is false when the request was already answered. */
+export interface BranchRequestAnswer {
+  resolved: boolean;
+}
 export interface ReadLogArgs {
   kind: LogKind;
   id: string;
@@ -934,6 +1103,7 @@ export interface SetTaskStepArgs {
   taskId: string;
   stepId: string;
   fromStepId?: string;
+  notes?: string | null;
 }
 export interface SendArgs {
   sessionId: string;

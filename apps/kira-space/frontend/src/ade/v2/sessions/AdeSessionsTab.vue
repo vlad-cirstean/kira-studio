@@ -9,6 +9,7 @@ import AdeSessionActions from './AdeSessionActions.vue';
 import AdeSessionStrip from './AdeSessionStrip.vue';
 import AdeStoppedList from './AdeStoppedList.vue';
 import AdeStoppedMenu from './AdeStoppedMenu.vue';
+import AdeTaskLaunchMenu from './AdeTaskLaunchMenu.vue';
 import AdeTuiPane from './AdeTuiPane.vue';
 import { byRecent, byRunningOrder } from './sessionView';
 import { useSessionViews } from './useSessionViews';
@@ -70,7 +71,7 @@ watch(stoppedOpen, (open) => {
 <template>
   <div class="flex min-h-0 flex-1 flex-col bg-bg" data-testid="ade-sessions-tab">
     <div
-      v-if="!archived && (running.length || stopped.length)"
+      v-if="!archived"
       class="flex shrink-0 items-center gap-1 border-b border-border bg-chrome pr-1.5"
       data-testid="ade-session-bar-row"
     >
@@ -82,6 +83,9 @@ watch(stoppedOpen, (open) => {
       />
       <AdeStoppedMenu v-model:open="stoppedOpen" :views="stopped" :selected-id="revealed" />
       <AdeSessionActions v-if="current" :view="current" />
+      <span class="ml-auto flex shrink-0 items-center">
+        <AdeTaskLaunchMenu :task-id="taskId" :branch-id="branchId" size="bar" />
+      </span>
     </div>
     <template v-if="current">
       <AdeHeadlessPane v-if="current.headless" :key="current.session.id" :view="current" />

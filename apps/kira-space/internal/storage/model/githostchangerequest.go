@@ -41,3 +41,9 @@ type GitHostSyncState struct {
 	DeltaFloor    int64
 	SchemaVersion int
 }
+
+// GitHostChangeRequestHit is an indexed change request with the repository key it belongs to.
+type GitHostChangeRequestHit struct {
+	RepoKey string
+	GitHostChangeRequest
+}

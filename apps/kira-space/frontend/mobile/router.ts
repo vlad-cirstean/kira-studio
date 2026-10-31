@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './AppShell.vue';
-import BacklogScreen from './screens/BacklogScreen.vue';
+import LaterScreen from './screens/LaterScreen.vue';
 import NeedsScreen from './screens/NeedsScreen.vue';
 import PairScreen from './screens/PairScreen.vue';
 import PlanScreen from './screens/PlanScreen.vue';
@@ -18,9 +18,9 @@ export const router = createRouter({
       component: AppShell,
       redirect: '/needs',
       children: [
-        { path: 'backlog', component: BacklogScreen },
         { path: 'needs', component: NeedsScreen },
         { path: 'plan', component: PlanScreen },
+        { path: 'later', component: LaterScreen },
       ],
     },
   ],

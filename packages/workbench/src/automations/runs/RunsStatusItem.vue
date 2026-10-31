@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipDetails from '@theme/components/TooltipDetails.vue';
 import { t } from '@theme/i18n';
 import { usePersistedState } from '@workbench/behaviour/persisted';
+import StatusBarItem from '@workbench/components/StatusBarItem.vue';
 import { computed } from 'vue';
 import { useAutomationsModule } from '../module';
 import { useScriptRuns } from './runsQueries';
@@ -20,14 +20,14 @@ function show(): void {
 </script>
 
 <template>
-  <Button
-    v-if="running > 0"
-    variant="toolbar"
-    size="status"
-    data-testid="status-runs"
-    @click="show"
-  >
-    <CodiconIcon name="play" :size="13" />
-    {{ t('automations.runs.running.label', { count: running }) }}
-  </Button>
+  <StatusBarItem v-if="running > 0" icon="play" data-testid="status-runs" @click="show">
+    {{ t('common.state.runningCount.status', { count: running }) }}
+    <template #tip>
+      <TooltipDetails
+        :title="t('workbench.statusBar.runs.tooltip')"
+        :rows="[{ label: t('common.state.running.status'), value: String(running) }]"
+        :hint="t('workbench.statusBar.runs.open.hint')"
+      />
+    </template>
+  </StatusBarItem>
 </template>

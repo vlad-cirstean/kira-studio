@@ -10,7 +10,6 @@
       "**",
       "!dist",
       "!test-results",
-      "!playwright-report",
       "!node_modules",
       "!apps/kira-studio/tests/contract",
       "!apps/kira-space/tests/contract",

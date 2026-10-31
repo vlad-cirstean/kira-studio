@@ -139,6 +139,13 @@ func (d *Discovery) Status(ctx context.Context, host string) Status {
 	return status
 }
 
+// Forget drops the cached probe of host, so the next Status asks gh again.
+func (d *Discovery) Forget(host string) {
+	d.mu.Lock()
+	delete(d.cache, host)
+	d.mu.Unlock()
+}
+
 // Hosts returns every host this Discovery has ever probed — D15's own "is this a GitHub
 // repository" test consults this alongside a literal "github.com" check, so a GHES host that has
 // ever answered "ok" here is recognised on every later call too.

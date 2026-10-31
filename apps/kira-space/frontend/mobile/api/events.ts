@@ -11,7 +11,6 @@ import { getJson } from './http';
 
 const CHANNELS = [
   CHANNEL.adeTaskBoard,
-  CHANNEL.adeTaskBacklog,
   CHANNEL.adeTaskWorkflows,
   CHANNEL.adeTaskRepos,
   CHANNEL.adeTaskRuns,
@@ -46,7 +45,6 @@ function dispatch(channel: string, raw: string): void {
 
 export const sseSignalSource: AdeSignalSource = {
   onBoard: (cb) => onChannel(CHANNEL.adeTaskBoard, () => cb()),
-  onBacklog: (cb) => onChannel(CHANNEL.adeTaskBacklog, () => cb()),
   onWorkflows: (cb) => onChannel(CHANNEL.adeTaskWorkflows, () => cb()),
   onSessions: (cb) => onChannel(CHANNEL.adeTaskSessions, () => cb()),
   onRuns: (cb) => onChannel(CHANNEL.adeTaskRuns, (d) => cb(d as RunsChangedEvent)),

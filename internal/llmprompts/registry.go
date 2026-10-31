@@ -53,6 +53,11 @@ type RememberVars struct {
 	Text string `json:"text"`
 }
 
+// CountVars fills a text with a count.
+type CountVars struct {
+	Count int `json:"count"`
+}
+
 // MaxVars fills an argument description with an upper bound.
 type MaxVars struct {
 	Max int `json:"max"`
@@ -121,6 +126,14 @@ type RepoLineVars struct {
 	Worktree     string `json:"worktree"`
 	Base         string `json:"base"`
 	ReadOnlyRoot string `json:"readOnlyRoot"`
+	// ChangeRequestURL is the branch's pull or merge request link, in review messages only.
+	ChangeRequestURL string `json:"changeRequestURL"`
+}
+
+// HandoverBlockVars fills the handover block fragment.
+type HandoverBlockVars struct {
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // JiraLineVars fills the Jira line.
@@ -145,8 +158,12 @@ type StepVars struct {
 	Message    string     `json:"message"`
 	Extra      string     `json:"extra"`
 	Context    []string   `json:"context"`
-	Space      bool       `json:"space"`
 	Finish     FinishVars `json:"finish"`
+	// Notes are the task notes; Handover is what the previous stage left, HandoverFrom its stage name.
+	// All arrive capped and outside Message, so a Run dialog edit keeps them.
+	Notes        string `json:"notes"`
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // ManualVars fills the manual step message. StepPrompt arrives substituted; Notes arrive capped.
@@ -158,6 +175,9 @@ type ManualVars struct {
 	Notes      string         `json:"notes"`
 	Repos      []RepoLineVars `json:"repos"`
 	StepPrompt string         `json:"stepPrompt"`
+	// Handover is what the previous stage left, HandoverFrom its stage name; both capped.
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // ReviewVars fills the review message. Notes arrive capped.
@@ -167,6 +187,9 @@ type ReviewVars struct {
 	JiraURL string         `json:"jiraURL"`
 	Notes   string         `json:"notes"`
 	Repos   []RepoLineVars `json:"repos"`
+	// Handover is what the previous stage left, HandoverFrom its stage name; both capped.
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // StartVars fills the Start message; StepName is empty when the workflow has no open step.
@@ -180,6 +203,9 @@ type StartVars struct {
 	ReadOnlyRoot string   `json:"readOnlyRoot"`
 	StepName     string   `json:"stepName"`
 	Context      []string `json:"context"`
+	// Handover is what the previous stage left, HandoverFrom its stage name; both capped.
+	Handover     string `json:"handover"`
+	HandoverFrom string `json:"handoverFrom"`
 }
 
 // RebaseContextVars fills the line about a branch whose last rebase did not finish.
@@ -197,6 +223,8 @@ type ReviewCommentVar struct {
 	Path  string `json:"path"`
 	Lines string `json:"lines"`
 	Body  string `json:"body"`
+	// Uncommitted marks a comment written against worktree content no commit holds yet.
+	Uncommitted bool `json:"uncommitted"`
 }
 
 // ReviewRoundVars fills the review round messages and the comment list fragment.
@@ -210,6 +238,8 @@ type ReviewRoundVars struct {
 	Worktree string             `json:"worktree"`
 	Round    int                `json:"round"`
 	Comments []ReviewCommentVar `json:"comments"`
+	// ChangeRequestURL is the branch's pull or merge request link, in the round message only.
+	ChangeRequestURL string `json:"changeRequestURL"`
 }
 
 // ResumeVars fills the resume-after-restart message.
@@ -771,7 +801,7 @@ var HeadlessSpaceSuffix = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceSuffix.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceSuffix.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceSuffix.usedBy.body",
-	Default:    `Kira Space tools: task_info, declare_repos, request_branch, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only through request_branch, with a name you choose, then work in the returned worktree.`,
+	Default:    `Kira Space tools: task_info, declare_repos, request_branches, branch_status. Your working directory may be a repo root: read it, change nothing there. Create branches and worktrees only with request_branches, one call for every repo you need; the user approves it. Never git branch, git worktree or git checkout -b. Then work in the returned worktrees.`,
 }, NoVars{})
 
 // HeadlessSandboxNote tells a sandboxed agent what it may write and what to do on a denial.
@@ -783,7 +813,7 @@ var HeadlessSandboxNote = define(Entry{
 	Default: `Sandbox{{if not .Enforced}} (declared, not enforced){{end}}: {{if eq .Access "write"}}write only in {{.Worktree}} and $TMPDIR{{else}}read only; write only in $TMPDIR{{end}}.{{range .Read}}
 Read also: {{.}}{{end}}{{if not .Network}}
 Network: Claude API only.{{end}}{{if .Tools}}
-No git branch, worktree, tag, stash, fetch or push. Use request_branch, fetch_remote, push_branch.{{end}}
+No git branch, worktree, tag, stash, fetch or push. Use request_branches, fetch_remote, push_branch.{{end}}
 "Operation not permitted" means the sandbox blocked it. Do not retry. Call finish_step failed; name the path in reason.`,
 }, SandboxNoteVars{
 	Access: "write", Worktree: "/work/kira-space/feat-login", Read: []string{"/work/specs"}, Network: false, Enforced: true, Tools: true,
@@ -813,7 +843,7 @@ var HeadlessSpaceInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceInstructions.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceInstructions.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceInstructions.usedBy.body",
-	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches only with request_branch, never with git branch or git worktree. A new worktree may still be preparing: call branch_status (it can wait) before editing there.`,
+	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches and worktrees only with request_branches, one call for all repos; the user approves it. Never git branch or git worktree. A new worktree may still be preparing: call branch_status before editing there. Record docs, deployments and links you make with report_artifacts; finishing replies list every artifact.`,
 }, NoVars{})
 
 // HeadlessToolFinishStep describes the finish_step tool.
@@ -878,15 +908,14 @@ var HeadlessToolDeclareRepos = define(Entry{
 var _ = arg(HeadlessToolDeclareRepos.id, "repos", spaceApp, NextCall,
 	`Repos to add: nickname, name or code repo id of a registered repo, from task_info. 1 to {{.Max}}.`, MaxVars{Max: 20})
 
-// HeadlessToolRequestBranch describes the request_branch tool.
-var HeadlessToolRequestBranch = define(Entry{
-	ID: "headless.tool.request_branch", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "request_branch",
-	Default: `Create a branch and its worktree for a repo of the task. Returns at once; the prepare script may still run, so call branch_status before working there.`,
+// HeadlessToolRequestBranches describes the request_branches tool.
+var HeadlessToolRequestBranches = define(Entry{
+	ID: "headless.tool.request_branches", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "request_branches",
+	Default: `Ask the user to approve branches and worktrees for task repos, all in one call; waits for the answer. Kira Space names each new branch. Per repo: created, existing, denied, failed or timeout. A new worktree may still be preparing: call branch_status before editing there.`,
 }, NoVars{})
 
 var (
-	_ = arg(HeadlessToolRequestBranch.id, "repo", spaceApp, NextCall, `Task repo: nickname, name or code repo id.`, NoVars{})
-	_ = arg(HeadlessToolRequestBranch.id, "name", spaceApp, NextCall, `Branch name to create, such as feat/login-form.`, NoVars{})
+	_ = arg(HeadlessToolRequestBranches.id, "repos", spaceApp, NextCall, `Task repos, 1 to {{.Max}}: nickname, name or code repo id. Add others first with declare_repos.`, MaxVars{Max: 20})
 )
 
 // HeadlessToolBranchStatus describes the branch_status tool.
@@ -928,6 +957,67 @@ var (
 	_ = arg(HeadlessToolRunOutcome.id, "kind", spaceApp, NextCall, `rebase, step or automation (script runs started for this task). Default rebase and step.`, NoVars{})
 	_ = arg(HeadlessToolRunOutcome.id, "limit", spaceApp, NextCall, `How many runs, 1 to {{.Max}}. Default 3.`, MaxVars{Max: 10})
 )
+
+// HeadlessToolHandover describes the handover tool.
+var HeadlessToolHandover = define(Entry{
+	ID: "headless.tool.handover", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "handover",
+	Default: `Leave notes for the next stage of this task. Call it when you did work the next stage must know about; again to replace the notes.`,
+}, NoVars{})
+
+var (
+	_ = arg(HeadlessToolHandover.id, "notes", spaceApp, NextCall, `What you did, what is left, what the next stage must know. Plain text, at most {{.Max}} bytes.`, MaxVars{Max: 16384})
+	_ = arg(HeadlessToolHandover.id, "finished", spaceApp, NextCall, `true when your stage's work is done: Kira Space then offers the user to move the task on. Default false.`, NoVars{})
+)
+
+// HeadlessHandoverAck is the reply to a handover call.
+var HeadlessHandoverAck = define(Entry{
+	ID: "headless.handover.ack", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessHandoverAck.title",
+	PurposeKey: "llmPrompts.entry.headlessHandoverAck.description",
+	UsedByKey:  "llmPrompts.entry.headlessHandoverAck.usedBy.body",
+	Default:    `Recorded. The user moves the task on.`,
+}, NoVars{})
+
+// HeadlessToolReportArtifacts describes the report_artifacts tool.
+var HeadlessToolReportArtifacts = define(Entry{
+	ID: "headless.tool.report_artifacts", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "report_artifacts",
+	Default: `Record what you made outside the task's git branches: docs, deployments, PRs in other repos, issues, links. The task's branches, their PRs and configured deployments are found already.`,
+}, NoVars{})
+
+var (
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts", spaceApp, NextCall, `1 to {{.Max}} items to record. A url already recorded is updated.`, MaxVars{Max: 20})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.kind", spaceApp, NextCall, `changeRequest, issue, deployment, doc or link.`, NoVars{})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.title", spaceApp, NextCall, `Short name, at most 200 bytes.`, NoVars{})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.url", spaceApp, NextCall, `http or https address. Give url or ref.`, NoVars{})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.ref", spaceApp, NextCall, `What names it without a url, such as a file path.`, NoVars{})
+)
+
+// HeadlessArtifactsHeader opens the artifact list a finishing call returns.
+var HeadlessArtifactsHeader = define(Entry{
+	ID: "headless.artifacts.header", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessArtifactsHeader.title",
+	PurposeKey: "llmPrompts.entry.headlessArtifactsHeader.description",
+	UsedByKey:  "llmPrompts.entry.headlessArtifactsHeader.usedBy.body",
+	Default:    `Every artifact of this task. Name them in your final message to the user.`,
+}, NoVars{})
+
+// HeadlessArtifactsMore ends a list cut short.
+var HeadlessArtifactsMore = define(Entry{
+	ID: "headless.artifacts.more", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessArtifactsMore.title",
+	PurposeKey: "llmPrompts.entry.headlessArtifactsMore.description",
+	UsedByKey:  "llmPrompts.entry.headlessArtifactsMore.usedBy.body",
+	Default:    `{{.Count}} more artifacts not shown.`,
+}, CountVars{Count: 1})
+
+// HeadlessArtifactsUnavailable replaces the artifact list when it could not be read.
+var HeadlessArtifactsUnavailable = define(Entry{
+	ID: "headless.artifacts.unavailable", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessArtifactsUnavailable.title",
+	PurposeKey: "llmPrompts.entry.headlessArtifactsUnavailable.description",
+	UsedByKey:  "llmPrompts.entry.headlessArtifactsUnavailable.usedBy.body",
+	Default:    `Artifacts could not be listed.`,
+}, NoVars{})
 
 // HeadlessToolGit describes the git tool.
 var HeadlessToolGit = define(Entry{
@@ -977,9 +1067,13 @@ Step {{.StepNumber}}/{{.StepCount}}: {{.StepName}}{{if .StepPrompt}}
 
 {{.Extra}}{{end}}{{if .Context}}
 
-{{join .Context "\n"}}{{end}}{{if .Space}}
+{{join .Context "\n"}}{{end}}{{if .Notes}}
 
-{{template "headless.space.suffix"}}{{end}}
+- Notes: {{.Notes}}{{end}}{{if .Handover}}
+
+{{template "ade.handoverBlock" .}}{{end}}
+
+{{template "headless.space.suffix"}}
 
 {{template "headless.finishStep.suffix" .Finish}}
 `,
@@ -988,6 +1082,7 @@ Step {{.StepNumber}}/{{.StepCount}}: {{.StepName}}{{if .StepPrompt}}
 	Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login",
 	StepNumber: 2, StepCount: 5, StepName: "Implement", StepPrompt: "Implement the task in the worktree.",
 	Context: []string{}, Finish: FinishVars{Implicit: true, Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}},
+	Notes: "Check the error states.", Handover: "Form wired; validation still missing.", HandoverFrom: "Design",
 })
 
 // AdeManualMessage is the first message of a manual step session.
@@ -1000,10 +1095,14 @@ var AdeManualMessage = define(Entry{
 {{template "ade.jiraLine" .}}{{end}}{{range .Repos}}
 {{template "ade.repoLine" .}}{{end}}{{if .Notes}}
 - Notes: {{.Notes}}{{end}}{{if .StepPrompt}}
-{{.StepPrompt}}{{end}}`,
+{{.StepPrompt}}{{end}}{{if .Handover}}
+{{template "ade.handoverBlock" .}}{{end}}
+{{template "headless.space.suffix"}}
+{{template "ade.handoverLine"}}`,
 }, ManualVars{
 	StepName: "Review", Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Notes: "Check the error states.", StepPrompt: "Check kira-space on feat/login.",
+	Handover: "Form wired; validation still missing.", HandoverFrom: "Implement",
 	Repos: []RepoLineVars{
 		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
@@ -1019,13 +1118,16 @@ var AdeReviewMessage = define(Entry{
 	Default: `Task: {{.Title}}{{if .JiraKey}}
 {{template "ade.jiraLine" .}}{{end}}{{if .Notes}}
 - Notes: {{.Notes}}{{end}}{{range .Repos}}
-{{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{end}}
-I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.`,
+{{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{if .ChangeRequestURL}}, PR {{.ChangeRequestURL}}{{end}}{{end}}
+I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.{{if .Handover}}
+{{template "ade.handoverBlock" .}}{{end}}
+{{template "headless.space.suffix"}}
+{{template "ade.handoverLine"}}`,
 }, ReviewVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
-	Notes: "Check the error states.",
+	Notes: "Check the error states.", Handover: "Form wired; validation still missing.", HandoverFrom: "Implement",
 	Repos: []RepoLineVars{
-		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main"},
+		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main", ChangeRequestURL: "https://github.com/acme/kira-space/pull/42"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
 	},
 })
@@ -1033,9 +1135,11 @@ I review these branches in Kira Space and will ask questions about them. Answer 
 var reviewRoundExample = ReviewRoundVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Repo: "kira-space", Branch: "feat/login", Base: "main", Worktree: "/work/kira-space/feat-login", Round: 1,
+	ChangeRequestURL: "https://github.com/acme/kira-space/pull/42",
 	Comments: []ReviewCommentVar{
 		{ID: 3, Kind: "change", Path: "src/login.ts", Lines: "12-14", Body: "Rename this to isValid."},
 		{ID: 4, Kind: "question", Path: "src/login.ts", Lines: "30", Body: "Why retry twice?"},
+		{ID: 5, Kind: "change", Path: "src/login.ts", Lines: "41", Body: "Drop this log line.", Uncommitted: true},
 	},
 }
 
@@ -1045,7 +1149,7 @@ var AdeReviewComments = define(Entry{
 	TitleKey:   "llmPrompts.entry.adeReviewComments.title",
 	PurposeKey: "llmPrompts.entry.adeReviewComments.description",
 	UsedByKey:  "llmPrompts.entry.adeReviewComments.usedBy.body",
-	Default: `{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}
+	Default: `{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}{{if .Uncommitted}} (uncommitted){{end}}
 {{.Body}}
 {{end}}Per comment, call reply_review_comment once.
 change: make the change, commit it, reply what changed, resolved true.
@@ -1062,7 +1166,8 @@ var AdeReviewRoundMessage = define(Entry{
 	RequiredFragments: []ID{"ade.review.comments"},
 	Default: `Review of task {{.Title}}{{if .JiraKey}}
 {{template "ade.jiraLine" .}}{{end}}
-Repo {{.Repo}}, branch {{.Branch}} (base {{.Base}}), worktree {{.Worktree}}.
+Repo {{.Repo}}, branch {{.Branch}} (base {{.Base}}), worktree {{.Worktree}}.{{if .ChangeRequestURL}}
+PR {{.ChangeRequestURL}}{{end}}
 Read the branch diff against the base first. The reviewer left these comments:
 {{template "ade.review.comments" .}}`,
 }, reviewRoundExample)
@@ -1085,7 +1190,7 @@ var AdeReviewForwardMessage = define(Entry{
 	PurposeKey: "llmPrompts.entry.adeReviewForwardMessage.description",
 	UsedByKey:  "llmPrompts.entry.adeReviewForwardMessage.usedBy.body",
 	Default: `My review comments on {{.Repo}} {{.Branch}} (base {{.Base}}):
-{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}
+{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}{{if .Uncommitted}} (uncommitted){{end}}
 {{.Body}}
 {{end}}Answer each question. Make the change a change comment asks for.`,
 }, reviewRoundExample)
@@ -1100,12 +1205,34 @@ var AdeStartMessage = define(Entry{
 {{template "ade.jiraLine" .}}{{end}}
 {{template "ade.repoLine" .}}{{if .StepName}}
 Step: {{.StepName}}{{end}}{{range .Context}}
-{{.}}{{end}}`,
+{{.}}{{end}}{{if .Handover}}
+{{template "ade.handoverBlock" .}}{{end}}
+{{template "headless.space.suffix"}}
+{{template "ade.handoverLine"}}`,
 }, StartVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", StepName: "Implement",
-	Context: []string{},
+	Context: []string{}, Handover: "Form wired; validation still missing.", HandoverFrom: "Design",
 })
+
+// AdeHandoverBlock is what the previous stage left for the next one.
+var AdeHandoverBlock = define(Entry{
+	ID: "ade.handoverBlock", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeHandoverBlock.title",
+	PurposeKey: "llmPrompts.entry.adeHandoverBlock.description",
+	UsedByKey:  "llmPrompts.entry.adeHandoverBlock.usedBy.body",
+	Default: `Handover from {{.HandoverFrom}}:
+{{.Handover}}`,
+}, HandoverBlockVars{HandoverFrom: "Design", Handover: "Form wired; validation still missing."})
+
+// AdeHandoverLine tells an interactive session to leave notes for the next stage.
+var AdeHandoverLine = define(Entry{
+	ID: "ade.handoverLine", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeHandoverLine.title",
+	PurposeKey: "llmPrompts.entry.adeHandoverLine.description",
+	UsedByKey:  "llmPrompts.entry.adeHandoverLine.usedBy.body",
+	Default:    `Call handover with notes for the next stage. Set finished true when this stage's work is done.`,
+}, NoVars{})
 
 // AdeRepoLine is one repository line of a launch message.
 var AdeRepoLine = define(Entry{
@@ -1230,3 +1357,57 @@ var (
 	_ = arg(DbmcpToolExplainQuery.id, "path", studioApp, NextCall, `Encoded database path from list_children. Required on postgres, mysql, mariadb and mongodb; pass "" on other engines.`, NoVars{})
 	_ = arg(DbmcpToolExplainQuery.id, "includeRaw", studioApp, NextCall, `Also return the server's raw EXPLAIN text. Default false: can be tens of kilobytes; the parsed plan is the point.`, NoVars{})
 )
+
+// DbmcpToolProofStartSession describes the proof_start_session tool.
+var DbmcpToolProofStartSession = define(Entry{
+	ID: "dbmcp.tool.proof_start_session", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_start_session",
+	Default: "Start a validation proof session: an ordered record of the checks that show your work is correct, which the user reviews in a window once you close it. Returns a draftId for proof_add_step. Names are unique, ignoring case and outer spaces. Touches no connection.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolProofStartSession.id, "name", studioApp, NextCall, `Unique session name, 1-80 characters.`, NoVars{})
+	_ = arg(DbmcpToolProofStartSession.id, "summary", studioApp, NextCall, `What the session proves, up to 500 characters. Optional.`, NoVars{})
+)
+
+// DbmcpToolProofEditSession describes the proof_edit_session tool.
+var DbmcpToolProofEditSession = define(Entry{
+	ID: "dbmcp.tool.proof_edit_session", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_edit_session",
+	Default: "Change a closed proof session. Returns a draftId and the current steps. Rebuild the full step list with proof_add_step: keepOrdinal reuses an old step unchanged, replacesOrdinal marks a changed version of one, neither adds a new step, and an old step you leave out is removed. The user sees old and new side by side and accepts or rejects.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolProofEditSession.id, "name", studioApp, NextCall, `Name of a closed session, as proof_list_sessions returns it.`, NoVars{})
+	_ = arg(DbmcpToolProofEditSession.id, "reason", studioApp, NextCall, `What changes and why, up to 500 characters.`, NoVars{})
+)
+
+// DbmcpToolProofAddStep describes the proof_add_step tool.
+var DbmcpToolProofAddStep = define(Entry{
+	ID: "dbmcp.tool.proof_add_step", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_add_step",
+	Default: "Add the next step to a draft. Steps show in the order added; the call returns the step's ordinal. The data can come from any tool you used: pick the view that shows it best. Every value is validated and rejected with the field and limit when it does not fit.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolProofAddStep.id, "draftId", studioApp, NextCall, `Draft id from proof_start_session or proof_edit_session.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "description", studioApp, NextCall, `One line, up to 200 characters, saying what this step shows. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "query", studioApp, NextCall, `The query or command you ran, up to 64 KiB. Shown above the data.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "language", studioApp, NextCall, `Highlighting for query: sql, json, shell or text. Default text.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "source", studioApp, NextCall, `Short label of the tool that produced the data, such as elasticsearch. Up to 64 characters.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "view", studioApp, NextCall, `table, document or keyvalue. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "data", studioApp, NextCall, `table: {columns:[{name,type?}],rows:[[cell,...]]} with type number, text, boolean, temporal, json or other (inferred when omitted). document: {documents:[{id?,body:{...}}]}. keyvalue: {entries:[{field,value}]}. Limits: 10000 rows or documents, 64 KiB per cell, 4 MiB per step. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "keepOrdinal", studioApp, NextCall, `Edit drafts only: reuse the old step with this ordinal unchanged. Pass no other step field.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "replacesOrdinal", studioApp, NextCall, `Edit drafts only: this step is a changed version of the old step with this ordinal.`, NoVars{})
+)
+
+// DbmcpToolProofCloseSession describes the proof_close_session tool.
+var DbmcpToolProofCloseSession = define(Entry{
+	ID: "dbmcp.tool.proof_close_session", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_close_session",
+	Default: "Finish a draft and notify the user. Needs at least one step. A new session returns status closed; an edit returns pending_review until the user accepts or rejects it. The draftId is spent.",
+}, NoVars{})
+
+var _ = arg(DbmcpToolProofCloseSession.id, "draftId", studioApp, NextCall, `Draft id from proof_start_session or proof_edit_session.`, NoVars{})
+
+// DbmcpToolProofListSessions describes the proof_list_sessions tool.
+var DbmcpToolProofListSessions = define(Entry{
+	ID: "dbmcp.tool.proof_list_sessions", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_list_sessions",
+	Default: "List closed proof sessions, newest first, with step count and whether an edit waits for review. Use it to find the name proof_edit_session needs. The app keeps the newest 30.",
+}, NoVars{})

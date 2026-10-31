@@ -62,6 +62,9 @@ type Spec struct {
 	// cat-file, rev-parse, for-each-ref) stays on Setpgid — a read cannot trigger an interactive
 	// prompt, so it is safe by construction and untouched since G2.
 	Setsid bool
+	// OKExits are exit codes the caller reads as an answer, not a failure (`merge-base
+	// --is-ancestor` exiting 1). The op log records them as ok.
+	OKExits []int
 	// buffered is Run's own private signal to Start (unexported — never set by a caller of
 	// Run, which is the only place that sets it): give cmd.Stdout/cmd.Stderr a plain io.Writer
 	// directly rather than StdoutPipe()/StderrPipe(). Go's os/exec spins its own internal copy

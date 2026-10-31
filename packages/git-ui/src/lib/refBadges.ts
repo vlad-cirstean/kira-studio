@@ -274,12 +274,12 @@ export function buildChangeRequestBadge(prs: readonly ChangeRequestRecord[]): HT
   badge.setAttribute(
     'data-kira-tip',
     prs.length > 1
-      ? t('git.refBadge.changeRequestMore.tooltip', {
-          title: best.title,
+      ? [
+          best.title,
           state,
-          count: prs.length - 1,
-        })
-      : t('common.dashPair.label', { first: best.title, second: state }),
+          t('git.refBadge.changeRequestMore.tooltip', { count: prs.length - 1 }),
+        ].join('\n')
+      : `${best.title}\n${state}`,
   );
 
   const label = document.createElement('span');

@@ -1,0 +1,94 @@
+{
+  "ProofService.Session": {
+    "closedAt": 0,
+    "current": {
+      "createdAt": 0,
+      "reason": "",
+      "rev": 1,
+      "steps": [
+        {
+          "bytes": 80,
+          "description": "keep",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 1,
+          "originOrdinal": null,
+          "source": "",
+          "view": "keyvalue"
+        },
+        {
+          "bytes": 80,
+          "description": "replace",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 2,
+          "originOrdinal": null,
+          "source": "",
+          "view": "keyvalue"
+        },
+        {
+          "bytes": 80,
+          "description": "drop",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 3,
+          "originOrdinal": null,
+          "source": "",
+          "view": "keyvalue"
+        }
+      ]
+    },
+    "id": "<masked>",
+    "name": "Edit me",
+    "pending": {
+      "createdAt": 0,
+      "reason": "tighten",
+      "rev": 2,
+      "steps": [
+        {
+          "bytes": 80,
+          "description": "keep",
+          "diff": "unchanged",
+          "language": "text",
+          "ordinal": 1,
+          "originOrdinal": 1,
+          "source": "",
+          "view": "keyvalue"
+        },
+        {
+          "bytes": 80,
+          "description": "replaced",
+          "diff": "changed",
+          "language": "text",
+          "ordinal": 2,
+          "originOrdinal": 2,
+          "source": "",
+          "view": "keyvalue"
+        },
+        {
+          "bytes": 80,
+          "description": "brand new",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 3,
+          "originOrdinal": null,
+          "source": "",
+          "view": "keyvalue"
+        }
+      ]
+    },
+    "removed": [
+      {
+        "bytes": 80,
+        "description": "drop",
+        "diff": "removed",
+        "language": "text",
+        "ordinal": 3,
+        "originOrdinal": null,
+        "source": "",
+        "view": "keyvalue"
+      }
+    ],
+    "summary": ""
+  }
+}

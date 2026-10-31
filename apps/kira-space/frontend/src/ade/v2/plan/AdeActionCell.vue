@@ -6,12 +6,20 @@ import { computed } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { type BranchAction, type Tone, tagLabel } from '../board/actions';
+import type { StatusColor } from '../wire';
 import AdeBranchTip from './AdeBranchTip.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
 // One cell of the left action column: the derived tag and, for a branch, its action buttons.
 const props = defineProps<{
-  tag: { label: string; tone: Tone; tip: string; tipParts?: readonly TextPart[]; since?: number };
+  tag: {
+    label: string;
+    tone?: Tone;
+    color?: StatusColor;
+    tip: string;
+    tipParts?: readonly TextPart[];
+    since?: number;
+  };
   tall?: boolean;
   actions?: readonly BranchAction[];
   row?: BranchRowModel;
@@ -32,9 +40,6 @@ const ACTION_VARIANT: Record<BranchAction['kind'], 'dialog' | 'dialog-danger'> =
   seeError: 'dialog-danger',
   start: 'dialog',
 };
-const tone = computed(() =>
-  !props.row || props.tag.tone === 'red' || props.tag.tone === 'amber' ? props.tag.tone : 'grey',
-);
 const TESTID: Record<BranchAction['kind'], string> = {
   forcePush: 'ade-force-push',
   rebase: 'ade-rebase',
@@ -55,10 +60,22 @@ const TESTID: Record<BranchAction['kind'], string> = {
     data-testid="ade-action-cell"
   >
     <AdeBranchTip v-if="row" :row="row" :color="color ?? null">
-      <AdeChip :label="label" :tone="tone" class="max-w-30 shrink truncate" data-testid="ade-tag" />
+      <AdeChip
+        :label="label"
+        :tone="tag.tone"
+        :color="tag.color"
+        class="max-w-30 shrink truncate"
+        data-testid="ade-tag"
+      />
     </AdeBranchTip>
     <AdeTip v-else :text="tag.tip" :parts="tag.tipParts">
-      <AdeChip :label="label" :tone="tone" class="max-w-30 shrink truncate" data-testid="ade-tag" />
+      <AdeChip
+        :label="label"
+        :tone="tag.tone"
+        :color="tag.color"
+        class="max-w-30 shrink truncate"
+        data-testid="ade-tag"
+      />
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.act?.id ?? a.kind" :text="a.tip" :parts="a.tipParts">
       <TooltipDisabledTrigger :disabled="a.disabled === true">

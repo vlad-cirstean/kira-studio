@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/notify"
 )
@@ -133,9 +134,10 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 			if !ok {
 				return nil, ipcerr.T(ipcerr.CodeUnknownMethod, "backend.space.gitrpc.unknownMethod.body", map[string]string{"method": method})
 			}
-			return h(r, ctx, c, params)
+			return h(r, oplog.WithOrigin(ctx, c.Origin()), c, params)
 		},
 		Stream: func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error {
+			ctx = oplog.WithOrigin(ctx, c.Origin())
 			switch method {
 			case "graph.stream":
 				return r.handleGraphStream(ctx, c, params, emit)
@@ -276,6 +278,9 @@ var requestHandlers = map[string]requestHandler{
 	},
 	"review.comment.setState": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewCommentSetState(ctx, c, params)
+	},
+	"review.comment.edit": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentEdit(ctx, c, params)
 	},
 	"review.comment.clear": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewCommentClear(ctx, c, params)

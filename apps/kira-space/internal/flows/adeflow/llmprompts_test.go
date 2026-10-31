@@ -47,7 +47,7 @@ func TestRunUsesEditedFinishInstruction(t *testing.T) {
 	}
 }
 
-// The Run dialog renders its message and finish suffix through Preview.
+// The Run dialog renders its message, Kira Space note and finish suffix through Preview.
 func TestRunDialogPreview(t *testing.T) {
 	f := newRunFixture(t, nil, agentStep("one", "")+manualStep)
 	finish := map[string]any{
@@ -59,7 +59,7 @@ func TestRunDialogPreview(t *testing.T) {
 		"repo": "{repo}", "branch": "{branch}", "worktree": "{worktree}",
 		"stepNumber": 1, "stepCount": 6, "stepName": "Plan from spec",
 		"stepPrompt": "Read the task spec and the Jira ticket PAY-130. Write an implementation plan per repo. Do not change code yet.",
-		"message":    "", "extra": "", "context": []string{}, "space": false, "finish": finish,
+		"message":    "", "extra": "", "context": []string{}, "finish": finish,
 	}
 	for _, c := range []struct {
 		key  string
@@ -67,6 +67,7 @@ func TestRunDialogPreview(t *testing.T) {
 		vars map[string]any
 	}{
 		{"step", "ade.step.prompt", step},
+		{"space", "headless.space.suffix", map[string]any{}},
 		{"finish", "headless.finishStep.suffix", finish},
 	} {
 		raw, err := json.Marshal(c.vars)

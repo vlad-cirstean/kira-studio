@@ -8,7 +8,13 @@ import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
 import { useAgentSessionsStore } from '../../state';
 import { withTuiActivity } from '../activity';
-import { type BranchTag, branchTag, type TaskAction, taskCell } from '../board/actions';
+import {
+  type BranchTag,
+  branchTag,
+  type TaskAction,
+  type TaskCell,
+  taskCell,
+} from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
 import {
@@ -28,8 +34,10 @@ import {
   buildTaskProgress,
   type TaskProgress,
 } from '../board/progress';
+import { shelfOf, type TaskShelf } from '../board/shelf';
 import { blocked as isBlocked, statusOf } from '../board/status';
 import { buildStepBlocks, type StepBlock } from '../board/stepBlocks';
+import { type TaskSessions, taskSessionsOf } from '../board/taskSessions';
 import {
   buildTimeline,
   type Ripple,
@@ -86,16 +94,20 @@ export interface CardModel {
   status: TaskStatusDef;
   /** A stuck or failed run or setup, shown beside the status. */
   blocked: boolean;
-  tag: { label: string; tone: BranchTag['tone']; tip: string; since?: number } | null;
+  tag: TaskCell['tag'] | null;
   /** Task step action; which kinds render is `useTaskAction`'s call. */
   action: TaskAction | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
   meta: string;
   attention: string;
   attentionItem: NeedsItem | null;
+  /** The task's agent sessions as one state, `null` when it has none. */
+  sessions: TaskSessions | null;
   rows: BranchRowModel[];
   review: boolean;
   parked: boolean;
+  /** Plan timeline, or the Later or Backlog shelf. */
+  shelf: TaskShelf;
   allMerged: boolean;
   selected: boolean;
   ripple: boolean;
@@ -212,9 +224,11 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     meta: cardMeta(c, entry, task, branches),
     attention: needsOf?.what ?? '',
     attentionItem: needsOf ?? null,
+    sessions: taskSessionsOf(sessions),
     rows: c.view.branchRows(id).map(({ id: bid, depth }) => buildRow(c, task, bid, depth)),
     review: task.kind === 'review',
     parked: task.kind === 'parked',
+    shelf: shelfOf(c.board, id),
     allMerged: mine.length > 0 && mine.every((br) => br.mergedIntoMain),
     selected: c.selectedId === id,
     ripple: c.ripple?.taskIds.includes(id) ?? false,

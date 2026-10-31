@@ -170,6 +170,41 @@ func (r *Router) handleReviewCommentSetState(ctx context.Context, c *gitsession.
 	)
 }
 
+func (r *Router) handleReviewCommentEdit(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var body string // set by resolve, read by call.
+	return handleRepoCall(ctx, c, "review.comment.edit", params,
+		func(p ReviewCommentEditParams) (string, error) {
+			if err := requireNonEmpty("review.comment.edit", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if err := validRefArg("branch", p.Branch); err != nil {
+				return "", err
+			}
+			if p.ID <= 0 {
+				return "", ipcerr.Contract("gitrpc: review.comment.edit: id must be positive")
+			}
+			if p.Kind != gitreview.CommentKindChange && p.Kind != gitreview.CommentKindQuestion {
+				return "", ipcerr.Contract("gitrpc: review.comment.edit: kind must be change or question")
+			}
+			body = normalizeCommentBody(p.Body)
+			if body == "" {
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentEmpty.body", nil)
+			}
+			if len(body) > gitreview.MaxCommentBytes {
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentTooLong.body", nil)
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewCommentEditParams) (ReviewCommentEditResult, error) {
+			changed, err := entry.EditComment(ctx, p.Branch, p.ID, body, p.Kind)
+			if err != nil {
+				return ReviewCommentEditResult{}, mapDetailError(err)
+			}
+			return ReviewCommentEditResult{Changed: changed}, nil
+		},
+	)
+}
+
 func (r *Router) handleReviewCommentClear(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleRepoCall(ctx, c, "review.comment.clear", params,
 		func(p ReviewCommentClearParams) (string, error) {

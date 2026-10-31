@@ -126,6 +126,10 @@ func (s *Server) Status() harness.HookStatus {
 	return harness.HookStatus{Running: true, SettingsPath: s.hooksPath}
 }
 
+// MCPToolTimeoutEnv lifts the CLI's 60 s limit on one MCP tool call: a tool that waits for the user, such
+// as Kira Space's request_branches, holds its call open for up to 30 minutes.
+const MCPToolTimeoutEnv = "MCP_TOOL_TIMEOUT=2100000"
+
 // Compose returns command with " --settings '<hooks.json>'" appended and the three hook env vars a
 // launch's shell needs (Env). With the statusline option on, the settings file is per terminal
 // (cwd locates the project's own statusline setting). The env carries KIRA_AGENT_HOOK_TOKEN in
@@ -157,6 +161,7 @@ func (s *Server) Env(terminalID string) []string {
 		"KIRA_TERMINAL_ID=" + terminalID,
 		"KIRA_AGENT_HOOK_SOCKET=" + s.ln.SockPath,
 		"KIRA_AGENT_HOOK_TOKEN=" + s.ln.Token,
+		MCPToolTimeoutEnv,
 	}
 }
 

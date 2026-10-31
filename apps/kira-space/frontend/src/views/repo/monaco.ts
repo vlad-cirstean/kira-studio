@@ -99,6 +99,12 @@ export function repoRevisionDiffUris(
   return { left: leftUri, right: rightUri };
 }
 
+/** The cached, live model at `uri`, if any; never creates one. */
+export function peekModel(uri: string): import('monaco-editor').editor.ITextModel | undefined {
+  const model = modelCache.get(uri);
+  return model && !model.isDisposed() ? model : undefined;
+}
+
 export function getOrCreateModel(
   mod: MonacoModule,
   uri: string,

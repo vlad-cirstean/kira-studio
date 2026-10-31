@@ -6,7 +6,7 @@ import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// Customizable task statuses and manual moves. Backend half: adeflow TestTaskStatuses.
+// Task statuses editor on the Workflows page and manual moves. Backend half: adeflow TestTaskStatuses.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const card = (id: string) => `[data-testid="ade-card"][data-task-id="${id}"]`;
@@ -15,21 +15,31 @@ const item = (id: string) => t(`menu-item-${id}`);
 interface StatusDef {
   id: string;
   name: string;
-  tone: string;
-  category: string;
+  color: string;
+}
+interface Defaults {
+  new: string;
+  step: string;
+  review: string;
+  finished: string;
 }
 interface Saved {
   statuses: StatusDef[];
+  defaults: Defaults;
 }
 interface SaveArgs extends Saved {
   reassign: Record<string, string>;
 }
 
-async function openPane(page: Page): Promise<void> {
-  await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator(t('settings-section-Task statuses')).click();
+async function openEditor(page: Page): Promise<void> {
+  await page.locator(t('ade-tab-workflows')).click();
+  await page.locator(t('ade-workflows')).waitFor();
+  await page.locator(t('ade-wf-statuses-row')).click();
   await expect(page.locator(t('ade-status-list'))).toBeVisible();
 }
+
+const sentSaves = (control: Parameters<typeof calls>[0]) =>
+  calls(control, IPC.adeTaskSaveStatuses).map((c) => c.args as SaveArgs);
 
 test('contract: the menu Status submenu sends the backend patch', async ({ relaunch }) => {
   const args = contract<{ patch: unknown }>('ade-task-statuses', 'args:AdeTaskService.UpdateTask');
@@ -43,23 +53,24 @@ test('contract: the menu Status submenu sends the backend patch', async ({ relau
   expect(sent.patch).toEqual(args.patch);
 });
 
-test('contract: the saved set renders its renamed and added statuses', async ({ relaunch }) => {
+test('contract: the saved set renders its renamed and recoloured status', async ({ relaunch }) => {
   const saved = contract<Saved>('ade-task-statuses', 'AdeTaskService.SaveStatuses#saved');
   const { window: page } = await openPlan(relaunch, [
     {
       channel: IPC.adeTaskBoard,
       response: adeBoard((b) => {
         b.statuses = saved.statuses;
-        const tk = b.tasks.find((x) => x.id === 'T_alerts');
-        if (!tk) throw new Error('fixture task missing');
-        tk.statusId = 'qa';
+        b.statusDefaults = saved.defaults;
       }),
     },
   ]);
   await openTask(page, 'T_alerts');
-  await expect(page.locator(t('ade-status-pick'))).toContainText('QA');
+  await expect(page.locator(t('ade-status-pick'))).toContainText('Doing');
+  await expect(page.locator(`${t('ade-chip')}[data-color="orange"]`).first()).toContainText(
+    'Doing',
+  );
   await page.locator(t('ade-status-pick')).click();
-  await expect(page.locator(t('ade-status-option-in-review'))).toContainText('Code review');
+  await expect(page.locator(t('ade-status-option-in-review'))).toContainText('In review');
 });
 
 test('the panel moves a task back and forth, by arrows and by picker', async ({ relaunch }) => {
@@ -98,94 +109,133 @@ test('a stuck task shows Blocked beside its status', async ({ relaunch }) => {
   await expect(page.locator(t('ade-task-blocked'))).toBeVisible();
 });
 
-test('the pane adds, renames and recolours a status', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch);
-  await openPane(page);
+test('the editor lists the set with its colours and defaults', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await openEditor(page);
   await expect(page.locator(t('ade-status-row'))).toHaveCount(4);
+  await expect(
+    page.locator(`${t('ade-status-row')}[data-status-id="in-progress"] ${t('ade-status-color')}`),
+  ).toHaveAttribute('data-color', 'amber');
+  await expect(page.locator(t('ade-status-default-new'))).toHaveValue('todo');
+  await expect(page.locator(t('ade-status-default-step'))).toHaveValue('in-progress');
+  await expect(page.locator(t('ade-status-default-review'))).toHaveValue('in-review');
+  await expect(page.locator(t('ade-status-default-finished'))).toHaveValue('done');
+  // New tasks always start somewhere: no keep option there.
+  await expect(page.locator(`${t('ade-status-default-new')} option`)).toHaveCount(4);
+  await expect(page.locator(`${t('ade-status-default-step')} option`)).toHaveCount(5);
+});
+
+test('the editor adds, renames and recolours a status', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await openEditor(page);
 
   await page.locator(t('ade-status-add')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveStatuses)).toHaveLength(1);
-  const added = calls(control, IPC.adeTaskSaveStatuses)[0]?.args as SaveArgs;
+  await expect.poll(() => sentSaves(control)).toHaveLength(1);
+  const added = sentSaves(control)[0] as SaveArgs;
   expect(added.statuses).toHaveLength(5);
-  expect(added.statuses[4]).toEqual({
-    id: '',
-    name: 'New status',
-    tone: 'grey',
-    category: 'active',
-  });
+  // The first palette colour no status uses yet.
+  expect(added.statuses[4]).toEqual({ id: '', name: 'New status', color: 'brown' });
 
   const first = page.locator(`${t('ade-status-row')}[data-status-id="in-progress"]`);
   await first.locator(t('ade-status-name')).fill('Working');
   await first.locator(t('ade-status-name')).press('Enter');
-  await expect.poll(() => calls(control, IPC.adeTaskSaveStatuses)).toHaveLength(2);
-  const renamed = calls(control, IPC.adeTaskSaveStatuses)[1]?.args as SaveArgs;
-  expect(renamed.statuses.map((s) => s.name)).toEqual(['To do', 'Working', 'In review', 'Done']);
+  await expect.poll(() => sentSaves(control)).toHaveLength(2);
+  expect(sentSaves(control)[1]?.statuses.map((s) => s.name)).toEqual([
+    'To do',
+    'Working',
+    'In review',
+    'Done',
+  ]);
 
-  await first.locator(t('ade-status-tone')).click();
-  await page.locator(t('ade-status-tone-purple')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveStatuses)).toHaveLength(3);
-  const toned = calls(control, IPC.adeTaskSaveStatuses)[2]?.args as SaveArgs;
-  expect(toned.statuses[1]?.tone).toBe('purple');
+  await first.locator(t('ade-status-color')).click();
+  await expect(page.locator('[data-testid^="ade-status-color-"][role="radio"]')).toHaveCount(16);
+  await page.locator(t('ade-status-color-purple')).click();
+  await expect.poll(() => sentSaves(control)).toHaveLength(3);
+  expect(sentSaves(control)[2]?.statuses[1]?.color).toBe('purple');
 });
 
-test('the pane reorders with the keyboard', async ({ relaunch }) => {
+test('the editor reorders with the keyboard', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
-  await openPane(page);
+  await openEditor(page);
   await page
     .locator(`${t('ade-status-row')}[data-status-id="in-review"] ${t('ade-status-handle')}`)
     .focus();
   await page.keyboard.press('Alt+ArrowUp');
-  await expect.poll(() => calls(control, IPC.adeTaskSaveStatuses)).toHaveLength(1);
-  const sent = calls(control, IPC.adeTaskSaveStatuses)[0]?.args as SaveArgs;
-  expect(sent.statuses.map((s) => s.id)).toEqual(['todo', 'in-review', 'in-progress', 'done']);
+  await expect.poll(() => sentSaves(control)).toHaveLength(1);
+  expect(sentSaves(control)[0]?.statuses.map((s) => s.id)).toEqual([
+    'todo',
+    'in-review',
+    'in-progress',
+    'done',
+  ]);
 });
 
-test('contract: deleting a status in use asks where its tasks go', async ({ relaunch }) => {
-  const args = contract<SaveArgs>('ade-task-statuses', 'args:AdeTaskService.SaveStatuses');
+test('a default select sends the defaults', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await openEditor(page);
+  await page.locator(t('ade-status-default-finished')).selectOption('');
+  await expect.poll(() => sentSaves(control)).toHaveLength(1);
+  expect(sentSaves(control)[0]?.defaults).toEqual({
+    new: 'todo',
+    step: 'in-progress',
+    review: 'in-review',
+    finished: '',
+  });
+  await page.locator(t('ade-status-default-review')).selectOption('done');
+  await expect.poll(() => sentSaves(control)).toHaveLength(2);
+  expect(sentSaves(control)[1]?.defaults.review).toBe('done');
+});
+
+test('contract: deleting a status asks where its tasks go', async ({ relaunch }) => {
+  const args = contract<SaveArgs>('ade-task-statuses', 'args:AdeTaskService.SaveStatuses#delete');
   const saved = contract<Saved>('ade-task-statuses', 'AdeTaskService.SaveStatuses#saved');
-  const qa = saved.statuses.find((s) => s.id === 'qa');
-  if (!qa) throw new Error('contract set has no qa');
   const { window: page, control } = await openPlan(relaunch, [
     {
       channel: IPC.adeTaskBoard,
       response: adeBoard((b) => {
-        b.statuses = [
-          { id: 'todo', name: 'To do', tone: 'grey', category: 'todo' },
-          { id: 'in-progress', name: 'In progress', tone: 'amber', category: 'active' },
-          qa,
-          { id: 'in-review', name: 'Code review', tone: 'blue', category: 'review' },
-          { id: 'done', name: 'Done', tone: 'green', category: 'done' },
-        ];
+        b.statuses = saved.statuses;
+        b.statusDefaults = saved.defaults;
       }),
     },
   ]);
-  await openPane(page);
+  await openEditor(page);
   await page
     .locator(`${t('ade-status-row')}[data-status-id="in-progress"] ${t('ade-status-delete')}`)
     .click();
   await expect(page.locator(t('ade-status-delete-dialog'))).toBeVisible();
-  await expect(page.locator(t('ade-status-reassign'))).toHaveValue('qa');
+  // What uses it: tasks, the step default; the fixture workflows name it on steps.
+  await expect(page.locator(t('ade-status-uses'))).toContainText('When a step starts');
+  await expect(page.locator(t('ade-status-reassign'))).toHaveValue('todo');
   await page.locator(t('ade-status-delete-confirm')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskSaveStatuses)).toHaveLength(1);
-  const sent = calls(control, IPC.adeTaskSaveStatuses)[0]?.args as SaveArgs;
-  expect(sent.reassign).toEqual(args.reassign);
-  expect(sent.statuses).toEqual(saved.statuses);
+  await expect.poll(() => sentSaves(control)).toHaveLength(1);
+  expect(sentSaves(control)[0]).toEqual(args);
 });
 
-test('the last status of a category cannot be deleted', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
-  await openPane(page);
-  for (const id of ['todo', 'in-progress', 'in-review', 'done']) {
-    await expect(
-      page.locator(`${t('ade-status-row')}[data-status-id="${id}"] ${t('ade-status-delete')}`),
-    ).toBeDisabled();
-  }
+test('the last status cannot be deleted', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskBoard,
+      response: adeBoard((b) => {
+        b.statuses = [{ id: 'todo', name: 'To do', color: 'grey' }];
+        b.statusDefaults = { new: 'todo', step: '', review: '', finished: '' };
+        for (const task of b.tasks) task.statusId = 'todo';
+      }),
+    },
+  ]);
+  await openEditor(page);
+  await expect(page.locator(t('ade-status-delete'))).toBeDisabled();
 });
 
-test('the step inspector lists the set and opens the pane', async ({ relaunch }) => {
+test('the step inspector offers the default and opens the editor', async ({ relaunch }) => {
   const saved = contract<Saved>('ade-task-statuses', 'AdeTaskService.SaveStatuses#saved');
   const { window: page } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskBoard, response: adeBoard((b) => (b.statuses = saved.statuses)) },
+    {
+      channel: IPC.adeTaskBoard,
+      response: adeBoard((b) => {
+        b.statuses = saved.statuses;
+        b.statusDefaults = saved.defaults;
+      }),
+    },
   ]);
   await page.locator(t('ade-tab-workflows')).click();
   await page.locator(t('ade-workflows')).waitFor();
@@ -193,9 +243,16 @@ test('the step inspector lists the set and opens the pane', async ({ relaunch })
   await page.locator(t('ade-wf-node')).first().click();
   const toggle = page.locator(t('ade-wf-step-advanced'));
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  const select = page.locator(t('ade-wf-step-status'));
-  const options = await select.locator('option').allTextContents();
-  expect(options.some((o) => o.includes('QA'))).toBe(true);
+  const options = await page.locator(t('ade-wf-step-status')).locator('option').allTextContents();
+  expect(options).toContain('Doing');
+  expect(options.some((o) => o.startsWith('Default ('))).toBe(true);
   await page.locator(t('ade-step-edit-statuses')).click();
   await expect(page.locator(t('ade-status-list'))).toBeVisible();
+});
+
+test('Settings has no Task statuses section', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await emitWailsEvent(page, IPC.openSettings, undefined);
+  await expect(page.locator(t('settings-section-Appearance'))).toBeVisible();
+  await expect(page.locator(t('settings-section-Task statuses'))).toHaveCount(0);
 });

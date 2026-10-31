@@ -24,6 +24,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
+	trackerproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -35,6 +38,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/memcheck"
 	"github.com/kirathecat/kira-studio/internal/memory/memorycli"
 	"github.com/kirathecat/kira-studio/internal/memory/modelstore"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -56,7 +60,7 @@ func RunArgvShim(args []string) (code int, ok bool) {
 	case "askpass":
 		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
 	case "memory-mcp":
-		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath())), true
+		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath()), memoryOps(config.DbPath(), opOwnersDir())), true
 	case "memory-ingest":
 		return memorycli.RunIngest(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath())), true
 	case "memory-embed":
@@ -92,6 +96,18 @@ type gitWired struct {
 	askpassBroker *gitaskpass.Broker
 	router        *gitrpc.Router
 	opLog         *oplog.Log
+	trackers      *issuetracker.Registry
+}
+
+// wireTrackers builds the issue tracker registry. Jira finds the pull requests that name an issue key
+// through the code hosts' search and the change request index.
+func wireTrackers(repositories *repos.Repos, hosts *githost.Registry, opLog *oplog.Log, o jira.Options) *issuetracker.Registry {
+	if o.Runner == nil {
+		o.Runner = jira.NewExecRunner()
+	}
+	o.Runner = oplog.NewRecordingToolRunner(o.Runner, opLog, jira.ProviderLabel)
+	o.ChangeRequests = ade.KeyChangeRequests(hosts, repositories.GitHostChangeRequests)
+	return trackerproviders.New(o)
 }
 
 // wireTracker constructs and starts the ade.Tracker and the harness.Hooks hub it drives, wired
@@ -183,8 +199,8 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
-	notifier *agentnotify.Notifier, usage *agentusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
-	agents harness.Selector,
+	notifier *agentnotify.Notifier, usage *agentusage.Service, rebaseTimeout, branchRequestWait time.Duration, runs *scriptruns.Service,
+	agents harness.Selector, promptSink prompts.Sink,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -193,15 +209,16 @@ func wireAdeTask(
 	gitPath := adeGitPathSetting(repositories)
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
 		Agent:   agents,
-		Prompts: runs.LlmPrompts,
-		Tasks:   repositories.AdeTasks, Statuses: repositories.AdeStatuses, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
+		Ops:     git.opLog,
+		Prompts: runs.LlmPrompts, PromptSink: promptSink,
+		Tasks: repositories.AdeTasks, Statuses: repositories.AdeStatuses, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
 		Registry:        git.registry,
+		Trackers:        git.trackers,
 		GitStatus:       func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
 		Askpass:         git.askpassBroker,
 		Workflows:       &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
 		OnBoard:         func() { bridge.AdeTaskBoardChanged(events) },
-		OnBacklog:       func() { bridge.AdeTaskBacklogChanged(events) },
 		OnWorkflows:     func() { bridge.AdeTaskWorkflowsChanged(events) },
 		OnRepos:         func() { bridge.AdeTaskReposChanged(events) },
 		Facts:           repositories.AdeFacts,
@@ -245,10 +262,11 @@ func wireAdeTask(
 			}
 			return settings.Ade.HeadlessSettingSources
 		},
-		AutofetchMinutes: adeAutofetchMinutes(repositories),
-		HomeDir:          userHome,
-		RebaseTimeout:    rebaseTimeout,
-		Now:              time.Now,
+		AutofetchMinutes:  adeAutofetchMinutes(repositories),
+		HomeDir:           userHome,
+		RebaseTimeout:     rebaseTimeout,
+		BranchRequestWait: branchRequestWait,
+		Now:               time.Now,
 	})
 	tracker.SetStoppedHandler(board.OnTUIStopped)
 	tracker.SetStartedHandler(board.OnTUIStarted)
@@ -304,15 +322,43 @@ func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 	}
 }
 
+// newOpLog opens the persisted op log: interrupted rows become errors, old rows are pruned, the
+// foreground lane is seeded from disk and rows other processes write are ingested. A storage failure leaves a memory-only log.
+func newOpLog(repositories *repos.Repos) *oplog.Log {
+	store := repositories.OpLog
+	if err := store.ReconcileInterrupted("Kira Space quit while this ran."); err != nil {
+		slog.Warn("op log: reconcile", "scope", "startup", "err", err)
+	}
+	if err := store.Prune(time.Now().Add(-oplog.Retention), oplog.MaxRows); err != nil {
+		slog.Warn("op log: prune", "scope", "startup", "err", err)
+	}
+	if err := oplog.SweepDeadOwners(store, opOwnersDir()); err != nil {
+		slog.Warn("op log: sweep foreign", "scope", "startup", "err", err)
+	}
+	cur, curErr := oplog.NewForeignCursor(store)
+	l := oplog.New(oplog.WithStore(store))
+	recent, err := store.Recent(oplog.FgCapacity)
+	if err != nil {
+		slog.Warn("op log: load", "scope", "startup", "err", err)
+	}
+	l.Seed(recent)
+	if curErr != nil {
+		slog.Warn("op log: foreign cursor", "scope", "startup", "err", curErr)
+		return l
+	}
+	oplog.WatchForeign(l, store, opOwnersDir(), oplog.FlushInterval, cur)
+	return l
+}
+
 // wireGit builds the git runner, discovery (over locator), session registry and router.
 func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githost.Registry, crSync gitsession.CRSyncConfig) gitWired {
-	gitRunner := gitclient.NewExecRunner()
+	opLog := newOpLog(repositories)
+	gitRunner := oplog.NewRecordingRunner(gitclient.NewExecRunner(), opLog)
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
 	if hosts != nil {
 		gitRegistry.Hosts = githost.Selector{Registry: hosts}
 	}
-	opLog := oplog.New()
 	gitRegistry.OpLog = opLog
 	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
 		s, err := repositories.Settings.GetAll()

@@ -318,7 +318,7 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	if plan[cur].TargetErr != nil {
 		return adewire.StartRunResult{}, invalid("step %q: %v", plan[cur].Def.Name, plan[cur].TargetErr)
 	}
-	paths, err := b.prepareWorktrees(ctx, tc, args.BranchNames)
+	paths, err := b.prepareWorktrees(ctx, tc, args.BranchNames, plan[cur].Def.Kind == adewire.KindAgent || plan[cur].Def.SmartScript != "")
 	if err != nil {
 		return adewire.StartRunResult{}, err
 	}
@@ -347,13 +347,13 @@ func (b *TaskBoard) checkBranchNames(tc *taskCtx, names map[string]string) error
 	return nil
 }
 
-// prepareWorktrees makes every mine branch's worktree exist and starts a setup in each new one. With
-// the Kira Space tools on, an unnamed branch gets none: the run starts in the repo root and the agent
-// creates the branch through request_branch.
-func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map[string]string) (map[string]string, error) {
+// prepareWorktrees makes every mine branch's worktree exist and starts a setup in each new one. When the
+// step is run by an agent, an unnamed branch the user did not name gets none: the run starts in the repo
+// root and the agent asks for the branch through request_branches; Kira Space names it. Any other step
+// cannot ask, so its unnamed branch takes a name derived from the task title.
+func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map[string]string, agentStep bool) (map[string]string, error) {
 	paths := map[string]string{}
 	title := taskTitle(tc.task, tc.branches)
-	space := b.spaceEnabled(tc.task)
 	for _, sb := range tc.branches {
 		if sb.Kind != model.AdeBranchKindMine {
 			continue
@@ -365,11 +365,11 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 		if rec == nil {
 			return nil, invalid("code repo %s not found", sb.CodeRepoID)
 		}
-		if space && sb.Name == "" && names[sb.ID] == "" {
-			paths[sb.ID] = rec.Root // the agent names the branch itself via request_branch
+		if agentStep && sb.Name == "" && names[sb.ID] == "" {
+			paths[sb.ID] = rec.Root // the agent creates the branch via request_branches
 			continue
 		}
-		res, err := b.ensureWorktree(ctx, title, *rec, sb, names[sb.ID])
+		res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{title: title, wanted: names[sb.ID]})
 		if err != nil {
 			return nil, err
 		}
@@ -583,10 +583,12 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		case smart != nil:
 			prompt = smart.prompt
 		default:
+			ho := b.handoverFor(tc, def.ID)
 			prompt = composePrompt(b.prompts(), promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: stepN, Of: stepOf, Def: def, Message: b.stepMessage(tc.task.ID, def.ID), Extra: spec.Extra,
-				Space: b.spaceEnabled(tc.task), Context: b.rebaseContext(tc),
+				Context: b.rebaseContext(tc),
+				Notes:   tc.task.Notes, Handover: ho.Body, HandoverFrom: ho.From,
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
@@ -597,6 +599,18 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 			return run, err
 		}
 		b.notifySessions()
+		kind := opRun
+		if spec.ResumeID != "" {
+			kind = opResume
+		}
+		op := b.startSessionOp(ctx, kind, tc.task.ID, agent.Label(), "")
+		b.sessionOps.put(sessionID, op)
+		b.cancelRunOp(op, run.ID)
+		defer func() {
+			if !started {
+				b.finishRunOp(sessionID, outcome{state: model.AdeRunFailed, note: "The run did not start."})
+			}
+		}()
 	}
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, patch)
 	if err != nil {
@@ -732,10 +746,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	rebase := run.Purpose == model.AdeRunPurposeRebase
 	round := run.Purpose == model.AdeRunPurposeReview
-	space := false
-	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase && !round {
-		space = b.spaceEnabled(task)
-	}
+	space := !rebase && !round
 	complete := func(out outcome) {
 		if round {
 			b.completeReviewRound(run, sessionID, out)
@@ -1012,6 +1023,7 @@ func (b *TaskBoard) completeRun(run model.AdeRun, sessionID string, out outcome)
 // (route.go), any other outcome moves the task on unless it was a user stop. The task mutex is held.
 func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out outcome) {
 	now := b.deps.Now().UnixMilli()
+	b.finishRunOp(sessionID, out)
 	if sessionID != "" {
 		if err := b.deps.Sessions.MarkStopped(sessionID, now); err != nil {
 			slog.Warn("ade: stop headless session", "scope", "ade", "session", sessionID, "err", err)
@@ -1031,6 +1043,7 @@ func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out 
 		return
 	}
 	b.emitRuns(updated)
+	b.recordRunHandoverLocked(updated)
 	switch {
 	case loop != nil:
 		loop.queue(b)
@@ -1069,7 +1082,7 @@ func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 			slog.Warn("ade: start step", "scope", "ade", "task", taskID, "err", err)
 		}
 	case actComplete:
-		if err := b.deps.Tasks.SetEntryStep(taskID, entryDone, nil); err != nil {
+		if err := b.deps.Tasks.SetEntryStep(taskID, entryDone, nil, nil); err != nil {
 			slog.Warn("ade: finish workflow", "scope", "ade", "task", taskID, "err", err)
 			return
 		}
@@ -1251,7 +1264,10 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 }
 
 // StepDone ends the current manual step: the task enters the next step, or finishes after the last.
-func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, error) {
+func (b *TaskBoard) StepDone(_ context.Context, taskID string, notes *string) (adewire.Task, error) {
+	if err := checkNotes(notes); err != nil {
+		return adewire.Task{}, err
+	}
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -1281,9 +1297,10 @@ func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, er
 	if i, more := nextStep(*tc.wf, cur); more {
 		next = tc.wf.Steps[i].ID
 	}
-	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil); err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, next, nil, b.handoffFor(tc, plan[cur].Def.ID, next, notes)); err != nil {
 		return adewire.Task{}, err
 	}
+	b.closeHandoverPrompt(taskID)
 	b.syncStatus(taskID)
 	b.notifyBoard()
 	task, err := b.deps.Tasks.GetTask(taskID)
@@ -1295,7 +1312,10 @@ func (b *TaskBoard) StepDone(_ context.Context, taskID string) (adewire.Task, er
 
 // SetTaskStep moves the task to any non-skipped step of its workflow, or to "done". The target and every
 // later step run fresh: their earlier runs stay as history. Refused while a run of the task is live.
-func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID string) (adewire.Task, error) {
+func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID string, notes *string) (adewire.Task, error) {
+	if err := checkNotes(notes); err != nil {
+		return adewire.Task{}, err
+	}
 	mu := b.taskMu(taskID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -1312,7 +1332,8 @@ func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID st
 	if tc.wf == nil {
 		return adewire.Task{}, invalid("workflow %q is not available", tc.task.WorkflowID)
 	}
-	if stepID == b.currentStepID(tc) {
+	from := b.currentStepID(tc)
+	if stepID == from {
 		return b.wireTask(tc.task)
 	}
 	running, err := b.deps.Tasks.HasRunning(taskID)
@@ -1348,9 +1369,10 @@ func (b *TaskBoard) SetTaskStep(_ context.Context, taskID, stepID, fromStepID st
 			}
 		}
 	}
-	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since); err != nil {
+	if err := b.deps.Tasks.SetEntryStep(taskID, stepID, since, b.handoffFor(tc, from, stepID, notes)); err != nil {
 		return adewire.Task{}, err
 	}
+	b.closeHandoverPrompt(taskID)
 	b.syncStatus(taskID)
 	b.clearStepMessages(taskID)
 	b.notifyBoard()
@@ -1392,7 +1414,7 @@ func (b *TaskBoard) RetrySetup(ctx context.Context, branchID string) error {
 		return err
 	}
 	if path == "" {
-		res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
+		res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{})
 		if err != nil {
 			return err
 		}

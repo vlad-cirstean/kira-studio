@@ -23,7 +23,7 @@ type MobileDeviceRow struct {
 	RevokedAt  *int64
 	// ExpiresAt is epoch ms; a device past it must pair again.
 	ExpiresAt int64
-	// CanWrite lets the phone change backlog and steps; CanAgentInput lets it reply to agents and
+	// CanWrite lets the phone add and shelve tasks and change steps; CanAgentInput lets it reply to agents and
 	// control their terminals. Both are set from the desktop pane only.
 	CanWrite      bool
 	CanAgentInput bool

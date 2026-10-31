@@ -3,7 +3,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
 import { useLaunchOpener } from '../dialog/useLaunchOpener';
-import { useTakeOver } from '../queries';
+import { useRestoreTask, useTakeOver } from '../queries';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from './adeBoardUi';
 import { isPreparing, useSetupWait } from './useSetupWait';
@@ -22,6 +22,7 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
   const ui = useAdeBoardUiStore();
   const launchOpener = useLaunchOpener();
   const takeOverM = useTakeOver();
+  const restoreM = useRestoreTask();
   const { sessions, view } = useSessionViews();
 
   /** The confirm for a session whose run is still running; `null` when none is open. */
@@ -94,6 +95,23 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
     if (err && taskId) ui.actionError[taskId] = err;
   }
 
+  /** Resume in an archived task: restores the task to Later, then takes the session over. */
+  async function resumeArchived(taskId: string, sessionId: string): Promise<void> {
+    if (pending.has(sessionId)) return;
+    delete ui.actionError[taskId];
+    pending.add(sessionId);
+    try {
+      await restoreM.mutateAsync({ taskId });
+    } catch (err) {
+      ui.actionError[taskId] = errMessage(err);
+      return;
+    } finally {
+      pending.delete(sessionId);
+    }
+    const err = await launch(sessionId);
+    if (err) ui.actionError[taskId] = err;
+  }
+
   /** The confirm's `Take over`: an error keeps the dialog open. */
   async function confirmYes(): Promise<string | null> {
     const c = confirm.value;
@@ -105,5 +123,5 @@ export const useAdeTakeOverStore = defineStore('adeTakeOver', () => {
     cancelWait();
   }
 
-  return { confirm, pending, waitingSession, request, confirmYes, cancel };
+  return { confirm, pending, waitingSession, request, resumeArchived, confirmYes, cancel };
 });

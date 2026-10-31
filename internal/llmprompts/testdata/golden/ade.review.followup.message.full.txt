@@ -3,6 +3,8 @@ Review round 1 on feat/login. The reviewer left these comments on your work:
 Rename this to isValid.
 #4 question src/login.ts:30
 Why retry twice?
+#5 change src/login.ts:41 (uncommitted)
+Drop this log line.
 Per comment, call reply_review_comment once.
 change: make the change, commit it, reply what changed, resolved true.
 question: answer in the reply, change no file for it, resolved true.

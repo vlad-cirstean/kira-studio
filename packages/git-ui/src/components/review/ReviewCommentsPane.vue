@@ -13,6 +13,7 @@ import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
  */
 import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
@@ -28,7 +29,7 @@ const props = defineProps<{
 
 // Reuses ReviewFilesState.selectFile rather than a second editor.openRangeDiff call site (D10) —
 // revealing the specific line inside the diff is not attempted (§10).
-const emit = defineEmits<(e: 'select', path: string) => void>();
+const emit = defineEmits<(e: 'select', path: string, origin: ReviewComment['origin']) => void>();
 
 interface PathGroup {
   readonly path: string;
@@ -81,6 +82,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
       return t('git.review.comments.anchorStale.hint', { sha: sha7 });
     case 'exact':
     case 'projected':
+    case 'uncommitted':
       return undefined;
   }
 }
@@ -156,10 +158,17 @@ const listEl = useTemplateRef<HTMLElement>('list');
                     size="inline"
                     class="font-data text-muted-foreground text-graph-sm after:absolute after:inset-0"
                     :aria-label="t('git.review.comments.open.aria', { path: group.path, line: lineLabel(c.range) })"
-                    @click="emit('select', group.path)"
+                    @click="emit('select', group.path, c.origin)"
                   >
                     {{ lineLabel(c.range) }}
                   </Button>
+                  <Badge
+                    v-if="c.origin === 'working'"
+                    variant="warn"
+                    data-testid="review-comment-uncommitted"
+                  >
+                    {{ t('space.ade.changes.uncommitted.label') }}
+                  </Badge>
                   <span
                     v-if="anchorTitle(c)"
                     class="codicon codicon-warning text-warn"

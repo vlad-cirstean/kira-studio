@@ -10,8 +10,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 )
 
-// The phone and the desktop reorder the same backlog at once: the result is one of the two serial
-// orders and no item is lost or doubled.
+// The phone and the desktop reorder the same Backlog shelf at once: the result is one of the two
+// serial orders, never a lost or doubled task.
 func TestPhoneAndDesktopWriteRace(t *testing.T) {
 	f := newFixture(t)
 	app := f.app
@@ -19,61 +19,63 @@ func TestPhoneAndDesktopWriteRace(t *testing.T) {
 	if err := app.W.Mobile.SetDevicePermissions(bridge.MobileDevicePermissionsArgs{ID: deviceID, Write: true}); err != nil {
 		t.Fatal(err)
 	}
+	names := []string{"a", "b", "c", "d"}
 	ids := map[string]string{}
-	for _, text := range []string{"a", "b", "c", "d"} {
-		it, err := app.W.AdeTask.AddBacklogItem(ctx, adewire.AddBacklogItemArgs{Text: text})
+	for _, title := range names {
+		tk, err := app.W.AdeTask.CaptureTask(ctx, adewire.CaptureTaskArgs{Title: title})
 		if err != nil {
 			t.Fatal(err)
 		}
-		ids[text] = it.ID
+		if err := app.W.AdeTask.ShelveTask(ctx, adewire.ShelveTaskArgs{TaskID: tk.ID, Shelf: adewire.ShelfBacklog}); err != nil {
+			t.Fatal(err)
+		}
+		ids[title] = tk.ID
 	}
 
 	for round := range 10 {
-		before := backlogTexts(t, app)
+		before := shelfTitles(t, app, adewire.ShelfBacklog, names...)
 		var wg sync.WaitGroup
 		var phoneStatus int
 		var desktopErr error
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			phoneStatus = p.post("/api/ade/backlog/move", map[string]any{"id": ids["a"], "toIndex": 3}).Status
+			phoneStatus = p.post("/api/ade/shelf/move", map[string]string{"taskId": ids["a"], "shelf": adewire.ShelfBacklog, "beforeId": ""}).Status
 		}()
 		go func() {
 			defer wg.Done()
-			desktopErr = app.W.AdeTask.MoveBacklogItem(ctx, adewire.MoveBacklogItemArgs{ID: ids["d"], ToIndex: 0})
+			desktopErr = app.W.AdeTask.ShelveTask(ctx, adewire.ShelveTaskArgs{TaskID: ids["d"], Shelf: adewire.ShelfBacklog, BeforeID: ids["b"]})
 		}()
 		wg.Wait()
 		if phoneStatus != http.StatusOK || desktopErr != nil {
 			t.Fatalf("round %d: phone %d, desktop %v", round, phoneStatus, desktopErr)
 		}
-		got := backlogTexts(t, app)
+		got := shelfTitles(t, app, adewire.ShelfBacklog, names...)
 		sorted := slices.Sorted(slices.Values(got))
-		if !slices.Equal(sorted, []string{"a", "b", "c", "d"}) {
-			t.Fatalf("round %d: backlog %v lost or doubled an item", round, got)
+		if !slices.Equal(sorted, names) {
+			t.Fatalf("round %d: Backlog %v lost or doubled a task", round, got)
 		}
-		phoneFirst := serial(before, ids["a"], 3, ids["d"], 0, ids)
-		desktopFirst := serial(before, ids["d"], 0, ids["a"], 3, ids)
+		phoneFirst := serial(before, "a", "", "d", "b")
+		desktopFirst := serial(before, "d", "b", "a", "")
 		if !slices.Equal(got, phoneFirst) && !slices.Equal(got, desktopFirst) {
-			t.Fatalf("round %d: backlog %v after %v, want %v or %v", round, got, before, phoneFirst, desktopFirst)
+			t.Fatalf("round %d: Backlog %v after %v, want %v or %v", round, got, before, phoneFirst, desktopFirst)
 		}
 	}
 }
 
-// serial applies two moves in order to a list of texts.
-func serial(start []string, firstID string, firstTo int, secondID string, secondTo int, ids map[string]string) []string {
-	text := map[string]string{}
-	for k, v := range ids {
-		text[v] = k
-	}
+// serial applies two shelf moves in order: each puts a title right before another, or last.
+func serial(start []string, firstTitle, firstBefore, secondTitle, secondBefore string) []string {
 	out := slices.Clone(start)
-	move := func(id string, to int) {
-		i := slices.Index(out, text[id])
-		item := out[i]
-		out = slices.Delete(out, i, i+1)
-		out = slices.Insert(out, min(to, len(out)), item)
+	move := func(title, before string) {
+		out = slices.Delete(out, slices.Index(out, title), slices.Index(out, title)+1)
+		if before == "" {
+			out = append(out, title)
+			return
+		}
+		out = slices.Insert(out, slices.Index(out, before), title)
 	}
-	move(firstID, firstTo)
-	move(secondID, secondTo)
+	move(firstTitle, firstBefore)
+	move(secondTitle, secondBefore)
 	return out
 }
 

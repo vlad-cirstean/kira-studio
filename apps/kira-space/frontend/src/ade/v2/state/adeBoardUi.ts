@@ -7,7 +7,7 @@ import type { OpenSessionEvent } from '../wire';
 // popover keep their own state in `adeWorkflowsUi` and `adeAddUi`. The three Plan toggles persist
 // per window profile; selection and the last refresh summaries are in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
-  const view = ref<'plan' | 'backlog' | 'needs' | 'archived' | 'workflows'>('plan');
+  const view = ref<'plan' | 'later' | 'needs' | 'workflows'>('plan');
   const selectedTaskId = ref<string | null>(null);
   const selectedBranchId = ref<string | null>(null);
   /** Active tab of the task panel and of the branch panel; Sessions is reachable from anywhere. */
@@ -29,6 +29,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const actionError = ref<Record<string, string>>({});
   /** Per repo: what the last fetch changed, shown on its chip until the next fetch. */
   const refreshSummary = ref<Record<string, string>>({});
+  /** The Needs page's All sessions list is open; the status bar's Show all sessions sets it. */
+  const showAllSessions = ref(false);
   const showAllItems = usePersistedState('kira.ade.showAllItems', false);
   const showHistory = usePersistedState('kira.ade.showHistory', false);
   const hiddenRepoIds = usePersistedState<string[]>('kira.ade.hiddenRepoIds', []);
@@ -60,6 +62,13 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     revealSessionId.value = e.sessionId;
   }
 
+  /** Opens the Plan on the task's Sessions tab. */
+  function openSessions(taskId: string): void {
+    if (view.value !== 'later') view.value = 'plan';
+    select(taskId);
+    taskTab.value = 'sessions';
+  }
+
   function toggleRepo(codeRepoId: string): void {
     hiddenRepoIds.value = hiddenRepoIds.value.includes(codeRepoId)
       ? hiddenRepoIds.value.filter((id) => id !== codeRepoId)
@@ -80,6 +89,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     focusRebaseLog,
     actionError,
     refreshSummary,
+    showAllSessions,
     showAllItems,
     showHistory,
     hiddenRepoIds,
@@ -87,6 +97,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     selectBranch,
     openTask,
     openSession,
+    openSessions,
     toggleRepo,
   };
 });

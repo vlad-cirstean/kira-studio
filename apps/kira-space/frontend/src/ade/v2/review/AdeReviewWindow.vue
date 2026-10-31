@@ -137,7 +137,7 @@ const right = useLiveSize(
           <AdeWorkflowReviewPanel
             v-if="rightTab === 'workflow'"
             :target="target"
-            @open-file="files?.selectFile($event)"
+            @open-file="(path, origin) => files?.selectFile(path, origin)"
           />
           <AdeReviewAgentPanel v-else :target="target" :repo-label="repoLabel" />
         </div>

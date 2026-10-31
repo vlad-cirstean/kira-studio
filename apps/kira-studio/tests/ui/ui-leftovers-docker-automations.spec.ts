@@ -230,7 +230,9 @@ test('contract: the run log keeps ANSI colour', async ({ relaunch }) => {
     startedAt: 2_000,
     finishedAt: 3_000,
   });
-  await page.locator('[data-testid="run-row"][data-state="done"] button').first().click();
+  await page.locator('[data-testid="toggle-operations-panel"]').click();
+  await page.locator(`[data-op-id="run:${done.id}"]`).click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-open-run"]').click();
   const log = page.locator('[data-testid="script-run-view"] [data-testid="run-log"]');
   await expect(log).toContainText('green tail');
   await expect(log.locator('span', { hasText: 'green' }).first()).toHaveAttribute('style', /color/);

@@ -18,6 +18,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/termtext"
+)
+
+const (
+	termTailBytes = 64 << 10
+	termTailLines = 40
 )
 
 // Service owns the run lifecycle; it is the terminal.ScriptLauncher.
@@ -62,6 +68,9 @@ type Service struct {
 	server    *agentmcp.Server
 	smartWait sync.WaitGroup
 	bgWait    sync.WaitGroup
+
+	tailMu sync.Mutex
+	tails  map[string]*termtext.Tail
 }
 
 var _ terminal.ScriptLauncher = (*Service)(nil)
@@ -127,6 +136,12 @@ func (s *Service) Begin(scriptID, terminalID, token string) (terminal.ScriptLaun
 		return terminal.ScriptLaunch{}, ipcerr.InternalErr(err)
 	}
 	s.emit(run)
+	s.tailMu.Lock()
+	if s.tails == nil {
+		s.tails = map[string]*termtext.Tail{}
+	}
+	s.tails[terminalID] = termtext.NewTail(termTailBytes)
+	s.tailMu.Unlock()
 	return terminal.ScriptLaunch{RunID: run.ID, Cwd: dir.Path, Command: command, Env: env}, nil
 }
 
@@ -160,6 +175,9 @@ func (s *Service) finish(run *Run, err error) {
 
 // Failed records that the run's session did not spawn.
 func (s *Service) Failed(runID string, err error) {
+	if run, gerr := s.Runs.Get(runID); gerr == nil {
+		s.takeTail(run.TerminalID)
+	}
 	o := runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndStartErr, Err: err})
 	run, ferr := s.Runs.FinishByRun(runID, o, s.now())
 	s.finish(run, ferr)
@@ -176,8 +194,30 @@ func (s *Service) Exited(terminalID string, code int, cause terminal.CloseCause)
 	case terminal.CauseQuit:
 		p.End = runoutcome.EndQuit
 	}
-	run, err := s.Runs.FinishByTerminal(terminalID, runoutcome.ForProcess(p), s.now())
+	o := runoutcome.ForProcess(p)
+	if tail := s.takeTail(terminalID); tail != nil && o.Status == runoutcome.StatusFailed {
+		o = o.WithOutputTail(tail.Lines(termTailLines))
+	}
+	run, err := s.Runs.FinishByTerminal(terminalID, o, s.now())
 	s.finish(run, err)
+}
+
+// Output appends a chunk of a terminal run's session to its tail.
+func (s *Service) Output(terminalID string, b []byte) {
+	s.tailMu.Lock()
+	t := s.tails[terminalID]
+	s.tailMu.Unlock()
+	if t != nil {
+		t.Write(b)
+	}
+}
+
+func (s *Service) takeTail(terminalID string) *termtext.Tail {
+	s.tailMu.Lock()
+	defer s.tailMu.Unlock()
+	t := s.tails[terminalID]
+	delete(s.tails, terminalID)
+	return t
 }
 
 // List returns the newest runs first; a task id narrows it to that task's runs.

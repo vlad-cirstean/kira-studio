@@ -1,32 +1,38 @@
-/* C11 §7.3/§7.4 (S9) — Monaco glyph-margin/line decoration classes for the review diff layer.
-   No precedent elsewhere in this repo (the plan's own §7 doc comment): reviewDecorations.ts
-   assigns these class names to glyphMarginClassName/className; the codicon font (already loaded,
-   base.css) supplies each glyph's ::before content, so this file only sets color/sizing. */
+/* Monaco line-number and line decoration classes for the review diff layer. reviewDecorations.ts
+   assigns these through lineNumberClassName/className; Monaco class names need global CSS. The add
+   mark replaces the hovered line's digits, so the gutter has no glyph margin and never changes
+   width on hover. */
 
-.kira-review-glyph {
+.kira-review-ln {
   cursor: pointer;
 }
 
-.kira-review-glyph-actionable::before {
-  color: var(--kira-accent);
+/* Digits go transparent; the codicon `add` draws in their place. */
+.monaco-editor .margin-view-overlays .line-numbers.kira-review-ln-add {
+  color: transparent;
 }
 
-.kira-review-glyph-reviewed::before {
-  color: var(--kira-ok);
-}
-
-.kira-review-glyph-comment::before {
-  color: var(--kira-info);
-}
-
-/* The hover-tracked "add a comment" glyph (§7.4/OQ3) — muted until hovered, since it is painted on
-   every line the pointer passes over, not just lines worth acting on. */
-.kira-review-glyph-add::before {
+.monaco-editor .margin-view-overlays .line-numbers.kira-review-ln-add::before {
+  content: "\ea60";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font:
+    normal normal normal 14px / 1 codicon,
+    sans-serif;
   color: var(--kira-fg-disabled);
 }
 
-.kira-review-glyph-add:hover::before {
+.monaco-editor .margin-view-overlays .line-numbers.kira-review-ln-add:hover::before {
   color: var(--kira-fg);
+}
+
+/* A commented line keeps its number, tinted. */
+.monaco-editor .margin-view-overlays .line-numbers.kira-review-ln-comment {
+  color: var(--kira-info);
+  background-color: color-mix(in srgb, var(--kira-info) 14%, transparent);
 }
 
 /* Whole-line background for a reviewed range (reviewedType's native equivalent, §7.4). A subtle
@@ -34,4 +40,10 @@
    own doc comment), so no light-mode counterpart is needed. */
 .kira-review-line-reviewed {
   background-color: color-mix(in srgb, var(--kira-ok) 10%, transparent);
+}
+
+/* The hunk mark lives in a zone's margin node; lift that layer over the line-number overlays so
+   the button receives clicks. */
+.monaco-editor .margin-view-zones {
+  z-index: 2;
 }

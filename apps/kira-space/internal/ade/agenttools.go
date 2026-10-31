@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"strings"
 	"time"
 
@@ -252,14 +252,16 @@ func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, 
 	case strings.HasPrefix(name, "-") || strings.Contains(name, "@{") || name == "HEAD":
 		return fmt.Sprintf("%q is not a valid branch name.", name), nil
 	}
-	cmd := exec.CommandContext(ctx, "git", "check-ref-format", "--branch", name)
-	cmd.Dir = rec.Root
-	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return fmt.Sprintf("%q is not a valid git branch name.", name), nil
-		}
+	entry, err := b.openRepo(ctx, rec.ID)
+	if err != nil {
 		return "", fmt.Errorf("ade: check branch name: %w", err)
+	}
+	valid, err := entry.CheckBranchName(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("ade: check branch name: %w", err)
+	}
+	if !valid {
+		return fmt.Sprintf("%q is not a valid git branch name.", name), nil
 	}
 	if main := b.mainShortName(ctx, rec.ID); main != "" && name == main {
 		return fmt.Sprintf("%q is the repo's main branch. Pick a new feature branch name.", name), nil
@@ -281,82 +283,40 @@ func (b *TaskBoard) checkNewBranchName(ctx context.Context, rec model.CodeRepo, 
 	return "", nil
 }
 
-// validateAgentBranch refuses a name git rejects and the names an agent must never take.
-func (b *TaskBoard) validateAgentBranch(ctx context.Context, rec model.CodeRepo, name string) error {
-	msg, err := b.checkNewBranchName(ctx, rec, name)
-	if err != nil {
-		return err
-	}
-	if msg != "" {
-		return agentmcp.ToolError(msg)
-	}
-	return nil
-}
-
-// RequestBranch implements agentmcp.SpaceTools: it creates the branch and its worktree, or confirms
-// the one the task already has under that name.
-func (b *TaskBoard) RequestBranch(ctx context.Context, taskID, ref, name string) (agentmcp.BranchInfo, error) {
-	mu := b.taskMu(taskID)
-	mu.Lock()
-	defer mu.Unlock()
-	tc, err := b.spaceCtx(taskID)
-	if err != nil {
-		return agentmcp.BranchInfo{}, err
-	}
-	if err := b.spaceWritable(tc); err != nil {
-		return agentmcp.BranchInfo{}, err
-	}
-	_, cfgs, err := b.registeredCandidates()
-	if err != nil {
-		return agentmcp.BranchInfo{}, err
-	}
-	id, err := resolveRepoRef(ref, b.taskCandidates(tc, cfgs), "task")
-	if err != nil {
-		return agentmcp.BranchInfo{}, err
-	}
-	var sb model.AdeTaskBranch
-	for _, br := range tc.branches {
-		if br.CodeRepoID == id {
-			sb = br
-		}
-	}
-	nick := tc.nick[id]
+// createBranch makes one repo's branch and worktree under a generated name. A ToolError is a failure
+// of this repo alone.
+func (b *TaskBoard) createBranch(ctx context.Context, sb model.AdeTaskBranch, nick string) (agentmcp.RequestedBranch, error) {
 	if sb.Kind != model.AdeBranchKindMine {
-		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
+		return agentmcp.RequestedBranch{}, agentmcp.ToolError(fmt.Sprintf("The branch of %s on this task is not yours to create.", nick))
 	}
-	if sb.Name != "" && sb.Name != name {
-		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("%s already has branch %q on this task. Branches cannot be renamed; use that one.", nick, sb.Name))
-	}
-	rec, err := b.deps.CodeRepos.Get(id)
+	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
 	if err != nil {
-		return agentmcp.BranchInfo{}, err
+		return agentmcp.RequestedBranch{}, err
 	}
 	if rec == nil {
-		return agentmcp.BranchInfo{}, agentmcp.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
+		return agentmcp.RequestedBranch{}, agentmcp.ToolError(fmt.Sprintf("Repo %s is no longer registered.", nick))
 	}
 	fresh := sb.Name == ""
-	if fresh {
-		if err := b.validateAgentBranch(ctx, *rec, name); err != nil {
-			return agentmcp.BranchInfo{}, err
-		}
-	}
-	res, err := b.ensureWorktree(ctx, taskTitle(tc.task, tc.branches), *rec, sb, name)
+	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{generated: true})
 	if err != nil {
-		return agentmcp.BranchInfo{}, toolErr(err)
+		return agentmcp.RequestedBranch{}, toolErr(err)
 	}
 	if fresh {
 		if err := b.deps.Tasks.SetBranchOrigin(sb.ID, model.AdeBranchOriginAgent); err != nil {
-			return agentmcp.BranchInfo{}, err
+			return agentmcp.RequestedBranch{}, err
 		}
 		sb.Name = res.Name
 	}
 	if res.Fresh {
 		if err := b.startSetup(*rec, sb, res.Name, res.Path, b.onSetupReady); err != nil {
-			return agentmcp.BranchInfo{}, err
+			return agentmcp.RequestedBranch{}, err
 		}
 	}
-	b.notifyBoard()
-	return b.branchInfo(sb, nick, res.Path), nil
+	outcome := agentmcp.BranchExisting
+	if res.Fresh {
+		outcome = agentmcp.BranchCreated
+	}
+	return agentmcp.RequestedBranch{BranchInfo: b.branchInfo(sb, nick, res.Path), Outcome: outcome}, nil
 }
 
 func (b *TaskBoard) branchInfo(sb model.AdeTaskBranch, nick, worktree string) agentmcp.BranchInfo {
@@ -421,7 +381,7 @@ func (b *TaskBoard) taskBranch(taskID, ref string) (br model.AdeTaskBranch, nick
 		}
 		if br.Name == "" {
 			return br, "", &agentmcp.BranchInfo{Repo: tc.nick[id], Setup: agentmcp.SetupInfo{State: "none"},
-				Next: "No branch yet. Call request_branch."}, nil
+				Next: "No branch yet. Call request_branches."}, nil
 		}
 		return br, tc.nick[id], nil, nil
 	}
@@ -500,4 +460,21 @@ func (b *TaskBoard) automationOutcomes(taskID string, q agentmcp.OutcomeQuery) (
 		out = append(out, entry)
 	}
 	return out, nil
+}
+
+// RunGit runs one checked git command of the agent git tool through the shared runner, so it uses
+// the git.gitPath setting, the spawn hygiene and the op log like every other git spawn. Output is
+// stdout then stderr, not interleaved.
+func (b *TaskBoard) RunGit(ctx context.Context, dir string, argv []string) (string, int, error) {
+	status := b.deps.GitStatus(ctx)
+	if status.Kind != "ok" && status.Kind != "tooOld" {
+		return "", 0, fmt.Errorf("git is unavailable: %s", status.Kind)
+	}
+	res, err := gitclient.Run(ctx, b.deps.Runner, status.Path, gitclient.Spec{
+		Dir: dir, Args: append([]string{"--no-pager"}, argv...), Setsid: true,
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	return string(res.Stdout) + string(res.Stderr), res.ExitCode, nil
 }

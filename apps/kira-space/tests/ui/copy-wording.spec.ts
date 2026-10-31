@@ -32,20 +32,6 @@ test('removing a repository says what stays and offers Remove / Cancel', async (
   await expect(page.locator(t('confirm-dialog-cancel'))).toHaveText('Cancel');
 });
 
-test('deleting a backlog item names it and offers Delete / Cancel', async ({ relaunch }) => {
-  const items = adeFixture<{ items: { text: string }[] }>('backlog').items;
-  const { window: page } = await openPlan(relaunch);
-  await page.locator(t('ade-tab-backlog')).click();
-  await page.locator(t('ade-backlog-row')).nth(3).locator(t('ade-backlog-delete')).click();
-  const dialog = page.locator(t('confirm-dialog'));
-  await expect(dialog).toContainText('Delete backlog item?');
-  await expect(page.locator(t('confirm-dialog-message'))).toContainText(
-    `Deletes “${items[3]?.text}” from the backlog. This can’t be undone.`,
-  );
-  await expect(page.locator(t('confirm-dialog-confirm'))).toHaveText('Delete');
-  await expect(page.locator(t('confirm-dialog-cancel'))).toHaveText('Cancel');
-});
-
 test('force push asks with Cancel / Force push', async ({ relaunch }) => {
   const board = adeFixture<{ plan: { unpushed: Record<string, boolean> } }>('board');
   board.plan.unpushed = { b_deps: true };

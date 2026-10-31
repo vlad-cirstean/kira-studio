@@ -77,6 +77,12 @@ export interface DialogCtx {
   openStep: (taskId: string) => string;
   /** The task's current step: its name and the first-message prompt of a manual step; `null` without one. */
   currentStep: (taskId: string) => { name: string; prompt: string } | null;
+  /** What the last stage move left for the task's current step; `null` when it went elsewhere. */
+  handoverInto: (taskId: string) => { from: string; body: string } | null;
+  /** The Kira Space note (`headless.space.suffix`, rendered in Go) that precedes the tool line. */
+  spaceNote: string;
+  /** The tool line (`ade.handoverLine`, rendered in Go) that ends a launch message. */
+  handoverLine: string;
 }
 
 interface DialogChip {
@@ -305,6 +311,16 @@ function repoLine(ctx: DialogCtx, b: Branch): string {
     : `- Repo: ${repo.nick} (read only, in ${repo.root})`;
 }
 
+/** The handover block, Kira Space note and tool line that end a launch message, as `ade.handoverBlock`, `headless.space.suffix` and `ade.handoverLine` render. */
+function handoverLines(ctx: DialogCtx, taskId: string): string[] {
+  const h = ctx.handoverInto(taskId);
+  return [
+    ...(h ? [`Handover from ${h.from}:\n${h.body}`] : []),
+    ...(ctx.spaceNote ? [ctx.spaceNote] : []),
+    ...(ctx.handoverLine ? [ctx.handoverLine] : []),
+  ];
+}
+
 function sessionMessage(ctx: DialogCtx, spec: DialogSpec): string {
   const taskId = spec.taskId ?? '';
   const t = taskOf(ctx, taskId);
@@ -328,6 +344,7 @@ function sessionMessage(ctx: DialogCtx, spec: DialogSpec): string {
       }),
     );
   }
+  lines.push(...handoverLines(ctx, taskId));
   return lines.join('\n');
 }
 
@@ -340,6 +357,7 @@ function startMessage(ctx: DialogCtx, spec: DialogSpec): string {
   lines.push(repoLine(ctx, b));
   const step = ctx.openStep(b.taskId);
   if (step) lines.push(`Step: ${step}`);
+  lines.push(...handoverLines(ctx, b.taskId));
   return lines.join('\n');
 }
 

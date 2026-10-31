@@ -27,6 +27,9 @@ type DiffContent struct {
 	Language string   `json:"language"`
 	Head     DiffSide `json:"head"`
 	Worktree DiffSide `json:"worktree"`
+	// ContentHash identifies Worktree; set only by the uncommitted review read, which echoes it on
+	// a mark or comment so the server can refuse one built on content the user never saw.
+	ContentHash string `json:"contentHash,omitempty"`
 }
 
 // ReadDiff reads relPath's own HEAD and worktree content for a diff tab (C6 §5) — validating

@@ -40,7 +40,7 @@ function fixtureData(): RegExp[] {
     new RegExp(`^(?:${token}|⟦[^⟧]*⟧|[\\s\\d.,:%·–—+\\-/→✓⚠▲›…↩≤])+$`),
     /\b\d{4}\b|\b\d+\s?(second|minute|hour|day|month|year)s?\b|\bago\b/,
     // Sent to Claude, not shown as chrome; notes toolbar glyph letters; palette ids stay raw by decision.
-    /^When this step is done, call finish_step/,
+    /^(?:Kira Space tools: |When this step is done, call finish_step)/,
     /^(red|amber|green|cyan|blue|magenta|grey)$/,
     /^(connecting|connected|error)$/,
     /^[BIH]$/,
@@ -69,12 +69,12 @@ test('plan board, task card menu and day menu', async ({ relaunch }) => {
   await expectCatalogText(page.locator(t('context-menu')), { allow });
 });
 
-test('backlog and needs pages', async ({ relaunch }) => {
+test('later and needs pages', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await setPseudoLocale(page);
   const allow = fixtureData();
-  await page.locator(t('ade-tab-backlog')).click();
-  await expectCatalogText(page.locator(t('ade-backlog')), { allow });
+  await page.locator(t('ade-tab-later')).click();
+  await expectCatalogText(page.locator(t('ade-later')), { allow });
   await page.locator(t('ade-tab-needs')).click();
   await expectCatalogText(page.locator(t('ade-needs-page')), { allow });
 });

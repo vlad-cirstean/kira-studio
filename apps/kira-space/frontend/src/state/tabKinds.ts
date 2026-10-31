@@ -14,6 +14,7 @@ import {
   dropRepoMultiDiffTab,
 } from '../views/repo/editors';
 import { useCodeReposStore } from './coderepos';
+import { useFileEditStore } from './fileEdit';
 import {
   asRepoFileTab,
   defaultLocalFileTabState,
@@ -132,6 +133,12 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       dropResources: (tabId) => dropRepoFileTab(tabId),
       menuExtras: () => [],
       parseState: parseStateWith(repoFileTabStateSchema),
+      // An edit buffer with unsaved changes: closing the tab asks to discard first.
+      isDirty: (tabId) => useFileEditStore().isDirty(tabId),
+      badge: (tab) =>
+        useFileEditStore().isDirty(tab.id)
+          ? { icon: 'circle-filled', tooltip: t('common.state.unsavedChanges.status') }
+          : null,
     },
     // An externally opened file outside every imported repository (`path` is absolute): the title
     // is the basename. No rail colour: no repository behind it.

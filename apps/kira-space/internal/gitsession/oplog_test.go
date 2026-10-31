@@ -32,7 +32,7 @@ func TestOpLog_RunOpSuccessRecordsCommandAndSource(t *testing.T) {
 		t.Fatalf("RunOp(branchCreate) = %+v, %v", res, err)
 	}
 
-	recs := log.Recent(10)
+	recs := fgRecs(log)
 	if len(recs) != 1 {
 		t.Fatalf("records = %d, want 1", len(recs))
 	}
@@ -57,13 +57,43 @@ func TestOpLog_RunOpFailureRecordsError(t *testing.T) {
 	if err != nil || res.OK {
 		t.Fatalf("RunOp(checkout missing) = %+v, %v, want a classified failure", res, err)
 	}
-	recs := log.Recent(10)
+	recs := fgRecs(log)
 	if len(recs) != 1 || recs[0].Status != oplog.StatusError || recs[0].Error == nil || *recs[0].Error == "" {
 		t.Fatalf("records = %+v, want one error record with a message", recs)
 	}
 }
 
-func TestOpLog_NilConnRemoteIsNotLogged(t *testing.T) {
+func TestOpLog_RunOpRecordsStepsAndWriteCommand(t *testing.T) {
+	t.Parallel()
+	log := oplog.New()
+	conn, entry := newTestEntry(t, "oplog-conn", newOpLogRepo(t), testEntryOpts{opLog: log})
+
+	res, err := entry.RunOp(oplog.WithOrigin(context.Background(), conn.Origin()), conn.ID, conn.ClientLabel, OpRequest{Kind: "branchCreate", Name: "feat", StartPoint: "main"})
+	if err != nil || !res.OK {
+		t.Fatalf("RunOp(branchCreate) = %+v, %v", res, err)
+	}
+	recs := fgRecs(log)
+	if len(recs) != 1 {
+		t.Fatalf("records = %d, want 1 (reads fold into the op as steps)", len(recs))
+	}
+	r := recs[0]
+	if r.Module != oplog.ModuleApp || r.Trigger != oplog.TriggerUser || r.Category != oplog.CategoryGit {
+		t.Fatalf("attribution = %s/%s/%s", r.Category, r.Module, r.Trigger)
+	}
+	var writes, reads int
+	for _, s := range r.Steps {
+		if s.ReadOnly {
+			reads++
+		} else {
+			writes++
+		}
+	}
+	if writes != 1 || reads == 0 || strings.Contains(*r.Command, "&&") {
+		t.Fatalf("steps writes=%d reads=%d command=%q", writes, reads, *r.Command)
+	}
+}
+
+func TestOpLog_AutoFetchRemoteIsBackground(t *testing.T) {
 	t.Parallel()
 	dir := newOpLogRepo(t)
 	remoteDir := t.TempDir()
@@ -73,12 +103,14 @@ func TestOpLog_NilConnRemoteIsNotLogged(t *testing.T) {
 	log := oplog.New()
 	_, entry := newTestEntry(t, "oplog-conn", dir, testEntryOpts{opLog: log})
 
-	res, err := entry.RunRemote(context.Background(), nil, RemoteOpParams{Kind: "fetch", Remote: "origin"}, RemoteDeps{})
+	res, err := entry.RunRemote(autoFetchCtx, nil, RemoteOpParams{Kind: "fetch", Remote: "origin"}, RemoteDeps{})
 	if err != nil || !res.OK {
 		t.Fatalf("RunRemote(fetch, nil conn) = %+v, %v", res, err)
 	}
-	if recs := log.Recent(10); len(recs) != 0 {
-		t.Fatalf("records = %+v, want none for a nil-conn fetch", recs)
+	for _, r := range fgRecs(log) {
+		if !r.Background || r.Trigger != oplog.TriggerAuto {
+			t.Fatalf("record = %+v, want only background auto rows", r)
+		}
 	}
 }
 
@@ -124,7 +156,7 @@ func TestOpLog_CancelledFetchEndsCancelled(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("fetch spawn never started")
 	}
-	recs := log.Recent(1)
+	recs := fgRecs(log)
 	if len(recs) != 1 || !recs[0].Cancellable || recs[0].Status != oplog.StatusRunning {
 		t.Fatalf("running record = %+v, want one cancellable running record", recs)
 	}
@@ -140,8 +172,19 @@ func TestOpLog_CancelledFetchEndsCancelled(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("RunRemote did not return after cancel")
 	}
-	final := log.Recent(1)[0]
+	final := fgRecs(log)[0]
 	if final.Status != oplog.StatusCancelled || final.Cancellable {
 		t.Fatalf("final record = %+v, want cancelled and not cancellable", final)
 	}
+}
+
+// fgRecs is the log's foreground lane: the rows a user sees by default.
+func fgRecs(l *oplog.Log) []oplog.Record {
+	var out []oplog.Record
+	for _, r := range l.Recent(100) {
+		if !r.Background {
+			out = append(out, r)
+		}
+	}
+	return out
 }

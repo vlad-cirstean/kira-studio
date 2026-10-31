@@ -229,7 +229,7 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 			e.mu.Unlock()
 			return nil
 		},
-		Tasks: r.AdeTasks, Statuses: r.AdeStatuses, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
+		Tasks: r.AdeTasks, Statuses: r.AdeStatuses, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		GitRepoSettings: r.GitRepoSettings.Get, Runner: gitclient.NewExecRunner(), Registry: registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },
 		Workflows: &adeflow.Reader{Dir: wfDir, Store: r.AdeTasks},
@@ -282,7 +282,17 @@ func (e *engine) task(repoNames ...string) string {
 
 func (e *engine) start(taskID string) []string {
 	e.t.Helper()
-	res, err := e.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: taskID})
+	tc, err := e.board.loadTaskCtx(taskID)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	names := map[string]string{}
+	for _, br := range tc.branches { // the user names each branch at Run; an agent step would leave it to the agent
+		if br.Kind == model.AdeBranchKindMine && br.Name == "" {
+			names[br.ID] = "feat/" + slug(taskTitle(tc.task, tc.branches))
+		}
+	}
+	res, err := e.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: taskID, BranchNames: names})
 	if err != nil {
 		e.t.Fatalf("StartRun: %v", err)
 	}
@@ -385,7 +395,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStepDone(t *testing.T) {
 		agentStep("one", "    allowed_tools: [\"Bash(git *)\"]\n") + agentStep("two", "    before: approval\n") + manualStep))
 	id := e.task("api", "web")
 
-	if _, err := e.board.StepDone(context.Background(), id); err == nil {
+	if _, err := e.board.StepDone(context.Background(), id, nil); err == nil {
 		t.Fatal("StepDone accepted before the steps ran")
 	}
 	if runIDs := e.start(id); len(runIDs) != 2 {
@@ -448,7 +458,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStepDone(t *testing.T) {
 	e.waitRun(id, "two/api", model.AdeRunDone)
 	e.waitRun(id, "two/web", model.AdeRunDone)
 
-	task, err := e.board.StepDone(context.Background(), id)
+	task, err := e.board.StepDone(context.Background(), id, nil)
 	if err != nil || task.EntryStepID != "done" {
 		t.Fatalf("StepDone = %+v, %v; want done", task, err)
 	}

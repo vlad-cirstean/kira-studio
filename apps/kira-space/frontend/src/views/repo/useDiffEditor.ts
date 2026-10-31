@@ -53,7 +53,7 @@ function toDiffSide(result: {
 }
 
 interface DiffSidesLoaded {
-  diff: { head: DiffSide; worktree: DiffSide };
+  diff: { head: DiffSide; worktree: DiffSide; contentHash?: string };
   gitRepoId: string | undefined;
 }
 
@@ -166,7 +166,7 @@ export interface DiffEditorParams {
    *  supplies both (a root commit's left is git's well-known empty-tree sha, never null). */
   left: string | null;
   right: string | null;
-  /** Only toggles glyphMargin (§7.3 gotcha 1) — the review object itself,
+  /** Only turns the glyph margin off (§7.3 gotcha 1) — the review object itself,
    *  and attaching its comment-thread layer, stay the caller's own concern. */
   review: boolean;
   /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
@@ -187,6 +187,9 @@ export interface DiffEditorHandle {
    *  wiring, both single-active-view concerns this composable deliberately stays out of (this
    *  file's own header comment), reach the live editor through it. */
   editor: Ref<import('monaco-editor').editor.IStandaloneDiffEditor | null>;
+  /** Hash of the uncommitted worktree text the models were filled from; the caller keeps it in
+   *  step when it rewrites them. Undefined for a diff that is not an uncommitted review read. */
+  contentHash: Ref<string | undefined>;
   mount(): Promise<void>;
   /** onUnmounted — disposes the widget only; the model(s) survive in editors.ts (unmountEditor's
    *  own contract) until dropResources actually closes the tab. */
@@ -205,6 +208,7 @@ export function useDiffEditor(
 ): DiffEditorHandle {
   const state = ref<DiffEditorState>('loading');
   const errorMessage = ref('');
+  const contentHash = ref<string | undefined>();
   const editor = shallowRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null);
   let goToFileImpl: (() => void) | null = null;
   let stopLayoutWatch: WatchStopHandle | null = null;
@@ -256,6 +260,7 @@ export function useDiffEditor(
     const language = monacoLanguageFor(path);
     const original = getOrCreateModel(mod, headUri.toString(), diff.head.text, language);
     const modified = getOrCreateModel(mod, worktreeUri.toString(), diff.worktree.text, language);
+    contentHash.value = diff.contentHash;
 
     const created = mod.editor.createDiffEditor(container.value, {
       theme: KIRA_EDITOR_THEME,
@@ -276,9 +281,9 @@ export function useDiffEditor(
         revealLineCount: 20,
       },
       // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
-      // for the review variant rather than depend on either being right in a future Monaco bump.
+      // (off: the review marks live in the line numbers and hunk rows) rather than depend on either being right in a future Monaco bump.
       // The plain diff passes nothing, unchanged from before this phase.
-      ...(review ? { glyphMargin: true } : {}),
+      ...(review ? { glyphMargin: false } : {}),
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       fontFamily: settingsStore.appearance.fontFamily,
@@ -321,5 +326,5 @@ export function useDiffEditor(
     goToFileImpl?.();
   }
 
-  return { state, errorMessage, editor, mount, dispose, goToFile };
+  return { state, errorMessage, editor, contentHash, mount, dispose, goToFile };
 }

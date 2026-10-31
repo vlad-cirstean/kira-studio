@@ -59,6 +59,7 @@ const id = (name: keyof typeof ids): string => props.testids[name] ?? ids[name];
         <p v-if="message" class="m-0 whitespace-pre-wrap" :data-testid="id('message')">{{
           message
         }}</p>
+        <slot />
         <Alert v-if="error" variant="error" :data-testid="id('error')">
           <AlertDescription>{{ error }}</AlertDescription>
         </Alert>

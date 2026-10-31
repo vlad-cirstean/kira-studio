@@ -112,9 +112,6 @@ func (f *fakeReader) Sessions(context.Context) (adewire.SessionsResult, error) {
 func (f *fakeReader) Workflows(context.Context) (adewire.WorkflowsResult, error) {
 	return adewire.WorkflowsResult{}, nil
 }
-func (f *fakeReader) Backlog(context.Context) (adewire.BacklogResult, error) {
-	return adewire.BacklogResult{Items: []adewire.BacklogItem{{ID: "b1", Text: "first"}}}, nil
-}
 func (f *fakeReader) Repos(context.Context) (adewire.ReposResult, error) {
 	return adewire.ReposResult{Repos: []adewire.Repo{{CodeRepoID: "r1", Name: "api", PrepareScript: "secret"}}}, nil
 }
@@ -150,11 +147,11 @@ func (f *fakeWriter) count() int {
 	return len(f.calls)
 }
 
-func (f *fakeWriter) AddBacklogItem(_ context.Context, a adewire.AddBacklogItemArgs) (adewire.BacklogItem, error) {
-	return adewire.BacklogItem{ID: "new", Text: a.Text}, f.record("AddBacklogItem", a)
+func (f *fakeWriter) CaptureTask(_ context.Context, a adewire.CaptureTaskArgs) (adewire.Task, error) {
+	return adewire.Task{ID: "new", Title: a.Title}, f.record("CaptureTask", a)
 }
-func (f *fakeWriter) MoveBacklogItem(_ context.Context, a adewire.MoveBacklogItemArgs) error {
-	return f.record("MoveBacklogItem", a)
+func (f *fakeWriter) ShelveTask(_ context.Context, a adewire.ShelveTaskArgs) error {
+	return f.record("ShelveTask", a)
 }
 func (f *fakeWriter) SetTaskStep(_ context.Context, a adewire.SetTaskStepArgs) (adewire.Task, error) {
 	return adewire.Task{ID: a.TaskID, EntryStepID: a.StepID}, f.record("SetTaskStep", a)

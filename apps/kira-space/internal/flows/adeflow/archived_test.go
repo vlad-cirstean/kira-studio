@@ -1,6 +1,8 @@
 package adeflow_test
 
 import (
+	"time"
+
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 // P399. Contract ade-archived: tests/ui/ade-v2-archived.spec.ts reads these.
@@ -172,5 +175,44 @@ func TestArchivedTaskKeepsData(t *testing.T) {
 	app.Contract(t, "ade-archived", "error:AdeTaskService.RestoreTask#branch-live", err.Error())
 	if _, err := app.W.AdeTask.ArchivedTask(ctx, args); err != nil {
 		t.Fatalf("task left the archive after a refused restore: %v", err)
+	}
+}
+
+// Resume of an archived task's session: Restore brings the task back, then Take over continues the
+// conversation in a recreated worktree. Contract ade-archived: tests/ui/ade-v2-archived.spec.ts.
+func TestResumeArchivedSession(t *testing.T) {
+	f := newRunFixtureWith(t, []fakeagent.Action{{Name: "done"}}, agentStep("one", ""),
+		flowharness.WithTrackerGrace(time.Second))
+	app := f.app
+	f.start(t, archivedBranch)
+	run := waitRun(t, app, f.taskID, "one", "done")
+	if run.SessionID == "" {
+		t.Fatalf("run %+v has no session", run)
+	}
+	args := adewire.TaskArgs{TaskID: f.taskID}
+	if err := app.W.AdeTask.ArchiveTask(ctx, args); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.W.AdeTask.TakeOver(ctx, adewire.TakeOverArgs{SessionID: run.SessionID}); err == nil {
+		t.Fatal("TakeOver of an archived task's session succeeded")
+	}
+	if _, err := app.W.AdeTask.RestoreTask(ctx, args); err != nil {
+		t.Fatal(err)
+	}
+	takeArgs := adewire.TakeOverArgs{SessionID: run.SessionID, StopIfRunning: true}
+	app.Contract(t, "ade-archived", "args:AdeTaskService.TakeOver", takeArgs)
+	var launch adewire.Launch
+	testx.WaitUntil(t, waitFor, func() bool {
+		l, err := app.W.AdeTask.TakeOver(ctx, takeArgs)
+		launch = l
+		return err == nil
+	})
+	app.Contract(t, "ade-archived", "AdeTaskService.TakeOver#archived-resume", launch, flowharness.Mask("sessionId", "terminalId", "cwd", "command"))
+	br := branchOf(t, board(t, app), f.taskID, f.repoID)
+	if br.Worktree == "" || launch.Cwd != br.Worktree || !strings.Contains(launch.Command, "--resume") {
+		t.Fatalf("resume launch = %+v, want a --resume in the restored worktree %q", launch, br.Worktree)
+	}
+	if got := sessionByID(t, app, run.SessionID); got.TaskID != f.taskID || got.Cwd != br.Worktree {
+		t.Fatalf("session after restore = %+v, want task %s in %q", got, f.taskID, br.Worktree)
 	}
 }

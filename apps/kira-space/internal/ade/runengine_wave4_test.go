@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
 // P147 engine scenarios: send-back, stop, recovery, Take over, launches, archive, add-existing.
@@ -409,6 +410,10 @@ func TestRunEngine_takeOver(t *testing.T) {
 
 const manualSessionStep = "  - id: spec\n    name: Spec\n    kind: manual\n    status: To do\n    session: true\n    prompt: Write the spec for {task}\n"
 
+// handoverLine ends every interactive launch message, after the Kira Space note.
+var handoverLine = llmprompts.HeadlessSpaceSuffix.Text(llmprompts.Defaults(), llmprompts.NoVars{}) + "\n" +
+	llmprompts.AdeHandoverLine.Text(llmprompts.Defaults(), llmprompts.NoVars{})
+
 func TestRunEngine_launchStep(t *testing.T) {
 	ctx := context.Background()
 	e := newEngine(t, nil)
@@ -424,7 +429,7 @@ func TestRunEngine_launchStep(t *testing.T) {
 		t.Fatalf("cwd = %s, want the repo root %s", l.Cwd, e.code["api"].Root)
 	}
 	composed := e.spawn(l)
-	want := " -- 'Spec: Fix login\n- Repo: api (read only, in " + e.code["api"].Root + ")\nWrite the spec for Fix login'"
+	want := " -- " + loginshell.Quote("Spec: Fix login\n- Repo: api (read only, in "+e.code["api"].Root+")\nWrite the spec for Fix login\n"+handoverLine)
 	if !strings.HasSuffix(composed, want) {
 		t.Fatalf("command = %q\nwant suffix %q", composed, want)
 	}
@@ -453,7 +458,7 @@ func TestRunEngine_startBranch(t *testing.T) {
 			t.Fatal(err)
 		}
 		composed := e.spawn(l)
-		if want := " -- 'Task: Fix login\n- Repo: api · Branch: feat/fix-login · Worktree: " + l.Cwd + "'"; !strings.HasSuffix(composed, want) {
+		if want := " -- " + loginshell.Quote("Task: Fix login\n- Repo: api · Branch: feat/fix-login · Worktree: "+l.Cwd+"\nHandover from one:\nsummary-done\n"+handoverLine); !strings.HasSuffix(composed, want) {
 			t.Fatalf("command = %q\nwant suffix %q", composed, want)
 		}
 		if _, err := e.board.StartBranch(ctx, adewire.StartBranchArgs{BranchID: branchOf(t, e, id, "api")}); err == nil || !strings.Contains(err.Error(), "already open") {

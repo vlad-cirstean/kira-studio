@@ -20,7 +20,6 @@ func TestFixturesMatchWireTypes(t *testing.T) {
 		"board.json":               func() any { return new(Board) },
 		"change-requests.json":     func() any { return new(ChangeRequestsResult) },
 		"host-providers.json":      func() any { return new(githost.Providers) },
-		"backlog.json":             func() any { return new(BacklogResult) },
 		"workflows.json":           func() any { return new(WorkflowsResult) },
 		"workflow-yaml.json":       func() any { return new(WorkflowYaml) },
 		"workflow-validation.json": func() any { return new(WorkflowValidation) },

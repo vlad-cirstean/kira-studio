@@ -416,9 +416,17 @@ func commentVars(comments []gitreview.Comment) []llmprompts.ReviewCommentVar {
 		if c.Range.End > c.Range.Start {
 			lines = fmt.Sprintf("%d-%d", c.Range.Start, c.Range.End)
 		}
-		out[i] = llmprompts.ReviewCommentVar{ID: c.ID, Kind: c.Kind, Path: c.Path, Lines: lines, Body: c.Body}
+		out[i] = llmprompts.ReviewCommentVar{ID: c.ID, Kind: c.Kind, Path: c.Path, Lines: lines, Body: c.Body,
+			Uncommitted: c.Origin == gitreview.OriginWorking}
 	}
 	return out
+}
+
+// roundMessage is the first message of a dedicated review round, with the branch's change request link.
+func (b *TaskBoard) roundMessage(ctx context.Context, rc *reviewCtx, tgt adewire.ReviewWindowTarget, round int, comments []gitreview.Comment) string {
+	v := b.roundVars(rc, tgt, round, comments)
+	v.ChangeRequestURL = b.changeRequestURL(ctx, rc.sb, rc.tc.task.HostURL)
+	return llmprompts.AdeReviewRoundMessage.Text(b.prompts(), v)
 }
 
 func (b *TaskBoard) roundVars(rc *reviewCtx, tgt adewire.ReviewWindowTarget, round int, comments []gitreview.Comment) llmprompts.ReviewRoundVars {
@@ -508,7 +516,7 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 		launch.ResumeID = rc.rev.DedicatedClaudeID
 		launch.Prompt = llmprompts.AdeReviewFollowupMessage.Text(b.prompts(), b.roundVars(rc, tgt, round, open))
 	default:
-		launch.Prompt = llmprompts.AdeReviewRoundMessage.Text(b.prompts(), b.roundVars(rc, tgt, round, open))
+		launch.Prompt = b.roundMessage(ctx, rc, tgt, round, open)
 	}
 	if entry, err := b.openRepo(ctx, rc.sb.CodeRepoID); err == nil {
 		if _, tip, err := entry.WorktreeHead(ctx, tgt.Worktree); err == nil {
@@ -603,7 +611,7 @@ func (b *TaskBoard) launchRound(ctx context.Context, tc *taskCtx, run model.AdeR
 	return out, err
 }
 
-func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
+func (b *TaskBoard) startRound(ctx context.Context, tc *taskCtx, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
 	if path == "" {
 		return run, invalid("worktree of %s is missing", sb.Name)
 	}
@@ -638,6 +646,13 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 		return run, err
 	}
 	b.notifySessions()
+	b.sessionOps.put(sessionID, b.startSessionOp(ctx, opReview, tc.task.ID, agent.Label(), ""))
+	b.cancelRunOp(b.sessionOps.peek(sessionID), run.ID)
+	defer func() {
+		if !started {
+			b.finishRunOp(sessionID, outcome{state: model.AdeRunFailed, note: "The review round did not start."})
+		}
+	}()
 	if spec.Route == adewire.ReviewSendNew {
 		if err := b.deps.Tasks.SetReviewDedicated(spec.ReviewRunID, agentSessionID); err != nil {
 			return run, err
@@ -679,6 +694,7 @@ func (b *TaskBoard) completeReviewRound(run model.AdeRun, sessionID string, out 
 	mu.Lock()
 	defer mu.Unlock()
 	now := b.deps.Now().UnixMilli()
+	b.finishRunOp(sessionID, out)
 	if sessionID != "" {
 		if err := b.deps.Sessions.MarkStopped(sessionID, now); err != nil {
 			slog.Warn("ade: stop headless session", "scope", "ade", "session", sessionID, "err", err)
@@ -781,7 +797,7 @@ func (b *TaskBoard) queueFallback(lost model.AdeRun, spec model.AdeReviewSpec) {
 	next := spec
 	next.Route, next.Fallback, next.HeadAfter, next.AllowedTools = adewire.ReviewSendNew, true, "", nil
 	launch := model.AdeRunLaunch{Note: i18n.T("backend.space.ade.reviewStep.fallback.body", nil)}
-	launch.Prompt = llmprompts.AdeReviewRoundMessage.Text(b.prompts(), b.roundVars(&reviewCtx{tc: tc, sb: sb}, tgt, spec.Round, comments))
+	launch.Prompt = b.roundMessage(b.ctx, &reviewCtx{tc: tc, sb: sb}, tgt, spec.Round, comments)
 	if _, err := b.queueRound(b.ctx, tc, sb, tgt.Worktree, next, launch); err != nil && !errors.Is(err, errBoardClosed) {
 		slog.Warn("ade: review fallback round", "scope", "ade", "run", rv.ID, "err", err)
 	}

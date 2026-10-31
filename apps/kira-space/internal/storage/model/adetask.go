@@ -132,11 +132,12 @@ func (b AdeTaskBranch) Validate() error {
 	return nil
 }
 
-// AdeTaskPlanRow is one row of ade_task_plan; Day nil = Later.
+// AdeTaskPlanRow is one row of ade_task_plan; Day nil = Later, or Backlog when Backlog is set.
 type AdeTaskPlanRow struct {
 	TaskID   string
 	Day      *string
 	Position int
+	Backlog  bool
 }
 
 // AdeRun is one row of ade_runs.
@@ -311,38 +312,6 @@ type AdeWorktreeSetup struct {
 	Note string
 }
 
-// AdeBacklogItem is one row of ade_backlog.
-type AdeBacklogItem struct {
-	ID       string
-	Text     string
-	Position int
-	JiraKey  string
-	JiraURL  string
-	HostURL  string
-	Notes    string
-	AddedAt  int64
-}
-
-// Validate asserts what the CHECK covers, earlier and with a message.
-func (i AdeBacklogItem) Validate() error {
-	if i.ID == "" {
-		return fmt.Errorf("model: ade backlog item: id is required")
-	}
-	if i.Text == "" {
-		return fmt.Errorf("model: ade backlog item %q: text is required", i.ID)
-	}
-	return nil
-}
-
-// AdeBacklogPatch holds only the leaves the caller changes; nil = unchanged.
-type AdeBacklogPatch struct {
-	Text    *string
-	JiraKey *string
-	JiraURL *string
-	HostURL *string
-	Notes   *string
-}
-
 // AdeRepoEnv is one row of ade_repo_envs.
 type AdeRepoEnv struct {
 	Name              string
@@ -426,20 +395,16 @@ const (
 	AdeStatusByUser = "user"
 )
 
-// AdeStatusCategory* are ade_task_statuses.category's CHECK values; a category drives the status
-// automation picks.
+// AdeStatusColors are ade_task_statuses.color's CHECK values, in display order.
+var AdeStatusColors = []string{"grey", "brown", "red", "orange", "amber", "yellow", "lime", "green", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple", "pink"}
+
+// Slots of ade_task_status_defaults: the automatic status changes.
 const (
-	AdeStatusTodo   = "todo"
-	AdeStatusActive = "active"
-	AdeStatusReview = "review"
-	AdeStatusDone   = "done"
+	AdeStatusSlotNew      = "new"
+	AdeStatusSlotStep     = "step"
+	AdeStatusSlotReview   = "review"
+	AdeStatusSlotFinished = "finished"
 )
-
-// AdeStatusCategories lists the categories in display order.
-var AdeStatusCategories = []string{AdeStatusTodo, AdeStatusActive, AdeStatusReview, AdeStatusDone}
-
-// AdeStatusTones are ade_task_statuses.tone's CHECK values.
-var AdeStatusTones = []string{"amber", "red", "green", "blue", "purple", "grey"}
 
 // Limits of the status set.
 const (
@@ -460,8 +425,7 @@ func ValidAdeStatusID(id string) bool {
 type AdeTaskStatus struct {
 	ID       string
 	Name     string
-	Tone     string
-	Category string
+	Color    string
 	Position int
 }
 
@@ -473,21 +437,49 @@ func (s AdeTaskStatus) Validate() error {
 	if n := utf8.RuneCountInString(s.Name); n < 1 || n > AdeStatusNameMax {
 		return fmt.Errorf("model: ade task status %q: name needs 1-%d characters", s.ID, AdeStatusNameMax)
 	}
-	if !slices.Contains(AdeStatusTones, s.Tone) {
-		return fmt.Errorf("model: ade task status %q: invalid tone %q", s.ID, s.Tone)
-	}
-	if !slices.Contains(AdeStatusCategories, s.Category) {
-		return fmt.Errorf("model: ade task status %q: invalid category %q", s.ID, s.Category)
+	if !slices.Contains(AdeStatusColors, s.Color) {
+		return fmt.Errorf("model: ade task status %q: invalid color %q", s.ID, s.Color)
 	}
 	return nil
 }
 
-// DefaultAdeTaskStatuses is the seed set of migration 0051.
+// DefaultAdeTaskStatuses is the seed set shipped with the app.
 func DefaultAdeTaskStatuses() []AdeTaskStatus {
 	return []AdeTaskStatus{
-		{ID: "todo", Name: "To do", Tone: "grey", Category: AdeStatusTodo, Position: 0},
-		{ID: "in-progress", Name: "In progress", Tone: "amber", Category: AdeStatusActive, Position: 1},
-		{ID: "in-review", Name: "In review", Tone: "blue", Category: AdeStatusReview, Position: 2},
-		{ID: "done", Name: "Done", Tone: "green", Category: AdeStatusDone, Position: 3},
+		{ID: "todo", Name: "To do", Color: "grey", Position: 0},
+		{ID: "in-progress", Name: "In progress", Color: "amber", Position: 1},
+		{ID: "in-review", Name: "In review", Color: "blue", Position: 2},
+		{ID: "done", Name: "Done", Color: "green", Position: 3},
 	}
+}
+
+// AdeStatusDefaults names the status of each automatic change; an empty field keeps the current status.
+// New is required: a task always starts somewhere.
+type AdeStatusDefaults struct {
+	New      string
+	Step     string
+	Review   string
+	Finished string
+}
+
+// DefaultAdeStatusDefaults is the seed of the defaults.
+func DefaultAdeStatusDefaults() AdeStatusDefaults {
+	return AdeStatusDefaults{New: "todo", Step: "in-progress", Review: "in-review", Finished: "done"}
+}
+
+// Validate asserts every named status is in set and New is named.
+func (d AdeStatusDefaults) Validate(set []AdeTaskStatus) error {
+	in := func(id string) bool {
+		return slices.ContainsFunc(set, func(s AdeTaskStatus) bool { return s.ID == id })
+	}
+	if d.New == "" {
+		return fmt.Errorf("model: ade status defaults: new tasks need a status")
+	}
+	named := [...]struct{ slot, id string }{{AdeStatusSlotNew, d.New}, {AdeStatusSlotStep, d.Step}, {AdeStatusSlotReview, d.Review}, {AdeStatusSlotFinished, d.Finished}}
+	for _, n := range named {
+		if n.id != "" && !in(n.id) {
+			return fmt.Errorf("model: ade status defaults: %s names unknown status %q", n.slot, n.id)
+		}
+	}
+	return nil
 }

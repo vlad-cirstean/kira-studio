@@ -18,9 +18,10 @@ import type { StepRun } from '../board/progress';
 import { WAITING_SETUP_NOTES } from '../board/setupGate';
 import { nextStepId, type StepBlock } from '../board/stepBlocks';
 import { type CardModel, usePlanModel } from '../plan/usePlanModel';
-import { useApprove, useResumeRun, useRetryRun, useSetTaskStep } from '../queries';
+import { useApprove, useResumeRun, useRetryRun } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeStageDialogStore } from '../state/adeStageDialog';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS, TONE_TEXT_CLASS } from '../tones';
 import AdeRunLog from './AdeRunLog.vue';
@@ -36,7 +37,7 @@ const takeOver = useAdeTakeOverStore();
 const approve = useApprove();
 const retry = useRetryRun();
 const resume = useResumeRun();
-const setStep = useSetTaskStep();
+const stage = useAdeStageDialogStore();
 const contextMenu = useContextMenuStore();
 const reviewCode = useReviewCode();
 const { model } = usePlanModel();
@@ -58,10 +59,7 @@ const skipped = computed(() => props.block.state === 'skipped');
 function moveTo(stepId: string): void {
   const taskId = props.card.task.id;
   delete ui.actionError[taskId];
-  setStep.mutate(
-    { taskId, stepId },
-    { onError: (err) => (ui.actionError[taskId] = errorText(err)) },
-  );
+  stage.open({ taskId, toStepId: stepId });
 }
 function onMenu(ev: MouseEvent): void {
   ev.preventDefault();

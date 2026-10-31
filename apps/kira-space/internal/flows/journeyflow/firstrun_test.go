@@ -110,8 +110,17 @@ func TestFirstRunJourney(t *testing.T) {
 	if run := waitRun(t, app, task.ID, "one", "done"); run.Summary != "summary-done" {
 		t.Fatalf("run = %+v", run)
 	}
+	// waitRun saw one branch's run end; the step moves on only once every branch's run has.
+	testx.WaitUntil(t, waitFor, func() bool {
+		for _, r := range taskOf(t, board(t, app), task.ID).Runs {
+			if r.StepID == "one" && r.State != "done" {
+				return false
+			}
+		}
+		return true
+	})
 	for _, want := range []string{"ship", "done"} {
-		if got, err := app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: task.ID}); err != nil || got.EntryStepID != want {
+		if got, err := app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: task.ID}); err != nil || got.EntryStepID != want {
 			t.Fatalf("StepDone = %+v, %v, want entry step %s", got, err, want)
 		}
 	}

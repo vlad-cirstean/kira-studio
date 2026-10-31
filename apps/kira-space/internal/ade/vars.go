@@ -40,8 +40,9 @@ type promptInput struct {
 	Message string
 	// Extra, when non-empty, is added after the body (the failure line of a fresh send-back run).
 	Extra string
-	// Space adds the Kira Space tools line after the body.
-	Space bool
+	// Notes are the task notes; Handover and HandoverFrom what the previous stage left (the stage name).
+	// They stay when Message replaces the composed header.
+	Notes, Handover, HandoverFrom string
 	// Context lines (a rebase that did not finish) go after the body.
 	Context []string
 }
@@ -54,8 +55,9 @@ func stepVars(in promptInput) llmprompts.StepVars {
 		Repo: in.Vars.Repo, Branch: in.Vars.Branch, Worktree: in.Vars.Worktree,
 		StepNumber: in.Step, StepCount: in.Of, StepName: in.Def.Name,
 		StepPrompt: strings.TrimRight(substitute(in.Def.Prompt, in.Vars, false), "\n"),
-		Extra:      in.Extra, Context: in.Context, Space: in.Space,
+		Extra:      in.Extra, Context: in.Context,
 		Finish: agentmcp.FinishVars(resultSpecs(in.Def.Results)),
+		Notes:  capNotes(in.Notes), Handover: capNotes(in.Handover), HandoverFrom: in.HandoverFrom,
 	}
 	if in.Message != "" {
 		v.Message = strings.TrimRight(substitute(in.Message, in.Vars, false), "\n")
@@ -82,22 +84,26 @@ type repoLine struct {
 	Base string
 	// ReadOnlyRoot, when set, makes the line a read-only repo in that directory.
 	ReadOnlyRoot string
+	// BranchID is the task branch the line describes.
+	BranchID string
+	// ChangeRequestURL is the branch's pull or merge request link, filled for the review message only.
+	ChangeRequestURL string
 }
 
 func repoLineVars(repos []repoLine) []llmprompts.RepoLineVars {
 	out := make([]llmprompts.RepoLineVars, len(repos))
 	for i, r := range repos {
-		out[i] = llmprompts.RepoLineVars{Repo: r.Nick, Branch: r.Branch, Worktree: r.Worktree, Base: r.Base, ReadOnlyRoot: r.ReadOnlyRoot}
+		out[i] = llmprompts.RepoLineVars{Repo: r.Nick, Branch: r.Branch, Worktree: r.Worktree, Base: r.Base, ReadOnlyRoot: r.ReadOnlyRoot, ChangeRequestURL: r.ChangeRequestURL}
 	}
 	return out
 }
 
 // composeManualMessage is the first message of a manual step's interactive session (SPEC2 section 5).
 // The step prompt sees every writable repo, joined with ", ".
-func composeManualMessage(src llmprompts.Source, step adewire.WorkflowStep, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+func composeManualMessage(src llmprompts.Source, step adewire.WorkflowStep, title, jiraKey, jiraURL, notes string, repos []repoLine, in handoverText) string {
 	v := llmprompts.ManualVars{
 		StepName: step.Name, Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
-		Notes: capNotes(notes), Repos: repoLineVars(repos),
+		Notes: capNotes(notes), Repos: repoLineVars(repos), Handover: capNotes(in.Body), HandoverFrom: in.From,
 	}
 	if step.Prompt != "" {
 		v.StepPrompt = substitute(step.Prompt, repoVars(title, jiraKey, repos), false)
@@ -129,18 +135,19 @@ func capNotes(notes string) string {
 }
 
 // composeReviewMessage is the first message of a task's review agent.
-func composeReviewMessage(src llmprompts.Source, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+func composeReviewMessage(src llmprompts.Source, title, jiraKey, jiraURL, notes string, repos []repoLine, in handoverText) string {
 	return llmprompts.AdeReviewMessage.Text(src, llmprompts.ReviewVars{
 		Title: title, JiraKey: jiraKey, JiraURL: jiraURL, Notes: capNotes(notes), Repos: repoLineVars(repos),
+		Handover: capNotes(in.Body), HandoverFrom: in.From,
 	})
 }
 
 // composeStartMessage is the first message of a branch-level Start session (SPEC2 section 9); step
 // is the first step not done, "" when the workflow has none.
-func composeStartMessage(src llmprompts.Source, title, jiraKey, jiraURL string, repo repoLine, step string, context []string) string {
+func composeStartMessage(src llmprompts.Source, title, jiraKey, jiraURL string, repo repoLine, step string, context []string, in handoverText) string {
 	return llmprompts.AdeStartMessage.Text(src, llmprompts.StartVars{
 		Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
 		Repo: repo.Nick, Branch: repo.Branch, Worktree: repo.Worktree, ReadOnlyRoot: repo.ReadOnlyRoot,
-		StepName: step, Context: context,
+		StepName: step, Context: context, Handover: capNotes(in.Body), HandoverFrom: in.From,
 	})
 }

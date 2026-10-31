@@ -9,7 +9,6 @@ import { errorText } from '@workbench/bridge/codedError';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import '@vue-flow/core/dist/style.css';
 import { Button } from '@theme/components/ui/button';
-import { Checkbox } from '@theme/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +22,6 @@ import { type Connection, type Edge, type Node, useVueFlow, VueFlow } from '@vue
 import { useElementSize } from '@vueuse/core';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
-import AdeTip from '../AdeTip.vue';
 import { kindLabel, PLACEHOLDER_TOKENS, STEP_KINDS } from '../board/workflowForm';
 import {
   canMove,
@@ -253,19 +251,6 @@ onBeforeUnmount(() => {
         data-testid="ade-wf-form-name"
         @update:model-value="(v: string | number) => draft.patchWorkflow({ name: String(v) })"
       />
-      <div class="flex items-center gap-2 text-kira-md">
-        <Checkbox
-          id="ade-wf-form-space"
-          :model-value="draft.draft.kiraSpaceMcp"
-          data-testid="ade-wf-form-space"
-          @update:model-value="(v) => draft.patchWorkflow({ kiraSpaceMcp: v === true })"
-        />
-        <AdeTip :text="t('space.ade.workflows.graph.spaceTools.tooltip')">
-          <Label for="ade-wf-form-space">{{
-            t('space.ade.workflows.graph.spaceTools.label')
-          }}</Label>
-        </AdeTip>
-      </div>
     </div>
     <div ref="split" class="flex min-h-96 flex-1 rounded-kira border border-border bg-bg">
       <div class="relative min-w-0" :style="{ flex: `0 0 ${graphPane.size.value}%` }">

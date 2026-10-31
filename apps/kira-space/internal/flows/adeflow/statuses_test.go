@@ -9,8 +9,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
+// check sets its own status; later and gate set none, so the step and review defaults apply.
 const statusFlow = "  - id: check\n    name: Check\n    kind: manual\n    status: in-review\n    session: true\n" +
-	"  - id: later\n    name: Later\n    kind: manual\n    status: in-progress\n    session: true\n"
+	"  - id: later\n    name: Later\n    kind: manual\n    session: true\n" +
+	"  - id: gate\n    name: Gate\n    kind: review\n    runs_on: each repo\n    timeout: 1m\n    review:\n      send_to: new\n"
 
 func TestTaskStatuses(t *testing.T) {
 	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("implement", "")+statusFlow)
@@ -36,8 +38,11 @@ func TestTaskStatuses(t *testing.T) {
 	}
 
 	b := board(t, app)
-	if len(b.Statuses) != 4 || b.Statuses[0].ID != "todo" || b.Statuses[3].ID != "done" {
+	if len(b.Statuses) != 4 || b.Statuses[0].ID != "todo" || b.Statuses[3].ID != "done" || b.Statuses[1].Color != "amber" {
 		t.Fatalf("default statuses = %+v", b.Statuses)
+	}
+	if want := (adewire.StatusDefaults{New: "todo", Step: "in-progress", Review: "in-review", Finished: "done"}); b.StatusDefaults != want {
+		t.Fatalf("default slots = %+v, want %+v", b.StatusDefaults, want)
 	}
 	expect(f.taskID, "todo", "auto")
 
@@ -75,79 +80,147 @@ func TestTaskStatuses(t *testing.T) {
 	f.start(t, "feat/api-status")
 	waitRun(t, app, f.taskID, "implement", "done")
 	testx.WaitUntil(t, waitFor, func() bool { s, _ := state(f.taskID); return s == "in-review" })
-	expect(f.taskID, "in-review", "auto")
+	expect(f.taskID, "in-review", "auto") // the next step, check, sets its own status
+
+	step(f.taskID, "later")
+	expect(f.taskID, "in-progress", "auto") // step default
+	step(f.taskID, "gate")
+	expect(f.taskID, "in-review", "auto") // review default
 
 	other := createTask(t, app, "Other", "flow", f.repoID)
 	if _, err := move(other.ID, "in-progress"); err != nil {
 		t.Fatal(err)
 	}
-
-	set := func(mut func([]adewire.TaskStatusDef) []adewire.TaskStatusDef, reassign map[string]string) (adewire.SaveStatusesResult, error) {
-		cur := append([]adewire.TaskStatusDef(nil), board(t, app).Statuses...)
-		return app.W.AdeTask.SaveStatuses(ctx, adewire.SaveStatusesArgs{Statuses: mut(cur), Reassign: reassign})
-	}
-	save := adewire.SaveStatusesArgs{
-		Statuses: []adewire.TaskStatusDef{
-			{ID: "todo", Name: "To do", Tone: "grey", Category: "todo"},
-			{ID: "qa", Name: "QA", Tone: "purple", Category: "active"},
-			{ID: "in-review", Name: "Code review", Tone: "blue", Category: "review"},
-			{ID: "done", Name: "Done", Tone: "green", Category: "done"},
-		},
-		Reassign: map[string]string{"in-progress": "qa"},
-	}
-	// A new status has an empty id on the wire.
-	save.Statuses[1].ID = ""
-	app.Contract(t, "ade-task-statuses", "args:AdeTaskService.SaveStatuses", save)
-	saved, err := app.W.AdeTask.SaveStatuses(ctx, save)
-	if err != nil {
+	old := createTask(t, app, "Old", "flow", f.repoID)
+	if _, err := move(old.ID, "in-progress"); err != nil {
 		t.Fatal(err)
 	}
-	if len(saved.Statuses) != 4 || saved.Statuses[1].ID != "qa" || saved.Statuses[2].Name != "Code review" {
-		t.Fatalf("saved = %+v", saved.Statuses)
+	if err := app.W.AdeTask.ArchiveTask(ctx, adewire.TaskArgs{TaskID: old.ID}); err != nil {
+		t.Fatal(err)
 	}
-	app.Contract(t, "ade-task-statuses", "AdeTaskService.SaveStatuses#saved", saved)
-	expect(f.taskID, "in-review", "auto")
-	expect(other.ID, "qa", "user")
-
-	step(f.taskID, "later")
-	expect(f.taskID, "qa", "auto")
-
-	refuse := func(name string, mut func([]adewire.TaskStatusDef) []adewire.TaskStatusDef) {
+	archivedStatus := func() string {
 		t.Helper()
-		if _, err := set(mut, nil); err == nil {
+		got, err := app.W.AdeTask.ArchivedTask(ctx, adewire.TaskArgs{TaskID: old.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.Task.StatusID
+	}
+
+	cur := func() adewire.SaveStatusesArgs {
+		b := board(t, app)
+		return adewire.SaveStatusesArgs{Statuses: append([]adewire.TaskStatusDef(nil), b.Statuses...), Defaults: b.StatusDefaults}
+	}
+	save := func(a adewire.SaveStatusesArgs) (adewire.SaveStatusesResult, error) {
+		return app.W.AdeTask.SaveStatuses(ctx, a)
+	}
+	mustSave := func(a adewire.SaveStatusesArgs) adewire.SaveStatusesResult {
+		t.Helper()
+		res, err := save(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	// Rename and recolour change display only; every task keeps its status id.
+	rename := cur()
+	rename.Statuses[1].Name, rename.Statuses[1].Color = "Doing", "orange"
+	app.Contract(t, "ade-task-statuses", "args:AdeTaskService.SaveStatuses", rename)
+	renamed := mustSave(rename)
+	app.Contract(t, "ade-task-statuses", "AdeTaskService.SaveStatuses#saved", renamed)
+	if renamed.Statuses[1].ID != "in-progress" || renamed.Statuses[1].Name != "Doing" || renamed.Statuses[1].Color != "orange" {
+		t.Fatalf("renamed = %+v", renamed.Statuses)
+	}
+	expect(f.taskID, "in-review", "auto")
+	expect(other.ID, "in-progress", "user")
+	if got := archivedStatus(); got != "in-progress" {
+		t.Fatalf("archived status = %s, want in-progress", got)
+	}
+
+	// A new default applies at the next automatic moment only.
+	slot := cur()
+	slot.Defaults.Review = "done"
+	mustSave(slot)
+	expect(f.taskID, "in-review", "auto")
+	step(f.taskID, "later")
+	expect(f.taskID, "in-progress", "auto")
+	step(f.taskID, "gate")
+	expect(f.taskID, "done", "auto")
+
+	// An empty finish default keeps the current status.
+	keep := cur()
+	keep.Defaults.Finished = ""
+	mustSave(keep)
+	if _, err := move(f.taskID, "in-review"); err != nil {
+		t.Fatal(err)
+	}
+	step(f.taskID, "done")
+	expect(f.taskID, "in-review", "user")
+	if got := board(t, app).StatusDefaults.Finished; got != "" {
+		t.Fatalf("finished default = %q, want empty", got)
+	}
+
+	refuse := func(name string, a adewire.SaveStatusesArgs) {
+		t.Helper()
+		if _, err := save(a); err == nil {
 			t.Fatalf("%s accepted", name)
 		}
 	}
-	refuse("removing the last done status", func(s []adewire.TaskStatusDef) []adewire.TaskStatusDef { return s[:3] })
-	refuse("duplicate name", func(s []adewire.TaskStatusDef) []adewire.TaskStatusDef {
-		s[1].Name = "to do"
-		return s
-	})
-	refuse("21 statuses", func(s []adewire.TaskStatusDef) []adewire.TaskStatusDef {
-		for i := 0; i < 17; i++ {
-			s = append(s, adewire.TaskStatusDef{Name: fmt.Sprintf("Extra %d", i), Tone: "grey", Category: "active"})
-		}
-		return s
-	})
-
-	// A new status named like a removed one gets a fresh id; the removed one's tasks still move.
-	if _, err := app.W.AdeTask.SaveStatuses(ctx, adewire.SaveStatusesArgs{
-		Statuses: []adewire.TaskStatusDef{
-			{ID: "todo", Name: "To do", Tone: "grey", Category: "todo"},
-			{Name: "Doing", Tone: "blue", Category: "active"},
-			{ID: "in-review", Name: "Code review", Tone: "blue", Category: "review"},
-			{Name: "QA", Tone: "purple", Category: "review"},
-			{ID: "done", Name: "Done", Tone: "green", Category: "done"},
-		},
-		Reassign: map[string]string{"qa": "doing"},
-	}); err != nil {
-		t.Fatal(err)
+	noTarget := cur()
+	noTarget.Statuses = append(noTarget.Statuses[:1], noTarget.Statuses[2:]...)
+	noTarget.Defaults.Step = ""
+	refuse("removing a status without a reassign target", noTarget)
+	badTarget := noTarget
+	badTarget.Reassign = map[string]string{"in-progress": "nope"}
+	refuse("reassign to an unknown status", badTarget)
+	noNew := cur()
+	noNew.Defaults.New = ""
+	refuse("no new-task default", noNew)
+	unknownSlot := cur()
+	unknownSlot.Defaults.Step = "nope"
+	refuse("default naming an unknown status", unknownSlot)
+	dup := cur()
+	dup.Statuses[1].Name = "to do"
+	refuse("duplicate name", dup)
+	many := cur()
+	for i := 0; i < 17; i++ {
+		many.Statuses = append(many.Statuses, adewire.TaskStatusDef{Name: fmt.Sprintf("Extra %d", i), Color: "grey"})
 	}
-	expect(other.ID, "doing", "user")
-	for _, st := range board(t, app).Statuses {
-		if st.Name == "QA" && st.ID == "qa" {
-			t.Fatalf("new status reused the removed id: %+v", st)
-		}
+	refuse("21 statuses", many)
+	badColor := cur()
+	badColor.Statuses[0].Color = "mauve"
+	refuse("unknown colour", badColor)
+
+	// Delete: tasks move to the chosen status, archived ones too; a default naming it moves with it.
+	toTodo := cur()
+	toTodo.Statuses = append(toTodo.Statuses[:1], toTodo.Statuses[2:]...)
+	toTodo.Reassign = map[string]string{"in-progress": "todo"}
+	// The editor moves the defaults that name the removed status itself; the server also does it when
+	// they arrive unmoved (toTodo below).
+	sent := adewire.SaveStatusesArgs{
+		Statuses: []adewire.TaskStatusDef{renamed.Statuses[0], renamed.Statuses[2], renamed.Statuses[3]},
+		Defaults: renamed.Defaults,
+		Reassign: toTodo.Reassign,
+	}
+	sent.Defaults.Step = "todo"
+	app.Contract(t, "ade-task-statuses", "args:AdeTaskService.SaveStatuses#delete", sent)
+	deleted := mustSave(toTodo)
+	if len(deleted.Statuses) != 3 || deleted.Defaults.Step != "todo" {
+		t.Fatalf("deleted = %+v", deleted)
+	}
+	expect(other.ID, "todo", "user")
+	if got := archivedStatus(); got != "todo" {
+		t.Fatalf("archived status = %s, want todo", got)
+	}
+	expect(f.taskID, "in-review", "user")
+
+	// A new status named like a removed one gets a fresh id.
+	again := cur()
+	again.Statuses = append(again.Statuses, adewire.TaskStatusDef{Name: "Doing", Color: "teal"})
+	res := mustSave(again)
+	if last := res.Statuses[len(res.Statuses)-1]; last.ID == "" || last.ID == "in-progress" {
+		t.Fatalf("new status id = %q", last.ID)
 	}
 }
 

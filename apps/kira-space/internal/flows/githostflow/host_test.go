@@ -77,6 +77,8 @@ func newRig(t *testing.T, forge *fakehost.Forge, opts ...flowharness.Opt) *rig {
 		t.Fatal(err)
 	}
 	br := branchIn(t, app, task.ID, rec.ID)
+	// finish_step lists the task's artifacts through the host; keep that out of the lookups under test.
+	forge.SetOffline(true)
 	if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{br.ID: branch}}); err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +96,8 @@ func newRig(t *testing.T, forge *fakehost.Forge, opts ...flowharness.Opt) *rig {
 		}
 		return false
 	})
+	forge.SetOffline(false)
+	forge.ResetCalls()
 	br = branchIn(t, app, task.ID, rec.ID)
 	tip := git(t, br.Worktree, "rev-parse", "HEAD")
 	forge.SetHead(7, tip)

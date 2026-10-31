@@ -7,6 +7,8 @@ package adewire
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
@@ -102,7 +104,7 @@ type WorkflowStep struct {
 	ID      string       `json:"id"`
 	Name    string       `json:"name"`
 	Kind    StepKind     `json:"kind"`
-	Status  TaskStatus   `json:"status"`
+	Status  TaskStatus   `json:"status"` // '' uses the default of the step's kind
 	Skip    bool         `json:"skip"`
 	Session bool         `json:"session"` // manual: open a Claude Code session
 	Command string       `json:"command"` // script
@@ -179,11 +181,9 @@ type ReviewStepConfig struct {
 }
 
 type Workflow struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	// KiraSpaceMcp turns on the Kira Space tools (declare repos, request branches) for the work of a task.
-	KiraSpaceMcp bool           `json:"kiraSpaceMcp"`
-	Steps        []WorkflowStep `json:"steps"`
+	ID    string         `json:"id"`
+	Name  string         `json:"name"`
+	Steps []WorkflowStep `json:"steps"`
 }
 
 type WorkflowError struct {
@@ -452,15 +452,106 @@ type Task struct {
 	// StatusID is the task's status; StatusBy says who set it last: 'auto' (a step change) or 'user'.
 	StatusID string `json:"statusId"`
 	StatusBy string `json:"statusBy"`
+	// StatusStep is the workflow step id whose position set the status; empty before the task starts.
+	StatusStep string `json:"statusStep"`
+	// HandoverIn is the newest handed handover (what the last stage move left); nil before any.
+	// HandoverDrafts are the open drafts sessions wrote, never nil. Full history comes from Handovers.
+	HandoverIn     *Handover  `json:"handoverIn"`
+	HandoverDrafts []Handover `json:"handoverDrafts"`
+	// BranchRequestID is the open request an agent waits on for this task; '' when none.
+	BranchRequestID string `json:"branchRequestId"`
 }
 
-// TaskStatusDef is one status of the user's set. Category is 'todo' | 'active' | 'review' | 'done'
-// and decides which status automation picks; Tone is an ADE tone name.
+// BranchRequestItem is one repo an agent asks branch work for. Kind 'branch': a new branch from Base (” =
+// the repo's main branch). Kind 'worktree': a worktree for the named, not yet checked out Branch.
+type BranchRequestItem struct {
+	CodeRepoID string `json:"codeRepoId"`
+	Repo       string `json:"repo"`
+	Kind       string `json:"kind"`
+	Branch     string `json:"branch"`
+	Base       string `json:"base"`
+}
+
+// BranchRequest is an agent's open request for branches and worktrees. Source is 'run' (a headless step run),
+// 'session' (an interactive session) or 'automation' (a smart script); StepName names the stage, ” when unknown.
+// ExpiresAt is unix millis.
+type BranchRequest struct {
+	ID        string              `json:"id"`
+	TaskID    string              `json:"taskId"`
+	TaskTitle string              `json:"taskTitle"`
+	Source    string              `json:"source"`
+	StepName  string              `json:"stepName"`
+	Items     []BranchRequestItem `json:"items"`
+	CreatedAt int64               `json:"createdAt"`
+	ExpiresAt int64               `json:"expiresAt"`
+}
+
+type BranchRequestArgs struct {
+	ID string `json:"id"`
+}
+
+type ApproveBranchRequestArgs struct {
+	ID          string   `json:"id"`
+	CodeRepoIDs []string `json:"codeRepoIds"`
+}
+
+// BranchRequestAnswer says whether an approve or deny reached a request still open.
+type BranchRequestAnswer struct {
+	Resolved bool `json:"resolved"`
+}
+
+// Handover is the text one stage leaves for the next. A draft (State 'draft', ToStepID empty) is open until
+// the task moves; a handed row is one stage move. Step names are snapshots; a step id of 'done' is past
+// the last step. Source is 'agent' (a session's handover call), 'run' (a finished run's summary) or 'user'.
+type Handover struct {
+	ID           string `json:"id"`
+	TaskID       string `json:"taskId"`
+	FromStepID   string `json:"fromStepId"`
+	FromStepName string `json:"fromStepName"`
+	ToStepID     string `json:"toStepId"`
+	ToStepName   string `json:"toStepName"`
+	Body         string `json:"body"`
+	Source       string `json:"source"`
+	State        string `json:"state"`
+	Finished     bool   `json:"finished"`
+	Dismissed    bool   `json:"dismissed"`
+	Edited       bool   `json:"edited"`
+	CreatedAt    int64  `json:"createdAt"`
+	UpdatedAt    int64  `json:"updatedAt"`
+}
+
+type HandoversResult struct {
+	Handovers []Handover `json:"handovers"`
+}
+
+type UpdateHandoverArgs struct {
+	ID string `json:"id"`
+	// Body '' deletes the row.
+	Body string `json:"body"`
+}
+
+// StepDoneArgs ends the current manual step. Notes, when set, replace the stage's draft handover; empty drops it.
+type StepDoneArgs struct {
+	TaskID string  `json:"taskId"`
+	Notes  *string `json:"notes,omitempty"`
+}
+
+// TaskStatusDef is one status of the user's set: a label. Color is one of the 16 status colours.
 type TaskStatusDef struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Tone     string `json:"tone"`
-	Category string `json:"category"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+// StatusDefaults names the status of each automatic change; an empty field keeps the current status.
+// New is required: it is the status of a new task and of a task back at its first step with nothing run.
+// Step applies when a step starts that sets no status, Review when a review step without one starts,
+// Finished when the workflow finishes.
+type StatusDefaults struct {
+	New      string `json:"new"`
+	Step     string `json:"step"`
+	Review   string `json:"review"`
+	Finished string `json:"finished"`
 }
 
 type Plan struct {
@@ -468,6 +559,8 @@ type Plan struct {
 	Order       []string          `json:"order"`
 	QueuedAfter map[string]string `json:"queuedAfter"`
 	Unpushed    map[string]bool   `json:"unpushed"`
+	// Backlog holds the Backlog shelf's task ids in order.
+	Backlog []string `json:"backlog"`
 }
 
 type HistoryEntry struct {
@@ -528,6 +621,7 @@ type RepoState struct {
 type Board struct {
 	Tasks            []Task          `json:"tasks"`
 	Statuses         []TaskStatusDef `json:"statuses"`
+	StatusDefaults   StatusDefaults  `json:"statusDefaults"`
 	Branches         []Branch        `json:"branches"`
 	Plan             Plan            `json:"plan"`
 	Pairs            []Pair          `json:"pairs"`
@@ -549,20 +643,6 @@ type ChangeRequestsResult struct {
 	Branches map[string]ChangeRequest `json:"branches"`
 	// BranchURLs maps a branch id to its web page, for branches whose repo has a host.
 	BranchURLs map[string]string `json:"branchUrls"`
-}
-
-type BacklogItem struct {
-	ID       string        `json:"id"`
-	Text     string        `json:"text"`
-	AddedAt  int64         `json:"addedAt"`
-	Jira     *Jira         `json:"jira"`
-	HostURL  string        `json:"hostUrl"`
-	HostLink *githost.Link `json:"hostLink"`
-	Notes    string        `json:"notes"`
-}
-
-type BacklogResult struct {
-	Items []BacklogItem `json:"items"`
 }
 
 type CandidateBranch struct {
@@ -715,16 +795,18 @@ type TaskPatch struct {
 	StatusID *string `json:"statusId"`
 }
 
-// SaveStatusesArgs rewrites the status set in order. A status with an empty ID is new. Reassign maps a
-// removed status id to the id its tasks move to; a removed id without an entry goes to the first kept
-// status of its category.
+// SaveStatusesArgs rewrites the status set in order and the defaults. A status with an empty ID is new.
+// Reassign maps every removed status id to the id its tasks move to; a defaults field naming a removed
+// status moves there too.
 type SaveStatusesArgs struct {
 	Statuses []TaskStatusDef   `json:"statuses"`
+	Defaults StatusDefaults    `json:"defaults"`
 	Reassign map[string]string `json:"reassign"`
 }
 
 type SaveStatusesResult struct {
 	Statuses []TaskStatusDef `json:"statuses"`
+	Defaults StatusDefaults  `json:"defaults"`
 }
 
 type UpdateTaskArgs struct {
@@ -800,30 +882,22 @@ type BranchArgs struct {
 	BranchID string `json:"branchId"`
 }
 
-type AddBacklogItemArgs struct {
-	Text string `json:"text"`
+// Shelf names are the targets of ShelveTask.
+const (
+	ShelfLater   = "later"
+	ShelfBacklog = "backlog"
+)
+
+// ShelveTaskArgs moves a task onto a shelf, right before BeforeID ("" = end of the shelf).
+type ShelveTaskArgs struct {
+	TaskID   string `json:"taskId"`
+	Shelf    string `json:"shelf"`
+	BeforeID string `json:"beforeId"`
 }
 
-type BacklogPatch struct {
-	Text      *string `json:"text"`
-	Jira      *Jira   `json:"jira"`
-	ClearJira bool    `json:"clearJira"`
-	HostURL   *string `json:"hostUrl"`
-	Notes     *string `json:"notes"`
-}
-
-type UpdateBacklogItemArgs struct {
-	ID    string       `json:"id"`
-	Patch BacklogPatch `json:"patch"`
-}
-
-type BacklogItemArgs struct {
-	ID string `json:"id"`
-}
-
-type MoveBacklogItemArgs struct {
-	ID      string `json:"id"`
-	ToIndex int    `json:"toIndex"`
+// CaptureTaskArgs adds a title-only task at the top of Later.
+type CaptureTaskArgs struct {
+	Title string `json:"title"`
 }
 
 type FileNameArgs struct {
@@ -931,11 +1005,68 @@ type ReviewWindowTarget struct {
 }
 
 // ReviewWorking is the uncommitted work of a branch's worktree against its HEAD (P384). Worktree
-// is "" when the branch has none, with no Files. Head is "" for an unborn HEAD.
+// is "" when the branch has none, with no Files. Head is "" for an unborn HEAD. Reviews holds each
+// file's uncommitted review status by path (P418); Promoted lists paths whose uncommitted review
+// moved onto a commit during this call.
 type ReviewWorking struct {
-	Worktree string                 `json:"worktree"`
-	Head     string                 `json:"head"`
-	Files    []porcelain.FileChange `json:"files"`
+	Worktree string                                 `json:"worktree"`
+	Head     string                                 `json:"head"`
+	Files    []porcelain.FileChange                 `json:"files"`
+	Reviews  map[string]gitsession.ReviewFileStatus `json:"reviews"`
+	Promoted []string                               `json:"promoted"`
+	// ContentHashes is each listed file's worktree content hash; echo it on a list mark.
+	ContentHashes map[string]string `json:"contentHashes"`
+}
+
+// ReviewWorkingFileReview is one uncommitted file's diff with the lines already marked reviewed.
+type ReviewWorkingFileReview struct {
+	Path           string                 `json:"path"`
+	Body           porcelain.FileDiffBody `json:"body"`
+	ReviewedRanges []gitreview.LineRange  `json:"reviewedRanges"`
+	LineCount      int                    `json:"lineCount"`
+	ContentKind    string                 `json:"contentKind"`
+}
+
+// ReviewWorkingMarkArgs marks or unmarks uncommitted files. Ranges (one path only, worktree line
+// numbers) null marks whole files.
+type ReviewWorkingMarkArgs struct {
+	BranchID string                `json:"branchId"`
+	Paths    []string              `json:"paths"`
+	Reviewed bool                  `json:"reviewed"`
+	Ranges   []gitreview.LineRange `json:"ranges"`
+	// ContentHashes maps a path to the hash of the content the caller saw (ReviewWorkingDiff's
+	// contentHash, or ReviewWorking's); E_CONFLICT, nothing marked, when any listed path changed.
+	// A path with no entry is not checked.
+	ContentHashes map[string]string `json:"contentHashes,omitempty"`
+}
+
+// ReviewWorkingMarkFile is the status of one path after a mark.
+type ReviewWorkingMarkFile struct {
+	Path   string                      `json:"path"`
+	Review gitsession.ReviewFileStatus `json:"review"`
+}
+
+// ReviewWorkingMarkResult lists the marked paths in request order.
+type ReviewWorkingMarkResult struct {
+	Files []ReviewWorkingMarkFile `json:"files"`
+}
+
+// ReviewWorkingCommentsResult is every uncommitted-origin comment of the branch, anchored against
+// the current worktree.
+type ReviewWorkingCommentsResult struct {
+	Comments []gitsession.CommentEntry `json:"comments"`
+}
+
+// ReviewWorkingCommentAddArgs adds a comment on uncommitted text.
+type ReviewWorkingCommentAddArgs struct {
+	BranchID string              `json:"branchId"`
+	Path     string              `json:"path"`
+	Range    gitreview.LineRange `json:"range"`
+	Body     string              `json:"body"`
+	Kind     string              `json:"kind"`
+	// ContentHash, when set, is the ReviewWorkingDiff hash the caller saw; E_CONFLICT when
+	// the file has changed since.
+	ContentHash string `json:"contentHash,omitempty"`
 }
 
 // ReviewWorkingDiffArgs names one uncommitted file of a branch's worktree.
@@ -1006,6 +1137,8 @@ type SetTaskStepArgs struct {
 	// FromStepID, when set, is the step the caller saw; the engine refuses with ErrStale when the
 	// task has moved on. Desktop leaves it empty.
 	FromStepID string `json:"fromStepId,omitempty"`
+	// Notes, when set, replace the stage's draft handover; empty drops it. Nil keeps the draft.
+	Notes *string `json:"notes,omitempty"`
 }
 
 type SendArgs struct {
@@ -1099,4 +1232,82 @@ type RepoBranches struct {
 	MainName string     `json:"mainName"`
 	Previous string     `json:"previous"`
 	Branches []BasePick `json:"branches"`
+}
+
+// Artifact is something a task produced or points at: a change request, issue, branch, deployment, doc
+// or link. Detected artifacts (ID "") are derived on read; stored ones carry the row id.
+type Artifact struct {
+	ID        string `json:"id"`
+	Kind      string `json:"kind"` // changeRequest | issue | branch | deployment | doc | link
+	Title     string `json:"title"`
+	URL       string `json:"url"` // '' none
+	Ref       string `json:"ref"` // display ref: #12, PROJ-7, worktree path, short sha, file path
+	Status    string `json:"status"`
+	Repo      string `json:"repo"`   // repo nickname, '' none
+	Source    string `json:"source"` // task | host | git | agent | user, or a tracker id
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// ArtifactGap names a source that failed or timed out; the list is partial.
+type ArtifactGap struct {
+	Source string `json:"source"` // host | git | a tracker id
+	Repo   string `json:"repo"`   // '' when not repo-bound
+	// Reason names why a tracker source is partial: unavailable | unauthenticated | notFound | otherSite |
+	// timeout | failed | changeRequestsMissing | changeRequests<Reason>. '' for the other sources.
+	Reason string `json:"reason,omitempty"`
+	// Count is how many change requests the tracker reports beyond the ones found (changeRequestsMissing).
+	Count int `json:"count,omitempty"`
+}
+
+// TaskIssue is the issue tracker's view of a task's linked issue.
+type TaskIssue struct {
+	Provider       string               `json:"provider"`
+	Label          string               `json:"label"` // provider display name, e.g. Jira
+	Key            string               `json:"key"`
+	URL            string               `json:"url"`
+	Title          string               `json:"title"`
+	Status         string               `json:"status"`
+	StatusCategory string               `json:"statusCategory"` // new | indeterminate | done | ''
+	Summary        IssueSummary         `json:"summary"`
+	ChangeRequests []IssueChangeRequest `json:"changeRequests"`
+	// Reason is why the issue could not be read ('' when it was): a tracker reason word, or noTracker when
+	// no registered tracker recognises the task's link.
+	Reason string `json:"reason"`
+	// ChangeRequestsReason is set when the pull request lookup failed but the issue itself was read.
+	ChangeRequestsReason string `json:"changeRequestsReason"`
+}
+
+// IssueSummary is the tracker's own count of change requests linked to the issue.
+type IssueSummary struct {
+	Known     bool     `json:"known"`
+	Count     int      `json:"count"`
+	State     string   `json:"state"`
+	Providers []string `json:"providers"`
+}
+
+// IssueChangeRequest is a pull or merge request associated with the issue.
+type IssueChangeRequest struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+	Ref   string `json:"ref"`
+	State string `json:"state"`
+	Repo  string `json:"repo"`
+}
+
+type ArtifactsResult struct {
+	Artifacts []Artifact    `json:"artifacts"`
+	Gaps      []ArtifactGap `json:"gaps"`
+}
+
+type AddArtifactArgs struct {
+	TaskID string `json:"taskId"`
+	Kind   string `json:"kind"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Ref    string `json:"ref"`
+}
+
+type RemoveArtifactArgs struct {
+	TaskID string `json:"taskId"`
+	ID     string `json:"id"`
 }

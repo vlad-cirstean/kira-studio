@@ -1,4 +1,4 @@
-import type { BaseResolution, CommitRange, FileChange } from '@kira/git-ipc';
+import type { BaseResolution, CommitRange, FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { errorText } from '@workbench/bridge/codedError';
 import { type Ref, type ShallowRef, shallowRef } from 'vue';
@@ -520,9 +520,12 @@ export interface ReviewApi {
   refresh(): void;
 }
 
-/** Uncommitted changes a host shows under the committed list (review window): no review marks,
- *  `onOpen` opens the host's own diff for the path. */
+/** Uncommitted changes a host shows under the committed list (review window), reviewed apart from
+ *  the committed ones. `onOpen` opens the host's own diff for the path. */
 export interface ReviewWorkingSection {
   readonly files: readonly FileChange[];
+  readonly reviewStates: ReadonlyMap<string, ReviewFileStatus>;
   onOpen(path: string, pinned: boolean): void;
+  onToggleReviewed(path: string, reviewed: boolean): void;
+  onToggleReviewedFolder(paths: readonly string[], reviewed: boolean): void;
 }

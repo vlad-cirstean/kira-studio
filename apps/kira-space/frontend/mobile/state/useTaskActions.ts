@@ -15,6 +15,8 @@ export function useTaskActions(card: () => PlanCard) {
   const writes = useAdeWrites();
   const intent = ref<TaskIntent | null>(null);
   const error = ref('');
+  /** Handover notes for a Back or Next move; empty sends none. */
+  const notes = ref('');
   let key = newIntentKey();
 
   const stepName = computed(() => card().progress.step?.name ?? '');
@@ -80,6 +82,7 @@ export function useTaskActions(card: () => PlanCard) {
 
   function ask(next: TaskIntent): void {
     error.value = '';
+    notes.value = '';
     key = newIntentKey();
     intent.value = next;
   }
@@ -101,6 +104,7 @@ export function useTaskActions(card: () => PlanCard) {
           fromStepId: from,
           stepId: target.id,
           key,
+          ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
         });
       } else if (intent.value === 'start' && startKind.value === 'run') {
         await writes.startRun.mutateAsync({ taskId: c.task.id, fromStepId: from, key });
@@ -113,5 +117,5 @@ export function useTaskActions(card: () => PlanCard) {
     }
   }
 
-  return { intent, error, busy, dialog, startKind, ask, cancel, confirm };
+  return { intent, error, notes, busy, dialog, startKind, ask, cancel, confirm };
 }

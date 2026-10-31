@@ -51,38 +51,37 @@
     ],
     "statuses": [
       {
-        "category": "todo",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In progress",
-        "tone": "amber"
+        "name": "In progress"
       },
       {
-        "category": "review",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ],
     "task": {
       "branchIds": [
         "<id:2>"
       ],
+      "branchRequestId": "",
       "color": 0,
       "createdAt": 0,
       "entryStepId": "done",
       "est": "3h",
+      "handoverDrafts": [],
+      "handoverIn": null,
       "hostLink": {
         "kind": "changeRequest",
         "provider": "forge",
@@ -132,10 +131,10 @@
       "since": {},
       "statusBy": "auto",
       "statusId": "done",
+      "statusStep": "done",
       "title": "Fix login",
       "workflow": {
         "id": "<masked>",
-        "kiraSpaceMcp": false,
         "name": "Flow",
         "steps": [
           {
@@ -175,7 +174,7 @@
             "session": false,
             "skip": false,
             "smartScript": "",
-            "status": "in-progress",
+            "status": "",
             "timeout": "1m"
           }
         ]
@@ -236,38 +235,37 @@
     ],
     "statuses": [
       {
-        "category": "todo",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In progress",
-        "tone": "amber"
+        "name": "In progress"
       },
       {
-        "category": "review",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ],
     "task": {
       "branchIds": [
         "<id:2>"
       ],
+      "branchRequestId": "",
       "color": 0,
       "createdAt": 0,
       "entryStepId": "done",
       "est": "3h",
+      "handoverDrafts": [],
+      "handoverIn": null,
       "hostLink": {
         "kind": "changeRequest",
         "provider": "forge",
@@ -317,10 +315,10 @@
       "since": {},
       "statusBy": "auto",
       "statusId": "done",
+      "statusStep": "done",
       "title": "Fix login",
       "workflow": {
         "id": "<masked>",
-        "kiraSpaceMcp": false,
         "name": "Flow",
         "steps": [
           {
@@ -360,7 +358,7 @@
             "session": false,
             "skip": false,
             "smartScript": "",
-            "status": "in-progress",
+            "status": "",
             "timeout": "1m"
           }
         ]
@@ -369,11 +367,21 @@
       "workflowOutdated": false
     }
   },
+  "AdeTaskService.TakeOver#archived-resume": {
+    "command": "<masked>",
+    "cwd": "<masked>",
+    "sessionId": "<masked>",
+    "terminalId": "<masked>"
+  },
   "args:AdeTaskService.ArchivedTask": {
     "taskId": "<id:1>"
   },
   "args:AdeTaskService.RestoreTask": {
     "taskId": "<id:1>"
+  },
+  "args:AdeTaskService.TakeOver": {
+    "sessionId": "<id:1>",
+    "stopIfRunning": true
   },
   "error:AdeTaskService.RestoreTask#branch-live": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"cannot restore: branch feat/api-keep is on task \\\"Other\\\"\"}"
 }

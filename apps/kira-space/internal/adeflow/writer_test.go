@@ -89,7 +89,7 @@ func stepIndex(wf adewire.Workflow, id string) int {
 
 func agentStep(id string) adewire.WorkflowStep {
 	return adewire.WorkflowStep{
-		ID: id, Name: "S", Kind: adewire.KindAgent, Status: "in-progress", RunsOn: "once", Before: "auto",
+		ID: id, Name: "S", Kind: adewire.KindAgent, Status: "", RunsOn: "once", Before: "auto",
 		Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "10m", Prompt: "go",
 		AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
 	}
@@ -200,7 +200,7 @@ func TestSave_edits(t *testing.T) {
 	t.Run("review step round trip", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		rv := agentStep("code-review")
-		rv.Kind, rv.Status, rv.Prompt, rv.MaxReturns, rv.AllowedTools = adewire.KindReview, "in-review", "", 0, []string{}
+		rv.Kind, rv.Status, rv.Prompt, rv.MaxReturns, rv.AllowedTools = adewire.KindReview, "", "", 0, []string{}
 		rv.Review = &adewire.ReviewStepConfig{SendTo: "new", Implementer: "impl"}
 		wf.Steps = append(wf.Steps, rv)
 		out := saveOK(t, r, "standard.yaml", wf)

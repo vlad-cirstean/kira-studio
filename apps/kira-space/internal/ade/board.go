@@ -21,12 +21,15 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -45,9 +48,10 @@ const (
 
 // TaskBoardDeps is NewTaskBoard's construction seam.
 type TaskBoardDeps struct {
-	Tasks           *repos.AdeTaskRepo
+	Tasks *repos.AdeTaskRepo
+	// PromptSink receives the "move to next stage" prompt a finished handover raises; nil drops it.
+	PromptSink      prompts.Sink
 	Statuses        *repos.AdeStatusRepo
-	Backlog         *repos.AdeBacklogRepo
 	RepoConfig      *repos.AdeRepoConfigRepo
 	Facts           *repos.AdeFactsRepo
 	CodeRepos       *repos.CodeReposRepo
@@ -59,6 +63,8 @@ type TaskBoardDeps struct {
 	Workflows *adeflow.Reader
 	// Runner spawns git for repo identification (folder import).
 	Runner gitclient.Runner
+	// Ops is the operation log: agent sessions, worktree setups and MCP tool calls land in it.
+	Ops *oplog.Log
 	// Scripts runs the environment deploy-sha scripts; nil = the OS runner.
 	Scripts gitprepare.Runner
 	// Logs stores run and worktree-setup logs; OnLog pushes each stored batch.
@@ -100,13 +106,18 @@ type TaskBoardDeps struct {
 	// policy and denials.
 	Sandbox    agentsandbox.Enforcer
 	RunSandbox *repos.AdeRunSandboxRepo
+	// Trackers are the issue tracker providers; each adds a task artifact source and fills TaskIssue. nil = none.
+	Trackers *issuetracker.Registry
+	// ArtifactSources append to the built-in task artifact sources.
+	ArtifactSources []ArtifactSource
+	// BranchRequestWait is how long an agent's branch request waits for the user; 0 = defaultBranchRequestWait.
+	BranchRequestWait time.Duration
 	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.
 	RebaseTimeout time.Duration
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
 	// uses, notification included, so git-ui sees a new prepare script.
 	SetRepoSettings func(repoID string, patch model.GitRepoSettingsPatch) error
 	OnBoard         func()
-	OnBacklog       func()
 	OnWorkflows     func()
 	OnRepos         func()
 	// Credentials receives the remote ops' credential prompts, shown in Kira Space's windows.
@@ -119,11 +130,13 @@ type TaskBoardDeps struct {
 // TaskBoard is the v2 engine: one gitsession.Conn holding every repo a live task touches, a per-repo
 // mutex serializing writes and remote ops, and per-repo fact caches.
 type TaskBoard struct {
-	deps    TaskBoardDeps
-	conn    *gitsession.Conn
-	checker *rebaseChecker
-	ctx     context.Context
-	cancel  context.CancelFunc
+	deps TaskBoardDeps
+	// sessionOps holds the op of each live headless agent session until its outcome lands.
+	sessionOps sessionOps
+	conn       *gitsession.Conn
+	checker    *rebaseChecker
+	ctx        context.Context
+	cancel     context.CancelFunc
 
 	importMu sync.Mutex // serializes repo imports (folder add, folder watch rescans)
 	// afterImport runs after each repo a folder scan imports; tests flip state mid-scan with it.
@@ -150,11 +163,13 @@ type TaskBoard struct {
 	setupLive        map[string]*liveRun        // branch id -> its running prepare script
 	archiving        map[string]int             // task id -> archives in progress; blocks launches
 	taskMus          map[string]*sync.Mutex     // task id -> serializes that task's run transitions
+	envScriptMus     sync.Map                   // code repo id -> *sync.Mutex: one env-script pass per repo at a time
 	finishes         map[string]agentmcp.Finish // run id -> last finish_step call
 	claims           map[string]string          // branch id -> the smart script working in its worktree
 	recoveredRebases []model.AdeRun             // rebase runs Recover interrupted; Start re-reads git for them
 	stepMsgs         map[string]string          // task|step -> the Run dialog's edited message
 	agent            *agentmcp.Server
+	branchReqs       branchRequests // open agent branch requests (P408)
 	wg               sync.WaitGroup // background setups and runs; Close waits
 	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
 	closed           bool
@@ -173,15 +188,19 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(oplog.WithOrigin(context.Background(), oplog.Origin{Module: oplog.ModuleADE, Trigger: oplog.TriggerAuto}))
 	b := &TaskBoard{
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]agentmcp.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 	}
-	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts()})
+	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Git: b, Handover: b, Prompts: b.prompts(), OnToolCall: b.mcpRecorder})
+	if deps.Tracker != nil {
+		deps.Tracker.deps.Ops, deps.Tracker.deps.OpSubject = deps.Ops, b.opSubject
+	}
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
+	b.conn.Module = oplog.ModuleADE
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)
 	})
@@ -226,6 +245,7 @@ func (b *TaskBoard) Close() {
 	b.closeMu.Lock()
 	b.closed = true
 	b.closeMu.Unlock()
+	b.abandonAllBranchRequests()
 	// Stop the MCP server first: a late finish_step must not start work after wg.Wait returns.
 	if err := b.agent.Close(); err != nil {
 		slog.Warn("ade: close agent server", "scope", "ade", "err", err)
@@ -266,12 +286,6 @@ func (b *TaskBoard) scheduleBoard() {
 func (b *TaskBoard) notifyBoard() {
 	if b.deps.OnBoard != nil {
 		b.deps.OnBoard()
-	}
-}
-
-func (b *TaskBoard) notifyBacklog() {
-	if b.deps.OnBacklog != nil {
-		b.deps.OnBacklog()
 	}
 }
 
@@ -347,6 +361,7 @@ func (b *TaskBoard) openRepo(ctx context.Context, codeRepoID string) (*gitsessio
 type boardData struct {
 	tasks      []model.AdeTask
 	statuses   []model.AdeTaskStatus
+	defaults   model.AdeStatusDefaults
 	branches   []model.AdeTaskBranch
 	plan       []model.AdeTaskPlanRow
 	runs       map[string][]model.AdeRun
@@ -354,6 +369,7 @@ type boardData struct {
 	setups     map[string]model.AdeWorktreeSetup
 	archived   []model.AdeTask
 	archBranch []model.AdeTaskBranch
+	handovers  map[string]repos.BoardHandover
 }
 
 func (b *TaskBoard) load() (boardData, error) {
@@ -363,6 +379,9 @@ func (b *TaskBoard) load() (boardData, error) {
 		return d, err
 	}
 	if d.statuses, err = b.deps.Statuses.List(); err != nil {
+		return d, err
+	}
+	if d.defaults, err = b.deps.Statuses.Defaults(); err != nil {
 		return d, err
 	}
 	if d.branches, err = b.deps.Tasks.BranchesLive(); err != nil {
@@ -383,7 +402,10 @@ func (b *TaskBoard) load() (boardData, error) {
 	if d.archived, err = b.deps.Tasks.ListArchived(); err != nil {
 		return d, err
 	}
-	d.archBranch, err = b.deps.Tasks.BranchesArchived()
+	if d.archBranch, err = b.deps.Tasks.BranchesArchived(); err != nil {
+		return d, err
+	}
+	d.handovers, err = b.deps.Tasks.BoardHandovers()
 	return d, err
 }
 
@@ -474,11 +496,12 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	for _, t := range d.tasks {
 		wt := b.toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
 		decorateTask(&wt, t, liveWf)
+		applyHandovers(&wt, d.handovers[t.ID])
 		tasks = append(tasks, wt)
 	}
 	b.badgeTasks(tasks)
 
-	plan := adewire.Plan{Day: map[string]string{}, Order: make([]string, 0, len(d.tasks)), QueuedAfter: map[string]string{}, Unpushed: map[string]bool{}}
+	plan := adewire.Plan{Day: map[string]string{}, Order: make([]string, 0, len(d.tasks)), QueuedAfter: map[string]string{}, Unpushed: map[string]bool{}, Backlog: []string{}}
 	live := make(map[string]bool, len(d.tasks))
 	for _, t := range d.tasks {
 		live[t.ID] = true
@@ -488,6 +511,9 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 			continue
 		}
 		plan.Order = append(plan.Order, p.TaskID)
+		if p.Backlog {
+			plan.Backlog = append(plan.Backlog, p.TaskID)
+		}
 		if p.Day != nil {
 			plan.Day[p.TaskID] = *p.Day
 		}
@@ -513,7 +539,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 		autofetch = b.deps.AutofetchMinutes()
 	}
 	return adewire.Board{
-		Tasks: tasks, Statuses: toWireStatuses(d.statuses), Branches: branches, Plan: plan, Pairs: pairs, History: toWireHistory(d.archived, d.archBranch),
+		Tasks: tasks, Statuses: toWireStatuses(d.statuses), StatusDefaults: toWireDefaults(d.defaults), Branches: branches, Plan: plan, Pairs: pairs, History: toWireHistory(d.archived, d.archBranch),
 		Repos: states, WorktreeBasePath: filepath.Join(b.deps.HomeDir, "wt"), AutofetchMinutes: autofetch,
 	}
 }
@@ -522,8 +548,9 @@ func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model
 	out := adewire.Task{
 		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, HostURL: t.HostURL, HostLink: b.hostLink(t.HostURL), WorkflowID: t.WorkflowID,
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
-		StatusID: t.StatusID, StatusBy: t.StatusBy,
+		StatusID: t.StatusID, StatusBy: t.StatusBy, StatusStep: t.StatusStep,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
+		HandoverDrafts: []adewire.Handover{}, BranchRequestID: b.branchRequestOf(t.ID),
 	}
 	out.BranchIDs = append(out.BranchIDs, branchIDs...)
 	if t.JiraKey != "" || t.JiraURL != "" {
@@ -575,11 +602,7 @@ func toWireHistory(tasks []model.AdeTask, branches []model.AdeTaskBranch) []adew
 	}
 	out := make([]adewire.HistoryEntry, 0, len(tasks))
 	for _, t := range tasks {
-		title := t.Title
-		if title == "" {
-			title = t.JiraKey
-		}
-		e := adewire.HistoryEntry{TaskID: t.ID, Title: title, CodeRepoIDs: []string{}, ArchivedAt: *t.ArchivedAt}
+		e := adewire.HistoryEntry{TaskID: t.ID, Title: taskTitle(t, byTask[t.ID]), CodeRepoIDs: []string{}, ArchivedAt: *t.ArchivedAt}
 		seen := map[string]bool{}
 		var latest int64
 		allMerged := len(byTask[t.ID]) > 0

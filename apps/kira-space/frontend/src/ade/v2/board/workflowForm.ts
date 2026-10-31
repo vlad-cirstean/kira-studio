@@ -39,7 +39,7 @@ function nextId(taken: readonly string[]): string {
 function kindDefaults(kind: StepKind): Omit<WorkflowStep, 'id' | 'name'> {
   const base: Omit<WorkflowStep, 'id' | 'name'> = {
     kind,
-    status: kind === 'review' ? 'in-review' : 'in-progress',
+    status: '',
     skip: false,
     session: false,
     command: '',
@@ -90,10 +90,7 @@ export function withKind(step: WorkflowStep, kind: StepKind): WorkflowStep {
     id: step.id,
     name: step.name,
     skip: step.skip,
-    status:
-      step.status === (step.kind === 'review' ? 'in-review' : 'in-progress')
-        ? fresh.status
-        : step.status,
+    status: step.status,
     runsOn: fresh.runsOn === '' ? '' : step.runsOn || fresh.runsOn,
   };
 }

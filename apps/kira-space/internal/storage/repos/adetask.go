@@ -14,19 +14,20 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-// Sentinels AdeTaskRepo/AdeBacklogRepo return; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
+// Sentinels AdeTaskRepo returns; bridge maps them to E_BAD_REQUEST/E_NOT_FOUND.
 var (
 	ErrTaskNotFound = errors.New("repos: task not found")
 	// ErrTaskNotArchived marks an archived-only call on a live task.
 	ErrTaskNotArchived = errors.New("repos: task is not archived")
 	// ErrStatusUnknown marks a status id missing from the status set.
 	ErrStatusUnknown = errors.New("repos: unknown task status")
+	// ErrShelfTarget marks a Shelve beforeID that is not on the target shelf.
+	ErrShelfTarget   = errors.New("repos: before task is not on that shelf")
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
 	ErrRepoOnTask    = errors.New("repos: task already has a branch in that repo")
 	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task only becomes a task")
 	ErrTaskUnnamed   = errors.New("a task needs a title or a Jira key")
 	ErrBranchMissing = errors.New("repos: branch not found")
-	ErrBacklogGone   = errors.New("repos: backlog item not found")
 	ErrRunNotFound   = errors.New("repos: run not found")
 	// ErrBranchNameTaken marks a created-branch name already used by a live branch of the repo.
 	ErrBranchNameTaken = errors.New("repos: a live branch in that repo already has that name")
@@ -174,9 +175,10 @@ func (r *AdeTaskRepo) GetTask(id string) (model.AdeTask, error) {
 	return t, nil
 }
 
-// insertTask writes the task, its branches and a plan row at the end of `day` (Later when nil), in tx. It assigns
-// the task's color: the first slot no live task uses, else the least-used slot overall.
-func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day *string) (model.AdeTask, error) {
+// insertTask writes the task, its branches and a plan row on `day` (Later when nil), in tx: at the end of
+// the order, or at the top when top is set. It assigns the task's color: the first slot no live task uses,
+// else the least-used slot overall.
+func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day *string, top bool) (model.AdeTask, error) {
 	if err := t.Validate(); err != nil {
 		return model.AdeTask{}, err
 	}
@@ -210,11 +212,7 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day
 		since = t.SinceJSON
 	}
 	if t.StatusID == "" {
-		category := model.AdeStatusTodo
-		if t.Kind == model.AdeTaskKindReview {
-			category = model.AdeStatusReview
-		}
-		id, err := firstStatusOf(tx, category)
+		id, err := statusForNew(tx, t.Kind == model.AdeTaskKindReview)
 		if err != nil {
 			return model.AdeTask{}, err
 		}
@@ -233,8 +231,12 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day
 			return model.AdeTask{}, err
 		}
 	}
+	position := `COALESCE(MAX(position) + 1, 0)`
+	if top {
+		position = `COALESCE(MIN(position) - 1, 0)`
+	}
 	if _, err := tx.Exec(`INSERT INTO ade_task_plan (task_id, day, position)
-		SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM ade_task_plan`, t.ID, day); err != nil {
+		SELECT ?, ?, `+position+` FROM ade_task_plan`, t.ID, day); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task plan %s: %w", t.ID, err)
 	}
 	return t, nil
@@ -281,12 +283,29 @@ func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch
 		return model.AdeTask{}, fmt.Errorf("repos: begin create ade task: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
-	out, err := insertTask(tx, t, branches, day)
+	out, err := insertTask(tx, t, branches, day, false)
 	if err != nil {
 		return model.AdeTask{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: commit create ade task: %w", err)
+	}
+	return out, nil
+}
+
+// CaptureTask inserts a branchless task at the top of Later (no day) and returns the stored task.
+func (r *AdeTaskRepo) CaptureTask(t model.AdeTask) (model.AdeTask, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return model.AdeTask{}, fmt.Errorf("repos: begin capture ade task: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	out, err := insertTask(tx, t, nil, nil, true)
+	if err != nil {
+		return model.AdeTask{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return model.AdeTask{}, fmt.Errorf("repos: commit capture ade task: %w", err)
 	}
 	return out, nil
 }
@@ -316,7 +335,7 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 		}
 	}
 	if prevKind == model.AdeTaskKindReview && cur.Kind == model.AdeTaskKindTask {
-		id, err := firstStatusOf(tx, model.AdeStatusTodo)
+		id, err := statusForNew(tx, false)
 		if err != nil {
 			return model.AdeTask{}, err
 		}
@@ -569,7 +588,7 @@ func (r *AdeTaskRepo) GetBranch(id string) (model.AdeTaskBranch, error) {
 
 // PlanRows returns every plan row in position order.
 func (r *AdeTaskRepo) PlanRows() ([]model.AdeTaskPlanRow, error) {
-	rows, err := r.DB.Query(`SELECT task_id, day, position FROM ade_task_plan ORDER BY position, task_id`)
+	rows, err := r.DB.Query(`SELECT task_id, day, position, backlog FROM ade_task_plan ORDER BY position, task_id`)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade task plan: %w", err)
 	}
@@ -578,7 +597,7 @@ func (r *AdeTaskRepo) PlanRows() ([]model.AdeTaskPlanRow, error) {
 	for rows.Next() {
 		var p model.AdeTaskPlanRow
 		var day sql.NullString
-		if err := rows.Scan(&p.TaskID, &day, &p.Position); err != nil {
+		if err := rows.Scan(&p.TaskID, &day, &p.Position, &p.Backlog); err != nil {
 			return nil, fmt.Errorf("repos: scan ade task plan: %w", err)
 		}
 		if day.Valid {
@@ -635,7 +654,7 @@ func (r *AdeTaskRepo) SetPlan(order []string, days map[string]*string) error {
 		}
 	}
 	for id, day := range days {
-		res, err := tx.Exec(`UPDATE ade_task_plan SET day = ? WHERE task_id = ?`, day, id)
+		res, err := tx.Exec(`UPDATE ade_task_plan SET day = ?, backlog = 0 WHERE task_id = ?`, day, id)
 		if err != nil {
 			return fmt.Errorf("repos: set ade task plan day %s: %w", id, err)
 		}
@@ -645,6 +664,79 @@ func (r *AdeTaskRepo) SetPlan(order []string, days map[string]*string) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos: commit set ade task plan: %w", err)
+	}
+	return nil
+}
+
+// Shelve moves the live task onto the Later (backlog false) or Backlog shelf, dropping its day, and
+// places it right before beforeID, or after the last task on that shelf when beforeID is empty (end of
+// the order for an empty shelf). beforeID must be on the same shelf, else ErrShelfTarget. Later holds
+// undated, non-Backlog tasks other than review items. A task with no plan row gets one.
+func (r *AdeTaskRepo) Shelve(taskID string, backlog bool, beforeID string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin shelve ade task %s: %w", taskID, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	var live bool
+	err = tx.QueryRow(`SELECT archived_at IS NULL FROM ade_tasks WHERE id = ?`, taskID).Scan(&live)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !live) {
+		return ErrTaskNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("repos: load ade task %s: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`INSERT INTO ade_task_plan (task_id, day, position, backlog)
+		SELECT ?, NULL, COALESCE(MAX(position) + 1, 0), ? FROM ade_task_plan WHERE true
+		ON CONFLICT (task_id) DO UPDATE SET day = NULL, backlog = excluded.backlog`, taskID, boolInt(backlog)); err != nil {
+		return fmt.Errorf("repos: upsert ade task plan %s: %w", taskID, err)
+	}
+	rows, err := tx.Query(`SELECT p.task_id, p.day IS NULL AND p.backlog = ? AND (? = 1 OR t.kind <> 'review')
+		FROM ade_task_plan p JOIN ade_tasks t ON t.id = p.task_id ORDER BY p.position, p.task_id`, boolInt(backlog), boolInt(backlog))
+	if err != nil {
+		return fmt.Errorf("repos: query ade task plan: %w", err)
+	}
+	var ids []string
+	onShelf := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		var member bool
+		if err := rows.Scan(&id, &member); err != nil {
+			rows.Close()
+			return fmt.Errorf("repos: scan ade task plan: %w", err)
+		}
+		if id == taskID {
+			continue
+		}
+		ids = append(ids, id)
+		onShelf[id] = member
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("repos: ade task plan rows: %w", err)
+	}
+	rows.Close()
+	at := len(ids)
+	if beforeID != "" {
+		if !onShelf[beforeID] {
+			return ErrShelfTarget
+		}
+		at = slices.Index(ids, beforeID)
+	} else {
+		for i, id := range ids {
+			if onShelf[id] {
+				at = i + 1
+			}
+		}
+	}
+	ids = slices.Insert(ids, at, taskID)
+	for i, id := range ids {
+		if _, err := tx.Exec(`UPDATE ade_task_plan SET position = ? WHERE task_id = ?`, i, id); err != nil {
+			return fmt.Errorf("repos: set ade task plan position %s: %w", id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit shelve ade task %s: %w", taskID, err)
 	}
 	return nil
 }
@@ -841,23 +933,36 @@ func (r *AdeTaskRepo) SetBranchOrigin(id, origin string) error {
 }
 
 // SetEntryStep sets the step the task last entered ("done" when finished). since, when not nil, replaces the
-// pass watermark ({"<stepId>/<branchId>": attempt}); nil keeps it.
-func (r *AdeTaskRepo) SetEntryStep(taskID, stepID string, since map[string]int) error {
+// pass watermark ({"<stepId>/<branchId>": attempt}); nil keeps it. handoff, when not nil, is applied in the
+// same transaction, so a move and its handover never land apart.
+func (r *AdeTaskRepo) SetEntryStep(taskID, stepID string, since map[string]int, handoff *model.AdeHandoff) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin set ade task entry step %s: %w", taskID, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
 	var res sql.Result
-	var err error
 	if since == nil {
-		res, err = r.DB.Exec(`UPDATE ade_tasks SET entry_step_id = ? WHERE id = ?`, stepID, taskID)
+		res, err = tx.Exec(`UPDATE ade_tasks SET entry_step_id = ? WHERE id = ?`, stepID, taskID)
 	} else {
 		var js []byte
 		if js, err = json.Marshal(since); err != nil {
 			return fmt.Errorf("repos: encode ade task since %s: %w", taskID, err)
 		}
-		res, err = r.DB.Exec(`UPDATE ade_tasks SET entry_step_id = ?, since_json = ? WHERE id = ?`, stepID, string(js), taskID)
+		res, err = tx.Exec(`UPDATE ade_tasks SET entry_step_id = ?, since_json = ? WHERE id = ?`, stepID, string(js), taskID)
 	}
 	if err != nil {
 		return fmt.Errorf("repos: set ade task entry step %s: %w", taskID, err)
 	}
-	return sqlitex.RequireOneRow(res, "ade task "+taskID)
+	if err := sqlitex.RequireOneRow(res, "ade task "+taskID); err != nil {
+		return err
+	}
+	if handoff != nil {
+		if err := applyHandoff(tx, taskID, *handoff); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ResetWorkflow switches the task's workflow and restarts it: the task's runs and run logs are

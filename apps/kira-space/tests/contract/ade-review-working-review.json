@@ -1,0 +1,254 @@
+{
+  "AdeTaskService.ReviewWorking": {
+    "contentHashes": {
+      "base.txt": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55"
+    },
+    "files": [
+      {
+        "kind": "modified",
+        "path": "base.txt"
+      }
+    ],
+    "head": "<masked>",
+    "promoted": [],
+    "reviews": {
+      "base.txt": {
+        "changedSinceReview": false,
+        "kind": "partial",
+        "reviewedAt": 0,
+        "reviewedAtSha": "<masked>"
+      }
+    },
+    "worktree": "<worktree>"
+  },
+  "AdeTaskService.ReviewWorkingCommentAdd": {
+    "anchor": "exact",
+    "anchorSha": "<masked>",
+    "body": "why bang?",
+    "createdAt": 0,
+    "id": 0,
+    "kind": "question",
+    "origin": "working",
+    "path": "base.txt",
+    "range": {
+      "end": 3,
+      "start": 3
+    },
+    "repliedAt": null,
+    "reply": "",
+    "sentAt": null,
+    "state": "open"
+  },
+  "AdeTaskService.ReviewWorkingComments": {
+    "comments": [
+      {
+        "anchor": "projected",
+        "anchorSha": "<masked>",
+        "body": "why bang?",
+        "createdAt": 0,
+        "id": 0,
+        "kind": "question",
+        "origin": "working",
+        "path": "base.txt",
+        "range": {
+          "end": 4,
+          "start": 4
+        },
+        "repliedAt": null,
+        "reply": "",
+        "sentAt": null,
+        "state": "open"
+      }
+    ]
+  },
+  "AdeTaskService.ReviewWorkingDiff": {
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
+    "head": {
+      "bytes": 10,
+      "kind": "found",
+      "limitBytes": 8388608,
+      "text": "a\nb\nc\nd\ne\n"
+    },
+    "language": "plaintext",
+    "path": "base.txt",
+    "worktree": {
+      "bytes": 11,
+      "kind": "found",
+      "limitBytes": 8388608,
+      "text": "a\nb\nC!\nd\ne\n"
+    }
+  },
+  "AdeTaskService.ReviewWorkingFile#reviewed": {
+    "body": {
+      "hunks": [
+        {
+          "heading": "",
+          "lines": [
+            {
+              "kind": "context",
+              "newLine": 1,
+              "noNewlineAtEof": false,
+              "oldLine": 1,
+              "text": "a"
+            },
+            {
+              "kind": "context",
+              "newLine": 2,
+              "noNewlineAtEof": false,
+              "oldLine": 2,
+              "text": "b"
+            },
+            {
+              "kind": "del",
+              "noNewlineAtEof": false,
+              "oldLine": 3,
+              "text": "c"
+            },
+            {
+              "kind": "add",
+              "newLine": 3,
+              "noNewlineAtEof": false,
+              "text": "C!"
+            },
+            {
+              "kind": "context",
+              "newLine": 4,
+              "noNewlineAtEof": false,
+              "oldLine": 4,
+              "text": "d"
+            },
+            {
+              "kind": "context",
+              "newLine": 5,
+              "noNewlineAtEof": false,
+              "oldLine": 5,
+              "text": "e"
+            }
+          ],
+          "newLines": 5,
+          "newStart": 1,
+          "oldLines": 5,
+          "oldStart": 1
+        }
+      ],
+      "kind": "text"
+    },
+    "contentKind": "text",
+    "lineCount": 5,
+    "path": "base.txt",
+    "reviewedRanges": [
+      {
+        "end": 3,
+        "start": 3
+      }
+    ]
+  },
+  "AdeTaskService.ReviewWorkingFile#unreviewed": {
+    "body": {
+      "hunks": [
+        {
+          "heading": "",
+          "lines": [
+            {
+              "kind": "context",
+              "newLine": 1,
+              "noNewlineAtEof": false,
+              "oldLine": 1,
+              "text": "a"
+            },
+            {
+              "kind": "context",
+              "newLine": 2,
+              "noNewlineAtEof": false,
+              "oldLine": 2,
+              "text": "b"
+            },
+            {
+              "kind": "del",
+              "noNewlineAtEof": false,
+              "oldLine": 3,
+              "text": "c"
+            },
+            {
+              "kind": "add",
+              "newLine": 3,
+              "noNewlineAtEof": false,
+              "text": "C!"
+            },
+            {
+              "kind": "context",
+              "newLine": 4,
+              "noNewlineAtEof": false,
+              "oldLine": 4,
+              "text": "d"
+            },
+            {
+              "kind": "context",
+              "newLine": 5,
+              "noNewlineAtEof": false,
+              "oldLine": 5,
+              "text": "e"
+            }
+          ],
+          "newLines": 5,
+          "newStart": 1,
+          "oldLines": 5,
+          "oldStart": 1
+        }
+      ],
+      "kind": "text"
+    },
+    "contentKind": "text",
+    "lineCount": 5,
+    "path": "base.txt",
+    "reviewedRanges": []
+  },
+  "AdeTaskService.ReviewWorkingMark": {
+    "files": [
+      {
+        "path": "base.txt",
+        "review": {
+          "changedSinceReview": false,
+          "kind": "partial",
+          "reviewedAt": 0,
+          "reviewedAtSha": "<masked>"
+        }
+      }
+    ]
+  },
+  "args:AdeTaskService.ReviewWorkingCommentAdd": {
+    "body": "why bang?",
+    "branchId": "<id:1>",
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
+    "kind": "question",
+    "path": "base.txt",
+    "range": {
+      "end": 3,
+      "start": 3
+    }
+  },
+  "args:AdeTaskService.ReviewWorkingComments": {
+    "branchId": "<id:1>"
+  },
+  "args:AdeTaskService.ReviewWorkingFile": {
+    "branchId": "<id:1>",
+    "path": "base.txt"
+  },
+  "args:AdeTaskService.ReviewWorkingMark": {
+    "branchId": "<id:1>",
+    "contentHashes": {
+      "base.txt": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55"
+    },
+    "paths": [
+      "base.txt"
+    ],
+    "ranges": [
+      {
+        "end": 3,
+        "start": 3
+      }
+    ],
+    "reviewed": true
+  },
+  "error:AdeTaskService.ReviewWorkingMark#changed": "{\"code\":\"E_CONFLICT\",\"message\":\"The file changed while you reviewed it. Refresh the diff.\"}"
+}

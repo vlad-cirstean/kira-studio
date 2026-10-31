@@ -99,6 +99,7 @@ test('a history row opens the archived panel with its sessions', async ({ relaun
   await expect(page.locator(t('ade-sessions-tab'))).toBeVisible();
   await expect(page.locator(t('ade-session-takeover'))).toHaveCount(0);
   await expect(page.locator(t('ade-stopped-takeover'))).toHaveCount(0);
+  await expect(page.locator(t('ade-stopped-resume')).first()).toBeVisible();
   await expect(page.locator(t('ade-stopped-row')).first()).toBeVisible();
   await expect(page.locator(t('ade-stopped-trigger'))).toHaveCount(0);
   await expect(page.locator(t('ade-sessions-empty'))).toHaveCount(0);

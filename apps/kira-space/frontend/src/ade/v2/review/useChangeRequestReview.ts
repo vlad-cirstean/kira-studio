@@ -12,6 +12,11 @@ type OkState = Extract<ChangeRequestReviewState, { kind: 'ok' }>;
 const reviewStateKey = (gitRepoId: string, branch: string, number: number) =>
   ['changeRequestReviewState', gitRepoId, branch, number] as const;
 
+/** The local branch tip differs from the head the host reviews. False when the branch is gone locally. */
+export function headStale(s: OkState): boolean {
+  return s.localHeadSha !== '' && s.localHeadSha !== s.headSha;
+}
+
 export interface ReviewGate {
   enabled: boolean;
   reason: string;

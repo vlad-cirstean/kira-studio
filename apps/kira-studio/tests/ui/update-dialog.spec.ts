@@ -56,6 +56,16 @@ test('update available: the routed dialog shows, Later dismisses it, the item re
   await emitPrompts(window, []);
   await expect(dialog).toHaveCount(0);
   await expect(item).toBeVisible();
+  await item.hover();
+  await expect(window.locator('[data-testid="tooltip-details-title"]')).toHaveText(
+    'Update available',
+  );
+  await expect(
+    window.locator('[data-testid="tooltip-details-row"][data-label="New version"]'),
+  ).toContainText('1.3.0');
+  await expect(
+    window.locator('[data-testid="tooltip-details-row"][data-label="Installed"]'),
+  ).toContainText('1.2.0');
 
   await item.click();
   await expect(dialog).toBeVisible();

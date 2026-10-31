@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/clisetup"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 )
 
@@ -29,6 +30,8 @@ var (
 
 	_ githost.ChangeRequestReviews = (*Provider)(nil)
 	_ githost.BranchLinks          = (*Provider)(nil)
+	_ githost.ChangeRequestSearch  = (*Provider)(nil)
+	_ githost.CLISetup             = (*Provider)(nil)
 )
 
 // New builds the GitHub provider over the `gh` CLI.
@@ -181,4 +184,27 @@ func (p *Provider) SubmitReview(ctx context.Context, r githost.Repo, number int,
 
 func (p *Provider) Comment(ctx context.Context, r githost.Repo, number int, body string) githost.Status {
 	return toStatus(p.client.CommentOnPull(ctx, Repo(r), number, body))
+}
+
+func (p *Provider) SearchChangeRequests(ctx context.Context, text string, limit int) ([]githost.ChangeRequest, githost.Status) {
+	prs, s := p.client.SearchPulls(ctx, text, limit)
+	return toChangeRequests(prs), toStatus(s)
+}
+
+func (p *Provider) Setup() clisetup.Setup {
+	return clisetup.Setup{
+		DocsURL: "https://cli.github.com",
+		Steps: []clisetup.Step{
+			{Purpose: clisetup.PurposeInstall, Command: "brew install gh"},
+			{Purpose: clisetup.PurposeLogin, Command: "gh auth login"},
+			{Purpose: clisetup.PurposeCheck, Command: "gh auth status"},
+		},
+	}
+}
+
+func (p *Provider) CLIStatus(ctx context.Context, refresh bool) githost.Status {
+	if refresh {
+		p.client.discovery.Forget(primaryHost)
+	}
+	return toStatus(p.client.discovery.Status(ctx, primaryHost))
 }

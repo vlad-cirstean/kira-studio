@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures';
 
-// Catalog wording on the phone: the take over confirm, the backlog empty state, the pairing screen.
+// Catalog wording on the phone: the take over confirm, the empty Later lists, the pairing screen.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
@@ -28,14 +28,20 @@ test('the pairing screen titles itself with the product name', async ({ page, ap
   await expect(page.locator(t('pair-request'))).toHaveText('Request access');
 });
 
-test('an empty backlog explains where items come from', async ({ page, app, server }) => {
+test('empty Later and Backlog lists say so', async ({ page, app, server }) => {
   server.state.auth = 'ok';
-  server.state.replies.backlog = { items: [] };
+  const board = JSON.parse(
+    readFileSync(resolve(__dirname, '../fixtures/ade-v2/board.json'), 'utf8'),
+  ) as { tasks: unknown[] };
+  server.state.replies.board = { ...board, tasks: [] };
   await app();
-  await page.locator(t('tab-backlog')).click();
-  const empty = page.locator(t('backlog-empty'));
-  await expect(empty).toContainText('No backlog items yet');
-  await expect(empty).toContainText('Items added here or in Kira Space appear here.');
+  await page.locator(t('tab-later')).click();
+  await expect(page.locator(`${t('later-shelf-later')} ${t('later-empty')}`)).toHaveText(
+    'Nothing in later yet',
+  );
+  await expect(page.locator(`${t('later-shelf-backlog')} ${t('later-empty')}`)).toHaveText(
+    'Nothing on the backlog yet',
+  );
 });
 
 test.describe('with write access', () => {

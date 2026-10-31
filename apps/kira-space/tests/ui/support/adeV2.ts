@@ -18,6 +18,21 @@ export function adeFixture<T = unknown>(name: string): T {
   return JSON.parse(readFileSync(resolve(FIXTURE_DIR, `${name}.json`), 'utf8')) as T;
 }
 
+/** The task issue of a task no tracker recognises: the Task tab shows no issue row. */
+const NO_TRACKER_ISSUE = {
+  provider: '',
+  label: '',
+  key: '',
+  url: '',
+  title: '',
+  status: '',
+  statusCategory: '',
+  summary: { known: false, count: 0, state: '', providers: [] },
+  changeRequests: [],
+  reason: 'noTracker',
+  changeRequestsReason: '',
+};
+
 const REBASE_PREVIEW = {
   prompt: 'Rebase feat/billing onto origin/main.',
   suffix: 'Report the outcome with finish_step.',
@@ -123,17 +138,11 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.gitHostProviders, response: adeFixture('host-providers') },
     { channel: IPC.adeTaskWorkflows, response: adeFixture('workflows') },
     { channel: IPC.adeTaskRepos, response: adeFixture('repos') },
-    { channel: IPC.adeTaskBacklog, response: adeFixture('backlog') },
     { channel: IPC.adeTaskSetPlan },
+    { channel: IPC.adeTaskShelveTask },
+    { channel: IPC.adeTaskCaptureTask, response: adeFixture('task') },
     { channel: IPC.adeTaskUpdateTask, response: adeFixture('task') },
     { channel: IPC.adeTaskAddTaskRepo, response: adeFixture('branch') },
-    {
-      channel: IPC.adeTaskUpdateBacklogItem,
-      response: adeFixture<{ items: unknown[] }>('backlog').items[0],
-    },
-    { channel: IPC.adeTaskMoveBacklogItem },
-    { channel: IPC.adeTaskDeleteBacklogItem },
-    { channel: IPC.adeTaskPromoteBacklogItem, response: adeFixture('task') },
     { channel: IPC.adeTaskWorkflowYaml, response: adeFixture('workflow-yaml') },
     { channel: IPC.adeTaskValidateWorkflowYaml, response: adeFixture('workflow-validation') },
     { channel: IPC.adeTaskSaveWorkflow, response: firstWorkflow() },
@@ -157,9 +166,19 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskRetryRun },
     { channel: IPC.adeTaskStepDone, response: adeFixture('task') },
     { channel: IPC.adeTaskSetTaskStep, response: adeFixture('task') },
+    { channel: IPC.adeTaskHandovers, response: { handovers: [] } },
+    { channel: IPC.adeTaskUpdateHandover },
+    { channel: IPC.adeTaskDismissHandover },
+    { channel: IPC.adeTaskArtifacts, response: { artifacts: [], gaps: [] } },
+    { channel: IPC.adeTaskIssue, response: NO_TRACKER_ISSUE },
+    { channel: IPC.adeTaskAddArtifact },
+    { channel: IPC.adeTaskRemoveArtifact },
     {
       channel: IPC.adeTaskSaveStatuses,
-      response: { statuses: adeFixture<{ statuses: unknown[] }>('board').statuses },
+      response: (() => {
+        const b = adeFixture<{ statuses: unknown[]; statusDefaults: unknown }>('board');
+        return { statuses: b.statuses, defaults: b.statusDefaults };
+      })(),
     },
     { channel: IPC.adeTaskRetrySetup },
     { channel: IPC.adeTaskReadLog, response: adeFixture('log-page') },
@@ -169,6 +188,7 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskRestartSession, response: adeFixture('launch') },
     { channel: IPC.adeTaskLaunchStep, response: adeFixture('launch') },
     { channel: IPC.adeTaskStartBranch, response: adeFixture('launch') },
+    { channel: IPC.adeTaskStartAdHoc, response: adeFixture('launch') },
     { channel: IPC.adeTaskSend },
     { channel: IPC.adeTaskFocusSession, response: true },
     { channel: IPC.adeTaskArchiveRisk, response: adeFixture('archive-risk') },

@@ -15,7 +15,6 @@ type Reader interface {
 	ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error)
 	Sessions(ctx context.Context) (adewire.SessionsResult, error)
 	Workflows(ctx context.Context) (adewire.WorkflowsResult, error)
-	Backlog(ctx context.Context) (adewire.BacklogResult, error)
 	Repos(ctx context.Context) (adewire.ReposResult, error)
 	ReadLog(ctx context.Context, args adewire.ReadLogArgs) (adewire.LogPage, error)
 	ArchivedTask(ctx context.Context, args adewire.TaskArgs) (adewire.ArchivedTask, error)

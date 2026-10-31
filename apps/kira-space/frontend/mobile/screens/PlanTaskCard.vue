@@ -4,6 +4,7 @@ import StatusDot from '@theme/components/StatusDot.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
 import { Progress } from '@theme/components/ui/progress';
+import { Textarea } from '@theme/components/ui/textarea';
 import { formatPercent } from '@theme/format';
 import { t } from '@theme/i18n';
 import ConfirmDialogView from '@workbench/components/ConfirmDialogView.vue';
@@ -35,7 +36,7 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <AdeChip :label="card.status.name" :tone="card.status.tone" />
+          <AdeChip :label="card.status.name" :color="card.status.color" />
           <AdeChip
             v-if="card.blocked"
             :label="t('space.common.status.blocked.status')"
@@ -153,6 +154,14 @@ const stopFirst = computed(() => props.card.moves.live);
       :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"
       @cancel="actions.cancel"
       @confirm="actions.confirm"
-    />
+    >
+      <Textarea
+        v-if="actions.intent.value === 'back' || actions.intent.value === 'next'"
+        v-model="actions.notes.value"
+        :placeholder="t('mobile.plan.notes.label')"
+        :aria-label="t('mobile.plan.notes.label')"
+        data-testid="plan-step-notes"
+      />
+    </ConfirmDialogView>
   </li>
 </template>

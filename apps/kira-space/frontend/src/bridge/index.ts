@@ -8,6 +8,7 @@ import * as FileHandlersService from '@bindings/filehandlersservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHostService from '@bindings/githostservice.js';
+import * as IssueTrackerService from '@bindings/issuetrackerservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
@@ -23,7 +24,7 @@ import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
-import type { HeadState } from '@kira/git-ipc';
+import type { HeadState, ReviewComment } from '@kira/git-ipc';
 import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type { PaletteColor } from '@shared/domain/color';
 import type { GitCredentialPrompt } from '@shared/domain/git';
@@ -38,6 +39,7 @@ import type {
 import type {
   CodeSearchEvent,
   DiffContent,
+  EditContent,
   FileContent,
   FileHandlersSetResult,
   FileHandlersStatus,
@@ -45,6 +47,7 @@ import type {
   OpenedFileTarget,
   RepoSummary,
   SearchRequest,
+  WriteFileResult,
 } from '@shared/domain/repo';
 import type {
   ScriptRun,
@@ -69,6 +72,7 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
+import type { CliToolsResult, IssueTrackers } from '../state/cliToolsDomain';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
@@ -274,6 +278,17 @@ const spaceControl = {
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
   codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
     unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+  codeWorkspaceReadFileForEdit: (id: string, path: string): Promise<EditContent> =>
+    unwrap(CodeWorkspaceService.ReadFileForEdit({ id, path })).then((r) => trust<EditContent>(r)),
+  codeWorkspaceWriteFile: (
+    id: string,
+    path: string,
+    text: string,
+    baseHash: string,
+  ): Promise<WriteFileResult> =>
+    unwrap(CodeWorkspaceService.WriteFile({ id, path, text, baseHash })).then((r) =>
+      trust<WriteFileResult>(r),
+    ),
 
   // External opens: the files this window was opened for (once), and a standalone file's content.
   openedFilesPending: (): Promise<OpenedFileTarget[]> =>
@@ -326,6 +341,7 @@ const spaceControl = {
     unwrap(OpsService.Recent({ limit })).then((r) => trust<SpaceOpRecord[]>(r ?? [])),
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: SpaceOpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
+  onOpBatch: (cb: (records: SpaceOpRecord[]) => void): (() => void) => on(CHANNEL.opBatch, cb),
 
   // P144: AdeTaskService (v2 task board). Types from ../ade/v2/wire; payload-free pushes invalidate queries.
   adeTaskBoard: (): Promise<V2.Board> =>
@@ -365,20 +381,12 @@ const spaceControl = {
   adeTaskAddHostLink: (args: V2.HostLinkArgs): Promise<V2.AddExistingBranchResult> =>
     unwrap(AdeTaskService.AddHostLink(args)).then((r) => trust<V2.AddExistingBranchResult>(r)),
   adeTaskSetPlan: (args: V2.SetPlanArgs): Promise<void> => unwrap(AdeTaskService.SetPlan(args)),
+  adeTaskShelveTask: (args: V2.ShelveTaskArgs): Promise<void> =>
+    unwrap(AdeTaskService.ShelveTask(args)),
+  adeTaskCaptureTask: (args: V2.CaptureTaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.CaptureTask(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSetQueuedAfter: (args: V2.SetQueuedAfterArgs): Promise<void> =>
     unwrap(AdeTaskService.SetQueuedAfter(args)),
-  adeTaskBacklog: (): Promise<V2.BacklogResult> =>
-    unwrap(AdeTaskService.Backlog()).then((r) => trust<V2.BacklogResult>(r)),
-  adeTaskAddBacklogItem: (args: V2.AddBacklogItemArgs): Promise<V2.BacklogItem> =>
-    unwrap(AdeTaskService.AddBacklogItem(args)).then((r) => trust<V2.BacklogItem>(r)),
-  adeTaskUpdateBacklogItem: (args: V2.UpdateBacklogItemArgs): Promise<V2.BacklogItem> =>
-    unwrap(AdeTaskService.UpdateBacklogItem(args)).then((r) => trust<V2.BacklogItem>(r)),
-  adeTaskMoveBacklogItem: (args: V2.MoveBacklogItemArgs): Promise<void> =>
-    unwrap(AdeTaskService.MoveBacklogItem(args)),
-  adeTaskDeleteBacklogItem: (args: V2.BacklogItemArgs): Promise<void> =>
-    unwrap(AdeTaskService.DeleteBacklogItem(args)),
-  adeTaskPromoteBacklogItem: (args: V2.BacklogItemArgs): Promise<V2.Task> =>
-    unwrap(AdeTaskService.PromoteBacklogItem(args)).then((r) => trust<V2.Task>(r)),
   adeTaskWorkflows: (): Promise<V2.WorkflowsResult> =>
     unwrap(AdeTaskService.Workflows()).then((r) => trust<V2.WorkflowsResult>(r)),
   adeTaskRepos: (): Promise<V2.ReposResult> =>
@@ -416,8 +424,26 @@ const spaceControl = {
   adeTaskApprove: (args: V2.StepArgs): Promise<void> => unwrap(AdeTaskService.Approve(args)),
   adeTaskRetryRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.RetryRun(args)),
   adeTaskResumeRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.ResumeRun(args)),
-  adeTaskStepDone: (args: V2.TaskArgs): Promise<V2.Task> =>
+  adeTaskStepDone: (args: V2.StepDoneArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.StepDone(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskHandovers: (args: V2.TaskArgs): Promise<V2.HandoversResult> =>
+    unwrap(AdeTaskService.Handovers(args)).then((r) => trust<V2.HandoversResult>(r)),
+  adeTaskUpdateHandover: (args: V2.UpdateHandoverArgs): Promise<void> =>
+    unwrap(AdeTaskService.UpdateHandover(args)),
+  adeTaskDismissHandover: (args: V2.TaskArgs): Promise<void> =>
+    unwrap(AdeTaskService.DismissHandover(args)),
+  adeTaskArtifacts: (args: V2.TaskArgs): Promise<V2.ArtifactsResult> =>
+    unwrap(AdeTaskService.Artifacts(args)).then((r) => trust<V2.ArtifactsResult>(r)),
+  adeTaskIssue: (args: V2.TaskArgs): Promise<V2.TaskIssue> =>
+    unwrap(IssueTrackerService.TaskIssue(args)).then((r) => trust<V2.TaskIssue>(r)),
+  cliTools: (refresh: boolean): Promise<CliToolsResult> =>
+    unwrap(IssueTrackerService.Tools({ refresh })).then((r) => trust<CliToolsResult>(r)),
+  issueTrackers: (): Promise<IssueTrackers> =>
+    unwrap(IssueTrackerService.Trackers()).then((r) => trust<IssueTrackers>(r)),
+  adeTaskAddArtifact: (args: V2.AddArtifactArgs): Promise<V2.Artifact> =>
+    unwrap(AdeTaskService.AddArtifact(args)).then((r) => trust<V2.Artifact>(r)),
+  adeTaskRemoveArtifact: (args: V2.RemoveArtifactArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveArtifact(args)),
   adeTaskSetTaskStep: (args: V2.SetTaskStepArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.SetTaskStep(args)).then((r) => trust<V2.Task>(r)),
   adeTaskSaveStatuses: (args: V2.SaveStatusesArgs): Promise<V2.SaveStatusesResult> =>
@@ -445,6 +471,8 @@ const spaceControl = {
     unwrap(AdeTaskService.LaunchStep(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskStartBranch: (args: V2.StartBranchArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.StartBranch(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskStartAdHoc: (args: V2.BranchArgs): Promise<V2.Launch> =>
+    unwrap(AdeTaskService.StartAdHoc(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskRebasePreview: (args: V2.OntoArgs): Promise<V2.RebasePreview> =>
     unwrap(AdeTaskService.RebasePreview(args)).then((r) => trust<V2.RebasePreview>(r)),
   adeTaskRebase: (args: V2.RebaseArgs): Promise<V2.RebaseStart> =>
@@ -468,6 +496,20 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewWorking(args)).then((r) => trust<V2.ReviewWorking>(r)),
   adeTaskReviewWorkingDiff: (args: V2.ReviewWorkingDiffArgs): Promise<DiffContent> =>
     unwrap(AdeTaskService.ReviewWorkingDiff(args)).then((r) => trust<DiffContent>(r)),
+  adeTaskReviewWorkingFile: (args: V2.ReviewWorkingDiffArgs): Promise<V2.ReviewWorkingFileReview> =>
+    unwrap(AdeTaskService.ReviewWorkingFile(args)).then((r) =>
+      trust<V2.ReviewWorkingFileReview>(r),
+    ),
+  adeTaskReviewWorkingMark: (args: V2.ReviewWorkingMarkArgs): Promise<V2.ReviewWorkingMarkResult> =>
+    unwrap(AdeTaskService.ReviewWorkingMark(args)).then((r) =>
+      trust<V2.ReviewWorkingMarkResult>(r),
+    ),
+  adeTaskReviewWorkingComments: (args: V2.BranchArgs): Promise<V2.ReviewWorkingCommentsResult> =>
+    unwrap(AdeTaskService.ReviewWorkingComments(args)).then((r) =>
+      trust<V2.ReviewWorkingCommentsResult>(r),
+    ),
+  adeTaskReviewWorkingCommentAdd: (args: V2.ReviewWorkingCommentAddArgs): Promise<ReviewComment> =>
+    unwrap(AdeTaskService.ReviewWorkingCommentAdd(args)).then((r) => trust<ReviewComment>(r)),
   adeTaskReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentState> =>
     unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
   adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>
@@ -484,10 +526,17 @@ const spaceControl = {
     unwrap(AdeTaskService.ArchiveTask(args)),
   adeTaskArchivedTask: (args: V2.TaskArgs): Promise<V2.ArchivedTask> =>
     unwrap(AdeTaskService.ArchivedTask(args)).then((r) => trust<V2.ArchivedTask>(r)),
+  adeTaskBranchRequest: (args: V2.BranchRequestArgs): Promise<V2.BranchRequest> =>
+    unwrap(AdeTaskService.BranchRequest(args)).then((r) => trust<V2.BranchRequest>(r)),
+  adeTaskApproveBranchRequest: (
+    args: V2.ApproveBranchRequestArgs,
+  ): Promise<V2.BranchRequestAnswer> =>
+    unwrap(AdeTaskService.ApproveBranchRequest(args)).then((r) => trust<V2.BranchRequestAnswer>(r)),
+  adeTaskDenyBranchRequest: (args: V2.BranchRequestArgs): Promise<V2.BranchRequestAnswer> =>
+    unwrap(AdeTaskService.DenyBranchRequest(args)).then((r) => trust<V2.BranchRequestAnswer>(r)),
   adeTaskRestoreTask: (args: V2.TaskArgs): Promise<V2.Task> =>
     unwrap(AdeTaskService.RestoreTask(args)).then((r) => trust<V2.Task>(r)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBoard, cb),
-  onAdeTaskBacklog: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBacklog, cb),
   onAdeTaskWorkflows: (cb: () => void): (() => void) => on(CHANNEL.adeTaskWorkflows, cb),
   onAdeTaskRepos: (cb: () => void): (() => void) => on(CHANNEL.adeTaskRepos, cb),
   onAdeTaskRuns: (cb: (event: V2.RunsChangedEvent) => void): (() => void) =>

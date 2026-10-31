@@ -3,6 +3,7 @@ package adeflow_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -216,6 +217,22 @@ func TestTaskBranchEditRefusals(t *testing.T) {
 		}
 		if err := app.W.AdeTask.RemoveTaskRepo(ctx, adewire.RemoveTaskRowArgs{BranchID: row.ID}); err != nil {
 			t.Fatalf("RemoveTaskRepo of a review row on a normal task: %v", err)
+		}
+	})
+
+	t.Run("an invalid new name", func(t *testing.T) {
+		app := flowharness.New(t)
+		repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
+		rec := importRepo(t, app, repo.Dir)
+		task := createTask(t, app, "Mine", "", rec.ID)
+		row := branchOf(t, board(t, app), task.ID, rec.ID)
+		for _, name := range []string{"main", "bad name", "-x", "a..b", "HEAD", strings.Repeat("a", 256)} {
+			if _, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: row.ID, Name: name}); errCode(err) != "E_BAD_REQUEST" {
+				t.Errorf("SetTaskBranch(%q) = %v, want E_BAD_REQUEST", name, err)
+			}
+		}
+		if got := branchOf(t, board(t, app), task.ID, rec.ID); got.Name != "" {
+			t.Fatalf("refused names left name %q", got.Name)
 		}
 	})
 

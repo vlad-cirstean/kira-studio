@@ -1,0 +1,285 @@
+{
+  "AdeTaskService.AddArtifact": {
+    "createdAt": 0,
+    "id": "<masked>",
+    "kind": "link",
+    "ref": "<masked>",
+    "repo": "",
+    "source": "user",
+    "status": "",
+    "title": "Runbook",
+    "url": "https://wiki.example/runbook"
+  },
+  "AdeTaskService.Artifacts": {
+    "artifacts": [
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "changeRequest",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "host",
+        "status": "open",
+        "title": "Fix login",
+        "url": "https://forge.test/acme/api/-/merge_requests/7"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "issue",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "jira",
+        "status": "",
+        "title": "KIRA-12",
+        "url": "https://jira.test/browse/KIRA-12"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "issue",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "task",
+        "status": "",
+        "title": "api#3",
+        "url": "https://forge.test/acme/api/-/issues/3"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "branch",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "git",
+        "status": "pushed",
+        "title": "feat/api-work",
+        "url": "https://forge.test/acme/api/-/tree/feat/api-work"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "deployment",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "git",
+        "status": "deployed",
+        "title": "prod",
+        "url": ""
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "deployment",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "agent",
+        "status": "",
+        "title": "Preview env",
+        "url": "https://preview.example/1"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "doc",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "agent",
+        "status": "",
+        "title": "Design notes",
+        "url": ""
+      }
+    ],
+    "gaps": [
+      {
+        "reason": "unavailable",
+        "repo": "",
+        "source": "jira"
+      }
+    ]
+  },
+  "AdeTaskService.Artifacts#archived": {
+    "artifacts": [
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "changeRequest",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "host",
+        "status": "open",
+        "title": "Fix login",
+        "url": "https://forge.test/acme/api/-/merge_requests/7"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "issue",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "jira",
+        "status": "",
+        "title": "KIRA-12",
+        "url": "https://jira.test/browse/KIRA-12"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "issue",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "task",
+        "status": "",
+        "title": "api#3",
+        "url": "https://forge.test/acme/api/-/issues/3"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "branch",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "git",
+        "status": "local",
+        "title": "feat/api-work",
+        "url": "https://forge.test/acme/api/-/tree/feat/api-work"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "deployment",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "agent",
+        "status": "",
+        "title": "Preview env",
+        "url": "https://preview.example/1"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "link",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "user",
+        "status": "",
+        "title": "Runbook",
+        "url": "https://wiki.example/runbook"
+      }
+    ],
+    "gaps": [
+      {
+        "repo": "api",
+        "source": "host"
+      },
+      {
+        "reason": "unavailable",
+        "repo": "",
+        "source": "jira"
+      }
+    ]
+  },
+  "AdeTaskService.Artifacts#gap": {
+    "artifacts": [
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "changeRequest",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "agent",
+        "status": "",
+        "title": "The PR",
+        "url": "https://forge.test/acme/api/-/merge_requests/7"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "issue",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "jira",
+        "status": "",
+        "title": "KIRA-12",
+        "url": "https://jira.test/browse/KIRA-12"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "issue",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "task",
+        "status": "",
+        "title": "api#3",
+        "url": "https://forge.test/acme/api/-/issues/3"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "branch",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "git",
+        "status": "pushed",
+        "title": "feat/api-work",
+        "url": "https://forge.test/acme/api/-/tree/feat/api-work"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "deployment",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "agent",
+        "status": "",
+        "title": "Preview env",
+        "url": "https://preview.example/1"
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "deployment",
+        "ref": "<masked>",
+        "repo": "api",
+        "source": "git",
+        "status": "deployed",
+        "title": "prod",
+        "url": ""
+      },
+      {
+        "createdAt": 0,
+        "id": "<masked>",
+        "kind": "link",
+        "ref": "<masked>",
+        "repo": "",
+        "source": "user",
+        "status": "",
+        "title": "Runbook",
+        "url": "https://wiki.example/runbook"
+      }
+    ],
+    "gaps": [
+      {
+        "repo": "api",
+        "source": "host"
+      },
+      {
+        "reason": "unavailable",
+        "repo": "",
+        "source": "jira"
+      }
+    ]
+  },
+  "args:AdeTaskService.AddArtifact": {
+    "kind": "link",
+    "ref": "",
+    "taskId": "<id:1>",
+    "title": "Runbook",
+    "url": "https://wiki.example/runbook"
+  },
+  "args:AdeTaskService.RemoveArtifact": {
+    "id": "<id:2>",
+    "taskId": "<id:1>"
+  }
+}

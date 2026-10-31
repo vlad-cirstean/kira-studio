@@ -9,35 +9,15 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
-type opCtxKey struct{}
-
-// withOp carries the op handle down to the write spawn sites, so each records its own argv.
-func withOp(ctx context.Context, op *oplog.Op) context.Context {
-	if op == nil {
-		return ctx
-	}
-	return context.WithValue(ctx, opCtxKey{}, op)
-}
-
-func opFrom(ctx context.Context) *oplog.Op {
-	op, _ := ctx.Value(opCtxKey{}).(*oplog.Op)
-	return op
-}
-
-func (e *RepoEntry) startOp(kind, source string) *oplog.Op {
+func (e *RepoEntry) startOp(ctx context.Context, kind, source string) *oplog.Op {
 	root := repoWorkingDir(e.Summary)
-	return e.opLog.Start(oplog.Meta{Kind: kind, RepoRoot: root, RepoName: filepath.Base(root), Source: source})
+	return e.opLog.Start(ctx, oplog.Meta{Category: oplog.CategoryGit, Kind: kind, RepoRoot: root, RepoName: filepath.Base(root), Source: source})
 }
 
 // recordFailure logs one finished failure that no running op covers (auto-fetch stop, graph load).
-func (e *RepoEntry) recordFailure(kind, source, message string) {
+func (e *RepoEntry) recordFailure(ctx context.Context, kind, source, message string) {
 	root := repoWorkingDir(e.Summary)
-	e.opLog.Record(oplog.Meta{Kind: kind, RepoRoot: root, RepoName: filepath.Base(root), Source: source}, oplog.StatusError, message)
-}
-
-// noteWrite records argv on the op carried by ctx, immediately before a write spawn.
-func (e *RepoEntry) noteWrite(ctx context.Context, argv []string) {
-	opFrom(ctx).AddCommand(argv)
+	e.opLog.Record(ctx, oplog.Meta{Category: oplog.CategoryGit, Kind: kind, RepoRoot: root, RepoName: filepath.Base(root), Source: source}, oplog.StatusError, message)
 }
 
 func connLabelOf(conn *Conn) string {

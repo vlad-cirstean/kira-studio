@@ -32,7 +32,10 @@ function annotationText(state: LineState): string {
 
 function hoverMessage(state: LineState): { value: string }[] {
   if (state.kind === 'uncommitted') return [{ value: t('space.repo.blame.uncommitted.tooltip') }];
-  return blameLineTooltip(state).map((value) => ({ value }));
+  const { subject, author, date } = blameLineTooltip(state);
+  return [subject, t('common.commaPair.label', { first: author, second: date })].map((value) => ({
+    value,
+  }));
 }
 
 /** Attaches the blame layer to an already-mounted, read-only file editor. Call once per mount

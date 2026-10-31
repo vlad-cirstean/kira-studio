@@ -48,7 +48,8 @@ export function shiftPlanArgs(
 }
 
 /** Mockup `dropOn` / band `drop`: a card is never dropped on itself, a card dropped on an
- *  auto-placed review item counts as a drop on its band, and a band takes a drop only when it is neither past nor a day off. */
+ *  auto-placed review item counts as a drop on its band, and a band takes a drop only when it is neither past, a day off nor the
+ *  tail band (it no longer means "no day"). */
 export function dropVerdict(
   view: {
     bands: readonly Pick<TimelineBand, 'key' | 'isPast' | 'dayOff'>[];
@@ -70,6 +71,7 @@ export function dropVerdict(
       args: movePlanArgs(plan, today, draggedId, entry.auto ? null : target.taskId, entry.day),
     };
   }
+  if (target.day === LATER) return { kind: 'refuse' };
   const band = view.bands.find((b) => b.key === target.day);
   if (!band || band.isPast || band.dayOff) return { kind: 'refuse' };
   return { kind: 'move', args: movePlanArgs(plan, today, draggedId, null, target.day) };

@@ -144,10 +144,16 @@ func countTitle(k Kind, n int) string {
 		return i18n.T("backend.prompt.count.dbMcp.title", map[string]string{"count": count})
 	case KindGitCredential:
 		return i18n.T("backend.prompt.count.gitCredential.title", map[string]string{"count": count})
+	case KindBranchRequest:
+		return i18n.T("backend.prompt.count.branchRequest.title", map[string]string{"count": count})
+	case KindHandover:
+		return i18n.T("backend.prompt.count.handover.title", map[string]string{"count": count})
 	case KindMobilePairing:
 		return i18n.T("backend.prompt.count.mobilePairing.title", map[string]string{"count": count})
 	case KindUpdate:
 		return i18n.T("backend.prompt.count.update.title", map[string]string{"count": count})
+	case KindProof:
+		return i18n.T("backend.prompt.count.proof.title", map[string]string{"count": count})
 	}
 	return ""
 }

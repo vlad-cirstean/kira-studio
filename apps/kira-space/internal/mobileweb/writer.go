@@ -18,8 +18,8 @@ type LaunchResult struct {
 // forwards each method to the AdeTaskService method desktop calls, so validation, engine rules and
 // error mapping are the same. Each method is one row in routes().
 type Writer interface {
-	AddBacklogItem(ctx context.Context, args adewire.AddBacklogItemArgs) (adewire.BacklogItem, error)
-	MoveBacklogItem(ctx context.Context, args adewire.MoveBacklogItemArgs) error
+	CaptureTask(ctx context.Context, args adewire.CaptureTaskArgs) (adewire.Task, error)
+	ShelveTask(ctx context.Context, args adewire.ShelveTaskArgs) error
 	SetTaskStep(ctx context.Context, args adewire.SetTaskStepArgs) (adewire.Task, error)
 	StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error)
 	LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (LaunchResult, error)

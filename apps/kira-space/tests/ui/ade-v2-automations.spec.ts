@@ -197,6 +197,15 @@ test('a task chip shows a running automation and a failed one until its run is o
   await expect(chip).toHaveAttribute('data-state', 'running');
   await expect(chip).toContainText('Review diff');
 
+  const runs = page.locator(t('status-runs'));
+  await expect(runs).toHaveText('1 running');
+  await runs.hover();
+  await expect(page.locator(t('tooltip-details-title'))).toHaveText('Automation runs');
+  await expect(page.locator(`${t('tooltip-details-row')}[data-label="Running"]`)).toHaveText(
+    /Running\s*1/,
+  );
+  await expect(page.locator(t('tooltip-details-hint'))).toHaveText('Click to show the runs list.');
+
   await emitWailsEvent(
     page,
     IPC.scriptRunsChanged,

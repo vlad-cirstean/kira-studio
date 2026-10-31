@@ -258,6 +258,70 @@ func TestAdeManualSession(t *testing.T) {
 	waitStops(2)
 }
 
+// TestAdeAdHocSession opens an agent session with no first message: the agent starts idle, the user's
+// first prompt arrives through Send, and the session holds the Space grant (handover).
+func TestAdeAdHocSession(t *testing.T) {
+	f := newAdeFixture(t, nil)
+	f.saveWorkflow(t, "flow", manualStepYAML)
+	task := f.createTask(t, "flow")
+	b, err := f.W.AdeTask.Board(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row adewire.Branch
+	for _, br := range b.Branches {
+		if br.TaskID == task.ID && br.CodeRepoID == f.repoID {
+			row = br
+		}
+	}
+	br, err := f.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: row.ID, Name: "feat/ad-hoc"})
+	if err != nil || br.Worktree == "" {
+		t.Fatalf("SetTaskBranch = %+v, %v", br, err)
+	}
+	launch, err := f.W.AdeTask.StartAdHoc(ctx, adewire.BranchArgs{BranchID: br.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.seedClaudeJSON(t, f.repo.Dir, launch.Cwd)
+	mark := f.Events.Mark()
+	if _, err := f.W.Terminal.Open(terminal.OpenArgs{
+		TerminalID: launch.TerminalID, WindowKey: window, Cwd: launch.Cwd, Cols: 120, Rows: 40,
+		Command: launch.Command, LaunchKind: terminal.LaunchKindAgent,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = f.W.Terminal.Close(terminal.CloseArgs{TerminalID: launch.TerminalID}) })
+
+	f.waitAgentEvent(t, mark, launch.TerminalID, "SessionStart", 60*time.Second)
+	// SessionStart fires before the input box accepts keys.
+	time.Sleep(2 * time.Second)
+	if err := f.W.AdeTask.Send(ctx, adewire.SendArgs{
+		SessionID: launch.SessionID,
+		Message:   "Call the handover tool with notes `adhoc ok`, then reply done.",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	testx.WaitUntil(t, 90*time.Second, func() bool {
+		for _, e := range f.agentEvents(t, mark, launch.TerminalID) {
+			if e.Event == "Stop" {
+				return true
+			}
+		}
+		return false
+	})
+	res, err := f.W.AdeTask.Handovers(ctx, adewire.TaskArgs{TaskID: task.ID})
+	if err != nil {
+		t.Fatalf("Handovers: %v", err)
+	}
+	for _, h := range res.Handovers {
+		if strings.Contains(h.Body, "adhoc ok") {
+			f.requireCostUnder(t)
+			return
+		}
+	}
+	t.Fatalf("no handover with the notes in %+v", res.Handovers)
+}
+
 // TestAdeRebaseRun rebases a pushed task branch in a background run with the real claude: main
 // moved on, the agent rebases and reports through finish_step, and git is the judge.
 func TestAdeRebaseRun(t *testing.T) {
@@ -346,4 +410,34 @@ func TestAdeRebaseRun(t *testing.T) {
 			f.requireCostUnder(t)
 		})
 	}
+}
+
+// TestAdeReportArtifacts runs a step that reports a doc by ref: the real claude must call
+// report_artifacts with a doc, and the task's artifacts hold the row.
+func TestAdeReportArtifacts(t *testing.T) {
+	f := newAdeFixture(t, nil)
+	step := "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 3m\n" +
+		"    prompt: Do not write any file. Call report_artifacts once with one artifact of kind doc, title Notes, " +
+		"ref notes.md. Then call finish_step with status pass and summary ok.\n"
+	f.saveWorkflow(t, "flow", step+manualStepYAML)
+	task := f.createTask(t, "flow")
+	run := f.startRun(t, task, "feat/real-claude")
+	log := f.runLog(t, run.ID)
+	if run.State != "done" {
+		t.Fatalf("run = %+v, want done; log:\n%s", run, tail(log, 1500))
+	}
+	if !strings.Contains(log, "mcp__kira-ade__report_artifacts") {
+		t.Fatalf("run log lacks the report_artifacts tool call:\n%s", tail(log, 1500))
+	}
+	res, err := f.W.AdeTask.Artifacts(ctx, adewire.TaskArgs{TaskID: task.ID})
+	if err != nil {
+		t.Fatalf("Artifacts: %v", err)
+	}
+	for _, a := range res.Artifacts {
+		if a.Kind == "doc" && a.Ref == "notes.md" {
+			f.requireCostUnder(t)
+			return
+		}
+	}
+	t.Fatalf("no doc artifact notes.md in %+v; log:\n%s", res.Artifacts, tail(log, 1500))
 }

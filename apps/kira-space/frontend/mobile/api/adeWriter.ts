@@ -1,4 +1,4 @@
-import type { BacklogItem } from '@ade/wire';
+import type { Shelf, Task } from '@ade/wire';
 import { postJson } from './http';
 
 // The phone's write routes, one function each. Every call carries the caller's idempotency key.
@@ -8,18 +8,18 @@ export interface LaunchResult {
 }
 
 export const adeWriter = {
-  addBacklogItem: (text: string, key: string) =>
-    postJson<BacklogItem>('/api/ade/backlog/items', { text }, { idempotencyKey: key }),
-  moveBacklogItem: (id: string, toIndex: number, key: string) =>
+  captureTask: (title: string, key: string) =>
+    postJson<Task>('/api/ade/later/items', { title }, { idempotencyKey: key }),
+  shelveTask: (taskId: string, shelf: Shelf, beforeId: string, key: string) =>
     postJson<Record<string, never>>(
-      '/api/ade/backlog/move',
-      { id, toIndex },
+      '/api/ade/shelf/move',
+      { taskId, shelf, beforeId },
       { idempotencyKey: key },
     ),
-  setTaskStep: (taskId: string, fromStepId: string, stepId: string, key: string) =>
+  setTaskStep: (taskId: string, fromStepId: string, stepId: string, key: string, notes?: string) =>
     postJson<{ taskId: string; stepId: string }>(
       '/api/ade/tasks/step',
-      { taskId, fromStepId, stepId },
+      { taskId, fromStepId, stepId, ...(notes === undefined ? {} : { notes }) },
       { idempotencyKey: key },
     ),
   startRun: (taskId: string, fromStepId: string, key: string) =>

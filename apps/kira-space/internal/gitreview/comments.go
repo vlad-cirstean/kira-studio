@@ -1,9 +1,12 @@
 package gitreview
 
 import (
+	"bytes"
+	"compress/flate"
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 )
@@ -23,6 +26,9 @@ type Comment struct {
 	Reply         string
 	RepliedAt     *time.Time
 	SentAt        *time.Time
+	Origin        string // OriginCommit | OriginWorking; "" reads as commit
+	// AnchorContent is the worktree content a working comment was written against (raw, text only).
+	AnchorContent []byte
 }
 
 // Comment kinds and states (P286).
@@ -61,13 +67,22 @@ func (s *Store) AddComment(ctx context.Context, repoID, branch string, c Comment
 	if c.Kind == "" {
 		c.Kind = CommentKindChange
 	}
+	if c.Origin == "" {
+		c.Origin = OriginCommit
+	}
+	var anchorContent []byte
+	if c.Origin == OriginWorking && len(c.AnchorContent) > 0 {
+		if anchorContent, err = Compress(c.AnchorContent); err != nil {
+			return Comment{}, err
+		}
+	}
 	c.State = CommentStateOpen
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO review_comment
-			(session_id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at, kind)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(session_id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at, kind, origin, anchor_content)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, sessionID, c.Path, c.Range.Start, c.Range.End, c.Body, c.AnchorSHA, c.AnchorBlobOID,
-		c.CreatedAt.UnixMilli(), c.Kind)
+		c.CreatedAt.UnixMilli(), c.Kind, c.Origin, anchorContent)
 	if err != nil {
 		return Comment{}, fmt.Errorf("gitreview: insert review_comment: %w", err)
 	}
@@ -122,7 +137,7 @@ func (s *Store) OpenComments(ctx context.Context, repoID, branch string) ([]Comm
 func queryComments(ctx context.Context, db *sql.DB, sessionID int64, openOnly bool) ([]Comment, error) {
 	q := `
 		SELECT id, path, start_line, end_line, body, anchor_sha, anchor_blob_oid, created_at,
-			kind, state, reply, replied_at, sent_at
+			kind, state, reply, replied_at, sent_at, origin, anchor_content
 		FROM review_comment WHERE session_id = ?`
 	if openOnly {
 		q += ` AND state = 'open'`
@@ -138,12 +153,18 @@ func queryComments(ctx context.Context, db *sql.DB, sessionID int64, openOnly bo
 		var c Comment
 		var createdAtMillis int64
 		var repliedAt, sentAt sql.NullInt64
+		var anchorContent []byte
 		if err := rows.Scan(&c.ID, &c.Path, &c.Range.Start, &c.Range.End, &c.Body,
 			&c.AnchorSHA, &c.AnchorBlobOID, &createdAtMillis,
-			&c.Kind, &c.State, &c.Reply, &repliedAt, &sentAt); err != nil {
+			&c.Kind, &c.State, &c.Reply, &repliedAt, &sentAt, &c.Origin, &anchorContent); err != nil {
 			return nil, fmt.Errorf("gitreview: scan review_comment: %w", err)
 		}
 		c.CreatedAt = time.UnixMilli(createdAtMillis)
+		if len(anchorContent) > 0 {
+			if c.AnchorContent, err = decompressAnchor(anchorContent); err != nil {
+				return nil, err
+			}
+		}
 		if repliedAt.Valid {
 			t := time.UnixMilli(repliedAt.Int64)
 			c.RepliedAt = &t
@@ -164,6 +185,12 @@ func queryComments(ctx context.Context, db *sql.DB, sessionID int64, openOnly bo
 // session.
 func (s *Store) SetCommentState(ctx context.Context, repoID, branch string, id int64, state string) (bool, error) {
 	return s.updateComment(ctx, repoID, branch, `state = ?`, []any{state}, id)
+}
+
+// EditComment replaces body and kind. Range, anchor, state and reply stay; sent_at clears, since the
+// edited text was never sent.
+func (s *Store) EditComment(ctx context.Context, repoID, branch string, id int64, body, kind string) (bool, error) {
+	return s.updateComment(ctx, repoID, branch, `body = ?, kind = ?, sent_at = NULL`, []any{body, kind}, id)
 }
 
 // ReplyComment stores an agent reply; resolved moves the comment to addressed, otherwise it stays open.
@@ -257,4 +284,19 @@ func (s *Store) ClearComments(ctx context.Context, repoID, branch string) (int, 
 		return 0, fmt.Errorf("gitreview: read RowsAffected: %w", err)
 	}
 	return int(n), nil
+}
+
+// decompressAnchor inflates a stored anchor_content BLOB. Its length is bounded by MaxSnapshotBytes
+// at write time; the decoder is capped one byte past it.
+func decompressAnchor(compressed []byte) ([]byte, error) {
+	r := flate.NewReader(bytes.NewReader(compressed))
+	defer r.Close()
+	raw, err := io.ReadAll(io.LimitReader(r, MaxSnapshotBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("gitreview: flate decode anchor_content: %w", err)
+	}
+	if len(raw) > MaxSnapshotBytes {
+		return nil, fmt.Errorf("gitreview: anchor_content exceeds %d bytes", MaxSnapshotBytes)
+	}
+	return raw, nil
 }

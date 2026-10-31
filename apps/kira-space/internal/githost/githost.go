@@ -7,6 +7,8 @@ import (
 	"context"
 	"net/url"
 	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/clisetup"
 )
 
 // Repo is one hosted repository. Owner may be a nested group path for hosts that allow one.
@@ -204,4 +206,21 @@ type ChangeRequestPage struct {
 type RateLimit struct {
 	Remaining int
 	ResetAt   time.Time
+}
+
+// ChangeRequestSearch is optional: a provider that finds change requests by text without knowing the
+// repository, for an issue tracker looking up the ones that name an issue key. Every call reports
+// failure in Status, never an error. The provider searches its primary host.
+type ChangeRequestSearch interface {
+	// SearchChangeRequests returns up to limit change requests whose title contains text, newest first.
+	// Each carries Number, Title, URL and State; the other fields stay empty.
+	SearchChangeRequests(ctx context.Context, text string, limit int) ([]ChangeRequest, Status)
+}
+
+// CLISetup is optional: a provider driven by a local CLI that Settings explains how to install and
+// sign in to.
+type CLISetup interface {
+	Setup() clisetup.Setup
+	// CLIStatus probes the CLI against the provider's primary host. refresh drops the cached probe first.
+	CLIStatus(ctx context.Context, refresh bool) Status
 }

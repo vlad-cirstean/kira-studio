@@ -6,6 +6,7 @@ import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
 import { branchLine2 } from '../../frontend/src/ade/v2/board/labels';
 import { buildNeedsYou, NEEDS_RANK } from '../../frontend/src/ade/v2/board/needsYou';
 import { buildTaskProgress, type TaskProgress } from '../../frontend/src/ade/v2/board/progress';
+import { shelfOf } from '../../frontend/src/ade/v2/board/shelf';
 import { blocked as isBlocked, statusOf } from '../../frontend/src/ade/v2/board/status';
 import { buildTimeline, type TimelineView } from '../../frontend/src/ade/v2/board/timeline';
 import type {
@@ -38,7 +39,7 @@ import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 //      review item (the mockup's file-overlap rule; the backend uses git merge-tree);
 //   3. `now` is 3m 40s after the `preparing` worktree setup started;
 //   4. the fixture's `tk01` session (a take-over the mockup only creates on click) is dropped.
-// Deliberate divergences (asserted in DIVERGENCE, never skipped): CI failing is dropped (D9); the 7-day window folds later day bands into Later (P401).
+// Deliberate divergences (asserted in DIVERGENCE, never skipped): CI failing is dropped (D9); the 7-day window folds later day bands into Further out (P401); undated tasks leave the plan for the Later tab (P405).
 
 const NOW = 1790067000000 + 220_000;
 const TODAY = '2026-09-22';
@@ -77,6 +78,9 @@ const DIVERGENCE: Record<string, { mockup: string; ours: string; why: string }> 
 
 /** P401: 7-day window; the mockup's 14-day bands after day 6 fold into its Later band. */
 const WINDOW_DIVERGENCE = { windowDays: 7, why: 'P401: 7-day window; later days fold into Later' };
+
+/** P405: the tail band is "Further out" and holds dated work only; undated tasks sit on the Later tab. */
+const TAIL_LABEL = 'Further out';
 
 let board: Board;
 let sessions: SessionsResult;
@@ -159,6 +163,10 @@ beforeAll(() => {
 
 const nick = (id: string) => nicks.get(id) ?? id;
 const hoursOf = (sub: string): number => Number.parseFloat(sub) || 0;
+const estHours = (est: string): number => {
+  const m = /^(\d+(?:\.\d+)?)(d|h)$/.exec(est);
+  return m ? Number(m[1]) * (m[2] === 'd' ? SETTINGS.workdayHours : 1) : 0;
+};
 
 /** The oracle bands with every day band past the window folded into Later (see WINDOW_DIVERGENCE). */
 function windowedBands(): MockupComponent[] {
@@ -170,14 +178,16 @@ function windowedBands(): MockupComponent[] {
   const folded = oracle.bands.filter(isFolded);
   expect(folded.length).toBeGreaterThan(0);
   const kept = oracle.bands.filter((b: MockupComponent) => !isFolded(b));
-  return kept.map((b: MockupComponent) => {
-    if (!b.isLater) return b;
-    const hours = [...folded, b].reduce((n, x) => n + hoursOf(x.sub), 0);
-    return {
-      ...b,
-      tasks: [...folded.flatMap((x: MockupComponent) => x.tasks), ...b.tasks],
-      sub: hours ? `${hours}h` : '',
-    };
+  return kept.flatMap((b: MockupComponent) => {
+    if (!b.isLater) return [b];
+    const all = [...folded.flatMap((x: MockupComponent) => x.tasks), ...b.tasks];
+    const tasks = all.filter((x: MockupComponent) => shelfOf(board, x.id) === 'plan');
+    if (!tasks.length) return [];
+    const shelved = all.filter((x: MockupComponent) => !tasks.includes(x));
+    const hours =
+      [...folded, b].reduce((n, x) => n + hoursOf(x.sub), 0) -
+      shelved.reduce((n: number, x: MockupComponent) => n + estHours(x._t.est), 0);
+    return [{ ...b, label: TAIL_LABEL, tasks, sub: hours ? `${hours}h` : '' }];
   });
 }
 
@@ -486,7 +496,7 @@ describe('script step recovery', () => {
     });
     const p = buildTaskProgress({
       task: t,
-      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, steps: [script] },
+      workflow: { id: 'w', name: 'w', steps: [script] },
       branch: () => b,
       repoNick: (id) => id,
     });
@@ -530,7 +540,7 @@ describe('Needs you extras (R16)', () => {
     });
     const p = buildTaskProgress({
       task: t,
-      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, steps: [script] },
+      workflow: { id: 'w', name: 'w', steps: [script] },
       branch: () => b,
       repoNick: (id) => id,
     });

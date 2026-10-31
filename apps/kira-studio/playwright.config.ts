@@ -34,11 +34,12 @@ export default defineConfig({
   workers: '100%',
   // 1 on CI (the first attempt plus one retry) to absorb shared-runner timing noise without
   // masking a real bug for long — a test that stays flaky still shows up as "flaky", not silently
-  // green, in the html reporter. 0 locally: a dev loop wants the fastest, most direct failure
+  // green, in the reporter output. 0 locally: a dev loop wants the fastest, most direct failure
   // signal, and the CPU contention/shared-runner conditions retries exist for are rare locally.
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: 'line',
+  use: { screenshot: 'only-on-failure', trace: 'on-first-retry' },
   outputDir: 'test-results',
   projects: [
     {

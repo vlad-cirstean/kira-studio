@@ -73,9 +73,9 @@ apps/kira-space/frontend/src/ade/v2/panel/AdePanelFrame.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeTaskPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeBranchPanel.vue
 apps/kira-space/frontend/src/ade/v2/panel/AdeArchivedPanel.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPage.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogPanel.vue
-apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue
+apps/kira-space/frontend/src/ade/v2/later/AdeLaterPage.vue
+apps/kira-space/frontend/src/ade/v2/later/AdeShelfSection.vue
+apps/kira-space/frontend/src/ade/v2/later/AdeShelfRow.vue
 apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedList.vue
 apps/kira-space/frontend/src/ade/v2/sessions/AdeStoppedRow.vue
 apps/kira-space/frontend/src/repo/ReposDialog.vue
@@ -117,6 +117,7 @@ U37 apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue # plan board branc
 U37 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # plan board history and span row selected fill, board visual exempt per P263 §2.10
 U62 apps/kira-space/frontend/src/views/repo/useReadonlyFileViewer.ts # Monaco editor.focus(), not DOM focus
 U62 apps/kira-space/frontend/src/views/repo/RepoDiffView.vue # Monaco editor.focus(), not DOM focus
+U62 apps/kira-space/frontend/src/views/repo/useFileEdit.ts # Monaco editor.focus(), not DOM focus
 U60 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # drags cards between day lists with sort off; useSortableReorder only reorders within one list
 U62 apps/kira-space/frontend/src/ade/v2/notes/AdeNotesEditor.vue # TipTap chain().focus() commands, not DOM focus
 U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into its 8-4-4-4-12 groups, not a commit sha
@@ -241,7 +242,7 @@ U102@@v@@@@shortSha(/shortId( in a component (use Identifier :short)@@\bshort(?:
 U103@@vt@@@@bare .sort() (end on a stable key)@@\.sort\(\)
 U104@@v@@@@toolbar divider must use ToolbarSeparator (P351)@@class="[^"]*(?:\bw-px\b[^"]*\bh-3\.5\b|\bh-3\.5\b[^"]*\bw-px\b)
 U104@@v@@ToolbarSeparator.vue@@toolbar divider must use ToolbarSeparator (P351)@@<Separator\b(?&t)\sorientation="vertical"
-U105@@vt@@@@repeating gradient texture (surfaces are flat tokens)@@repeating-(?:linear|radial|conic)-gradient
+U105@@vt@@AdeDayBand.vue@@repeating gradient texture (surfaces are flat tokens)@@repeating-(?:linear|radial|conic)-gradient
 GUARDS
 
 # hits: "U<n> path"

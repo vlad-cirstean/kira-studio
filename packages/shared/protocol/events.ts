@@ -33,6 +33,7 @@ export const CHANNEL = {
   settingsChanged: 'kira:settings:changed',
   layoutChanged: 'kira:layout:changed',
   opUpdate: 'kira:op:update',
+  opBatch: 'kira:op:batch',
   appMetrics: 'kira:app:metrics',
   schemaChanged: 'kira:schema:changed',
   // P11 D8: a server-streaming call's coalesced message batches, delivered via EmitTo (one window
@@ -98,7 +99,6 @@ export const CHANNEL = {
   // P143: ADE v2 channels (`apps/kira-space/internal/bridge/adewire/channels.go`, verbatim).
   // Payload types live in apps/kira-space/frontend/src/ade/v2/wire.ts.
   adeTaskBoard: 'kira:adetask:board',
-  adeTaskBacklog: 'kira:adetask:backlog',
   adeTaskWorkflows: 'kira:adetask:workflows',
   adeTaskRepos: 'kira:adetask:repos',
   adeTaskRuns: 'kira:adetask:runs',
@@ -106,6 +106,10 @@ export const CHANNEL = {
   adeTaskSessions: 'kira:adetask:sessions',
   adeTaskOpenSession: 'kira:adetask:openSession',
   adeTaskReview: 'kira:adetask:review',
+  // P420: validation-proof sessions changed (Emit, app-wide), {sessionId}; a request for the proof
+  // window to show one session (EmitTo), {sessionId}.
+  proofChanged: 'kira:proof:changed',
+  proofSelect: 'kira:proof:select',
 } as const;
 
 /** Summed across every process metrics.Sample covers — a single app-wide readout

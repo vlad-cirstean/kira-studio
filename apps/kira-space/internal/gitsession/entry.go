@@ -175,7 +175,7 @@ func newRepoEntry(
 	review *gitreview.Store, hosts githost.Selector, isOpen func(string) bool,
 	skipInitialAutoFetch bool, opLog *oplog.Log, crStore ChangeRequestStore, crCfg CRSyncConfig, crShare *crShared,
 ) *RepoEntry {
-	life, lifeStop := context.WithCancel(context.Background())
+	life, lifeStop := context.WithCancel(oplog.WithOrigin(context.Background(), oplog.Origin{Module: oplog.ModuleGit, Trigger: oplog.TriggerAuto}))
 	e := &RepoEntry{
 		life:            life,
 		lifeStop:        lifeStop,

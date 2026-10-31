@@ -111,6 +111,8 @@ type Config struct {
 	// client gets them (dbMcp.previewResponses) — read fresh on every call. It is the default for connections whose McpReviewResults is inherit. Required for the same
 	// reason as ExplainThreshold: a silently-defaulted switch would send unreviewed data.
 	PreviewResponses func() bool
+	// Proof backs the proof_* tools (P420); nil leaves them unregistered.
+	Proof ProofStore
 	// Prompts resolves the editable instruction and tool texts; nil means the registry defaults.
 	Prompts llmprompts.Source
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
@@ -257,6 +259,9 @@ func (s *Server) buildMCPServer() *mcp.Server {
 		Description: llmprompts.DbmcpToolExplainQuery.Text(src, llmprompts.NoVars{}),
 		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[explainQueryArgs](src, llmprompts.DbmcpToolExplainQuery.ID(), nil), "connectionId", "sql"),
 	}, withPanicRecovery(s, "explain_query", s.explainQuery))
+	if s.cfg.Proof != nil {
+		s.addProofTools(srv, src)
+	}
 
 	return srv
 }

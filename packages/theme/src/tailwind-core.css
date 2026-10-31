@@ -70,6 +70,23 @@
   --color-conn-magenta: var(--kira-conn-magenta);
   --color-conn-grey: var(--kira-conn-grey);
 
+  --color-status-grey: var(--kira-status-grey);
+  --color-status-brown: var(--kira-status-brown);
+  --color-status-red: var(--kira-status-red);
+  --color-status-orange: var(--kira-status-orange);
+  --color-status-amber: var(--kira-status-amber);
+  --color-status-yellow: var(--kira-status-yellow);
+  --color-status-lime: var(--kira-status-lime);
+  --color-status-green: var(--kira-status-green);
+  --color-status-teal: var(--kira-status-teal);
+  --color-status-cyan: var(--kira-status-cyan);
+  --color-status-sky: var(--kira-status-sky);
+  --color-status-blue: var(--kira-status-blue);
+  --color-status-indigo: var(--kira-status-indigo);
+  --color-status-violet: var(--kira-status-violet);
+  --color-status-purple: var(--kira-status-purple);
+  --color-status-pink: var(--kira-status-pink);
+
   /* P110 I2-38: xs is the replacement for shadcn's own retired 4px radius alias -- see
      tokens.css's --kira-radius-xs comment. */
   --radius-kira-xs: var(--kira-radius-xs);

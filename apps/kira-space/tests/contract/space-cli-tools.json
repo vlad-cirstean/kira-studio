@@ -1,0 +1,237 @@
+{
+  "IssueTrackerService.Tools#not-installed": {
+    "tools": [
+      {
+        "cli": "GitHub CLI (gh)",
+        "kind": "host",
+        "label": "GitHub",
+        "provider": "github",
+        "setup": {
+          "docsUrl": "https://cli.github.com",
+          "steps": [
+            {
+              "command": "brew install gh",
+              "purpose": "install"
+            },
+            {
+              "command": "gh auth login",
+              "purpose": "login"
+            },
+            {
+              "command": "gh auth status",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "octocat",
+          "kind": "ok",
+          "path": "<masked>",
+          "probed": [],
+          "reason": "",
+          "site": "",
+          "version": "2.42.0"
+        }
+      },
+      {
+        "cli": "Atlassian CLI (acli)",
+        "kind": "tracker",
+        "label": "Jira",
+        "provider": "jira",
+        "setup": {
+          "docsUrl": "https://developer.atlassian.com/cloud/acli/guides/introduction/",
+          "steps": [
+            {
+              "command": "brew tap atlassian/homebrew-acli && brew install acli",
+              "purpose": "install"
+            },
+            {
+              "command": "acli jira auth login --web",
+              "purpose": "login"
+            },
+            {
+              "command": "acli jira auth login --site <your-site>.atlassian.net --email <you@example.com> --token < token.txt",
+              "purpose": "loginToken"
+            },
+            {
+              "command": "acli jira auth status",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "",
+          "kind": "notFound",
+          "path": "<masked>",
+          "probed": [
+            "acli (on PATH)",
+            "/opt/homebrew/bin/acli",
+            "/usr/local/bin/acli"
+          ],
+          "reason": "acli is not installed",
+          "site": "",
+          "version": ""
+        }
+      }
+    ]
+  },
+  "IssueTrackerService.Tools#ready": {
+    "tools": [
+      {
+        "cli": "GitHub CLI (gh)",
+        "kind": "host",
+        "label": "GitHub",
+        "provider": "github",
+        "setup": {
+          "docsUrl": "https://cli.github.com",
+          "steps": [
+            {
+              "command": "brew install gh",
+              "purpose": "install"
+            },
+            {
+              "command": "gh auth login",
+              "purpose": "login"
+            },
+            {
+              "command": "gh auth status",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "octocat",
+          "kind": "ok",
+          "path": "<masked>",
+          "probed": [],
+          "reason": "",
+          "site": "",
+          "version": "2.42.0"
+        }
+      },
+      {
+        "cli": "Atlassian CLI (acli)",
+        "kind": "tracker",
+        "label": "Jira",
+        "provider": "jira",
+        "setup": {
+          "docsUrl": "https://developer.atlassian.com/cloud/acli/guides/introduction/",
+          "steps": [
+            {
+              "command": "brew tap atlassian/homebrew-acli && brew install acli",
+              "purpose": "install"
+            },
+            {
+              "command": "acli jira auth login --web",
+              "purpose": "login"
+            },
+            {
+              "command": "acli jira auth login --site <your-site>.atlassian.net --email <you@example.com> --token < token.txt",
+              "purpose": "loginToken"
+            },
+            {
+              "command": "acli jira auth status",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "me@acme.test",
+          "kind": "ok",
+          "path": "<masked>",
+          "probed": [],
+          "reason": "",
+          "site": "acme.atlassian.net",
+          "version": "1.3.4"
+        }
+      }
+    ]
+  },
+  "IssueTrackerService.Tools#signed-out": {
+    "tools": [
+      {
+        "cli": "GitHub CLI (gh)",
+        "kind": "host",
+        "label": "GitHub",
+        "provider": "github",
+        "setup": {
+          "docsUrl": "https://cli.github.com",
+          "steps": [
+            {
+              "command": "brew install gh",
+              "purpose": "install"
+            },
+            {
+              "command": "gh auth login",
+              "purpose": "login"
+            },
+            {
+              "command": "gh auth status",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "octocat",
+          "kind": "ok",
+          "path": "<masked>",
+          "probed": [],
+          "reason": "",
+          "site": "",
+          "version": "2.42.0"
+        }
+      },
+      {
+        "cli": "Atlassian CLI (acli)",
+        "kind": "tracker",
+        "label": "Jira",
+        "provider": "jira",
+        "setup": {
+          "docsUrl": "https://developer.atlassian.com/cloud/acli/guides/introduction/",
+          "steps": [
+            {
+              "command": "brew tap atlassian/homebrew-acli && brew install acli",
+              "purpose": "install"
+            },
+            {
+              "command": "acli jira auth login --web",
+              "purpose": "login"
+            },
+            {
+              "command": "acli jira auth login --site <your-site>.atlassian.net --email <you@example.com> --token < token.txt",
+              "purpose": "loginToken"
+            },
+            {
+              "command": "acli jira auth status",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "",
+          "kind": "unauthenticated",
+          "path": "<masked>",
+          "probed": [],
+          "reason": "not logged in to Jira: run `acli jira auth login --web`",
+          "site": "",
+          "version": "1.3.4"
+        }
+      }
+    ]
+  },
+  "IssueTrackerService.Trackers": {
+    "trackers": [
+      {
+        "id": "jira",
+        "issue": "Work item",
+        "label": "Jira"
+      }
+    ]
+  },
+  "args:IssueTrackerService.Tools": {
+    "refresh": true
+  },
+  "args:IssueTrackerService.Tools#refresh": {
+    "refresh": true
+  }
+}

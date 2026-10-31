@@ -3,6 +3,7 @@ import { pageChunks } from '@shared/protocol/page';
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import { i18n, installCopyTestHook } from '@theme/i18n';
 import { bootstrapShell, provideShellServices } from '@workbench/bootstrapShell';
+import { windowKey } from '@workbench/bridge/rpc';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
@@ -10,6 +11,7 @@ import { initApiDataSync } from './api/state/apiQueries';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { useTreeStore } from './project/state/tree';
+import { mountProofWindow } from './proof/boot';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCacheStatsStore } from './state/cacheStats';
@@ -364,4 +366,4 @@ async function mountShell(): Promise<void> {
 // entry in the Promise.all above) can reject — a DB error, or a busy DB. The catch-and-
 // retry wrapper itself moved to workbench/bootstrapShell.ts, shared with apps/kira-space's own
 // identical copy.
-void bootstrapShell(mountShell, 'Kira Studio');
+void bootstrapShell(windowKey.startsWith('proof-') ? mountProofWindow : mountShell, 'Kira Studio');

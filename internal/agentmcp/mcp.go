@@ -67,6 +67,8 @@ type Grant struct {
 	// Sandbox, when set on a run grant, adds fetch_remote and push_branch: the git operations a
 	// sandboxed agent cannot do itself.
 	Sandbox *SandboxGrant
+	// StepID is the stage a task session without a run was opened for; handover refuses a task that moved on.
+	StepID string
 	// Agent is the provider the run's CLI belongs to; it writes the grant's MCP config.
 	Agent harness.Provider
 }
@@ -98,6 +100,9 @@ type registration struct {
 	hash, salt []byte
 	// server carries this run's own finish_step schema; nil = the shared server for its flags.
 	server *mcp.Server
+	// ctx ends when the registration is released or the server closes; calls in flight end with it.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 const grantPrefix = "g"
@@ -112,6 +117,9 @@ type Server struct {
 	outcomes Outcomes
 	review   ReviewReplier
 	sandbox  SandboxGit
+	git      GitRunner
+	onCall   func(ctx context.Context, c ToolCall) (context.Context, func(isError bool, text string, err error))
+	handover HandoverRecorder
 	prompts  llmprompts.Source
 
 	mu     sync.Mutex
@@ -121,7 +129,7 @@ type Server struct {
 	srv    *http.Server
 	closed bool
 	// shared holds the per-flags servers of the revision sharedRev; a prompt edit rebuilds them.
-	shared    map[[5]bool]*mcp.Server
+	shared    map[[6]bool]*mcp.Server
 	sharedRev uint64
 }
 
@@ -136,6 +144,13 @@ type Options struct {
 	Review ReviewReplier
 	// SandboxGit runs fetch_remote and push_branch; nil refuses sandbox grants.
 	SandboxGit SandboxGit
+	// Git runs the git tool's commands; nil refuses git grants.
+	Git GitRunner
+	// OnToolCall, when set, records each tools/call: it returns the ctx the handler runs under and
+	// the func that reports the outcome (isError and the tool's text, or a Go error).
+	OnToolCall func(ctx context.Context, c ToolCall) (context.Context, func(isError bool, text string, err error))
+	// Handover stores handover calls; nil means no grant lists the handover tool.
+	Handover HandoverRecorder
 	// Prompts resolves tool and instruction texts; nil means the registry defaults.
 	Prompts llmprompts.Source
 }
@@ -145,7 +160,7 @@ func NewServer(o Options) *Server {
 	if o.Prompts == nil {
 		o.Prompts = llmprompts.Defaults()
 	}
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, prompts: o.Prompts}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, git: o.Git, onCall: o.OnToolCall, handover: o.Handover, prompts: o.Prompts}
 }
 
 type finishArgs struct {
@@ -219,7 +234,7 @@ func (s *Server) finishSchema(results []ResultSpec) (*jsonschema.Schema, error) 
 }
 
 // buildMCPServer returns the tool set a grant sees: an agent never lists a tool it cannot call.
-func (s *Server) buildMCPServer(finish, space, outcomes, git, review, sandbox bool, results []ResultSpec) *mcp.Server {
+func (s *Server) buildMCPServer(finish, space, outcomes, git, review, sandbox, handover bool, results []ResultSpec) *mcp.Server {
 	opts := &mcp.ServerOptions{}
 	if space {
 		opts.Instructions = llmprompts.HeadlessSpaceInstructions.Text(s.prompts, llmprompts.NoVars{})
@@ -251,6 +266,10 @@ func (s *Server) buildMCPServer(finish, space, outcomes, git, review, sandbox bo
 	if sandbox {
 		s.addSandboxGitTools(srv)
 	}
+	if handover {
+		s.addHandoverTool(srv)
+	}
+	s.recordCalls(srv)
 	return srv
 }
 
@@ -282,7 +301,7 @@ func toolError(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}, IsError: true}
 }
 
-func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args finishArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) finishStep(ctx context.Context, req *mcp.CallToolRequest, args finishArgs) (*mcp.CallToolResult, any, error) {
 	var info *auth.TokenInfo
 	if req.Extra != nil {
 		info = req.Extra.TokenInfo
@@ -304,7 +323,8 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 		Status: args.Status, Summary: args.Summary, Reason: args.Reason, ConflictedFiles: args.ConflictedFiles,
 		LastGitError: args.LastGitError, Tried: args.Tried,
 	})
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: llmprompts.HeadlessFinishStepAck.Text(s.prompts, llmprompts.NoVars{})}}}, nil, nil
+	ack := llmprompts.HeadlessFinishStepAck.Text(s.prompts, llmprompts.NoVars{})
+	return &mcp.CallToolResult{Content: s.finishContent(ctx, req, ack, g)}, nil, nil
 }
 
 // verify maps a presented bearer token to the registration it was minted for.
@@ -340,7 +360,7 @@ func (s *Server) startLocked() error {
 			return reg.server
 		}
 		g := reg.grant
-		return s.sharedServer([5]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Sandbox != nil})
+		return s.sharedServer([6]bool{g.RunID != "", g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Sandbox != nil, s.handoverGranted(g)})
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 	protected := auth.RequireBearerToken(s.verify, nil)(handler)
 	mux := http.NewServeMux()
@@ -352,16 +372,16 @@ func (s *Server) startLocked() error {
 }
 
 // sharedServer returns the tool set for a grant's flags, rebuilt when a prompt edit moved the revision.
-func (s *Server) sharedServer(key [5]bool) *mcp.Server {
+func (s *Server) sharedServer(key [6]bool) *mcp.Server {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if rev := s.prompts.Revision(); s.shared == nil || rev != s.sharedRev {
-		s.shared = map[[5]bool]*mcp.Server{}
+		s.shared = map[[6]bool]*mcp.Server{}
 		s.sharedRev = rev
 	}
 	srv := s.shared[key]
-	if srv == nil && (key[0] || key[1] || key[2] || key[3] || key[4]) {
-		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], false, key[4], nil)
+	if srv == nil && (key[0] || key[1] || key[2] || key[3] || key[4] || key[5]) {
+		srv = s.buildMCPServer(key[0], key[1], key[2], key[3], false, key[4], key[5], nil)
 		s.shared[key] = srv
 	}
 	return srv
@@ -370,7 +390,7 @@ func (s *Server) sharedServer(key [5]bool) *mcp.Server {
 // Register mints a token for the grant, writes its MCP config file and returns its path. release
 // deletes that registration's file and token only; call it when the process has exited.
 func (s *Server) Register(g Grant) (configPath string, release func(), err error) {
-	if g.RunID == "" && !g.Space {
+	if g.RunID == "" && !g.Space && !s.handoverGranted(g) {
 		return "", nil, errors.New("agentmcp: grant allows nothing")
 	}
 	if g.Space && (g.TaskID == "" || s.space == nil) {
@@ -380,6 +400,9 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 		return "", nil, errors.New("agentmcp: grant needs a provider")
 	}
 	if g.Git != nil {
+		if s.git == nil {
+			return "", nil, errors.New("agentmcp: git grant needs a git runner")
+		}
 		wts := make([]string, len(g.Git.Worktrees))
 		for i, w := range g.Git.Worktrees {
 			wts[i] = filepath.Clean(w)
@@ -400,7 +423,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	}
 	var perRun *mcp.Server
 	if g.RunID != "" && (!IsImplicit(g.Results) || g.Review != nil) {
-		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Review != nil, g.Sandbox != nil, g.Results)
+		perRun = s.buildMCPServer(true, g.Space, g.TaskID != "" && s.outcomes != nil, g.Git != nil, g.Review != nil, g.Sandbox != nil, s.handoverGranted(g), g.Results)
 	}
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {
@@ -417,7 +440,8 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	url := "http://" + s.ln.Addr().String() + mcpPath
 	s.seq++
 	id := s.seq
-	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun})
+	regCtx, cancel := context.WithCancel(context.Background())
+	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun, ctx: regCtx, cancel: cancel})
 	s.mu.Unlock()
 
 	cfg, err := g.Agent.MCPConfig([]harness.MCPServer{{Name: ServerName, URL: url, Headers: map[string]string{"Authorization": "Bearer " + plain}}})
@@ -447,9 +471,27 @@ func (s *Server) forget(id uint64) {
 	for _, t := range s.tokens {
 		if t.id != id {
 			kept = append(kept, t)
+		} else if t.cancel != nil {
+			t.cancel()
 		}
 	}
 	s.tokens = kept
+}
+
+// callCtx returns ctx ended also when the caller's registration is released, so a blocking tool call
+// stops when its run or session does even if the HTTP connection lingers.
+func (s *Server) callCtx(ctx context.Context, req *mcp.CallToolRequest) (context.Context, func()) {
+	var info *auth.TokenInfo
+	if req.Extra != nil {
+		info = req.Extra.TokenInfo
+	}
+	reg, ok := s.registered(info)
+	if !ok || reg.ctx == nil {
+		return ctx, func() {}
+	}
+	merged, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(reg.ctx, cancel)
+	return merged, func() { stop(); cancel() }
 }
 
 // Port is the loopback port the server listens on, 0 before the first Register.
@@ -470,6 +512,11 @@ func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
 	srv := s.srv
+	for _, t := range s.tokens {
+		if t.cancel != nil {
+			t.cancel()
+		}
+	}
 	s.srv, s.ln, s.tokens = nil, nil, nil
 	s.mu.Unlock()
 	if srv == nil {

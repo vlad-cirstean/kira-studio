@@ -162,6 +162,7 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 		return invalid("cannot archive: worktree of %s cannot be removed", strings.Join(blocked, ", "))
 	}
 
+	b.abandonBranchRequests(taskID)
 	if err := b.stopTaskWork(tc); err != nil {
 		return err
 	}
@@ -182,6 +183,7 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 	if err := b.deps.Tasks.ArchiveTask(taskID, b.deps.Now().UnixMilli()); err != nil {
 		return err
 	}
+	b.closeHandoverPrompt(taskID)
 	b.snapshotReviewComments(ctx, tc.branches)
 	b.notifyBoard()
 	b.notifySessions()

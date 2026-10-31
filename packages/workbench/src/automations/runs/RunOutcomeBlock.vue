@@ -70,6 +70,13 @@ async function copyForAgent(): Promise<void> {
       >
         {{ run.outcome.lastError }}
       </span>
+      <span
+        v-if="run.outcome?.outputTail"
+        class="font-data text-error whitespace-pre-wrap"
+        data-testid="run-outcome-tail"
+      >
+        {{ run.outcome.outputTail }}
+      </span>
     </template>
     <span v-if="copyError" class="text-error">{{ copyError }}</span>
     <span v-if="resumeError" class="text-error" data-testid="run-resume-error">{{

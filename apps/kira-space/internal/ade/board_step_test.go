@@ -17,7 +17,7 @@ func TestRunEngine_SetTaskStepMovesBothWaysAndGuardsLiveRuns(t *testing.T) {
 
 	e.start(id)
 	e.waitRun(id, "one/api", model.AdeRunRunning)
-	if _, err := e.board.SetTaskStep(ctx, id, "review", ""); err == nil {
+	if _, err := e.board.SetTaskStep(ctx, id, "review", "", nil); err == nil {
 		t.Fatal("step moved while a run is live")
 	}
 	if err := e.board.StopRun(ctx, e.runs(id)["one/api"].ID); err != nil {
@@ -26,7 +26,7 @@ func TestRunEngine_SetTaskStepMovesBothWaysAndGuardsLiveRuns(t *testing.T) {
 	e.waitRun(id, "one/api", model.AdeRunStuck)
 
 	for _, want := range []string{"review", "one", "done", "one"} {
-		task, err := e.board.SetTaskStep(ctx, id, want, "")
+		task, err := e.board.SetTaskStep(ctx, id, want, "", nil)
 		if err != nil || task.EntryStepID != want {
 			t.Fatalf("SetTaskStep(%q) = %+v, %v", want, task.EntryStepID, err)
 		}
@@ -34,7 +34,7 @@ func TestRunEngine_SetTaskStepMovesBothWaysAndGuardsLiveRuns(t *testing.T) {
 	if len(e.runs(id)) != 1 {
 		t.Fatal("moving steps deleted runs")
 	}
-	if _, err := e.board.SetTaskStep(ctx, id, "nope", ""); err == nil {
+	if _, err := e.board.SetTaskStep(ctx, id, "nope", "", nil); err == nil {
 		t.Fatal("unknown step accepted")
 	}
 }
@@ -73,15 +73,15 @@ func TestRunEngine_StartedTaskKeepsItsWorkflowAfterAnEdit(t *testing.T) {
 		t.Fatalf("idle task = %+v, want no snapshot and no flag", idleWire)
 	}
 
-	if _, err := e.board.SetTaskStep(ctx, started, "qa", ""); err == nil {
+	if _, err := e.board.SetTaskStep(ctx, started, "qa", "", nil); err == nil {
 		t.Fatal("started task moved to a step only the edited file has")
 	}
-	task, err := e.board.StepDone(ctx, started)
+	task, err := e.board.StepDone(ctx, started, nil)
 	if err != nil || task.EntryStepID != "done" {
 		t.Fatalf("StepDone = %+v, %v; want done from the snapshot, not qa", task.EntryStepID, err)
 	}
 
-	task, err = e.board.SetTaskStep(ctx, idle, "qa", "")
+	task, err = e.board.SetTaskStep(ctx, idle, "qa", "", nil)
 	if err != nil || task.EntryStepID != "qa" {
 		t.Fatalf("idle SetTaskStep = %+v, %v; want qa from the live file", task.EntryStepID, err)
 	}

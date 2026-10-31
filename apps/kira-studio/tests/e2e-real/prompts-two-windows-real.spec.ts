@@ -4,7 +4,7 @@ import { expect, test } from './fixtures';
 
 // P246: a due confirm popup shows in the app's main window only. Two pages stand in for two
 // windows: the main window's key and a random one. `Not now` in the main page skips the run, and
-// both pages list it as Skipped.
+// both pages list it in Operations.
 
 async function addRecurring(page: Page, name: string): Promise<void> {
   await page.locator('[data-testid="mode-tab"][data-mode="automations"]').click();
@@ -42,8 +42,7 @@ test('the confirm popup shows in the main window only; Not now skips in both', a
   await popup.locator('[data-testid="schedule-confirm-decline"]').click();
   await expect(popup).toHaveCount(0);
   for (const page of [main, other]) {
-    await expect(
-      page.locator('[data-testid="run-row"][data-state="skipped"]').first(),
-    ).toBeVisible();
+    await page.locator('[data-testid="toggle-operations-panel"]').click();
+    await expect(page.locator('[data-testid="op-row"][data-op-id^="run:"]').first()).toBeVisible();
   }
 });

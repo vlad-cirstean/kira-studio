@@ -100,6 +100,27 @@ func (b *TaskBoard) linkedChangeRequest(ctx context.Context, entry *gitsession.R
 	return 0
 }
 
+// changeRequestURL is the web link of the branch's change request: the task link's when it names
+// this repo's, else the host's lookup by branch name. Empty when there is none; a host that is off
+// or down never fails the caller.
+func (b *TaskBoard) changeRequestURL(ctx context.Context, sb model.AdeTaskBranch, hostURL string) string {
+	if sb.Name == "" || (sb.Kind != model.AdeBranchKindMine && sb.Kind != model.AdeBranchKindReview) {
+		return ""
+	}
+	entry, err := b.openRepo(ctx, sb.CodeRepoID)
+	if err != nil {
+		return ""
+	}
+	if n := b.linkedChangeRequest(ctx, entry, hostURL); n > 0 {
+		url, _ := entry.ChangeRequestURL(ctx, n)
+		return url
+	}
+	if res := entry.ResolveBranchChangeRequest(ctx, sb.Name); res.Kind == "ok" && len(res.ChangeRequests) > 0 {
+		return res.ChangeRequests[0].URL
+	}
+	return ""
+}
+
 // reviewableBranch rejects a branch a review cannot target: archived, not mine or review, or not created.
 func (b *TaskBoard) reviewableBranch(tc *taskCtx, sb model.AdeTaskBranch) error {
 	if sb.ArchivedAt != nil {
@@ -141,6 +162,9 @@ func (b *TaskBoard) OpenReviewWindow(ctx context.Context, branchID string) (Revi
 	tgt, err := b.reviewTarget(ctx, tc, sb)
 	if err != nil {
 		return ReviewWindowOpen{}, err
+	}
+	if err := b.promoteBranchReview(ctx, sb); err != nil {
+		warnPromote(sb.ID, err)
 	}
 	if err := b.deps.Registry.Review.SetPinned(ctx, tgt.GitRepoID, tgt.Branch, true); err != nil {
 		return ReviewWindowOpen{}, err
@@ -219,21 +243,62 @@ func (b *TaskBoard) reviewWorktree(ctx context.Context, branchID string) (*gitse
 	return entry, sb, worktree, err
 }
 
-// ReviewWorking lists the staged, unstaged and untracked changes of the branch's worktree. The
-// worktree path comes from the branch row, never from the caller.
+// ReviewWorking lists the staged, unstaged and untracked changes of the branch's worktree with
+// their uncommitted review status, after moving review state onto commits made since. The worktree
+// path comes from the branch row, never from the caller.
 func (b *TaskBoard) ReviewWorking(ctx context.Context, branchID string) (adewire.ReviewWorking, error) {
 	entry, _, worktree, err := b.reviewWorktree(ctx, branchID)
 	if err != nil {
 		return adewire.ReviewWorking{}, err
 	}
 	if worktree == "" {
-		return adewire.ReviewWorking{Files: []porcelain.FileChange{}}, nil
+		return adewire.ReviewWorking{
+			Files: []porcelain.FileChange{}, Reviews: map[string]gitsession.ReviewFileStatus{}, Promoted: []string{}, ContentHashes: map[string]string{},
+		}, nil
+	}
+	w, err := b.workingReview(ctx, branchID)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	promoted, err := w.promote(ctx)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
 	}
 	head, files, err := entry.WorktreeChanges(ctx, worktree)
 	if err != nil {
 		return adewire.ReviewWorking{}, err
 	}
-	return adewire.ReviewWorking{Worktree: worktree, Head: head, Files: files}, nil
+	paths := make([]string, len(files))
+	for i, f := range files {
+		paths[i] = f.Path
+	}
+	// One read per file serves both the review states and the hashes a list mark echoes back.
+	read := make(map[string]gitsession.WorkingContent, len(paths))
+	current := func(path string) (gitsession.WorkingContent, error) {
+		if c, ok := read[path]; ok {
+			return c, nil
+		}
+		c, err := w.current(ctx, path)
+		if err == nil {
+			read[path] = c
+		}
+		return c, err
+	}
+	reviews, err := entry.WorkingReviewStates(ctx, w.branch, paths, current)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	hashes := make(map[string]string, len(paths))
+	for _, path := range paths {
+		c, err := current(path)
+		if err != nil {
+			return adewire.ReviewWorking{}, err
+		}
+		hashes[path] = wireHash(c)
+	}
+	return adewire.ReviewWorking{
+		Worktree: worktree, Head: head, Files: files, Reviews: reviews, Promoted: promoted, ContentHashes: hashes,
+	}, nil
 }
 
 // ReviewWorkingDiff reads one uncommitted file: the worktree HEAD side against the file on disk.
@@ -256,7 +321,12 @@ func (b *TaskBoard) ReviewWorkingDiff(ctx context.Context, branchID, path string
 	if cf == nil {
 		return codeworkspace.DiffContent{}, invalid("the repo is closing")
 	}
-	return codeworkspace.ReadDiffAt(ctx, cf, worktree, head, path)
+	d, err := codeworkspace.ReadDiffAt(ctx, cf, worktree, head, path)
+	if err != nil {
+		return d, err
+	}
+	d.ContentHash = wireHash(workingSide(d.Worktree))
+	return d, nil
 }
 
 // closeReviewWindows closes the task's review windows and drops their records (Archive). Review

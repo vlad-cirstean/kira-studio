@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/clisetup"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 )
 
@@ -44,6 +45,8 @@ var (
 	_ githost.ChangeRequestSync = (*Forge)(nil)
 
 	_ githost.ChangeRequestReviews = (*Forge)(nil)
+	_ githost.ChangeRequestSearch  = (*Forge)(nil)
+	_ githost.CLISetup             = (*Forge)(nil)
 )
 
 // New returns an empty fake host.
@@ -126,6 +129,13 @@ func (f *Forge) Calls() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.calls)
+}
+
+// ResetCalls forgets every recorded call.
+func (f *Forge) ResetCalls() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = nil
 }
 
 // Count returns how many recorded calls start with prefix.
@@ -401,3 +411,30 @@ func (f *Forge) Comment(_ context.Context, _ githost.Repo, number int, body stri
 	f.comments[number] = append(f.comments[number], body)
 	return githost.Status{Kind: githost.KindOK, Host: Host}
 }
+
+// SearchChangeRequests returns the merge requests whose title contains text, as a host search does. It
+// honours SetOffline and the rate limit like the listing calls.
+func (f *Forge) SearchChangeRequests(_ context.Context, text string, limit int) ([]githost.ChangeRequest, githost.Status) {
+	f.record("Search:" + text)
+	if st, limited := f.rateLimit(); limited {
+		return nil, st
+	}
+	out, st := f.match(func(cr githost.ChangeRequest) bool { return strings.Contains(cr.Title, text) })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, st
+}
+
+func (f *Forge) Setup() clisetup.Setup {
+	return clisetup.Setup{
+		DocsURL: "https://forge.test/cli",
+		Steps: []clisetup.Step{
+			{Purpose: clisetup.PurposeInstall, Command: "brew install forge"},
+			{Purpose: clisetup.PurposeLogin, Command: "forge login"},
+			{Purpose: clisetup.PurposeCheck, Command: "forge status"},
+		},
+	}
+}
+
+func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status { return f.Status(ctx, Host) }

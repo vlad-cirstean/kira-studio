@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/scripts';
 import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
@@ -30,7 +29,7 @@ import {
   type ScriptMenuActions,
   scriptMenu,
 } from './panelMenus';
-import { useRerun, useRunScript } from './runScript';
+import { useRunScript } from './runScript';
 import RunsSection from './runs/RunsSection.vue';
 import { useLiveRunByScript } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
@@ -308,11 +307,6 @@ async function runScript(script: CustomScript): Promise<void> {
   actionError.value = await startScript(script);
 }
 
-const rerunRun = useRerun();
-async function rerun(run: ScriptRun): Promise<void> {
-  actionError.value = await rerunRun(run);
-}
-
 const liveRunByScript = useLiveRunByScript();
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
@@ -549,7 +543,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           <FieldError v-if="actionError" data-testid="script-error">{{ actionError }}</FieldError>
         </EmptyState>
       </div>
-      <RunsSection @rerun="rerun" />
+      <RunsSection />
       <ScriptDialog
         v-if="editor"
         :scripts="scripts"

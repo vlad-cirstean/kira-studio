@@ -32,7 +32,10 @@ const (
 	SourceSchedule Source = "schedule"
 )
 
-const lastErrorCap = 1024
+const (
+	lastErrorCap  = 1024
+	outputTailCap = 8 << 10
+)
 
 type Outcome struct {
 	Status    Status `json:"status"`
@@ -41,7 +44,9 @@ type Outcome struct {
 	Reported  bool   `json:"reported"`
 	ExitCode  *int   `json:"exitCode,omitempty"`
 	LastError string `json:"lastError,omitempty"`
-	Summary   string `json:"summary,omitempty"`
+	// OutputTail is the last sanitized output lines of a failed script run, capped at 8 KiB.
+	OutputTail string `json:"outputTail,omitempty"`
+	Summary    string `json:"summary,omitempty"`
 	// Result is the id of the step result an agent reported through finish_step; empty otherwise.
 	Result string `json:"result,omitempty"`
 	// CostUSD is what a Claude run reported spending; nil when it reported none.
@@ -65,6 +70,16 @@ func (o Outcome) WithLastError(line string) Outcome {
 		line = strings.ToValidUTF8(line[:lastErrorCap], "")
 	}
 	o.LastError = line
+	return o
+}
+
+// WithOutputTail returns o with the end of s, capped at 8 KiB on a rune boundary.
+func (o Outcome) WithOutputTail(s string) Outcome {
+	s = strings.TrimSpace(s)
+	if len(s) > outputTailCap {
+		s = strings.ToValidUTF8(s[len(s)-outputTailCap:], "")
+	}
+	o.OutputTail = s
 	return o
 }
 

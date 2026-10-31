@@ -9,6 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/shell"
@@ -320,6 +321,27 @@ func TestRebaseRun(t *testing.T) {
 		if strings.Contains(args, "Bash") && !strings.Contains(args, "--disallowedTools\nBash") {
 			t.Errorf("rebase args grant Bash:\n%s", args)
 		}
+		var gitCalls, refChecks int
+		for _, r := range opsNow(t, f.app) {
+			if r.Category == oplog.CategoryMCP && r.Kind == "git" {
+				gitCalls++
+				if len(r.Steps) != 1 || !strings.HasPrefix(r.Steps[0].Argv, "git --no-pager ") || r.Status != oplog.StatusOK {
+					t.Errorf("git tool op = %+v, want one step on the shared runner's argv", r)
+				}
+			}
+			for _, st := range r.Steps {
+				if strings.Contains(st.Argv, "check-ref-format") {
+					refChecks++
+				}
+			}
+			if strings.Contains(derefCmd(r), "check-ref-format") && r.Status != oplog.StatusOK {
+				t.Errorf("check-ref-format op %+v is not ok", r)
+			}
+		}
+		if gitCalls != 3 {
+			t.Errorf("git tool ops = %d, want 3", gitCalls)
+		}
+		t.Logf("check-ref-format steps: %d", refChecks)
 	})
 
 	t.Run("run_outcome lists the failed rebase to a later step run of the same task only", func(t *testing.T) {
@@ -458,4 +480,11 @@ func latestRebase(t *testing.T, app *flowharness.App, taskID string) (adewire.Ru
 		}
 	}
 	return best, found
+}
+
+func derefCmd(r oplog.Record) string {
+	if r.Command == nil {
+		return ""
+	}
+	return *r.Command
 }

@@ -15,6 +15,7 @@ import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as PromptsService from '@bindings/promptsservice.js';
+import * as ProofService from '@bindings/proofservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
@@ -42,6 +43,18 @@ import type { Layout } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { AppMode } from '@shared/domain/mode';
 import type { OpRecord } from '@shared/domain/ops';
+import type {
+  ProofChanged,
+  ProofDetail,
+  ProofOpenResult,
+  ProofSavePngResult,
+  ProofSelect,
+  ProofStepDetail,
+  ProofSummary,
+  ProofViewState,
+  ProofViewStateEntry,
+  ProofWindowTarget,
+} from '@shared/domain/proof';
 import type {
   ConsoleBody,
   FilterBody,
@@ -76,7 +89,7 @@ import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
 import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
-import { on, trust, unwrap } from '@workbench/bridge/rpc';
+import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
@@ -313,6 +326,37 @@ const studioControl = {
     unwrap(DbMcpService.DenyQuery({ requestId })).then((r) => trust<DbMcpApprovalSnapshot>(r)),
   onDbMcpApprovalChanged: (cb: (snap: DbMcpApprovalSnapshot) => void): (() => void) =>
     on(CHANNEL.dbMcpApproval, cb),
+
+  proofSessions: (): Promise<ProofSummary[]> =>
+    unwrap(ProofService.Sessions()).then((r) => trust<ProofSummary[]>(r ?? [])),
+  proofSession: (sessionId: string): Promise<ProofDetail> =>
+    unwrap(ProofService.Session({ sessionId })).then((r) => trust<ProofDetail>(r)),
+  proofStep: (sessionId: string, rev: number, ordinal: number): Promise<ProofStepDetail> =>
+    unwrap(ProofService.Step({ sessionId, rev, ordinal })).then((r) => trust<ProofStepDetail>(r)),
+  proofViewState: (sessionId: string, rev: number): Promise<ProofViewStateEntry[]> =>
+    unwrap(ProofService.ViewState({ sessionId, rev })).then((r) =>
+      trust<ProofViewStateEntry[]>(r ?? []),
+    ),
+  proofSetViewState: (
+    sessionId: string,
+    rev: number,
+    ordinal: number,
+    state: ProofViewState,
+  ): Promise<void> => unwrap(ProofService.SetViewState({ sessionId, rev, ordinal, state })),
+  proofAcceptEdit: (sessionId: string): Promise<void> =>
+    unwrap(ProofService.AcceptEdit({ sessionId })),
+  proofRejectEdit: (sessionId: string): Promise<void> =>
+    unwrap(ProofService.RejectEdit({ sessionId })),
+  proofDelete: (sessionId: string): Promise<void> => unwrap(ProofService.Delete({ sessionId })),
+  proofMarkSeen: (sessionId: string): Promise<void> => unwrap(ProofService.MarkSeen({ sessionId })),
+  proofOpenWindow: (sessionId?: string): Promise<ProofOpenResult> =>
+    unwrap(ProofService.OpenWindow({ sessionId })).then((r) => trust<ProofOpenResult>(r)),
+  proofWindowTarget: (): Promise<ProofWindowTarget> =>
+    unwrap(ProofService.WindowTarget({ key: windowKey })).then((r) => trust<ProofWindowTarget>(r)),
+  proofSavePng: (filename: string, pngBase64: string): Promise<ProofSavePngResult> =>
+    unwrap(ProofService.SavePng({ filename, pngBase64 })).then((r) => trust<ProofSavePngResult>(r)),
+  onProofChanged: (cb: (event: ProofChanged) => void): (() => void) => on(CHANNEL.proofChanged, cb),
+  onProofSelect: (cb: (event: ProofSelect) => void): (() => void) => on(CHANNEL.proofSelect, cb),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

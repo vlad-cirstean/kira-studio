@@ -13,13 +13,14 @@ import { control } from '../../../bridge/control';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
+import AdeArtifactList from '../artifacts/AdeArtifactList.vue';
 import { useHostLabels } from '../hostLabels';
+import AdeHandoverList from '../notes/AdeHandoverList.vue';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useRestoreTask } from '../queries';
 import { useArchivedTask } from '../readQueries';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
-import { useAdeArchiveUiStore } from '../state/adeArchiveUi';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { ArchivedBranch, ArchivedComment, ArchivedTask } from '../wire';
 import AdePanelFrame from './AdePanelFrame.vue';
@@ -29,30 +30,27 @@ import { PR_TONE, prStateLabel } from './prState';
 // need that first.
 const props = defineProps<{ taskId: string }>();
 
-const archive = useAdeArchiveUiStore();
 const boardUi = useAdeBoardUiStore();
 const { sessions, repoLabel } = usePlanModel();
 const hostLabels = useHostLabels();
 const query = useArchivedTask(() => props.taskId);
 const restore = useRestoreTask();
 const restoreError = ref('');
+const tab = ref('task');
 
 watch(
   () => props.taskId,
   () => {
-    archive.tab = 'task';
+    tab.value = 'task';
     restoreError.value = '';
   },
 );
 
-const tab = computed({
-  get: () => archive.tab,
-  set: (v: string) => (archive.tab = v as typeof archive.tab),
-});
 const count = computed(() => sessions.value.filter((s) => s.taskId === props.taskId).length);
 const tabs = computed(() => [
   { value: 'task', label: t('common.task.label') },
   { value: 'notes', label: t('space.common.notes.label') },
+  { value: 'artifacts', label: t('space.ade.artifacts.title.title') },
   { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: count.value }) },
 ]);
 
@@ -106,7 +104,6 @@ async function onRestore(): Promise<void> {
   restoreError.value = '';
   try {
     await restore.mutateAsync({ taskId: props.taskId });
-    if (archive.selectedTaskId === props.taskId) archive.select(null);
     boardUi.openTask(props.taskId);
   } catch (err) {
     restoreError.value = errorText(err);
@@ -125,7 +122,7 @@ async function onRestore(): Promise<void> {
             <AdeChip
               v-if="status(a)"
               :label="status(a)!.name"
-              :tone="status(a)!.tone"
+              :color="status(a)!.color"
               data-testid="ade-archived-status"
             />
             <AdeTip :text="titleOf(a)">
@@ -161,6 +158,12 @@ async function onRestore(): Promise<void> {
           </div>
           <Alert v-if="restoreError" variant="error" data-testid="ade-archived-restore-error"
             ><AlertDescription>{{ restoreError }}</AlertDescription></Alert
+          >
+          <Alert
+            v-if="boardUi.actionError[taskId]"
+            variant="error"
+            data-testid="ade-archived-resume-error"
+            ><AlertDescription>{{ boardUi.actionError[taskId] }}</AlertDescription></Alert
           >
         </template>
 
@@ -306,10 +309,18 @@ async function onRestore(): Promise<void> {
         </div>
         <div
           v-else-if="tab === 'notes'"
-          class="flex min-h-0 flex-1 flex-col p-3"
+          class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"
           data-testid="ade-archived-notes"
         >
           <AdeNotesEditor :notes="a.task.notes" :item-id="a.task.id" readonly />
+          <AdeHandoverList :task-id="a.task.id" readonly />
+        </div>
+        <div
+          v-else-if="tab === 'artifacts'"
+          class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3"
+          data-testid="ade-archived-artifacts"
+        >
+          <AdeArtifactList :task-id="a.task.id" readonly />
         </div>
         <AdeSessionsTab v-else :task-id="a.task.id" archived />
       </AdePanelFrame>

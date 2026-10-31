@@ -7,7 +7,6 @@
       "workflow": {
         "id": "standard",
         "name": "Standard feature",
-        "kiraSpaceMcp": false,
         "steps": [
           {
             "id": "spec",
@@ -311,7 +310,6 @@
       "workflow": {
         "id": "bugfix",
         "name": "Bugfix",
-        "kiraSpaceMcp": false,
         "steps": [
           {
             "id": "triage",
@@ -550,7 +548,6 @@
       "workflow": {
         "id": "chore",
         "name": "Maintenance",
-        "kiraSpaceMcp": false,
         "steps": [
           {
             "id": "update",

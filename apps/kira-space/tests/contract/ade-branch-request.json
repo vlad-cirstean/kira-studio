@@ -1,0 +1,27 @@
+{
+  "AdeTaskService.BranchRequest": {
+    "createdAt": 0,
+    "expiresAt": 0,
+    "id": "<masked>",
+    "items": [
+      {
+        "base": "",
+        "branch": "",
+        "codeRepoId": "<masked>",
+        "kind": "branch",
+        "repo": "api"
+      },
+      {
+        "base": "",
+        "branch": "",
+        "codeRepoId": "<masked>",
+        "kind": "branch",
+        "repo": "web"
+      }
+    ],
+    "source": "run",
+    "stepName": "one",
+    "taskId": "<masked>",
+    "taskTitle": "Fix login"
+  }
+}

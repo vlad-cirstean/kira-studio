@@ -22,7 +22,6 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  */
 import InlineState from '@theme/components/InlineState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import { Badge } from '@theme/components/ui/badge';
 import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -74,7 +73,16 @@ const reviewStatesMap = computed<ReadonlyMap<string, ReviewFileStatus>>(() => {
   return map;
 });
 
+const reviewedCount = computed(
+  () => props.reviewFiles.files.value.filter((e) => e.review.kind === 'full').length,
+);
+
 const workingFiles = computed(() => props.working?.files ?? []);
+const workingReviewedCount = computed(
+  () =>
+    workingFiles.value.filter((f) => props.working?.reviewStates.get(f.path)?.kind === 'full')
+      .length,
+);
 const workingSelected = ref(-1);
 
 function onOpenWorkingIndex(index: number, pinned: boolean): void {
@@ -120,6 +128,11 @@ function onToggleReviewed(path: string): void {
 function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
   void props.reviewFiles.markMany(paths, reviewed);
 }
+
+function onToggleWorkingReviewed(path: string): void {
+  const isReviewed = (props.working?.reviewStates.get(path)?.kind ?? 'none') !== 'none';
+  props.working?.onToggleReviewed(path, !isReviewed);
+}
 </script>
 
 <template>
@@ -158,6 +171,19 @@ function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
         {{ t('git.review.files.markError.error', { error: reviewFiles.markError.value }) }}
       </FieldError>
 
+      <div
+        class="flex items-center gap-1.5 px-2 py-1 text-graph-sm font-medium"
+        data-testid="review-committed-header"
+      >
+        <CodiconIcon name="git-commit" :size="13" />
+        <span>{{ t('git.review.committed.title') }}</span>
+        <span class="ml-auto text-muted-foreground font-normal">{{
+          t('git.review.reviewedCount.label', {
+            reviewed: reviewedCount,
+            total: files.length,
+          })
+        }}</span>
+      </div>
       <FileTree
         data-testid="review-files-tree"
         class="flex-auto min-h-0"
@@ -177,7 +203,7 @@ function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
       />
       <section
         v-if="workingFiles.length > 0"
-        class="flex flex-col min-h-0 max-h-[40%] shrink-0 border-t border-border"
+        class="flex flex-col min-h-0 max-h-[40%] shrink-0 border-t border-border border-l-2 border-l-warn"
         data-testid="review-working"
       >
         <div
@@ -185,8 +211,13 @@ function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
           data-testid="review-working-header"
         >
           <CodiconIcon name="edit" :size="13" class="text-warn" />
-          <span>{{ t('git.detail.working.title') }}</span>
-          <Badge variant="warn" class="ml-auto">{{ workingFiles.length }}</Badge>
+          <span>{{ t('space.ade.changes.uncommitted.label') }}</span>
+          <span class="ml-auto text-muted-foreground font-normal">{{
+            t('git.review.reviewedCount.label', {
+              reviewed: workingReviewedCount,
+              total: workingFiles.length,
+            })
+          }}</span>
         </div>
         <p class="px-2 pb-1 text-muted-foreground text-graph-sm">{{
           t('git.review.working.hint')
@@ -203,8 +234,11 @@ function onToggleReviewedFolder(paths: string[], reviewed: boolean): void {
           :parent-index="0"
           :store="store"
           :actions="actions"
+          :review-states="working?.reviewStates"
           @select-file="(i) => (workingSelected = i)"
           @open-file="onOpenWorkingIndex"
+          @toggle-reviewed="onToggleWorkingReviewed"
+          @toggle-reviewed-folder="(paths, reviewed) => working?.onToggleReviewedFolder(paths, reviewed)"
         />
       </section>
       <InlineState v-if="reviewFiles.loading.value && files.length === 0" kind="loading">

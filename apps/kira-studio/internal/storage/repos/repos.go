@@ -38,6 +38,8 @@ type Repos struct {
 	ScriptRuns    *scriptruns.Repo
 	// DockerRestore is P334's last-known-running store for Docker engine restarts.
 	DockerRestore *DockerRestoreRepo
+	// Proof is P420's validation-proof session store.
+	Proof *ProofRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -85,6 +87,7 @@ func New(db *sql.DB) (*Repos, error) {
 		CustomScripts:   &scripts.Repo{DB: db},
 		ScriptRuns:      &scriptruns.Repo{DB: db},
 		DockerRestore:   &DockerRestoreRepo{DB: db},
+		Proof:           &ProofRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }

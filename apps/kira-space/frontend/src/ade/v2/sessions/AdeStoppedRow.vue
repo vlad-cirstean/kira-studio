@@ -6,6 +6,7 @@ import { useFocus } from '@vueuse/core';
 import { revealElement } from '@workbench/behaviour/focus';
 import { useRelativeTime } from '@workbench/behaviour/format';
 import { onMounted, ref, watch } from 'vue';
+import AdeTip from '../AdeTip.vue';
 import AdeRunLog from '../panel/AdeRunLog.vue';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import type { SessionView } from './sessionView';
@@ -30,6 +31,10 @@ watch(
   (on) => on && reveal(),
   { flush: 'post' },
 );
+
+function onResume(): void {
+  takeOver.resumeArchived(props.view.session.taskId, props.view.session.id);
+}
 
 function onTakeOver(): void {
   takeOver.request(props.view.session.id);
@@ -59,6 +64,19 @@ function onTakeOver(): void {
     >
       {{ t('common.action.takeOver.label') }}
     </Button>
+    <AdeTip v-else-if="view.session.agentSessionId" :text="t('space.ade.archived.resume.tooltip')">
+      <Button
+        ref="takeBtn"
+        variant="dialog"
+        size="kira"
+        class="shrink-0"
+        :pending="takeOver.pending.has(view.session.id)"
+        data-testid="ade-stopped-resume"
+        @click="onResume"
+      >
+        {{ t('common.action.resume.label') }}
+      </Button>
+    </AdeTip>
     <Button
       v-if="view.headless && view.session.runId"
       variant="link"

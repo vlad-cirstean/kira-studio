@@ -465,32 +465,42 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		}
 	}
 
-	dir, err := os.MkdirTemp("", "kira-review-")
-	if err != nil {
-		return deltaResult{}, fmt.Errorf("gitsession: create review temp dir: %w", err)
-	}
-	defer os.RemoveAll(dir)
-
-	oldPath, newPath := filepath.Join(dir, "old"), filepath.Join(dir, "new")
-	if err := os.WriteFile(oldPath, snapshot, 0o600); err != nil {
-		return deltaResult{}, fmt.Errorf("gitsession: write review snapshot: %w", err)
-	}
-	if err := os.WriteFile(newPath, currentContent, 0o600); err != nil {
-		return deltaResult{}, fmt.Errorf("gitsession: write review current content: %w", err)
-	}
-
-	res, err := e.runAllowingExit(ctx, porcelain.NoIndexDiffArgs(oldPath, newPath), 0, 1)
-	if err != nil {
-		return deltaResult{}, err
-	}
-	parsed, body, err := e.parseAndResolve(ctx, res.Stdout)
+	hunks, body, rawBytes, err := e.contentDelta(ctx, snapshot, currentContent)
 	if err != nil {
 		return deltaResult{}, err
 	}
 	return deltaResult{
-		Source: "slow", Hunks: parsed.Hunks, Body: body, CurrentOID: currentOID,
-		CurrentLineCount: countLines(currentContent), RawBytes: int64(len(res.Stdout)),
+		Source: "slow", Hunks: hunks, Body: body, CurrentOID: currentOID,
+		CurrentLineCount: countLines(currentContent), RawBytes: rawBytes,
 	}, nil
+}
+
+// contentDelta is the `diff --no-index` of two in-memory contents (old to new), parsed. The one
+// diff path for stored-snapshot vs current content: FileDelta's slow tier and uncommitted review.
+func (e *RepoEntry) contentDelta(ctx context.Context, oldContent, newContent []byte) ([]porcelain.DiffHunk, porcelain.FileDiffBody, int64, error) {
+	dir, err := os.MkdirTemp("", "kira-review-")
+	if err != nil {
+		return nil, porcelain.FileDiffBody{}, 0, fmt.Errorf("gitsession: create review temp dir: %w", err)
+	}
+	defer os.RemoveAll(dir)
+
+	oldPath, newPath := filepath.Join(dir, "old"), filepath.Join(dir, "new")
+	if err := os.WriteFile(oldPath, oldContent, 0o600); err != nil {
+		return nil, porcelain.FileDiffBody{}, 0, fmt.Errorf("gitsession: write review snapshot: %w", err)
+	}
+	if err := os.WriteFile(newPath, newContent, 0o600); err != nil {
+		return nil, porcelain.FileDiffBody{}, 0, fmt.Errorf("gitsession: write review current content: %w", err)
+	}
+
+	res, err := e.runAllowingExit(ctx, porcelain.NoIndexDiffArgs(oldPath, newPath), 0, 1)
+	if err != nil {
+		return nil, porcelain.FileDiffBody{}, 0, err
+	}
+	parsed, body, err := e.parseAndResolve(ctx, res.Stdout)
+	if err != nil {
+		return nil, porcelain.FileDiffBody{}, 0, err
+	}
+	return parsed.Hunks, body, int64(len(res.Stdout)), nil
 }
 
 // recordRanges returns rec's ranges in snapshot coordinates — Expand(rec.LineCount) for a "full"

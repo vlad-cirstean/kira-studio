@@ -533,6 +533,13 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 		return run, err
 	}
 	b.notifySessions()
+	b.sessionOps.put(sessionID, b.startSessionOp(b.ctx, opRebase, run.TaskID, agent.Label(), ""))
+	b.cancelRunOp(b.sessionOps.peek(sessionID), run.ID)
+	defer func() {
+		if !started {
+			b.finishRunOp(sessionID, outcome{state: model.AdeRunFailed, note: "The rebase did not start."})
+		}
+	}()
 	running := model.AdeRunRunning
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{State: &running, StartedAt: &now, SessionID: &sessionID})
 	if err != nil {
@@ -579,6 +586,7 @@ func (b *TaskBoard) settleRebase(runID, sessionID string, spec model.AdeRebaseSp
 		return
 	}
 	now := b.deps.Now().UnixMilli()
+	b.finishRunOp(sessionID, out)
 	if sessionID != "" {
 		if err := b.deps.Sessions.MarkStopped(sessionID, now); err != nil {
 			slog.Warn("ade: stop headless session", "scope", "ade", "session", sessionID, "err", err)

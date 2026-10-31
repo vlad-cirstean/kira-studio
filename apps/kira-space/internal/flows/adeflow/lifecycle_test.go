@@ -52,6 +52,7 @@ func TestArchiveRisk(t *testing.T) {
 	}
 	key := app.WindowMgr.Opened[len(app.WindowMgr.Opened)-1].Key
 
+	liveTitle := taskOf(t, board(t, app), f.taskID).Title
 	if err := app.W.AdeTask.ArchiveTask(ctx, adewire.TaskArgs{TaskID: f.taskID}); err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +65,9 @@ func TestArchiveRisk(t *testing.T) {
 	b := board(t, app)
 	if len(b.Tasks) != 0 || len(b.History) != 1 || b.History[0].TaskID != f.taskID {
 		t.Fatalf("board after archive: tasks %d, history %+v", len(b.Tasks), b.History)
+	}
+	if got := b.History[0].Title; got != liveTitle {
+		t.Fatalf("history title = %q, want the live title %q", got, liveTitle)
 	}
 	if tgt, err := app.W.AdeTask.ReviewWindowTarget(ctx, adewire.WindowKeyArgs{WindowKey: key}); err != nil || tgt != nil {
 		t.Fatalf("review target after archive = %+v, %v, want nil", tgt, err)

@@ -182,12 +182,15 @@ func TestScheduleHeadless(t *testing.T) {
 			t.Fatalf("log = %q", log)
 		}
 
-		update(t, app, rec, func(f *scripts.CustomScriptFields) { f.Command = "exit 3" })
+		update(t, app, rec, func(f *scripts.CustomScriptFields) { f.Command = "echo bad >&2; exit 3" })
 		rearmed(t, clock)
 		advance(t, clock, time.Minute)
 		failed := waitSched(t, app, rec.ID, 1, "failed")
 		if reasonOf(failed) != "exited with status 3" {
 			t.Fatalf("reason = %q", reasonOf(failed))
+		}
+		if failed.Outcome.OutputTail != "bad" {
+			t.Fatalf("outputTail = %q, want bad", failed.Outcome.OutputTail)
 		}
 	})
 

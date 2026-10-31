@@ -21,7 +21,7 @@ import Identifier from '@workbench/components/Identifier.vue';
 import { shortcutKeydown } from '@workbench/shortcuts/useShortcut';
 import { computed, onMounted, ref } from 'vue';
 import type { ReviewWindowTarget } from '../wire';
-import { reviewGate, useChangeRequestReview } from './useChangeRequestReview';
+import { headStale, reviewGate, useChangeRequestReview } from './useChangeRequestReview';
 
 type Mode = ChangeRequestReviewEvent | 'conversation';
 type OkState = Extract<ChangeRequestReviewState, { kind: 'ok' }>;
@@ -77,12 +77,7 @@ const canSubmit = computed(
     gate.value.enabled &&
     (!required.value || body.value.trim() !== ''),
 );
-const headDiffers = computed(
-  () =>
-    props.mode !== 'conversation' &&
-    live.value.localHeadSha !== '' &&
-    live.value.localHeadSha !== live.value.headSha,
-);
+const headDiffers = computed(() => props.mode !== 'conversation' && headStale(live.value));
 
 async function submit(): Promise<void> {
   if (!canSubmit.value) return;

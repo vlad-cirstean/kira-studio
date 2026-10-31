@@ -80,7 +80,7 @@
   --kira-bar-h: 34px;
   --kira-titlebar-h: 34px;
   --kira-tabbar-h: var(--kira-bar-h);
-  --kira-statusbar-h: 20px;
+  --kira-statusbar-h: 22px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
@@ -169,6 +169,24 @@
   --kira-conn-violet: #b296d2;
   --kira-conn-magenta: #cb8eb6;
   --kira-conn-grey: #9fa5ac;
+
+  /* P411 task status palette: oklch(0.78 0.11 h), grey and brown desaturated; at least 6.4:1 on --kira-bg-elevated. */
+  --kira-status-grey: #adb1b8;
+  --kira-status-brown: #c19c7f;
+  --kira-status-red: #f69b94;
+  --kira-status-orange: #eea471;
+  --kira-status-amber: #dcaf61;
+  --kira-status-yellow: #c8b962;
+  --kira-status-lime: #a7c474;
+  --kira-status-green: #82cb92;
+  --kira-status-teal: #59ceba;
+  --kira-status-cyan: #4fccd9;
+  --kira-status-sky: #64c4f0;
+  --kira-status-blue: #8eb8fe;
+  --kira-status-indigo: #a9b0fd;
+  --kira-status-violet: #c2a7f4;
+  --kira-status-purple: #d7a0e3;
+  --kira-status-pink: #ed9ac1;
 
   /* P17 D19: eight method-colour aliases, borrowed from the connection palette above rather than
      new hues — it was already tuned for "one lightness and one chroma for N things, so none

@@ -97,7 +97,6 @@
     "usedBy": 1,
     "workflow": {
       "id": "flow",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -162,7 +161,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -212,7 +211,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -252,7 +251,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -260,10 +259,13 @@
   },
   "AdeTaskService.Task#created": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "spec",
     "est": "",
+    "handoverDrafts": [],
+    "handoverIn": null,
     "hostLink": null,
     "hostUrl": "",
     "id": "<masked>",
@@ -275,6 +277,7 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "todo",
+    "statusStep": "",
     "title": "Fix login",
     "workflow": null,
     "workflowId": "flow",
@@ -282,10 +285,28 @@
   },
   "AdeTaskService.Task#done": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "done",
     "est": "",
+    "handoverDrafts": [],
+    "handoverIn": {
+      "body": "lgtm",
+      "createdAt": 0,
+      "dismissed": false,
+      "edited": false,
+      "finished": false,
+      "fromStepId": "review",
+      "fromStepName": "review",
+      "id": "<masked>",
+      "source": "run",
+      "state": "handed",
+      "taskId": "<masked>",
+      "toStepId": "release",
+      "toStepName": "release",
+      "updatedAt": 0
+    },
     "hostLink": null,
     "hostUrl": "",
     "id": "<masked>",
@@ -396,10 +417,10 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "done",
+    "statusStep": "done",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -464,7 +485,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -514,7 +535,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -554,7 +575,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -564,10 +585,13 @@
   },
   "AdeTaskService.Task#manual": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "spec",
     "est": "",
+    "handoverDrafts": [],
+    "handoverIn": null,
     "hostLink": null,
     "hostUrl": "",
     "id": "<masked>",
@@ -579,10 +603,10 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "todo",
+    "statusStep": "",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -647,7 +671,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -697,7 +721,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -737,7 +761,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -747,10 +771,28 @@
   },
   "AdeTaskService.Task#moved": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "implement",
     "est": "",
+    "handoverDrafts": [],
+    "handoverIn": {
+      "body": "summary-done",
+      "createdAt": 0,
+      "dismissed": false,
+      "edited": false,
+      "finished": false,
+      "fromStepId": "implement",
+      "fromStepName": "implement",
+      "id": "<masked>",
+      "source": "run",
+      "state": "handed",
+      "taskId": "<masked>",
+      "toStepId": "review",
+      "toStepName": "review",
+      "updatedAt": 0
+    },
     "hostLink": null,
     "hostUrl": "",
     "id": "<masked>",
@@ -827,10 +869,10 @@
     },
     "statusBy": "auto",
     "statusId": "in-progress",
+    "statusStep": "implement",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -895,7 +937,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -945,7 +987,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -985,7 +1027,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -995,10 +1037,28 @@
   },
   "AdeTaskService.Task#return": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "implement",
     "est": "",
+    "handoverDrafts": [],
+    "handoverIn": {
+      "body": "summary-done",
+      "createdAt": 0,
+      "dismissed": false,
+      "edited": false,
+      "finished": false,
+      "fromStepId": "implement",
+      "fromStepName": "implement",
+      "id": "<masked>",
+      "source": "run",
+      "state": "handed",
+      "taskId": "<masked>",
+      "toStepId": "review",
+      "toStepName": "review",
+      "updatedAt": 0
+    },
     "hostLink": null,
     "hostUrl": "",
     "id": "<masked>",
@@ -1169,10 +1229,10 @@
     },
     "statusBy": "auto",
     "statusId": "in-review",
+    "statusStep": "review",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -1237,7 +1297,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1287,7 +1347,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1327,7 +1387,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -1340,7 +1400,6 @@
     "fileName": "flow.yaml",
     "workflow": {
       "id": "flow",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -1405,7 +1464,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1455,7 +1514,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1495,7 +1554,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]

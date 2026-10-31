@@ -2,7 +2,7 @@
 import { cn } from '@theme/lib/utils';
 import { reactiveOmit } from '@vueuse/core';
 import type { TooltipContentEmits, TooltipContentProps } from 'reka-ui';
-import { TooltipArrow, TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui';
+import { TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
 import { type TooltipContentVariants, tooltipContentVariants } from '.';
 
@@ -19,7 +19,7 @@ const props = withDefaults(
   >(),
   {
     variant: 'default',
-    sideOffset: 0,
+    sideOffset: 4,
     collisionPadding: 4,
   },
 );
@@ -39,11 +39,6 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
       :class="cn(tooltipContentVariants({ variant }), props.class)"
     >
       <slot />
-
-      <TooltipArrow
-        v-if="variant === 'default'"
-        class="size-2.5 rotate-45 rounded-kira-xs bg-fg fill-fg z-(--kira-z-tooltip) -translate-y-1/2"
-      />
     </TooltipContent>
   </TooltipPortal>
 </template>

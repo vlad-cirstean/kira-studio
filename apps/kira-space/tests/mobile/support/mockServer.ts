@@ -44,9 +44,8 @@ interface State {
     me?: unknown;
     pair?: unknown;
     expired?: unknown;
-    backlog?: unknown;
     board?: unknown;
-    backlogItem?: unknown;
+    laterTask?: unknown;
   };
   pairWaiters: ServerResponse[];
   /** Outcome resolved before the phone's `POST /api/pair` arrived; the request answers on arrival. */
@@ -107,17 +106,8 @@ async function serveFile(res: ServerResponse, pathname: string): Promise<void> {
 // Canned answers for the phone's write routes; undefined means the path is not a write route.
 function writeReply(path: string, body: string): unknown {
   const args = body ? (JSON.parse(body) as Record<string, string>) : {};
-  if (path === '/api/ade/backlog/items')
-    return {
-      id: 'i-new',
-      text: args.text,
-      addedAt: 0,
-      jira: null,
-      hostUrl: '',
-      hostLink: null,
-      notes: '',
-    };
-  if (path === '/api/ade/backlog/move') return {};
+  if (path === '/api/ade/later/items') return { id: 't-new', title: args.title, notes: '' };
+  if (path === '/api/ade/shelf/move') return {};
   if (path === '/api/ade/tasks/step') return { taskId: args.taskId, stepId: args.stepId };
   if (path === '/api/ade/tasks/run') return { runIds: ['run-new'] };
   if (path === '/api/ade/tasks/launch') return { sessionId: 'sp22' };
@@ -235,8 +225,8 @@ export async function startMobileServer(): Promise<MobileServer> {
         json(
           res,
           200,
-          path === '/api/ade/backlog/items' && state.replies.backlogItem
-            ? state.replies.backlogItem
+          path === '/api/ade/later/items' && state.replies.laterTask
+            ? state.replies.laterTask
             : writeReply(path, body),
         );
       }
@@ -244,8 +234,6 @@ export async function startMobileServer(): Promise<MobileServer> {
       json(res, 200, AGENT_INFO['AgentService.Info']);
     } else if (path === '/api/agent/sessions' && method === 'GET') {
       json(res, 200, { sessions: state.agentSessions });
-    } else if (path === '/api/ade/backlog' && method === 'GET') {
-      json(res, 200, state.replies.backlog ?? fixture('backlog'));
     } else if (path === '/api/ade/board' && method === 'GET' && state.replies.board) {
       json(res, 200, state.replies.board);
     } else if (path in reads && method === 'GET') {

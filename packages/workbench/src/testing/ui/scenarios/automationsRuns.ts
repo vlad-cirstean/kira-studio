@@ -137,7 +137,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
     await expect(
       page.locator(`[data-testid="script-${SCRIPT.id}"] [data-testid="script-running"]`),
     ).toBeVisible();
-    await expect(page.locator('[data-testid="status-runs"]')).toContainText('Running: 1');
+    await expect(page.locator('[data-testid="status-runs"]')).toContainText('1 running');
     await expect(page.locator('[data-testid="run-row"][data-state="running"]')).toHaveCount(1);
     await expect(
       page.locator('[data-testid="script-run-strip"] [data-testid="run-status"]'),
@@ -145,9 +145,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
 
     await emitWailsEvent(page, IPC.scriptRunsChanged, run(terminalId, 'done'));
     await expect(page.locator('[data-testid="status-runs"]')).toHaveCount(0);
-    await expect(
-      page.locator('[data-testid="run-row"][data-state="done"] [data-testid="run-status"]'),
-    ).toHaveText('Succeeded');
+    await expect(page.locator('[data-testid="run-row"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="script-run-outcome"]')).toBeVisible();
     await expect(page.locator('[data-testid="tab-badge"]')).toHaveCount(1);
   });
@@ -258,23 +256,6 @@ export function registerRunsScenarios(env: Env, options: Options): void {
     await expect(dialog.locator('[data-testid="script-dialog-home-notice"]')).toHaveCount(0);
   });
 
-  test('the Runs filter narrows to failed runs', async ({ relaunch }) => {
-    const rows = [
-      run('t-a', 'done', { id: 'r-a', createdAt: 3_000 }),
-      run('t-b', 'failed', { id: 'r-b', createdAt: 2_000 }),
-    ];
-    const { window: page } = await relaunch({
-      control: [...BASE, { channel: IPC.scriptRunsList, response: rows }],
-    });
-    await modeTab(page).click();
-    await expect(page.locator('[data-testid="run-row"]')).toHaveCount(2);
-    await page.locator('[data-testid="runs-filter-failed"]').click();
-    await expect(page.locator('[data-testid="run-row"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="run-row"]')).toHaveAttribute('data-state', 'failed');
-    await page.locator('[data-testid="runs-filter-running"]').click();
-    await expect(page.locator('[data-testid="runs-empty"]')).toBeVisible();
-  });
-
   // Contract automations. Backend half: termflow TestScriptRunLifecycle, TestScriptRunNonZeroExit and
   // TestScriptRunStopAndClose store the script and its finished run for each outcome.
   const CONTRACT_OUTCOMES = [
@@ -321,7 +302,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
         outcome: null,
         finishedAt: null,
       });
-      await expect(page.locator('[data-testid="status-runs"]')).toContainText('Running: 1');
+      await expect(page.locator('[data-testid="status-runs"]')).toContainText('1 running');
       await emitWailsEvent(page, IPC.scriptRunsChanged, {
         ...finished,
         ...times,

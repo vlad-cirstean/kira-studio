@@ -9,8 +9,7 @@ export interface LinkPatch {
   hostUrl?: string;
 }
 
-/** Validation and write wiring of the Jira and git host link fields, shared by the task panel and the
- *  backlog panel. `write` resolves with an error message, or `null` on success. */
+/** Validation and write wiring of the Jira and git host link fields, of the task panel. `write` resolves with an error message, or `null` on success. */
 export function useLinkFields(
   hostLink: () => HostLink | null,
   write: (patch: LinkPatch) => Promise<string | null>,

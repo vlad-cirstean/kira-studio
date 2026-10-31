@@ -136,6 +136,49 @@ test('a pushed kira:app:metrics sample renders CPU and memory in the status bar'
 
   await expect(window.locator('[data-testid="app-metrics"]')).toBeVisible();
   await expect(window.locator('[data-testid="app-metrics-cpu"]')).toHaveText('3.4%');
+
+  const family = (selector: string) =>
+    window
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).fontFamily);
+  expect(await family('[data-testid="app-metrics-cpu"]')).toBe(await family('body'));
+
+  const trigger = window.locator('[data-testid="app-metrics"]');
+  await trigger.hover();
+  await expect(window.locator('[data-testid="tooltip-details-title"]')).toHaveText(
+    'Kira Space resource use',
+  );
+  const row = (label: string) =>
+    window.locator(`[data-testid="tooltip-details-row"][data-label="${label}"]`);
+  await expect(row('CPU')).toContainText('3.4% of total capacity');
+  await expect(row('Cores')).toContainText('8');
+  await expect(row('Memory')).toContainText('512');
+  await expect(row('Processes')).toContainText('2');
+  await expect(window.locator('[data-testid="tooltip-details-hint"]')).toHaveText(
+    'Includes helper processes. Updates every 5 seconds.',
+  );
+
+  // The tooltip sits on the elevated ground, draws no arrow and keeps off its trigger.
+  const tipSel = '[data-slot="tooltip-content"][data-variant="default"]';
+  const ground = await window.evaluate((sel) => {
+    const probe = document.createElement('div');
+    probe.style.backgroundColor = 'var(--kira-bg-elevated)';
+    document.body.appendChild(probe);
+    const elevated = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const el = document.querySelector(sel);
+    return { elevated, actual: el ? getComputedStyle(el).backgroundColor : '' };
+  }, tipSel);
+  expect(ground.actual).toBe(ground.elevated);
+  await expect(window.locator('[data-slot="tooltip-content"] svg')).toHaveCount(0);
+  const [tip, box] = await Promise.all([
+    window.locator(tipSel).boundingBox(),
+    trigger.boundingBox(),
+  ]);
+  if (!(tip && box)) throw new Error('tooltip or trigger not laid out');
+  const gap = Math.max(box.y - (tip.y + tip.height), tip.y - (box.y + box.height));
+  expect(gap).toBeGreaterThanOrEqual(4);
 });
 
 test('kira:menu:openSettings opens the Settings dialog', async ({ relaunch }) => {

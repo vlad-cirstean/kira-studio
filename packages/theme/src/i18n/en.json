@@ -113,6 +113,14 @@
         "error": "Repeat is required."
       }
     },
+    "ops": {
+      "openRun": {
+        "label": "Open run"
+      },
+      "triggerManual": {
+        "label": "Manual run"
+      }
+    },
     "panel": {
       "add": {
         "tooltip": "New…"
@@ -281,13 +289,13 @@
     },
     "runs": {
       "none": {
-        "emptyHint": "No runs."
+        "emptyHint": "No automation is running. Finished runs are in the operations panel."
       },
       "running": {
         "label": "Running: {count}"
       },
-      "title": {
-        "label": "Runs"
+      "showHistory": {
+        "label": "Show history"
       }
     },
     "schedule": {
@@ -997,15 +1005,27 @@
       }
     },
     "prompt": {
+      "branchRequest": {
+        "title": "Approve branches · {task}"
+      },
       "count": {
+        "branchRequest": {
+          "title": "{count} branch requests wait for approval"
+        },
         "dbMcp": {
           "title": "{count} queries wait for approval"
         },
         "gitCredential": {
           "title": "{count} Git credential requests wait"
         },
+        "handover": {
+          "title": "{count} tasks are ready to move on"
+        },
         "mobilePairing": {
           "title": "{count} phones ask for access"
+        },
+        "proof": {
+          "title": "{count} validation proofs are ready"
         },
         "schedule": {
           "title": "{count} scripts wait for confirmation"
@@ -1032,6 +1052,9 @@
       "gitCredentialNamed": {
         "title": "Git needs a credential · {repository}"
       },
+      "handover": {
+        "title": "Move {task} to the next stage"
+      },
       "mobilePairing": {
         "title": "A phone asks for access"
       },
@@ -1040,6 +1063,12 @@
       },
       "open": {
         "body": "Open Kira {app} to answer."
+      },
+      "proof": {
+        "title": "Validation proof ready · {name}"
+      },
+      "proofEdit": {
+        "title": "Validation proof changed · {name}"
       },
       "quit": {
         "title": "Kira {app} waits to quit"
@@ -1067,9 +1096,6 @@
     },
     "space": {
       "ade": {
-        "backlogGone": {
-          "body": "That backlog item no longer exists."
-        },
         "branchMissing": {
           "body": "That branch no longer exists."
         },
@@ -1085,11 +1111,17 @@
         "branchOnTask": {
           "body": "That branch is already on a task."
         },
+        "branchRequestGone": {
+          "body": "This branch request was already answered."
+        },
         "estimateInvalid": {
           "body": "Enter an estimate like 2h or 3d."
         },
         "estimateTooLong": {
           "body": "An estimate can be at most 480h or 60d."
+        },
+        "handoverTooLong": {
+          "body": "The handover notes are too long."
         },
         "jiraKeyInvalid": {
           "body": "That Jira key isn’t valid."
@@ -1217,6 +1249,9 @@
         "workflowUnreadable": {
           "body": "Can’t read the file ({detail})."
         },
+        "workingChanged": {
+          "body": "The file changed while you reviewed it. Refresh the diff."
+        },
         "yamlTooLarge": {
           "body": "The workflow file is too large."
         }
@@ -1228,11 +1263,20 @@
         "bareRepo": {
           "body": "A bare repository has no files to browse."
         },
+        "fileChanged": {
+          "body": "The file changed on disk. Refresh it or overwrite it."
+        },
+        "notRegularFile": {
+          "body": "That path isn’t a regular file."
+        },
         "notRepo": {
           "body": "That folder isn’t a Git repository."
         },
         "repoNotFound": {
           "body": "That repository isn’t in the workspace."
+        },
+        "saveTooLarge": {
+          "body": "The file is too large to save."
         },
         "workspaceClosed": {
           "body": "The workspace was closed. Reopen it and retry."
@@ -1799,6 +1843,20 @@
           "body": "Unsupported URL scheme: {scheme}."
         }
       },
+      "proof": {
+        "notPng": {
+          "body": "The screenshot is not a PNG image."
+        },
+        "tooLarge": {
+          "body": "The screenshot is too large to save."
+        },
+        "unavailable": {
+          "body": "The proof window is not available."
+        },
+        "window": {
+          "title": "Validation proof"
+        }
+      },
       "query": {
         "notFound": {
           "body": "This saved query no longer exists."
@@ -2117,6 +2175,9 @@
       "blue": {
         "label": "Blue"
       },
+      "brown": {
+        "label": "Brown"
+      },
       "cyan": {
         "label": "Cyan"
       },
@@ -2126,14 +2187,38 @@
       "grey": {
         "label": "Grey"
       },
+      "indigo": {
+        "label": "Indigo"
+      },
+      "lime": {
+        "label": "Lime"
+      },
       "magenta": {
         "label": "Magenta"
+      },
+      "orange": {
+        "label": "Orange"
+      },
+      "pink": {
+        "label": "Pink"
       },
       "purple": {
         "label": "Purple"
       },
       "red": {
         "label": "Red"
+      },
+      "sky": {
+        "label": "Sky"
+      },
+      "teal": {
+        "label": "Teal"
+      },
+      "violet": {
+        "label": "Violet"
+      },
+      "yellow": {
+        "label": "Yellow"
       }
     },
     "command": {
@@ -2623,6 +2708,9 @@
       },
       "running": {
         "status": "Running"
+      },
+      "runningCount": {
+        "status": "{count} running"
       },
       "unsavedChanges": {
         "status": "Unsaved changes"
@@ -3234,9 +3322,6 @@
       "showStopped": {
         "label": "Show stopped"
       },
-      "summary": {
-        "label": "{running} running"
-      },
       "summaryStopped": {
         "label": "{running} running · {stopped} stopped"
       },
@@ -3549,8 +3634,11 @@
       "open": {
         "aria": "Open {changeRequestNoun} #{number} on {label}"
       },
+      "state": {
+        "label": "State"
+      },
       "summary": {
-        "tooltip": "#{number} {title} — {state}"
+        "tooltip": "#{number} {title}"
       }
     },
     "commit": {
@@ -4173,8 +4261,11 @@
       "parentNoSubject": {
         "label": "Parent {number} · {sha}"
       },
+      "renamed": {
+        "tooltip": "Renamed from {from} to {to}"
+      },
       "similar": {
-        "tooltip": "{percent}% similar — {from} → {to}"
+        "tooltip": "{percent}% similar"
       },
       "tree": {
         "aria": "File tree"
@@ -4842,7 +4933,7 @@
     },
     "refBadge": {
       "changeRequestMore": {
-        "tooltip": "{title} — {state} (and {count} more)"
+        "tooltip": "And {count} more"
       }
     },
     "review": {
@@ -4953,6 +5044,9 @@
           "label": "{count} commit | {count} commits"
         }
       },
+      "committed": {
+        "title": "Committed"
+      },
       "empty": {
         "body": "“{branch}” adds no commits to “{base}”."
       },
@@ -5029,6 +5123,9 @@
       "resolving": {
         "loading": "Resolving comparison…"
       },
+      "reviewedCount": {
+        "label": "{reviewed} of {total} reviewed"
+      },
       "stale": {
         "status": "This comparison has changed"
       },
@@ -5042,7 +5139,7 @@
         "body": "“{branch}” and “{base}” share no common history."
       },
       "working": {
-        "hint": "Not committed yet. Not part of the review marks."
+        "hint": "Not committed yet. Reviewed separately; checks and comments move to the committed list once the lines are committed."
       }
     },
     "search": {
@@ -5411,6 +5508,20 @@
       "body": "The default text changed after this edit was saved. Review the diff."
     },
     "entry": {
+      "adeHandoverBlock": {
+        "description": "The handover text the previous stage left for the next one, under a heading that names that stage.",
+        "title": "Handover block",
+        "usedBy": {
+          "body": "Included in the step, manual step, review and start messages when the task has a handover for the stage."
+        }
+      },
+      "adeHandoverLine": {
+        "description": "Tells an interactive session to call the handover tool with notes for the next stage.",
+        "title": "Handover instruction",
+        "usedBy": {
+          "body": "Ends the manual step, review and start messages."
+        }
+      },
       "adeJiraLine": {
         "description": "The Jira key and link line of a launch message.",
         "title": "Jira line",
@@ -5509,6 +5620,27 @@
           "body": "Sent to {agent} when it connects to the database MCP server."
         }
       },
+      "headlessArtifactsHeader": {
+        "description": "Opens the artifact list a finishing call returns.",
+        "title": "Artifacts list heading",
+        "usedBy": {
+          "body": "Returned to the agent after finish_step on a Kira Space task or a finished handover."
+        }
+      },
+      "headlessArtifactsMore": {
+        "description": "Ends the artifact list when it holds more than the reply shows.",
+        "title": "Artifacts list cut short",
+        "usedBy": {
+          "body": "Returned to the agent after the artifact list when it is cut short."
+        }
+      },
+      "headlessArtifactsUnavailable": {
+        "description": "Replaces the artifact list when it can’t be read.",
+        "title": "Artifacts unavailable",
+        "usedBy": {
+          "body": "Returned to the agent after finish_step or a finished handover when listing fails."
+        }
+      },
       "headlessFinishStepAck": {
         "description": "The reply to a finish_step call. It tells the agent to stop.",
         "title": "Finish step reply",
@@ -5521,6 +5653,13 @@
         "title": "Finish step instruction",
         "usedBy": {
           "body": "Ends every ADE step prompt and every resumed step message."
+        }
+      },
+      "headlessHandoverAck": {
+        "description": "The reply to a handover call.",
+        "title": "Handover result",
+        "usedBy": {
+          "body": "Returned to the agent after it records handover notes."
         }
       },
       "headlessRebaseReportSuffix": {
@@ -5552,17 +5691,17 @@
         }
       },
       "headlessSpaceInstructions": {
-        "description": "Tells the agent the order to use the Kira Space tools. It reads the task, declares repositories, then branches.",
+        "description": "Tells the agent the order to use the Kira Space tools. It reads the task, declares repositories, then asks the user for branches.",
         "title": "Kira Space tools instructions",
         "usedBy": {
           "body": "Sent to {agent} when a run connects to the Kira Space tools server."
         }
       },
       "headlessSpaceSuffix": {
-        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branch.",
+        "description": "Lists the Kira Space tools and tells the agent to create branches only through request_branches, which the user approves.",
         "title": "Kira Space tools notice",
         "usedBy": {
-          "body": "Added before the finish instruction when a workflow turns the Kira Space tools on."
+          "body": "Added before the finish instruction of every agent step and smart step, and to the first message of manual, review and start sessions."
         }
       },
       "memoryDataHygiene": {
@@ -5762,6 +5901,9 @@
       "cause": {
         "description": "The reason the notice appears."
       },
+      "changeRequestURL": {
+        "description": "The pull or merge request link of the branch. Empty when it has none."
+      },
       "context": {
         "description": "Extra lines added after the prompt, one per entry."
       },
@@ -5930,7 +6072,7 @@
       },
       "groupKind": {
         "document": {
-          "label": "Document"
+          "label": "Documentation"
         },
         "thread": {
           "label": "Thread"
@@ -6444,28 +6586,30 @@
   },
   "mobile": {
     "backlog": {
-      "add": {
-        "placeholder": "Add to the backlog"
-      },
       "handle": {
         "aria": "Drag to reorder"
-      },
-      "list": {
-        "emptyHint": "Items added here or in Kira Space appear here."
-      },
-      "loadError": {
-        "error": "Couldn’t load the backlog."
-      },
-      "notes": {
-        "empty": "No notes"
-      },
-      "writeOff": {
-        "hint": "Adding and reordering are off for this phone."
       }
     },
     "http": {
       "unreachable": {
         "error": "Can’t reach Kira Space."
+      }
+    },
+    "later": {
+      "backlogEmpty": {
+        "empty": "Nothing on the backlog yet"
+      },
+      "laterEmpty": {
+        "empty": "Nothing in later yet"
+      },
+      "loadError": {
+        "error": "Couldn’t load the tasks."
+      },
+      "notes": {
+        "empty": "No notes"
+      },
+      "writeOff": {
+        "hint": "Adding and moving are off for this phone."
       }
     },
     "needs": {
@@ -6551,6 +6695,9 @@
         "body": "Move “{title}” forward to {step}.",
         "confirm": "Move forward",
         "title": "Move forward?"
+      },
+      "notes": {
+        "label": "Handover notes (optional)"
       },
       "noWorkflow": {
         "empty": "No workflow"
@@ -6953,21 +7100,89 @@
         "comments": {
           "label": "Review comments ({count})"
         },
-        "filter": {
-          "placeholder": "Filter archived tasks"
-        },
-        "list": {
-          "aria": "Archived tasks",
-          "empty": "Nothing archived yet"
-        },
         "restore": {
           "hint": "Restore to edit."
         },
-        "select": {
-          "emptyHint": "Select an archived task to see what it kept."
+        "resume": {
+          "tooltip": "Restores the task, then continues this session"
         },
         "snapshot": {
           "hint": "Taken when the task was archived."
+        }
+      },
+      "artifacts": {
+        "add": {
+          "label": "Add artifact"
+        },
+        "empty": {
+          "body": "No artifacts yet. Branches, pull requests and deployments show up as the task produces them."
+        },
+        "gap": {
+          "body": "Couldn’t read {source} for {repo}. The list may be incomplete.",
+          "changeRequestsFailed": {
+            "body": "Couldn’t search the code host for pull requests of {source}. The list may be incomplete."
+          },
+          "changeRequestsMissing": {
+            "body": "{source} counts {count} more pull request than found here. Links made only in commit messages aren’t found. | {source} counts {count} more pull requests than found here. Links made only in commit messages aren’t found."
+          },
+          "changeRequestsUnauthenticated": {
+            "body": "Searching for pull requests needs a sign-in to the code host. Sign in from settings, under CLI tools."
+          },
+          "changeRequestsUnavailable": {
+            "body": "Searching for pull requests needs the code host command line tool. Set it up in settings, under CLI tools."
+          },
+          "notFound": {
+            "body": "{source} has no such issue, or you don’t have access to it."
+          },
+          "otherSite": {
+            "body": "This link is on a different {source} site than the one you’re signed in to."
+          },
+          "timeout": {
+            "body": "{source} didn’t answer in time. The list may be incomplete."
+          },
+          "unauthenticated": {
+            "body": "You’re not signed in to {source}. Sign in from settings, under CLI tools."
+          },
+          "unavailable": {
+            "body": "The {source} command line tool isn’t installed. Set it up in settings, under CLI tools."
+          }
+        },
+        "gapNoRepo": {
+          "body": "Couldn’t read {source}. The list may be incomplete."
+        },
+        "kind": {
+          "deployment": {
+            "label": "Deployment"
+          },
+          "doc": {
+            "label": "Doc file"
+          },
+          "link": {
+            "label": "Web link"
+          }
+        },
+        "ref": {
+          "label": "Reference"
+        },
+        "remove": {
+          "tooltip": "Remove artifact"
+        },
+        "stageDone": {
+          "label": "Produced by this task"
+        },
+        "status": {
+          "local": {
+            "status": "Local only"
+          },
+          "pushed": {
+            "status": "Pushed"
+          }
+        },
+        "title": {
+          "title": "Artifacts"
+        },
+        "url": {
+          "label": "Web address"
         }
       },
       "automation": {
@@ -6976,48 +7191,6 @@
         },
         "none": {
           "empty": "No automations yet"
-        }
-      },
-      "backlog": {
-        "add": {
-          "label": "Add to backlog",
-          "placeholder": "Type a thought and press Enter"
-        },
-        "added": {
-          "announce": "Added to backlog"
-        },
-        "captured": {
-          "label": "Captured {ago}"
-        },
-        "deleteConfirm": {
-          "body": "Deletes “{text}” from the backlog. This can’t be undone.",
-          "title": "Delete backlog item?"
-        },
-        "intro": {
-          "hint": "Get it out of your head and order it later, most important first. Nothing here is on the plan yet."
-        },
-        "item": {
-          "label": "Backlog item"
-        },
-        "jira": {
-          "placeholder": "Paste a Jira link or key"
-        },
-        "link": {
-          "placeholder": "Paste a {labels} {shorts} or issue link"
-        },
-        "notPlanned": {
-          "label": "Backlog · not planned"
-        },
-        "promotePanel": {
-          "label": "→ Plan as task",
-          "tooltip": "Turn into a task in the spec phase, unscheduled"
-        },
-        "promoteRow": {
-          "label": "→ Task",
-          "tooltip": "Turn into a task, unscheduled"
-        },
-        "selectHint": {
-          "hint": "Select an item to add links and notes."
         }
       },
       "baseMarker": {
@@ -7316,6 +7489,9 @@
           "markNotMerging": {
             "label": "Mark as not merging"
           },
+          "moveBacklog": {
+            "label": "Move to backlog"
+          },
           "moveLater": {
             "label": "Move to later"
           },
@@ -7424,6 +7600,39 @@
           "status": "Up to date"
         }
       },
+      "branchRequest": {
+        "approve": {
+          "label": "Approve ({count})"
+        },
+        "item": {
+          "branch": {
+            "label": "New branch from {base}"
+          },
+          "branchMain": {
+            "label": "New branch from the repository’s main branch"
+          },
+          "worktree": {
+            "label": "Worktree for {branch}"
+          }
+        },
+        "naming": {
+          "hint": "Kira Space names new branches kira/ plus a random ID. The agent then works in the worktrees."
+        },
+        "source": {
+          "automation": {
+            "label": "Automation"
+          },
+          "run": {
+            "label": "Run · {step}"
+          },
+          "session": {
+            "label": "Session · {step}"
+          }
+        },
+        "title": {
+          "title": "Branches for {task}"
+        }
+      },
       "changes": {
         "uncommitted": {
           "label": "Uncommitted"
@@ -7480,6 +7689,29 @@
         "body": "Replaces the remote branch “{branch}” in {repo} with your local one. Refused when someone else pushed since your last fetch.",
         "title": "Force push?"
       },
+      "handover": {
+        "draftFrom": {
+          "label": "{from} (open)"
+        },
+        "edit": {
+          "tooltip": "Edit handover"
+        },
+        "empty": {
+          "body": "No handovers yet. The notes a stage leaves for the next show here."
+        },
+        "finished": {
+          "status": "Ready to hand over"
+        },
+        "fromTo": {
+          "label": "{from} to {to}"
+        },
+        "moveOn": {
+          "label": "Move on…"
+        },
+        "title": {
+          "title": "Handovers"
+        }
+      },
       "header": {
         "created": {
           "label": "Created when the pipeline runs"
@@ -7503,6 +7735,21 @@
         },
         "takeOver": {
           "tooltip": "Continue this run yourself in an interactive {product} session"
+        }
+      },
+      "later": {
+        "add": {
+          "label": "Add to later",
+          "placeholder": "Type a task and press Enter"
+        },
+        "added": {
+          "announce": "Added to later"
+        },
+        "intro": {
+          "hint": "Tasks taken off the plan wait here. Later is next in line; backlog holds work that may never be picked up. Drag a task between the lists or reorder it."
+        },
+        "laterEmpty": {
+          "empty": "Nothing in later yet. Drag tasks here"
         }
       },
       "link": {
@@ -7757,6 +8004,11 @@
         }
       },
       "plan": {
+        "band": {
+          "further": {
+            "label": "Further out"
+          }
+        },
         "branchRow": {
           "menuTitle": {
             "label": "{name} in {repo}"
@@ -7776,6 +8028,15 @@
           },
           "open": {
             "aria": "Open {title}"
+          },
+          "sessionsFinished": {
+            "tooltip": "Agent finished, no session working"
+          },
+          "sessionsInput": {
+            "tooltip": "An agent needs your input"
+          },
+          "sessionsRunning": {
+            "tooltip": "{count} agent session running | {count} agent sessions running"
           }
         },
         "header": {
@@ -7789,6 +8050,9 @@
         "history": {
           "current": {
             "label": "Current work"
+          },
+          "find": {
+            "label": "Find archived task"
           },
           "goTo": {
             "label": "Go to"
@@ -7821,14 +8085,14 @@
           "collapse": {
             "label": "Show only the first {count} again"
           },
+          "historyDays": {
+            "tooltip": "{tasks} in the last day | {tasks} in the last {count} days"
+          },
+          "historyWeeks": {
+            "tooltip": "{tasks} in the last week | {tasks} in the last {count} weeks"
+          },
           "loadAll": {
             "label": "Load all items · {count} more"
-          },
-          "loadHistoryDays": {
-            "label": "Load history · {tasks} in the last day | Load history · {tasks} in the last {count} days"
-          },
-          "loadHistoryWeeks": {
-            "label": "Load history · {tasks} in the last week | Load history · {tasks} in the last {count} weeks"
           },
           "loading": {
             "loading": "Loading board…"
@@ -8057,8 +8321,12 @@
           "base": {
             "label": "Base {base}"
           },
+          "headCurrent": {
+            "hint": "Your local branch is at the {short} head.",
+            "label": "At {short} head"
+          },
           "uncommitted": {
-            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review.",
+            "hint": "{count} uncommitted change in the worktree, reviewed in the uncommitted section. | {count} uncommitted changes in the worktree, reviewed in the uncommitted section.",
             "label": "{count} uncommitted | {count} uncommitted"
           }
         },
@@ -8074,6 +8342,9 @@
           }
         },
         "working": {
+          "markRefused": {
+            "body": "The file changed on disk, so the mark was not saved. Reloaded; mark it again."
+          },
           "right": {
             "label": "Working tree"
           }
@@ -8149,8 +8420,17 @@
         }
       },
       "runDialog": {
+        "branchName": {
+          "placeholder": "Empty means the agent asks you for one"
+        },
+        "handover": {
+          "label": "Handover from {stage}"
+        },
         "smartMissing": {
           "error": "This smart script was not found."
+        },
+        "taskNotes": {
+          "label": "Task notes"
         },
         "title": {
           "title": "Run {step} in the background"
@@ -8244,33 +8524,68 @@
           "label": "Worktree setup"
         }
       },
+      "stageDialog": {
+        "from": {
+          "label": "Leaving {stage}"
+        },
+        "notes": {
+          "hint": "The next stage’s agent and sessions read these. Leave empty to pass nothing on.",
+          "label": "Handover notes",
+          "placeholder": "What the next stage needs to know"
+        },
+        "target": {
+          "label": "Move to"
+        },
+        "title": {
+          "title": "Move {task}"
+        }
+      },
       "statuses": {
         "add": {
           "label": "Add status"
         },
-        "category": {
-          "active": {
-            "label": "In progress"
+        "defaults": {
+          "description": "A workflow step can set its own status. These apply when it does not.",
+          "finished": {
+            "hint": "Keep current status leaves the task as it is.",
+            "label": "When the workflow finishes"
           },
-          "description": "Each status counts as one of four kinds of progress. Every kind needs at least one status.",
-          "label": "Counts as",
+          "keep": {
+            "label": "Keep current status"
+          },
+          "new": {
+            "hint": "Also used when a task goes back to its first step before anything ran.",
+            "label": "New tasks start in"
+          },
           "review": {
-            "label": "In review"
+            "hint": "Review steps and new review tasks.",
+            "label": "When a review starts"
           },
-          "todo": {
-            "label": "To do"
-          }
+          "step": {
+            "hint": "Unless the step picks its own status in the workflow.",
+            "label": "When a step starts"
+          },
+          "title": "Automatic changes"
         },
         "delete": {
           "tooltip": "Delete status"
         },
         "deleteDialog": {
-          "body": "{count} tasks are in {status}. Move them to another status first.",
-          "title": "Delete status and move its tasks"
+          "body": "Choose the status its tasks move to, archived tasks included.",
+          "defaults": {
+            "body": "Automatic changes using it: {slots}. They move to the same status."
+          },
+          "steps": {
+            "body": "{count} workflow step names it and uses its default instead. | {count} workflow steps name it and use their default instead."
+          },
+          "tasks": {
+            "body": "{count} task has it. | {count} tasks have it."
+          },
+          "title": "Delete {status}"
         },
-        "description": "Statuses a task moves through. Workflow steps set one automatically; you can move a task by hand at any time.",
-        "lastOfCategory": {
-          "tooltip": "Each category needs one status"
+        "description": "Statuses are labels for where a task stands. Kira reads nothing into a name, colour or order. It changes a task’s status only at the moments set below, and you can always move a task by hand. Editing a status never changes the tasks that have it.",
+        "lastOne": {
+          "tooltip": "Keep at least one status"
         },
         "newName": {
           "label": "New status"
@@ -8376,6 +8691,22 @@
       "takeOverTaskConfirm": {
         "body": "“{step}” is still running. Taking over stops it, marks it stuck and continues it in {product}."
       },
+      "taskLaunch": {
+        "agent": {
+          "label": "{agent} session"
+        },
+        "reason": {
+          "noWorktree": {
+            "label": "No worktree yet"
+          },
+          "sessionOpen": {
+            "label": "Session open"
+          }
+        },
+        "trigger": {
+          "tooltip": "New terminal or agent session"
+        }
+      },
       "taskPanel": {
         "reviewNote": {
           "body": "{owner}’s work. Read-only here; you can keep your own notes."
@@ -8429,8 +8760,23 @@
             "aria": "Repository and branch actions"
           }
         },
+        "branchRequest": {
+          "label": "Branch request",
+          "status": "An agent waits for your approval"
+        },
+        "handover": {
+          "label": "Handover"
+        },
         "issue": {
           "label": "Issue"
+        },
+        "issueLine": {
+          "prs": {
+            "label": "{count} pull request | {count} pull requests"
+          },
+          "prsNone": {
+            "label": "No pull requests"
+          }
         },
         "jiraPlaceholder": {
           "placeholder": "Paste Jira link or key"
@@ -8480,12 +8826,6 @@
         },
         "outdatedHint": {
           "hint": "This task runs the version of the workflow it started with."
-        },
-        "spaceTools": {
-          "label": "Kira Space tools"
-        },
-        "spaceToolsHint": {
-          "hint": "Agents in this workflow can declare repositories and request branches."
         }
       },
       "workflowDiscardConfirm": {
@@ -8548,10 +8888,6 @@
           "resize": {
             "aria": "Resize inspector"
           },
-          "spaceTools": {
-            "label": "Kira Space tools for agents",
-            "tooltip": "Agent steps can declare repositories on the task and request branches and worktrees through Kira Space"
-          },
           "stepMenu": {
             "aria": "Step actions"
           },
@@ -8589,6 +8925,9 @@
           },
           "new": {
             "label": "New workflow"
+          },
+          "statuses": {
+            "label": "Task statuses"
           },
           "usedBy": {
             "label": "Used by {count} task | Used by {count} tasks"
@@ -8759,8 +9098,14 @@
           "status": {
             "label": "Task status while in this step"
           },
+          "statusDefault": {
+            "label": "Default ({status})"
+          },
+          "statusDefaultKeep": {
+            "label": "Default (keep current status)"
+          },
           "statusMissing": {
-            "label": "{id} (missing, uses {fallback})"
+            "label": "{id} is deleted; uses the default ({status})"
           },
           "tools": {
             "example": "Bash(git *), Edit",
@@ -8833,7 +9178,7 @@
         "label": "Backlog"
       },
       "backlogEmpty": {
-        "empty": "No backlog items yet"
+        "empty": "Nothing on the backlog yet. Drag tasks here"
       },
       "base": {
         "label": "Base"
@@ -8920,8 +9265,29 @@
       }
     },
     "operations": {
+      "background": {
+        "label": "Background"
+      },
       "clearHint": {
-        "hint": "Clears this window’s list only. The log resets when Kira Space quits."
+        "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
+      },
+      "copiedDetails": {
+        "announce": "Copied details"
+      },
+      "copyDetails": {
+        "label": "Copy details"
+      },
+      "module": {
+        "label": "Module"
+      },
+      "repeat": {
+        "label": "×{count}"
+      },
+      "step": {
+        "label": "{argv} · exit {exit} · {duration}"
+      },
+      "via": {
+        "label": "Via {tool}"
       }
     },
     "repo": {
@@ -8934,6 +9300,9 @@
         },
         "openInGraph": {
           "label": "Open blame commit in graph"
+        },
+        "reveal": {
+          "hint": "Click to show the commit."
         },
         "uncommitted": {
           "tooltip": "Not committed yet"
@@ -9058,6 +9427,17 @@
         "script": {
           "aria": "Deployed SHA script",
           "example": "curl -s https://…/version"
+        }
+      },
+      "file": {
+        "changedOnDisk": {
+          "body": "This file changed on disk since you started editing."
+        },
+        "deletedOnDisk": {
+          "body": "This file was deleted on disk since you started editing."
+        },
+        "notUtf8": {
+          "error": "This file’s text encoding isn’t supported for editing."
         }
       },
       "heads": {
@@ -9256,11 +9636,11 @@
         }
       },
       "agentUsage": {
-        "fiveHourLong": {
-          "label": "Five-hour"
+        "limits": {
+          "tooltip": "{product} usage limits"
         },
         "line": {
-          "status": "{window}: {percent}% used · resets {when} (in {left})"
+          "status": "{percent}% used, resets in {left} ({when})"
         },
         "readFailed": {
           "error": "Couldn’t read the usage limits."
@@ -9268,11 +9648,14 @@
         "session": {
           "label": "Session"
         },
+        "sessionWindow": {
+          "label": "Session (5-hour)"
+        },
         "sourceRun": {
-          "status": "From a background ADE run, {when}"
+          "hint": "From a background ADE run, {when}."
         },
         "sourceSession": {
-          "status": "From a {product} session, {when}"
+          "hint": "From a {product} session, {when}."
         },
         "unavailable": {
           "status": "Usage unavailable"
@@ -9283,7 +9666,7 @@
         "waiting": {
           "hint": "Start a {product} session to see usage."
         },
-        "weeklyLong": {
+        "weekly": {
           "label": "Weekly"
         }
       },
@@ -9307,6 +9690,40 @@
         },
         "wordWrap": {
           "description": "Long lines wrap instead of scrolling, in the file viewer."
+        }
+      },
+      "cliTools": {
+        "description": "Kira runs local command line tools for pull requests and issues. The tools keep your credentials; Kira never sees them. Install and sign in with the commands below.",
+        "docs": {
+          "label": "Open documentation"
+        },
+        "refresh": {
+          "label": "Check again"
+        },
+        "state": {
+          "notFound": {
+            "status": "Not installed"
+          },
+          "ok": {
+            "status": "Ready"
+          },
+          "unauthenticated": {
+            "status": "Not signed in"
+          }
+        },
+        "step": {
+          "check": {
+            "label": "Verify"
+          },
+          "install": {
+            "label": "Install"
+          },
+          "login": {
+            "label": "Sign in"
+          },
+          "loginToken": {
+            "label": "Sign in with an API token"
+          }
         }
       },
       "fileTypes": {
@@ -9471,14 +9888,14 @@
         }
       },
       "nav": {
+        "cliTools": {
+          "label": "CLI tools"
+        },
         "fileTypes": {
           "label": "File types"
         },
         "mobileAccess": {
           "label": "Mobile access"
-        },
-        "taskStatuses": {
-          "label": "Task statuses"
         }
       }
     },
@@ -9501,6 +9918,18 @@
         "toggleProjectPanel": {
           "label": "Show or hide repositories"
         }
+      }
+    },
+    "statusBar": {
+      "agents": {
+        "label": "{count} agent | {count} agents",
+        "list": {
+          "hint": "Click to list them."
+        },
+        "rowMeta": {
+          "label": "{where}, {activity}, {ago}"
+        },
+        "tooltip": "Running agents"
       }
     }
   },
@@ -10822,7 +11251,7 @@
           "body": "{connection} ({kind}) ran this statement. Check its result before the AI gets it."
         },
         "masked": {
-          "tooltip": "A masking rule applies to this column"
+          "hint": "A masking rule applies to this column."
         },
         "ran": {
           "body": "This statement already ran. Withhold hides the result from the AI; it does not undo the change."
@@ -12027,7 +12456,7 @@
     },
     "operations": {
       "clear": {
-        "hint": "Clears the in-memory ring only. Retention of op_log is automatic."
+        "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "commandTruncated": {
         "status": "Command (truncated at 64 kibibytes, can’t be re-run): {command}"
@@ -12724,6 +13153,108 @@
       },
       "uriRevealFailed": {
         "error": "Couldn’t reveal the saved URI."
+      }
+    },
+    "proof": {
+      "change": {
+        "accept": {
+          "label": "Accept"
+        },
+        "accepted": {
+          "announce": "Edit accepted"
+        },
+        "current": {
+          "label": "Current"
+        },
+        "proposed": {
+          "label": "Proposed"
+        },
+        "reject": {
+          "label": "Reject"
+        },
+        "rejected": {
+          "announce": "Edit rejected"
+        },
+        "steps": {
+          "aria": "Changed steps"
+        },
+        "title": "Proposed edit",
+        "view": {
+          "aria": "Revision to show"
+        }
+      },
+      "compare": {
+        "added": {
+          "emptyHint": "This step is new in the edit."
+        },
+        "new": {
+          "label": "New"
+        },
+        "old": {
+          "label": "Old"
+        },
+        "removed": {
+          "emptyHint": "The edit removes this step."
+        }
+      },
+      "delete": {
+        "body": "Removes {name} and its saved views. This can’t be undone.",
+        "title": "Delete this session"
+      },
+      "history": {
+        "aria": "Validation sessions",
+        "empty": "No validation sessions yet",
+        "unseen": {
+          "aria": "Not opened yet"
+        }
+      },
+      "pending": {
+        "label": "Edit pending"
+      },
+      "resize": {
+        "label": "Resize sessions list"
+      },
+      "session": {
+        "aria": "Proof",
+        "empty": {
+          "emptyHint": "Select a session on the left."
+        },
+        "steps": {
+          "label": "{count} step | {count} steps"
+        }
+      },
+      "shot": {
+        "copied": {
+          "announce": "Screenshot copied"
+        },
+        "copy": {
+          "label": "Copy screenshot",
+          "tooltip": "Copy a screenshot of this tab"
+        },
+        "copyAll": {
+          "label": "Copy all tabs"
+        },
+        "failed": {
+          "error": "Couldn’t take the screenshot: {error}"
+        },
+        "more": {
+          "aria": "Screenshot options"
+        },
+        "notSettled": {
+          "error": "The step did not finish loading."
+        },
+        "save": {
+          "label": "Save tab as PNG…"
+        },
+        "saveAll": {
+          "label": "Save all tabs as PNG…"
+        },
+        "saved": {
+          "announce": "Saved to {path}"
+        }
+      },
+      "tabs": {
+        "aria": "Proof steps"
       }
     },
     "savedList": {
@@ -13677,6 +14208,29 @@
         "label": "Show more ({count} remaining)"
       }
     },
+    "statusBar": {
+      "metrics": {
+        "cores": {
+          "label": "Cores"
+        },
+        "cpuShare": {
+          "label": "{percent} of total capacity"
+        },
+        "interval": {
+          "hint": "Includes helper processes. Updates every 5 seconds."
+        },
+        "processes": {
+          "label": "Processes"
+        },
+        "tooltip": "{app} resource use"
+      },
+      "runs": {
+        "open": {
+          "hint": "Click to show the runs list."
+        },
+        "tooltip": "Automation runs"
+      }
+    },
     "tabStrip": {
       "discard": {
         "body": "{count} tab has unsaved changes. Closing discards them. | {count} tabs have unsaved changes. Closing discards them.",
@@ -13716,8 +14270,9 @@
     },
     "update": {
       "available": {
+        "hint": "Click to review and install.",
         "label": "Update {version}",
-        "tooltip": "Version {latest} is available (you have {current})"
+        "tooltip": "Update available"
       },
       "checking": {
         "status": "Checking for updates…"
@@ -13734,8 +14289,14 @@
       "installDetails": {
         "error": "Details: {log}."
       },
+      "installed": {
+        "label": "Installed"
+      },
       "installing": {
         "body": "Downloading and verifying {app} {version}. {app} quits once the new version is ready."
+      },
+      "newVersion": {
+        "label": "New version"
       },
       "upToDate": {
         "body": "{app} {current} is the latest version."

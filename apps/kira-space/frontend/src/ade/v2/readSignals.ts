@@ -1,7 +1,6 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { appendChunks, mergeRuns } from './pushMerge';
 import {
-  backlogKey,
   boardKey,
   changeRequestsKey,
   logKey,
@@ -15,7 +14,6 @@ import type { Board, LogEvent, LogPage, RunsChangedEvent } from './wire';
  *  phone. Each `on*` subscribes and returns its unsubscribe. */
 export interface AdeSignalSource {
   onBoard(cb: () => void): () => void;
-  onBacklog(cb: () => void): () => void;
   onWorkflows(cb: () => void): () => void;
   onSessions(cb: () => void): () => void;
   onRuns(cb: (event: RunsChangedEvent) => void): () => void;
@@ -23,15 +21,12 @@ export interface AdeSignalSource {
 }
 
 /** Cache upkeep for the read queries, shared by both apps. Every board push re-reads the board and
- *  PR facts; sessions, backlog and workflows pushes re-read their list; a runs push merges into
+ *  PR facts; sessions and workflows pushes re-read their list; a runs push merges into
  *  the cached board; a log push appends to the cached log. */
 export function installAdeReadSignals(queryClient: QueryClient, source: AdeSignalSource): void {
   source.onBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
     void queryClient.invalidateQueries({ queryKey: changeRequestsKey, exact: true });
-  });
-  source.onBacklog(() => {
-    void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });
   });
   source.onWorkflows(() => {
     void queryClient.invalidateQueries({ queryKey: workflowsKey, exact: true });

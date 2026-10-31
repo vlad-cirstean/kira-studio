@@ -186,7 +186,7 @@ func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 		v.fail(m["id"], "", "id must be lowercase letters, digits, - or _")
 	}
 	wf.Name = v.str(m, "", "name", true)
-	wf.KiraSpaceMcp = v.boolean(m, "", "kira_space_mcp")
+	v.boolean(m, "", "kira_space_mcp") // legacy switch (P408): still valid, ignored, dropped on save
 	if v.err != nil {
 		return wf
 	}
@@ -255,7 +255,7 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 			return step, nil
 		}
 	}
-	step.Status = v.status(sm, sp, step.Kind)
+	step.Status = v.status(sm, sp)
 	step.Skip = v.boolean(sm, sp, "skip")
 	if v.err != nil {
 		return step, nil
@@ -304,21 +304,22 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 	return step, rn
 }
 
-// legacyStatuses maps the names files used before statuses became ids to the seed set's ids.
+// legacyStatuses maps the names files used before statuses became ids to the ids the app first shipped;
+// a file-format compatibility shim, not a status rule.
 var legacyStatuses = map[string]string{"To do": "todo", "In progress": "in-progress", "In review": "in-review", "Done": "done"}
 
-// status reads a step's task status id; absent, it is in-review on a review step, else in-progress.
+// status reads a step's task status id; absent, it is "" and the default of the step's kind applies.
 // Membership in the user's set is checked at run time, so a file loads without the DB.
-func (v *validator) status(sm map[string]*yaml.Node, sp, kind string) string {
+func (v *validator) status(sm map[string]*yaml.Node, sp string) string {
 	if _, has := sm["status"]; !has {
-		return adewire.DefaultStatus(kind)
+		return ""
 	}
 	val := v.str(sm, sp, "status", true)
 	if id, legacy := legacyStatuses[val]; legacy {
 		return id
 	}
 	if v.err == nil && (!idPattern.MatchString(val) || len(val) > maxStatusID) {
-		v.fail(sm["status"], sp, "status must be a status id such as in-progress")
+		v.fail(sm["status"], sp, "status must be a status id")
 	}
 	return val
 }

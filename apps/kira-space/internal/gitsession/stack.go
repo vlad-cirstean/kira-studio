@@ -21,6 +21,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
 // ---------------------------------------------------------------------------------------
@@ -630,7 +631,6 @@ func buildRestackUndo(conn ConnID, connLabel, base string, origBranch, origHeadS
 func (e *RepoEntry) runRestackSpawn(ctx context.Context, argv []string) (gitclient.Result, error) {
 	var res gitclient.Result
 	err := e.Repo.Write(ctx, func(wctx context.Context) error {
-		e.noteWrite(wctx, argv)
 		r, rerr := gitclient.Run(wctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: false,
 			Env: []string{"GIT_SEQUENCE_EDITOR=true"}, Setsid: true,
@@ -685,9 +685,9 @@ func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
 //     read back head + in-progress, ALWAYS, success or failure.
 //  7. Release the slot (deferred) and return.
 func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (result RestackResult, runErr error) {
-	logOp := e.startOp("restack", connLabelOf(conn))
+	logOp := e.startOp(ctx, "restack", connLabelOf(conn))
 	defer func() { finishRestackResult(logOp, result, runErr) }()
-	ctx = withOp(ctx, logOp)
+	ctx = oplog.WithOp(ctx, logOp)
 
 	opCtx, cancel := context.WithCancel(ctx)
 	if !e.restack.claim("restack", cancel, true) {

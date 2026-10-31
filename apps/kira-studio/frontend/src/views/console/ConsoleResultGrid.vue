@@ -22,8 +22,10 @@ import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
 import type { CopyAllFormat } from './copyAll';
 import { mongoDocumentRowMenu, rowAsJsonMenu } from './menu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
+import type { ResultViewState } from './resultViewState';
 import { type Match, matchedRows, searchState } from './search';
 import { useConsoleViewStore } from './state';
+import { useResultScrollState } from './useResultScrollState';
 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
@@ -48,6 +50,13 @@ const props = defineProps<{
   tabId: string;
   connectionId: string | null;
   path: string;
+  /** Opt-in view-state persistence (the proof window): restored on mount, reported on every
+   *  scroll, click and expansion. `undefined` for the console, which keeps none. */
+  viewState?: ResultViewState | null;
+}>();
+const emit = defineEmits<{
+  'update:viewState': [state: ResultViewState];
+  ready: [];
 }>();
 
 const { single: rowHeight } = useRowHeight();
@@ -101,6 +110,7 @@ const documentRowHeights = computed<number[]>(() => {
 
 function onToggleDocExpanded(id: string): void {
   consoleViewStore.toggleResultDocExpanded(props.tabId, props.pageKey, id);
+  emitViewState();
 }
 
 // VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
@@ -204,9 +214,11 @@ function expandAll(): void {
     documentRows.value.map((v) => v.id),
     true,
   );
+  emitViewState();
 }
 function collapseAll(): void {
   consoleViewStore.setAllResultDocsExpanded(props.tabId, props.pageKey, [], false);
+  emitViewState();
 }
 
 function kvRowAt(row: number) {
@@ -218,6 +230,40 @@ function kvRowAt(row: number) {
 // result panels can each show their own last-clicked cell highlighted at once; only whichever
 // published most recently is what the cell editor panel displays.
 const selected = ref<{ row: number; col: number } | null>(null);
+
+// Restoring a saved state: expansion goes into the console store before the first row renders; the
+// highlighted row is a local ref, so it is set here too. Scroll is applied once mounted (below).
+const saved = props.viewState;
+if (saved) {
+  for (const id of saved.expanded) {
+    if (!consoleViewStore.isResultDocExpanded(props.tabId, props.pageKey, id)) {
+      consoleViewStore.toggleResultDocExpanded(props.tabId, props.pageKey, id);
+    }
+  }
+  if (saved.selectedRow !== null) selected.value = { row: saved.selectedRow, col: 0 };
+}
+const { report: emitViewState } = useResultScrollState({
+  viewState: () => props.viewState,
+  page: () => page.value,
+  scrollEl: () => (page.value?.kind === 'document' ? docScrollEl.value : kvScrollEl.value),
+  selectedRow: () => selected.value?.row ?? null,
+  expandedIds: () =>
+    documentRows.value
+      .filter((v) => consoleViewStore.isResultDocExpanded(props.tabId, props.pageKey, v.id))
+      .map((v) => v.id),
+  onState: (state) => emit('update:viewState', state),
+  onReady: () => emit('ready'),
+});
+
+function onDocScroll(): void {
+  docVirtual.onScroll();
+  emitViewState();
+}
+
+function onKeyValueScroll(): void {
+  kvVirtual.onScroll();
+  emitViewState();
+}
 
 function isSelected(row: number, col: number): boolean {
   return selected.value?.row === row && selected.value?.col === col;
@@ -278,10 +324,12 @@ function publish(selectedCell: Omit<SelectedCell, 'tabId' | 'connectionId' | 'pa
 // highlight, the same convention DocumentView.vue's rows use independent of any editor.
 function selectDocumentRow(row: number): void {
   selected.value = { row, col: 0 };
+  emitViewState();
 }
 
 function selectKeyValueRow(row: number): void {
   selected.value = { row, col: 0 };
+  emitViewState();
   const kv = kvRowAt(row);
   const column: ColumnDescriptor = {
     name: kv.field || 'value',
@@ -420,7 +468,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       :connection-id="connectionId"
       :path="path"
       class="flex-1 min-h-0"
+      :view-state="viewState"
       @copy-error="onCopyError"
+      @update:view-state="emit('update:viewState', $event)"
+      @ready="emit('ready')"
     />
     <div
       v-else-if="page.kind === 'document'"
@@ -429,7 +480,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       data-testid="virtual-list"
       role="listbox"
       :aria-label="t('studio.common.documents.aria')"
-      @scroll="docVirtual.onScroll"
+      @scroll="onDocScroll"
     >
       <div class="relative" :style="{ height: `${docVirtual.totalSize.value}px` }">
         <!-- P48 F10-F12: this read-only copy of DocumentRow (no edit/delete affordance) wants no
@@ -480,7 +531,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       data-testid="virtual-list"
       role="listbox"
       :aria-label="t('studio.console.result.rows.aria')"
-      @scroll="kvVirtual.onScroll"
+      @scroll="onKeyValueScroll"
     >
       <div class="relative" :style="{ height: `${kvVirtual.totalSize.value}px` }">
         <div

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,16 +9,15 @@ import {
 } from '@theme/components/ui/dropdown-menu';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
-import { errorText } from '@workbench/bridge/codedError';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { stepMoves } from '../board/stepMoves';
 import type { CardModel } from '../plan/usePlanModel';
-import { useSetTaskStep } from '../queries';
+import { useAdeStageDialogStore } from '../state/adeStageDialog';
 
-// Moves the task to any step of its workflow, or to Done, in either direction.
+// Moves the task to any step of its workflow, or to Done, in either direction: each move opens the
+// stage dialog, where the handover notes go.
 const props = defineProps<{ card: CardModel }>();
-const setStep = useSetTaskStep();
-const error = ref('');
+const stage = useAdeStageDialogStore();
 
 const moves = computed(() =>
   stepMoves(
@@ -39,13 +37,8 @@ const reason = computed(() =>
   live.value ? t('space.ade.board.taskMenu.liveBlocked.tooltip') : '',
 );
 
-async function move(stepId: string): Promise<void> {
-  error.value = '';
-  try {
-    await setStep.mutateAsync({ taskId: props.card.task.id, stepId });
-  } catch (err) {
-    error.value = errorText(err);
-  }
+function move(toStepId: string): void {
+  stage.open({ taskId: props.card.task.id, toStepId });
 }
 </script>
 
@@ -94,8 +87,5 @@ async function move(stepId: string): Promise<void> {
         @click="move(next?.id ?? '')"
       />
     </div>
-    <Alert v-if="error" variant="error" data-testid="ade-step-error"
-      ><AlertDescription>{{ error }}</AlertDescription></Alert
-    >
   </div>
 </template>

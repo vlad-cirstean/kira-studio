@@ -5,7 +5,13 @@ import { reposKey } from '../repo/state/reposQueries';
 import type { useAgentSessionsStore } from './state';
 import { installMobileLaunch } from './v2/dialog/mobileLaunch';
 import { adeTurns } from './v2/dialog/turnWatch';
-import { reviewStepPrefix, workflowYamlKey } from './v2/queries';
+import {
+  artifactsPrefix,
+  handoversPrefix,
+  issuePrefix,
+  reviewStepPrefix,
+  workflowYamlKey,
+} from './v2/queries';
 import { installAdeReadSignals } from './v2/readSignals';
 import { useAdeBoardUiStore } from './v2/state/adeBoardUi';
 
@@ -29,7 +35,6 @@ export function installAdeSignals(
   );
   installAdeReadSignals(queryClient, {
     onBoard: control.onAdeTaskBoard,
-    onBacklog: control.onAdeTaskBacklog,
     onWorkflows: control.onAdeTaskWorkflows,
     onSessions: control.onAdeTaskSessions,
     onRuns: control.onAdeTaskRuns,
@@ -51,6 +56,11 @@ export function installAdeSignals(
   };
   control.onAdeTaskReview(refreshReviewStep);
   control.onAdeTaskBoard(refreshReviewStep);
+  control.onAdeTaskBoard(() => {
+    void queryClient.invalidateQueries({ queryKey: handoversPrefix });
+    void queryClient.invalidateQueries({ queryKey: artifactsPrefix });
+    void queryClient.invalidateQueries({ queryKey: issuePrefix });
+  });
   control.onAdeTaskRuns(refreshReviewStep);
   control.onAdeTaskOpenSession((event) => {
     useAdeBoardUiStore().openSession(event);

@@ -27,6 +27,10 @@ var ErrInvalidInput = errors.New("ade: invalid input")
 // maps it to E_CONFLICT.
 var ErrStale = errors.New("ade: task moved on")
 
+// ErrWorkingChanged marks a working-review write built from file content that has since changed;
+// the bridge maps it to E_CONFLICT.
+var ErrWorkingChanged = errors.New("ade: working file changed")
+
 func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidInput, fmt.Sprintf(format, args...))
 }
@@ -61,6 +65,11 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 	}
 	out := b.toWireTask(t, ids, runs, reviews)
 	decorateTask(&out, t, b.liveWorkflows())
+	bh, err := b.deps.Tasks.BoardHandovers()
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	applyHandovers(&out, bh[t.ID])
 	b.badgeTasks([]adewire.Task{out})
 	return out, nil
 }
@@ -339,7 +348,7 @@ func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch)
 		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
 		return
 	}
-	res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
+	res, err := b.ensureWorktree(ctx, *rec, sb, newBranchName{})
 	if err != nil {
 		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
 		b.recordSetupFailure(sb, "could not create the worktree: "+trimInvalid(err))
@@ -517,6 +526,53 @@ func (b *TaskBoard) SetPlan(_ context.Context, args adewire.SetPlanArgs) error {
 	return nil
 }
 
+// ShelveTask moves a task onto the Later or Backlog shelf, dropping its day. A review item stays on the Plan.
+func (b *TaskBoard) ShelveTask(_ context.Context, args adewire.ShelveTaskArgs) error {
+	if args.Shelf != adewire.ShelfLater && args.Shelf != adewire.ShelfBacklog {
+		return invalid("shelf must be %q or %q", adewire.ShelfLater, adewire.ShelfBacklog)
+	}
+	if args.BeforeID == args.TaskID {
+		return invalid("a task cannot go before itself")
+	}
+	mu := b.taskMu(args.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	t, err := b.deps.Tasks.GetTask(args.TaskID)
+	if err != nil {
+		return err
+	}
+	if t.ArchivedAt != nil {
+		return repos.ErrTaskNotFound
+	}
+	if t.Kind == model.AdeTaskKindReview {
+		return invalid("a review item stays on the Plan")
+	}
+	if err := b.deps.Tasks.Shelve(args.TaskID, args.Shelf == adewire.ShelfBacklog, args.BeforeID); err != nil {
+		if errors.Is(err, repos.ErrShelfTarget) {
+			return invalid("beforeId is not on the %s shelf", args.Shelf)
+		}
+		return err
+	}
+	b.notifyBoard()
+	return nil
+}
+
+// CaptureTask adds a repo-less, workflow-less task at the top of Later.
+func (b *TaskBoard) CaptureTask(_ context.Context, args adewire.CaptureTaskArgs) (adewire.Task, error) {
+	title := strings.TrimSpace(args.Title)
+	if title == "" {
+		return adewire.Task{}, invalid("title is required")
+	}
+	task, err := b.deps.Tasks.CaptureTask(model.AdeTask{
+		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: title, CreatedAt: b.deps.Now().UnixMilli(),
+	})
+	if err != nil {
+		return adewire.Task{}, err
+	}
+	b.notifyBoard()
+	return b.wireTask(task)
+}
+
 // SetQueuedAfter orders a branch after another branch of the same repo; "" clears it.
 func (b *TaskBoard) SetQueuedAfter(_ context.Context, args adewire.SetQueuedAfterArgs) error {
 	live, err := b.deps.Tasks.BranchesLive()
@@ -550,118 +606,6 @@ func (b *TaskBoard) SetQueuedAfter(_ context.Context, args adewire.SetQueuedAfte
 	}
 	b.notifyBoard()
 	return nil
-}
-
-// --- backlog -----------------------------------------------------------------------------------
-
-func (b *TaskBoard) toWireBacklog(i model.AdeBacklogItem) adewire.BacklogItem {
-	out := adewire.BacklogItem{ID: i.ID, Text: i.Text, AddedAt: i.AddedAt, HostURL: i.HostURL, HostLink: b.hostLink(i.HostURL), Notes: i.Notes}
-	if i.JiraKey != "" || i.JiraURL != "" {
-		out.Jira = &adewire.Jira{Key: i.JiraKey, URL: i.JiraURL}
-	}
-	return out
-}
-
-// Backlog lists the items top first.
-func (b *TaskBoard) Backlog(_ context.Context) (adewire.BacklogResult, error) {
-	items, err := b.deps.Backlog.List()
-	if err != nil {
-		return adewire.BacklogResult{}, err
-	}
-	out := adewire.BacklogResult{Items: make([]adewire.BacklogItem, len(items))}
-	for i, it := range items {
-		out.Items[i] = b.toWireBacklog(it)
-	}
-	return out, nil
-}
-
-// AddBacklogItem adds an item at the top.
-func (b *TaskBoard) AddBacklogItem(_ context.Context, args adewire.AddBacklogItemArgs) (adewire.BacklogItem, error) {
-	text := strings.TrimSpace(args.Text)
-	if text == "" {
-		return adewire.BacklogItem{}, invalid("text is required")
-	}
-	item, err := b.deps.Backlog.Add(model.AdeBacklogItem{ID: b.newID(), Text: text, AddedAt: b.deps.Now().UnixMilli()})
-	if err != nil {
-		return adewire.BacklogItem{}, err
-	}
-	b.notifyBacklog()
-	return b.toWireBacklog(item), nil
-}
-
-// UpdateBacklogItem applies a patch.
-func (b *TaskBoard) UpdateBacklogItem(_ context.Context, args adewire.UpdateBacklogItemArgs) (adewire.BacklogItem, error) {
-	p := args.Patch
-	if p.Jira != nil && p.ClearJira {
-		return adewire.BacklogItem{}, invalid("jira and clearJira are mutually exclusive")
-	}
-	patch := model.AdeBacklogPatch{Text: p.Text, HostURL: p.HostURL, Notes: p.Notes}
-	if p.Text != nil {
-		trimmed := strings.TrimSpace(*p.Text)
-		if trimmed == "" {
-			return adewire.BacklogItem{}, invalid("text must not be empty")
-		}
-		patch.Text = &trimmed
-	}
-	switch {
-	case p.Jira != nil:
-		patch.JiraKey, patch.JiraURL = &p.Jira.Key, &p.Jira.URL
-	case p.ClearJira:
-		empty := ""
-		patch.JiraKey, patch.JiraURL = &empty, &empty
-	}
-	item, err := b.deps.Backlog.Update(args.ID, patch)
-	if err != nil {
-		return adewire.BacklogItem{}, err
-	}
-	b.notifyBacklog()
-	return b.toWireBacklog(item), nil
-}
-
-// MoveBacklogItem moves an item to toIndex.
-func (b *TaskBoard) MoveBacklogItem(_ context.Context, args adewire.MoveBacklogItemArgs) error {
-	if err := b.deps.Backlog.Move(args.ID, args.ToIndex); err != nil {
-		return err
-	}
-	b.notifyBacklog()
-	return nil
-}
-
-// DeleteBacklogItem removes an item.
-func (b *TaskBoard) DeleteBacklogItem(_ context.Context, args adewire.BacklogItemArgs) error {
-	if err := b.deps.Backlog.Delete(args.ID); err != nil {
-		return err
-	}
-	b.notifyBacklog()
-	return nil
-}
-
-// PromoteBacklogItem turns an item into a Later task with no repos and no workflow; the user picks
-// both on the task afterwards.
-func (b *TaskBoard) PromoteBacklogItem(_ context.Context, args adewire.BacklogItemArgs) (adewire.Task, error) {
-	items, err := b.deps.Backlog.List()
-	if err != nil {
-		return adewire.Task{}, err
-	}
-	var item *model.AdeBacklogItem
-	for i := range items {
-		if items[i].ID == args.ID {
-			item = &items[i]
-		}
-	}
-	if item == nil {
-		return adewire.Task{}, repos.ErrBacklogGone
-	}
-	task, err := b.deps.Backlog.Promote(item.ID, model.AdeTask{
-		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: item.Text, JiraKey: item.JiraKey, JiraURL: item.JiraURL,
-		HostURL: item.HostURL, Notes: item.Notes, CreatedAt: b.deps.Now().UnixMilli(),
-	})
-	if err != nil {
-		return adewire.Task{}, err
-	}
-	b.notifyBacklog()
-	b.notifyBoard()
-	return b.wireTask(task)
 }
 
 // --- workflows and repos -----------------------------------------------------------------------

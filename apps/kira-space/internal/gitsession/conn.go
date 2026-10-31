@@ -3,6 +3,7 @@ package gitsession
 import (
 	"context"
 	"errors"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
@@ -51,6 +52,8 @@ type Conn struct {
 	// (F11), threaded through so the undo slot can attribute a record to "this window" for every
 	// OTHER connection's reader (D7's SnapshotFor).
 	ClientLabel string
+	// Module is the oplog module this connection's work is attributed to (git, vscode or ade).
+	Module string
 
 	// emitMu guards emitFn: gitrpc.Router.ForConn's own
 	// repoSettings.changed forwarding goroutine starts as soon as ForConn is called — before
@@ -97,6 +100,15 @@ type Conn struct {
 }
 
 // NewConn constructs a Conn with an empty hold set.
+// Origin is the op-log attribution for work this connection's user asked for.
+func (c *Conn) Origin() oplog.Origin {
+	m := c.Module
+	if m == "" {
+		m = oplog.ModuleApp
+	}
+	return oplog.Origin{Module: m, Trigger: oplog.TriggerUser, Label: c.ClientLabel}
+}
+
 func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, payload any)) *Conn {
 	return &Conn{
 		ID: id, ClientID: clientID, ClientLabel: clientLabel, emitFn: emit,
@@ -260,7 +272,7 @@ func (c *Conn) alreadyHeld(repoID string) (*RepoEntry, bool) {
 // that died). It does nothing when this connection does not hold repoID.
 func (c *Conn) RecordFailure(repoID, kind, message string) {
 	if entry, ok := c.alreadyHeld(repoID); ok {
-		entry.recordFailure(kind, c.ClientLabel, message)
+		entry.recordFailure(oplog.WithOrigin(context.Background(), c.Origin()), kind, c.ClientLabel, message)
 	}
 }
 

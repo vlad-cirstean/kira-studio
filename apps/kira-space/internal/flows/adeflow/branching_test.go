@@ -85,7 +85,7 @@ func TestBranching(t *testing.T) {
 		if impl := stepRuns(t, f, "impl"); len(impl) != 3 {
 			t.Fatalf("impl runs = %d, want 3 (first plus two fix rounds)", len(impl))
 		}
-		task, err := f.app.W.AdeTask.StepDone(ctx, adewire.TaskArgs{TaskID: f.taskID})
+		task, err := f.app.W.AdeTask.StepDone(ctx, adewire.StepDoneArgs{TaskID: f.taskID})
 		if err != nil || task.EntryStepID != "done" {
 			t.Fatalf("StepDone = %+v, %v, want the task done after the manual step", task, err)
 		}

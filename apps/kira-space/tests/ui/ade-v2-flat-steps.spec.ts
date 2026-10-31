@@ -68,12 +68,15 @@ test('contract: Move task here and the step mover send SetTaskStep with the targ
       position: { x: 200, y: 8 },
     });
   await page.locator(t('menu-item-ade-step-move-here')).click();
+  await page.locator(t('ade-stage-move')).click();
   await expect.poll(moves).toHaveLength(1);
-  expect(moves()[0]?.args).toEqual({ taskId: 'T_alerts', stepId: 'impl' });
+  expect(moves()[0]?.args).toMatchObject({ taskId: 'T_alerts', stepId: 'impl' });
 
   await page.locator(t('ade-step-next')).click();
-  await expect.poll(moves).toHaveLength(2);
-  expect(moves()[1]?.args).toMatchObject({ taskId: 'T_alerts' });
+  await page.locator(t('ade-stage-move')).click();
+  // The next stage of a manual step is its natural end: StepDone, not a free move.
+  await expect.poll(() => calls(control, IPC.adeTaskStepDone)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskStepDone)[0]?.args).toEqual({ taskId: 'T_alerts' });
 });
 
 test('a step moved back shows pending while its earlier runs stay hidden', async ({ relaunch }) => {

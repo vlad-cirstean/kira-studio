@@ -93,8 +93,8 @@ func TestCheckGitArgs(t *testing.T) {
 }
 
 func TestGitArgvPlain(t *testing.T) {
-	got := strings.Join(gitArgv("/wt", []string{"diff", "HEAD"}), " ")
-	if got != "-C /wt --no-pager diff --no-ext-diff --no-textconv HEAD" {
+	got := strings.Join(gitArgv([]string{"diff", "HEAD"}), " ")
+	if got != "diff --no-ext-diff --no-textconv HEAD" {
 		t.Fatalf("argv = %q", got)
 	}
 }

@@ -1,6 +1,6 @@
-import { withMovedItem } from '@ade/backlogOrder';
-import { backlogKey, boardKey, sessionsKey } from '@ade/readQueries';
-import type { BacklogResult } from '@ade/wire';
+import { withShelved } from '@ade/board/shelf';
+import { boardKey, sessionsKey } from '@ade/readQueries';
+import type { Board, Shelf } from '@ade/wire';
 import { useMutation, useQueryClient } from '@tanstack/vue-query';
 import { optimisticUpdate } from '@workbench/behaviour/optimistic';
 import type { CodedError } from '@workbench/bridge/codedError';
@@ -34,31 +34,35 @@ export function useAdeWrites() {
     if (PERMISSION_CODES.has((err as CodedError).code ?? '')) void auth.refreshMe();
   };
 
-  const addBacklogItem = useMutation({
-    mutationFn: (v: { text: string; key: string }) => adeWriter.addBacklogItem(v.text, v.key),
+  const captureTask = useMutation({
+    mutationFn: (v: { title: string; key: string }) => adeWriter.captureTask(v.title, v.key),
     retry,
     onError,
-    onSettled: () => invalidate(backlogKey),
+    onSettled: () => invalidate(boardKey),
   });
 
-  const moveOptimistic = optimisticUpdate<
-    BacklogResult,
-    { id: string; toIndex: number; key: string }
-  >(queryClient, backlogKey, withMovedItem, { invalidate: 'settled' });
-  const moveBacklogItem = useMutation({
-    mutationFn: (v: { id: string; toIndex: number; key: string }) =>
-      adeWriter.moveBacklogItem(v.id, v.toIndex, v.key),
+  type ShelveVars = { taskId: string; shelf: Shelf; beforeId: string; key: string };
+  const shelveOptimistic = optimisticUpdate<Board, ShelveVars>(queryClient, boardKey, withShelved, {
+    invalidate: 'settled',
+  });
+  const shelveTask = useMutation({
+    mutationFn: (v: ShelveVars) => adeWriter.shelveTask(v.taskId, v.shelf, v.beforeId, v.key),
     retry,
-    ...moveOptimistic,
+    ...shelveOptimistic,
     onError: (err, v, ctx) => {
-      moveOptimistic.onError(err, v, ctx);
+      shelveOptimistic.onError(err, v, ctx);
       onError(err);
     },
   });
 
   const setTaskStep = useMutation({
-    mutationFn: (v: { taskId: string; fromStepId: string; stepId: string; key: string }) =>
-      adeWriter.setTaskStep(v.taskId, v.fromStepId, v.stepId, v.key),
+    mutationFn: (v: {
+      taskId: string;
+      fromStepId: string;
+      stepId: string;
+      key: string;
+      notes?: string;
+    }) => adeWriter.setTaskStep(v.taskId, v.fromStepId, v.stepId, v.key, v.notes),
     retry,
     onError,
     onSettled: () => invalidate(boardKey),
@@ -95,8 +99,8 @@ export function useAdeWrites() {
   });
 
   return {
-    addBacklogItem,
-    moveBacklogItem,
+    captureTask,
+    shelveTask,
     setTaskStep,
     startRun,
     launchStep,

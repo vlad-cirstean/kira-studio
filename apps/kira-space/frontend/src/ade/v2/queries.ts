@@ -3,25 +3,19 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { optimisticUpdate } from '@workbench/behaviour/optimistic';
 import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
-import { computed, toValue } from 'vue';
+import { toValue } from 'vue';
 import { control } from '../../bridge/control';
-import { withMovedItem } from './backlogOrder';
-import {
-  archivedTaskKey,
-  backlogKey,
-  boardKey,
-  runSandboxKey,
-  sessionsKey,
-  useWorkflows,
-} from './readQueries';
+import { withShelved } from './board/shelf';
+import { archivedTaskKey, boardKey, runSandboxKey, sessionsKey } from './readQueries';
 import type {
-  AddBacklogItemArgs,
+  AddArtifactArgs,
   AddExistingBranchArgs,
   AddTaskRepoArgs,
-  BacklogItemArgs,
-  BacklogResult,
+  ApproveBranchRequestArgs,
   Board,
   BranchArgs,
+  BranchRequestArgs,
+  CaptureTaskArgs,
   CreateTaskArgs,
   FinishReviewArgs,
   FocusSessionArgs,
@@ -29,7 +23,6 @@ import type {
   HostLinkArgs,
   ImportWorkflowArgs,
   LaunchStepArgs,
-  MoveBacklogItemArgs,
   NewWorkflowArgs,
   OntoArgs,
   RebaseArgs,
@@ -37,6 +30,7 @@ import type {
   RebaseStart,
   RecordMergeArgs,
   RefreshArgs,
+  RemoveArtifactArgs,
   RemoveTaskRowArgs,
   RepoBranches,
   RepoBranchesArgs,
@@ -55,13 +49,15 @@ import type {
   SetTaskBranchArgs,
   SetTaskStepArgs,
   SetTaskWorkflowArgs,
+  ShelveTaskArgs,
   StartBranchArgs,
   StartRunArgs,
   StepArgs,
+  StepDoneArgs,
   TakeOverArgs,
   Task,
   TaskArgs,
-  UpdateBacklogItemArgs,
+  UpdateHandoverArgs,
   UpdateTaskArgs,
   UpdateTaskRepoArgs,
   ValidateWorkflowYamlArgs,
@@ -69,7 +65,6 @@ import type {
 
 export {
   logKey,
-  useBacklog,
   useBoard,
   useChangeRequests,
   useSessions,
@@ -84,18 +79,11 @@ export {
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 const candidatesKey = (codeRepoId: string) => ['adetask', 'candidates', codeRepoId] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
+export const handoversPrefix = ['adetask', 'handovers'] as const;
+export const artifactsPrefix = ['adetask', 'artifacts'] as const;
+export const issuePrefix = ['adetask', 'issue'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
-
-/** Whether the workflow turns the Kira Space tools on; the agent then names its own branches. */
-export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
-  const workflows = useWorkflows();
-  return computed(
-    () =>
-      workflows.data.value?.workflows.find((e) => e.workflow?.id === toValue(workflowId))?.workflow
-        ?.kiraSpaceMcp ?? false,
-  );
-}
 
 /**
  * Branches that can join the plan, of one repo or ('' ) every repo; refetched on every open so a
@@ -146,12 +134,6 @@ export function useResolveHostLink(url: MaybeRefOrGetter<string>) {
 
 export function useAddHostLink() {
   return useMutation({ mutationFn: (args: HostLinkArgs) => control.adeTaskAddHostLink(args) });
-}
-
-export function useAddBacklogItem() {
-  return useMutation({
-    mutationFn: (args: AddBacklogItemArgs) => control.adeTaskAddBacklogItem(args),
-  });
 }
 
 export function useAddTaskRepo() {
@@ -223,6 +205,7 @@ function withSavedStatuses(board: Board, args: SaveStatusesArgs): Board {
       ...s,
       id: s.id || board.statuses.find((o) => o.name === s.name)?.id || s.name,
     })),
+    statusDefaults: args.defaults,
   };
 }
 
@@ -255,31 +238,6 @@ function withSavedIds(board: Board, args: SaveStatusesArgs, result: SaveStatuses
   };
 }
 
-export function useUpdateBacklogItem() {
-  return useMutation({
-    mutationFn: (args: UpdateBacklogItemArgs) => control.adeTaskUpdateBacklogItem(args),
-  });
-}
-
-export function useMoveBacklogItem() {
-  return useMutation({
-    mutationFn: (args: MoveBacklogItemArgs) => control.adeTaskMoveBacklogItem(args),
-    ...optimisticUpdate<BacklogResult, MoveBacklogItemArgs>(queryClient, backlogKey, withMovedItem),
-  });
-}
-
-export function useDeleteBacklogItem() {
-  return useMutation({
-    mutationFn: (args: BacklogItemArgs) => control.adeTaskDeleteBacklogItem(args),
-  });
-}
-
-export function usePromoteBacklogItem() {
-  return useMutation({
-    mutationFn: (args: BacklogItemArgs) => control.adeTaskPromoteBacklogItem(args),
-  });
-}
-
 /** Applies a plan write to a board snapshot the way the backend does: `order` replaces, a `null`
  *  day sends the task to Later. */
 function withPlan(board: Board, args: SetPlanArgs): Board {
@@ -288,7 +246,8 @@ function withPlan(board: Board, args: SetPlanArgs): Board {
     if (iso === null) delete day[id];
     else day[id] = iso;
   }
-  return { ...board, plan: { ...board.plan, order: args.order, day } };
+  const backlog = board.plan.backlog.filter((id) => !(id in args.days));
+  return { ...board, plan: { ...board.plan, order: args.order, day, backlog } };
 }
 
 export function useSetPlan() {
@@ -296,6 +255,18 @@ export function useSetPlan() {
     mutationFn: (args: SetPlanArgs) => control.adeTaskSetPlan(args),
     ...optimisticUpdate<Board, SetPlanArgs>(queryClient, boardKey, withPlan),
   });
+}
+
+export function useShelveTask() {
+  return useMutation({
+    mutationFn: (args: ShelveTaskArgs) => control.adeTaskShelveTask(args),
+    ...optimisticUpdate<Board, ShelveTaskArgs>(queryClient, boardKey, withShelved),
+  });
+}
+
+/** Adds a title-only task at the top of Later. */
+export function useCaptureTask() {
+  return useMutation({ mutationFn: (args: CaptureTaskArgs) => control.adeTaskCaptureTask(args) });
 }
 
 /** The stored sandbox of a run; the badge popover and profile dialog read it. */
@@ -372,7 +343,7 @@ export function useResumeRun() {
 }
 
 export function useStepDone() {
-  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStepDone(args) });
+  return useMutation({ mutationFn: (args: StepDoneArgs) => control.adeTaskStepDone(args) });
 }
 
 /** Applies a step move to a board snapshot; the backend's push reconciles the run-derived fields. */
@@ -414,6 +385,10 @@ export function useLaunchStep() {
 
 export function useStartBranch() {
   return useMutation({ mutationFn: (args: StartBranchArgs) => control.adeTaskStartBranch(args) });
+}
+
+export function useStartAdHoc() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskStartAdHoc(args) });
 }
 
 export function useSend() {
@@ -460,6 +435,81 @@ export function useReviewAgent(taskId: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: ['adetask', 'reviewAgent', taskId] as const,
     queryFn: () => control.adeTaskReviewAgent({ taskId: toValue(taskId) }),
+  });
+}
+
+/** The task's handover history, newest first; a board push refetches it. */
+export function useHandovers(taskId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...handoversPrefix, taskId] as const,
+    queryFn: () => control.adeTaskHandovers({ taskId: toValue(taskId) }),
+  });
+}
+
+/** The task's artifacts, detected and stored; a board push refetches it while mounted. */
+export function useTaskArtifacts(taskId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...artifactsPrefix, taskId] as const,
+    queryFn: () => control.adeTaskArtifacts({ taskId: toValue(taskId) }),
+  });
+}
+
+/**
+ * The issue a task links, as its tracker reports it. The tracker caches for a minute, so the same
+ * window keeps a remount from asking again; a board push refetches it.
+ */
+export function useTaskIssue(taskId: MaybeRefOrGetter<string>, link: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...issuePrefix, taskId, link] as const,
+    queryFn: () => control.adeTaskIssue({ taskId: toValue(taskId) }),
+    staleTime: 60_000,
+  });
+}
+
+const refetchArtifacts = () => queryClient.invalidateQueries({ queryKey: artifactsPrefix });
+
+export function useAddArtifact() {
+  return useMutation({
+    mutationFn: (args: AddArtifactArgs) => control.adeTaskAddArtifact(args),
+    onSuccess: refetchArtifacts,
+  });
+}
+
+export function useRemoveArtifact() {
+  return useMutation({
+    mutationFn: (args: RemoveArtifactArgs) => control.adeTaskRemoveArtifact(args),
+    onSuccess: refetchArtifacts,
+  });
+}
+
+export function useUpdateHandover() {
+  return useMutation({
+    mutationFn: (args: UpdateHandoverArgs) => control.adeTaskUpdateHandover(args),
+  });
+}
+
+export function useDismissHandover() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskDismissHandover(args) });
+}
+
+/** An agent's open branch request; E_NOT_FOUND means it was answered. */
+export function useBranchRequest(id: MaybeRefOrGetter<string>) {
+  return useQuery(() => ({
+    queryKey: ['adetask', 'branchRequest', toValue(id)] as const,
+    queryFn: () => control.adeTaskBranchRequest({ id: toValue(id) }),
+    enabled: toValue(id) !== '',
+  }));
+}
+
+export function useApproveBranchRequest() {
+  return useMutation({
+    mutationFn: (args: ApproveBranchRequestArgs) => control.adeTaskApproveBranchRequest(args),
+  });
+}
+
+export function useDenyBranchRequest() {
+  return useMutation({
+    mutationFn: (args: BranchRequestArgs) => control.adeTaskDenyBranchRequest(args),
   });
 }
 

@@ -33,11 +33,11 @@ type Repos struct {
 	AdeReview             *AdeReviewWindowsRepo
 	AdeTasks              *AdeTaskRepo
 	AdeStatuses           *AdeStatusRepo
-	AdeBacklog            *AdeBacklogRepo
 	AdeRepoConfig         *AdeRepoConfigRepo
 	AdeFacts              *AdeFactsRepo
 	AdeLogs               *AdeLogsRepo
 	AdeRunSandbox         *AdeRunSandboxRepo
+	OpLog                 *OpLogRepo
 	CustomScripts         *scripts.Repo
 	ScriptRuns            *scriptruns.Repo
 
@@ -76,11 +76,11 @@ func New(db *sql.DB) (*Repos, error) {
 		AdeReview:             &AdeReviewWindowsRepo{DB: db},
 		AdeTasks:              &AdeTaskRepo{DB: db},
 		AdeStatuses:           &AdeStatusRepo{DB: db},
-		AdeBacklog:            &AdeBacklogRepo{DB: db},
 		AdeRepoConfig:         &AdeRepoConfigRepo{DB: db},
 		AdeFacts:              &AdeFactsRepo{DB: db},
 		AdeLogs:               &AdeLogsRepo{DB: db},
 		AdeRunSandbox:         &AdeRunSandboxRepo{DB: db},
+		OpLog:                 &OpLogRepo{DB: db},
 		CustomScripts:         &scripts.Repo{DB: db},
 		ScriptRuns:            &scriptruns.Repo{DB: db},
 		stmts:                 []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},

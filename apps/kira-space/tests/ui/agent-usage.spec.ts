@@ -59,13 +59,29 @@ test('shows both windows, and the tooltip lists the reset times and the source',
 }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(23.4, 41.2)));
   await expect(text(page)).toHaveText('Session 23% · Weekly 41%');
-  await expect(item(page)).toHaveClass(/text-fg/);
+  await expect(item(page)).not.toHaveClass(/(^|\s)text-(warn|error)(\s|$)/);
   await item(page).hover();
   const tip = page.locator('[data-testid="agent-usage-tooltip"]');
-  await expect(tip).toContainText('Five-hour: 23% used');
-  await expect(tip).toContainText('in 2h');
-  await expect(tip).toContainText('Weekly: 41% used');
-  await expect(tip).toContainText('From a Claude Code session, 5m ago');
+  await expect(tip.locator('[data-testid="tooltip-details-title"]')).toHaveText(
+    'Claude Code usage limits',
+  );
+  const row = (label: string) =>
+    tip.locator(`[data-testid="tooltip-details-row"][data-label="${label}"]`);
+  await expect(row('Session (5-hour)')).toContainText('23% used, resets in 2h');
+  await expect(row('Weekly')).toContainText('41% used, resets in');
+  await expect(tip.locator('[data-testid="tooltip-details-hint"]')).toHaveText(
+    'From a Claude Code session, 5m ago.',
+  );
+});
+
+test('the readout uses the interface font like the rest of the bar', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, usageControl(snapshot(23, 41)));
+  const family = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).fontFamily);
+  expect(await family('[data-testid="agent-usage-text"]')).toBe(await family('body'));
 });
 
 test('contract: a session snapshot shows both windows and its source', async ({ relaunch }) => {
@@ -111,10 +127,10 @@ test('the usage item sits in the left group with the dashboard icon', async ({ r
 
 test('warns at 80 percent and errors at 95 percent', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(85, 10)));
-  await expect(item(page)).toHaveClass(/text-warn-text/);
+  await expect(item(page)).toHaveClass(/(^|\s)text-warn(\s|$)/);
   await emitWailsEvent(page, IPC.agentUsage, snapshot(85, 97));
   await expect(text(page)).toHaveText('Session 85% · Weekly 97%');
-  await expect(item(page)).toHaveClass(/text-error/);
+  await expect(item(page)).toHaveClass(/(^|\s)text-error(\s|$)/);
 });
 
 test('shows a dash and the hint before any session reported', async ({ relaunch }) => {

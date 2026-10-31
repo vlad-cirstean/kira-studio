@@ -86,7 +86,6 @@ func (s *Server) routes() []route {
 			return withoutCwd(v)
 		})),
 		read("/api/ade/workflows", readJSON(s, "workflows", false, s.cfg.Reader.Workflows)),
-		read("/api/ade/backlog", readJSON(s, "backlog", false, s.cfg.Reader.Backlog)),
 		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),
 		read("/api/ade/hosts", readJSON(s, "hosts", false, s.cfg.Reader.HostProviders)),
 		read("/api/ade/log", s.handleLog),
@@ -106,8 +105,8 @@ func (s *Server) routes() []route {
 			}
 			writeJSON(w, http.StatusOK, s.cfg.AgentInfo())
 		}),
-		write("/api/ade/backlog/items", "backlog.add", permWrite, s.handleBacklogAdd),
-		write("/api/ade/backlog/move", "backlog.move", permWrite, s.handleBacklogMove),
+		write("/api/ade/later/items", "later.add", permWrite, s.handleLaterAdd),
+		write("/api/ade/shelf/move", "shelf.move", permWrite, s.handleShelfMove),
 		write("/api/ade/tasks/step", "task.step", permWrite, s.handleTaskStep),
 		write("/api/ade/tasks/run", "task.run", permWrite, s.handleTaskRun),
 		write("/api/ade/tasks/launch", "task.launch", permWrite, s.handleTaskLaunch),

@@ -32,6 +32,7 @@ type CommentEntry struct {
 	Reply     string                  `json:"reply"`
 	RepliedAt *int64                  `json:"repliedAt"`
 	SentAt    *int64                  `json:"sentAt"`
+	Origin    string                  `json:"origin"`
 }
 
 // CommentListResult mirrors @kira/git-ipc's own review.comment.list result.
@@ -41,8 +42,12 @@ type CommentListResult struct {
 }
 
 func toCommentEntry(ac gitreview.AnchoredComment) CommentEntry {
+	origin := ac.Origin
+	if origin == "" {
+		origin = gitreview.OriginCommit
+	}
 	return CommentEntry{
-		ID: ac.ID, Path: ac.Path, Range: ac.Range, Body: ac.Body,
+		ID: ac.ID, Origin: origin, Path: ac.Path, Range: ac.Range, Body: ac.Body,
 		Anchor: ac.Anchor, AnchorSHA: ac.AnchorSHA, CreatedAt: ac.CreatedAt.UnixMilli(),
 		Kind: ac.Kind, State: ac.State, Reply: ac.Reply,
 		RepliedAt: millisPtr(ac.RepliedAt), SentAt: millisPtr(ac.SentAt),
@@ -172,6 +177,18 @@ func (e *RepoEntry) SetCommentState(ctx context.Context, branch string, id int64
 	return changed, nil
 }
 
+// EditComment is review.comment.edit's whole orchestration.
+func (e *RepoEntry) EditComment(ctx context.Context, branch string, id int64, body, kind string) (bool, error) {
+	changed, err := e.review.EditComment(ctx, e.Summary.RepoID, branch, id, body, kind)
+	if err != nil {
+		return false, err
+	}
+	if err := e.review.Touch(ctx, e.Summary.RepoID, branch); err != nil {
+		return false, err
+	}
+	return changed, nil
+}
+
 // ClearComments is review.comment.clear's whole orchestration — a thin pass-through plus Touch.
 func (e *RepoEntry) ClearComments(ctx context.Context, branch string) (int, error) {
 	n, err := e.review.ClearComments(ctx, e.Summary.RepoID, branch)
@@ -228,10 +245,16 @@ func (e *RepoEntry) anchorAll(ctx context.Context, at string, cs []gitreview.Com
 //  2. exit 1 (unreachable but present, the common rewrite case) or exit 128 (genuinely pruned) —
 //     both take stale: there is no honest mapping to compute, so the original range and sha are
 //     reported rather than guessed. Any other exit is the classified error.
+//
+// A working-origin comment (P418) skips the tiers: anchor "uncommitted", stored range.
 func (e *RepoEntry) anchorOne(
 	ctx context.Context, at string, c gitreview.Comment,
 	lineCounts map[string]int, patches map[string][]porcelain.DiffHunk,
 ) (gitreview.AnchoredComment, error) {
+	if c.Origin == gitreview.OriginWorking {
+		// Its range is in worktree coordinates: a commit diff would mis-project it.
+		return gitreview.AnchoredComment{Comment: c, Anchor: gitreview.AnchorUncommitted, Range: c.Range}, nil
+	}
 	currentOID, err := e.blobOID(ctx, at, c.Path)
 	if err != nil {
 		return gitreview.AnchoredComment{}, err

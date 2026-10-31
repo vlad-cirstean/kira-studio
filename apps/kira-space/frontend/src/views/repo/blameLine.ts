@@ -90,16 +90,18 @@ export function blameLineText(state: Extract<BlameLineState, { kind: 'resolved' 
     : t('common.commaPair.label', { first: state.author, second: age });
 }
 
-/** Two lines: the clamped subject, then `<author>, <absolute date>`. */
-export function blameLineTooltip(state: Extract<BlameLineState, { kind: 'resolved' }>): string[] {
+/** The tooltip parts: the clamped subject (or a no-message placeholder), author and absolute date. */
+export function blameLineTooltip(state: Extract<BlameLineState, { kind: 'resolved' }>): {
+  subject: string;
+  author: string;
+  date: string;
+} {
   const subject = clampSubject(state.summary);
-  return [
-    subject.length > 0 ? subject : t('space.repo.blame.noMessage.label'),
-    t('common.commaPair.label', {
-      first: state.author,
-      second: formatAbsoluteUtc(state.authorTimeSeconds),
-    }),
-  ];
+  return {
+    subject: subject.length > 0 ? subject : t('space.repo.blame.noMessage.label'),
+    author: state.author,
+    date: formatAbsoluteUtc(state.authorTimeSeconds),
+  };
 }
 
 // `blame.line` needs this connection to already hold the repo — `ensureRepoOpen` (moved to

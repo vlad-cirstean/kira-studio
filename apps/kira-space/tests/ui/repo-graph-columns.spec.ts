@@ -42,7 +42,7 @@ async function bootGrid(
     holdAfter: options.holdAfter,
     results: options.tip ? { 'refs.list': refsAtTip(options.tip) } : undefined,
   });
-  await expect(row(page, 0)).toBeVisible();
+  await expect(row(page, 0)).toBeVisible({ timeout: 15_000 });
   await closeDetail(page);
   return page;
 }

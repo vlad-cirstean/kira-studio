@@ -6,17 +6,17 @@ import { computed, onMounted, onScopeDispose } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
-import AdeArchivedPage from '../archived/AdeArchivedPage.vue';
-import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdeAgentDialog from '../dialog/AdeAgentDialog.vue';
+import AdeLaterPage from '../later/AdeLaterPage.vue';
 import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
 import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
 import { usePlanModel } from '../plan/usePlanModel';
-import { useBacklog } from '../queries';
+import AdeBranchRequestDialog from '../request/AdeBranchRequestDialog.vue';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
+import AdeStageDialog from '../stage/AdeStageDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
@@ -30,10 +30,12 @@ async function onView(view: unknown): Promise<void> {
   if (view === ui.view || (ui.view === 'workflows' && !(await wfUi.leave()))) return;
   ui.view = view as typeof ui.view;
 }
-const backlog = useBacklog();
-const count = computed(() => backlog.data.value?.items.length ?? 0);
 const { model } = usePlanModel();
-const archivedCount = computed(() => model.value?.board.history.length ?? 0);
+/** The panel on the Later tab opens only for a task that sits on a shelf. */
+const shelfSelected = computed(() => {
+  const id = ui.selectedTaskId;
+  return id !== null && (model.value?.cardFor(id)?.shelf ?? 'plan') !== 'plan';
+});
 const needsCount = computed(() => model.value?.needs.badge ?? 0);
 
 // Review code on the focused branch or card, else the selected one.
@@ -99,20 +101,6 @@ onScopeDispose(() => offReviewCode?.());
     >
       <TabsList class="justify-self-start">
         <TabsTrigger
-          value="backlog"
-          :class="tabChipVariants({ active: ui.view === 'backlog', size: 'wide' })"
-          data-testid="ade-tab-backlog"
-        >
-          {{ t('space.common.backlog.label') }}
-          <span
-            class="text-kira-sm tabular-nums text-muted-foreground"
-            data-testid="ade-backlog-count"
-            >{{
-              count
-            }}</span
-          >
-        </TabsTrigger>
-        <TabsTrigger
           value="needs"
           :class="tabChipVariants({ active: ui.view === 'needs', size: 'wide' })"
           data-testid="ade-tab-needs"
@@ -130,18 +118,11 @@ onScopeDispose(() => offReviewCode?.());
           {{ t('space.common.plan.label') }}
         </TabsTrigger>
         <TabsTrigger
-          value="archived"
-          :class="tabChipVariants({ active: ui.view === 'archived', size: 'wide' })"
-          data-testid="ade-tab-archived"
+          value="later"
+          :class="tabChipVariants({ active: ui.view === 'later', size: 'wide' })"
+          data-testid="ade-tab-later"
         >
-          {{ t('space.ade.panel.archived.label') }}
-          <span
-            class="text-kira-sm tabular-nums text-muted-foreground"
-            data-testid="ade-archived-count"
-            >{{
-              archivedCount
-            }}</span
-          >
+          {{ t('common.later.label') }}
         </TabsTrigger>
       </TabsList>
       <div class="mx-2 flex items-center gap-2">
@@ -159,9 +140,11 @@ onScopeDispose(() => offReviewCode?.());
       </TabsList>
     </nav>
     <div class="flex min-h-0 flex-1 gap-0.5">
-      <AdeBacklogPage v-if="ui.view === 'backlog'" />
+      <template v-if="ui.view === 'later'">
+        <AdeLaterPage />
+        <AdePanel v-if="shelfSelected" />
+      </template>
       <AdeNeedsPage v-else-if="ui.view === 'needs'" />
-      <AdeArchivedPage v-else-if="ui.view === 'archived'" />
       <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
       <template v-else>
         <AdePlanView />
@@ -172,5 +155,7 @@ onScopeDispose(() => offReviewCode?.());
     <AdeAgentDialog />
     <AdeAbortRebaseDialog />
     <AdeTakeOverDialog />
+    <AdeStageDialog :routed="false" />
+    <AdeBranchRequestDialog :routed="false" />
   </Tabs>
 </template>

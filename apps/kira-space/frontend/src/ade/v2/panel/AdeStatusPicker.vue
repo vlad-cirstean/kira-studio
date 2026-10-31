@@ -63,7 +63,7 @@ async function move(statusId: string): Promise<void> {
             :data-testid="`ade-status-option-${s.id}`"
             @select="move(s.id)"
           >
-            <AdeChip :label="s.name" :tone="s.tone" />
+            <AdeChip :label="s.name" :color="s.color" />
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
