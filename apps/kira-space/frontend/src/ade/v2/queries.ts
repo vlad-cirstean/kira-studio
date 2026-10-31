@@ -385,6 +385,10 @@ export function useStartBranch() {
   return useMutation({ mutationFn: (args: StartBranchArgs) => control.adeTaskStartBranch(args) });
 }
 
+export function useStartAdHoc() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskStartAdHoc(args) });
+}
+
 export function useSend() {
   return useMutation({ mutationFn: (args: SendArgs) => control.adeTaskSend(args) });
 }

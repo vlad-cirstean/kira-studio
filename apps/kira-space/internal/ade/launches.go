@@ -579,11 +579,27 @@ func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLi
 
 // StartBranch opens an interactive session on one branch's worktree (R16).
 func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArgs) (adewire.Launch, error) {
+	return b.startBranch(ctx, args.BranchID, func(tc *taskCtx, sb model.AdeTaskBranch, path string) string {
+		if args.Message != "" {
+			return args.Message
+		}
+		return composeStartMessage(b.prompts(), taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
+			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc), b.handoverFor(tc, b.currentStepID(tc)))
+	})
+}
+
+// StartAdHoc opens an agent session on the branch's worktree with no first message.
+func (b *TaskBoard) StartAdHoc(ctx context.Context, args adewire.BranchArgs) (adewire.Launch, error) {
+	return b.startBranch(ctx, args.BranchID, func(*taskCtx, model.AdeTaskBranch, string) string { return "" })
+}
+
+// startBranch holds every Start rule; message supplies the first prompt once the worktree is ready.
+func (b *TaskBoard) startBranch(ctx context.Context, branchID string, message func(tc *taskCtx, sb model.AdeTaskBranch, path string) string) (adewire.Launch, error) {
 	tr, err := b.tracker()
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	sb, err := b.deps.Tasks.GetBranch(args.BranchID)
+	sb, err := b.deps.Tasks.GetBranch(branchID)
 	if err != nil {
 		return adewire.Launch{}, err
 	}
@@ -594,8 +610,8 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	if sb, _ = tc.branch(args.BranchID); sb.ID == "" {
-		return adewire.Launch{}, invalid("branch %s is not on a live task", args.BranchID)
+	if sb, _ = tc.branch(branchID); sb.ID == "" {
+		return adewire.Launch{}, invalid("branch %s is not on a live task", branchID)
 	}
 	if sb.Name == "" {
 		return adewire.Launch{}, invalid("the branch is not created yet")
@@ -622,12 +638,7 @@ func (b *TaskBoard) StartBranch(ctx context.Context, args adewire.StartBranchArg
 	if err := b.checkNoBackgroundRun(sb); err != nil {
 		return adewire.Launch{}, err
 	}
-	message := args.Message
-	if message == "" {
-		message = composeStartMessage(b.prompts(), taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL,
-			repoLine{Nick: b.repoNick(tc, sb), Branch: sb.Name, Worktree: path}, b.firstOpenStep(tc), b.rebaseContext(tc), b.handoverFor(tc, b.currentStepID(tc)))
-	}
-	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message}, "", "")
+	return b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, BranchID: sb.ID, Cwd: path, Message: message(tc, sb, path)}, "", "")
 }
 
 // checkNoBackgroundRun refuses a session on a worktree a run or a rebase is working in.

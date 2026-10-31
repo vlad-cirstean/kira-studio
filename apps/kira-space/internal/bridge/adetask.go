@@ -1077,6 +1077,14 @@ func (s *AdeTaskService) StartBranch(ctx context.Context, args adewire.StartBran
 	return l, adeTaskError(err)
 }
 
+func (s *AdeTaskService) StartAdHoc(ctx context.Context, args adewire.BranchArgs) (adewire.Launch, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.Launch{}, err
+	}
+	l, err := s.Engine.StartAdHoc(ctx, args)
+	return l, adeTaskError(err)
+}
+
 func (s *AdeTaskService) Send(ctx context.Context, args adewire.SendArgs) error {
 	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
 		return err
