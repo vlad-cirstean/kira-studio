@@ -7225,3 +7225,71 @@ Agents panel. `AdeShell` bar loses `border-b` and becomes a `1fr auto 1fr` grid:
 ### v0.2.22 P403 (Done)
 Code review round 1 ran, findings fixed; migration 0054 snapshots review comments per row. Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.22/` removed. PR opened to `main`.
 <!-- /chapter v0.2.22 -->
+
+<!-- chapter v0.2.23 -->
+## v0.2.23
+Source: docs/v0.2.23/ at 13ec38999c79. 21 phases.
+
+### v0.2.23 P404 (Done)
+Board shows archived tasks inline by `taskTitle`; Archived tab, page and store removed. Compact History toggle plus `AdeArchivedFinder` search popover. Stopped archived sessions resume via Restore, then Take over (`resumeArchived`). Weekend bands hatched. Branch tags keep tone (`AdeChip` `data-tone`). Card shows session state (`input`, `running`, `finished`) via `taskSessionsOf`. Tests `TestArchiveRisk`, `TestResumeArchivedSession`; `plan-branches-stacked` baseline re-recorded.
+
+### v0.2.23 P405 (Done)
+Shelf model on `ade_task_plan` (migration 0055 adds `backlog`): Later is undated non-review work, Backlog is flagged rows, review items never shelve. `ShelveTask` and `CaptureTask` (top of Later). Migration 0056 folds `ade_backlog` into repo-less Backlog tasks and drops the table. Desktop Later tab with Later and Backlog drag lists in one Sortable group; Plan tail band is "Further out". Mobile `LaterScreen` with `later/items` and `shelf/move` routes. Tests `TestShelves`, `TestMigration56FoldsBacklogIntoTasks`, contracts `ade-shelf`, `mobile-board`.
+
+### v0.2.23 P406 (Done)
+`request_branch` takes only `repo`; Kira Space names new branches `kira/<10-char nanoid>` (`claimBranchName`, 5 tries on a taken name). New `internal/shortid` shares the nanoid alphabet with memory ids. `validateAgentBranch` gone; name-validation table moved to `TestTaskBranchEditRefusals`. Real `claude` ADE, smart script and memory rows pass.
+
+### v0.2.23 P407 (Done)
+Migration 0057 `ade_task_handovers`: one handed row per stage move, one open draft per (task, stage). MCP tool `handover` (`notes`, `finished`); `Grant.StepID` makes a late call fail with "The task moved on". `StepDone` and `SetTaskStep` take `notes`; a finished run inserts a `run` row from its summaries. Next stage prompts carry task notes and handover. Desktop `AdeStageDialog`, `AdeHandoverPrompt`, `AdeHandoverList`; mobile Back/Next takes optional notes. Tests `TestStageHandover` (`ade-handover`), `ade-v2-handover.spec.ts`; ADE real `claude` row passes.
+
+### v0.2.23 P408 (Done)
+`request_branch` became `request_branches` (`repos`, 1 to 20): one blocking call, one routed `branch-request` prompt, per-repo `created`, `existing`, `denied`, `timeout` or `failed`. Engine `ade/branchrequest.go` (30 min, one request per task). Kira Space tools always on; `kira_space_mcp` ignored on load. Desktop `AdeBranchRequestDialog`. CLI cuts an MCP call at 60 s, so every `claude` launch sets `MCP_TOOL_TIMEOUT=2100000`. Run sandbox allows per-repo `wt/<repo>` folders for unnamed branches (macOS Seatbelt not verifiable). Tests `TestBranchRequest`, `ade-v2-branch-request.spec.ts`, real `TestAdeBranchRequest`.
+
+### v0.2.23 P409 (Done)
+Table `ade_task_artifacts` (migration 0058) stores agent and user reports; detected ones (tracker link, branches, commits, change requests, deployments) derive on read. Aggregator `ade/artifacts.go` with `ArtifactSource` seam, 5 s per source, failure becomes a gap, dedup by URL or (kind, repo, ref). MCP `report_artifacts`; `finish_step` and `handover(finished:true)` append compact JSON. Artifacts tab in task and archived panels. Tests `TestTaskArtifacts`, `ade-v2-artifacts.spec.ts`, real `TestAdeReportArtifacts`.
+
+### v0.2.23 P410 (Done)
+`AdeTaskService.StartAdHoc(branchId)` opens an agent TUI on a branch worktree with no first message, sharing `StartBranch` rules. Plus menu `AdeTaskLaunchMenu.vue` on card head and Sessions tab bar: per worktree a Terminal or agent session; disabled items show the reason. Tests `TestAdHocSession`, `ade-v2-task-launch.spec.ts`, real `TestAdeAdHocSession`.
+
+### v0.2.23 P411 (Done)
+Status editor moved from Settings to the Workflows page. A status is id, name, color (16 `--kira-status-*`), position; categories gone. Four default slots (`new`, `step`, `review`, `finished`) in `ade_task_status_defaults`; empty keeps current status. Delete requires a reassign target per removed id. Edits never touch existing tasks. Migration 0059 seeds slots from the first status per old category. Tests `TestTaskStatuses`, `ade-v2-task-status.spec.ts`; 4 Settings baselines re-recorded.
+
+### v0.2.23 P412 (Done)
+Title bar badge `ade-review-head` ("At {short} head" or warn "Stale", `useReviewHead`, shared `headStale` rule). Refreshes on mount, focus, 60 s staleness and `repo.changed`; no polling. `changeRequestURL` var in review agent prompts (task link first, else branch lookup, never blocks a launch). Tests `ade-review-actions` `#stale`, `TestReviewAgentLinksChangeRequest`, `TestReviewAgentLinksPR`. Fixed flaky `TestFirstRunJourney` and a wheel-scroll `ui` spec.
+
+### v0.2.23 P413 (Done)
+Plus replaces the line number (Monaco 0.56 `lineNumberClassName`); glyph margin gone on both panes (64/82px to 46px). Hunk mark is a one-line view zone (`ReviewHunkMark.vue`). Threads are spacer zone plus overlay widget (`ReviewThread.vue`), height capped at `max(12 lines, 80% of editor)`, wheel scrolls the box. New `review.comment.edit`, `ContractVersion` 55 to 56. Keystroke leak not reproduced; no containment added. Tests `TestCommentEdit` (`git-review-edit`), UI specs, new baseline `review-diff-gutter`.
+
+### v0.2.23 P414 (Done)
+Status bar shows running ADE agents ("N agents · M needs input"); popover lists sessions, row opens via `useOpenSession`. Bar is 22px in interface font. Every item is a `StatusBarItem` with a `tip` slot. Tooltips share one elevated ground, no arrow, fade only; new `TooltipDetails`. Tests `TestRunningSessionsList`, `status-agents.spec.ts`; baselines re-recorded. Fixed flaky `TestTaskArtifacts`. Not covered: agents item when the last agent stops.
+
+### v0.2.23 P415 Part 1 (Done)
+Op log persisted (`op_log`, migration 0060, 30 days / 5000 rows), two lanes (foreground 500, background 300), batched `kira:op:batch`, failure dedupe, redaction. `oplog.RecordingRunner` on the shared `gitclient.Runner` records every git spawn from every module; `Origin` stamped per caller. ADE git moved onto the shared runner. Session ops with Cancel; in-app MCP ops via `Options.OnToolCall`. Panel gains module, subject, background toggle, steps list, "Via <tool>", Copy details. Tests `TestOpsLogAndCancel`, `TestOpsEveryGitSpawn`, `TestOpsAde`, `TestOpsBackgroundDedupe`, `operations.spec.ts`. Fixed flaky `TestDeployment_scriptStates`.
+
+### v0.2.23 P415 Part 2 (Done)
+Memory MCP tool calls reach the Operations panel. `internal/mcpcall.Record` middleware shared with `agentmcp`. `kira-space memory-mcp` writes `op_log` rows into `kira.db` through its own `oplog.Log`; no-op if `kira.db` or table absent. Owner holds `op-owners/<token>.lock`; app polls `data_version` every 1 s and ingests foreign rows by rowid cursor. Orphaned running row becomes `error`. Not cancellable. Tests `TestMemoryMcpOps` (`space-ops-memory`), `operations-memory.spec.ts`. Follow-up: `oplogforeign.go` duplicates the `Recent` column list.
+
+### v0.2.23 P416 (Done)
+Finished automation runs list in the Operations panel of both apps; Automations panel keeps only running and waiting runs. Runs stay in `script_runs` and project to `run:<id>` rows (`automationOp`, `useAutomationOps`). Failed runs persist `outcome.outputTail` (40 lines, 8 KiB) via `termtext.Tail`; `internal/termtext` is the single ANSI stripper. Fixed `BoundService.Open` gocognit and a stale Studio data-grid snapshot.
+
+### v0.2.23 P417 (Done)
+`internal/issuetracker` mirrors `githost`; Jira provider shells to `acli`, credentials stay in acli. acli returns title, status and PR count only, so PR rows come from code host search by key plus head-branch index; gap shows Jira's count against rows found. Commit-only links stay a known limitation. Settings "CLI tools" pane for gh and acli. Every acli call is a background op-log row (`oplog.RecordingToolRunner`). Tests `TestTaskIssueTracker`, `TestCliTools`; jira units over hand-written fixtures.
+
+### v0.2.23 P418 (Done)
+Review window reviews uncommitted work like committed. review.db gains `review_working_file`, `review_working_range` (gitreview 0005) and `origin`, `anchor_content` on `review_comment`. Working records store a sha256-hashed snapshot (text to 1 MiB). `PromoteWorkingReview` moves marks and comments onto the committed review once a commit lands them. git-ipc contract v57. Files pane splits Committed and Uncommitted. Agent panel off by default (`kira.ade.review.agentPanel`). Tests `TestReviewWorkingReview`, `ade-v2-review-working.spec.ts`.
+
+### v0.2.23 P419 (Done)
+Git module files editable: read only by default, Edit on a worktree `repo-file` tab, save via button or Cmd/Ctrl+S, Done asks to discard when dirty. `ReadFileForEdit` returns content plus SHA-256; `WriteFile` checks base hash under a mutex, answers `E_CONFLICT`, replaces atomically via renameio keeping mode, BOM and EOL, refuses over 8 MiB. Conflict alert offers Refresh or Overwrite. Tests `TestEditFile` (`repo-file-edit.json`), `repo-file-edit.spec.ts`. Quit with unsaved edit discards silently: Known open item.
+
+### v0.2.23 P420 Part 1 (Done)
+Kira Studio validation proof backend. Migration 0046 (sessions, revisions, steps, view state). Service limits: 100 steps, 5 drafts, 32 MiB per session, 30-session retention. Five kira-db MCP tools (`proof_start_session`, `proof_edit_session`, `proof_add_step`, `proof_close_session`, `proof_list_sessions`) read raw args so integer precision and key order survive. Draft/revision edit model; `ProofService` bridge; ephemeral `proof-` windows purged at startup; `proof` prompt kind. Tests `proofflow` (`proof.json`, `proof-pending.json`), real `TestProofMcpThroughClaude`.
+
+### v0.2.23 P420 Part 2 (Done)
+Proof window UI: history of 30 with hover delete, tab strip in step order, `ConsoleResultGrid` plus read-only Monaco, change panel (current, proposed, compare, accept, reject), ready prompt. View state persists per step and revision (cache writes throttled 120 ms). Screenshot via `modern-screenshot` 4.7.0 (MIT): clipboard by default, dropdown saves to disk, one or all tabs. 8 UI specs, 3 Studio visual baselines. Known: 4 Studio tests reported "did not run" once, not reproduced.
+
+### v0.2.23 P421 (Done)
+Two review rounds, findings fixed. Round 1 (F1-F4): working review writes guarded by content hash with `E_CONFLICT`, redaction, run-note restore, tracker fixes. Round 2 (R2-F1..F6): per-path hashes on list marks, refused-mark notice and reload, review reload only when branch tip or dirty state moved, `ade-v2-review` context-menu test waits on a ready marker, proof step failing to load counts as ready, released proof page drops its console runtime. Known: `ReviewWorking` reads every changed file once per refresh to hash it.
+
+### v0.2.23 P422 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.23/` removed. PR opened to `main`.
+<!-- /chapter v0.2.23 -->
