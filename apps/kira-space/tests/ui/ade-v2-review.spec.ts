@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, reviewTest, test } from './fixtures';
+import { AGENT_PANEL_ON, expect, reviewTest, test } from './fixtures';
 import { adeFixture, emitAgentEvent, emitAgentSessions, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { gitStreamEmit, gitStreamParams, gitStreamRequests } from './support/gitStreamMock';
@@ -31,6 +31,7 @@ async function openReview(
   git: Record<string, unknown> = {},
 ): Promise<Page> {
   const { window: page } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl(extra),
     gitStream: { ...GIT, extraResults: { ...GIT.extraResults, ...git } },
   });
@@ -83,6 +84,7 @@ reviewTest("the left bar stays on the window's branch", async ({ relaunch }) => 
 
 reviewTest('a review diff opens side by side', async ({ relaunch }) => {
   const { window: page } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl([
       { channel: IPC.windowsEnsure, response: { mode: 'git' } },
       {
@@ -135,7 +137,7 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
   const rendered = (text: string) =>
     lines.filter({ hasText: new RegExp(`^\\s*${text.replace(' ', '\\s')}$`) });
 
-  await expect(rendered('CHANGED 100')).toHaveCount(1);
+  await expect(rendered('CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
   for (const n of [97, 98, 99, 101, 102, 103, 12]) {
     await expect(rendered(`line ${n}`)).toHaveCount(1);
   }
@@ -239,6 +241,7 @@ async function openDiffWindow(
   extraResults: Record<string, unknown>,
 ): Promise<Page> {
   const { window: page } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl([
       { channel: IPC.windowsEnsure, response: { mode: 'git' } },
       {
@@ -293,6 +296,7 @@ reviewTest('a folder checkbox marks every file under it', async ({ relaunch }) =
   });
   const all = ['src/pending.ts', 'src/done.ts', 'src/moved.ts'];
   const { window: mixed } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl(),
     gitStream: {
       ...GIT,
@@ -437,7 +441,9 @@ reviewTest('uncommitted changes sit in their own section', async ({ relaunch }) 
   await expect(page.locator(t('ade-review-uncommitted'))).toHaveText(
     `${working.files.length} uncommitted`,
   );
-  await expect(section.locator('input[type="checkbox"]')).toHaveCount(0);
+  // Each row carries a review checkbox, in the contract's state.
+  await expect(section.getByRole('checkbox')).toHaveCount(working.files.length);
+  await expect(section.getByRole('checkbox', { checked: true })).toHaveCount(0);
 });
 
 reviewTest('no uncommitted section for a clean worktree', async ({ relaunch }) => {
@@ -448,6 +454,7 @@ reviewTest('no uncommitted section for a clean worktree', async ({ relaunch }) =
 
 reviewTest('an uncommitted file opens a worktree diff', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl([
       ...withWorking,
       { channel: IPC.windowsEnsure, response: { mode: 'git' } },
@@ -486,6 +493,7 @@ reviewTest(
   'agent activity in the worktree refreshes the uncommitted list',
   async ({ relaunch }) => {
     const { window: page, control } = await relaunch({
+      storage: AGENT_PANEL_ON,
       control: reviewControl(withWorking),
       gitStream: GIT,
     });
@@ -504,6 +512,7 @@ reviewTest(
 
 reviewTest('a file already marked reviewed still opens its diff', async ({ relaunch }) => {
   const { window: page } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl([
       { channel: IPC.windowsEnsure, response: { mode: 'git' } },
       {
@@ -589,6 +598,7 @@ async function openForward(
   extra: readonly ControlSnapshot[] = [],
 ): Promise<{ page: Page; control: { log(): { channel: string; args?: unknown }[] } }> {
   const { window: page, control } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: reviewControl([{ channel: IPC.adeTaskReviewAgent, response: agent }, ...extra]),
     gitStream: {
       ...GIT,

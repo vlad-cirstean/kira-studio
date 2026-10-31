@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import type { reviewTest } from '../fixtures';
+import { AGENT_PANEL_ON, type reviewTest } from '../fixtures';
 import { adeFixture, adeV2Control } from './adeV2';
 import { contract } from './contract';
 import { IPC } from './ipcChannels';
@@ -92,6 +92,7 @@ export async function openWindow(
   comments: Wire[] = ANSWERED,
 ): Promise<{ page: Page; control: Awaited<ReturnType<typeof relaunch>>['control'] }> {
   const { window: page, control } = await relaunch({
+    storage: AGENT_PANEL_ON,
     control: adeV2Control([
       { channel: IPC.adeTaskReviewWindowTarget, response: target },
       { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },

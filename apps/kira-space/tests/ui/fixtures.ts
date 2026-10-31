@@ -23,7 +23,12 @@ export interface RelaunchOptions extends UiFixturesOptions {
    *  `support/gitStreamMock.ts`'s own doc comment for why that's a different install path than the
    *  per-spec `installGitStreamMock` default. */
   gitStream?: GitStreamMockArgs;
+  /** localStorage entries seeded before the page's scripts run. */
+  storage?: Readonly<Record<string, string>>;
 }
+
+/** The review window's agent panel is off by default; specs that drive it seed it on. */
+export const AGENT_PANEL_ON = { 'kira.ade.review.agentPanel': 'true' } as const;
 
 /**
  * Kira Studio's own `tests/ui/fixtures.ts`, ported — `relaunch()` means "open a fresh page against
@@ -36,6 +41,11 @@ export interface RelaunchOptions extends UiFixturesOptions {
  */
 const installMocks = async (page: Page, options?: RelaunchOptions): Promise<KiraAppExtra> => {
   const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
+  if (options?.storage) {
+    await page.addInitScript((entries: Record<string, string>) => {
+      for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value);
+    }, options.storage);
+  }
   if (options?.gitStream) {
     await installGitStreamMockOnInit(page, options.gitStream);
   }
