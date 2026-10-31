@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
@@ -54,8 +55,10 @@ func (s *AdeTaskService) ReviewWorkingMark(ctx context.Context, args adewire.Rev
 			return adewire.ReviewWorkingMarkResult{}, adeTaskInvalid("path is required")
 		}
 	}
-	if args.ContentHash != "" && len(args.Paths) != 1 {
-		return adewire.ReviewWorkingMarkResult{}, adeTaskInvalid("contentHash needs exactly one path")
+	for p := range args.ContentHashes {
+		if !slices.Contains(args.Paths, p) {
+			return adewire.ReviewWorkingMarkResult{}, adeTaskInvalid("contentHashes names a path outside paths")
+		}
 	}
 	if args.Ranges != nil {
 		if len(args.Paths) != 1 {

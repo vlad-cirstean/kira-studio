@@ -114,6 +114,8 @@ export const diffContentSchema = /*#__PURE__*/ z.object({
   language: z.string(),
   head: diffSideSchema,
   worktree: diffSideSchema,
+  /** Uncommitted review read only: identifies `worktree`, echoed on a mark or comment. */
+  contentHash: z.string().optional(),
 });
 export type DiffContent = z.infer<typeof diffContentSchema>;
 

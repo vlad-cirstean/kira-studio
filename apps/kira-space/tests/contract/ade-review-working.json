@@ -1,5 +1,11 @@
 {
   "AdeTaskService.ReviewWorking": {
+    "contentHashes": {
+      "fresh.txt": "02db0d2659c9d48bc15f81a388594fc0e3cf4c780fdc27ea21e0671afc37de19",
+      "gone.txt": "absent",
+      "keep.txt": "42b196c1d1d0818254320eab692b321fd014a0453e5c6f3534bcaf01178859fb",
+      "staged.txt": "346bdf947485c35fff1715eedf9d87118aa21a33ca3eeb43a80a0103d425b171"
+    },
     "files": [
       {
         "kind": "deleted",
@@ -41,6 +47,7 @@
     "worktree": "<worktree>"
   },
   "AdeTaskService.ReviewWorkingDiff": {
+    "contentHash": "42b196c1d1d0818254320eab692b321fd014a0453e5c6f3534bcaf01178859fb",
     "head": {
       "bytes": 9,
       "kind": "found",

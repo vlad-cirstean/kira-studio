@@ -53,7 +53,7 @@ function toDiffSide(result: {
 }
 
 interface DiffSidesLoaded {
-  diff: { head: DiffSide; worktree: DiffSide };
+  diff: { head: DiffSide; worktree: DiffSide; contentHash?: string };
   gitRepoId: string | undefined;
 }
 
@@ -187,6 +187,9 @@ export interface DiffEditorHandle {
    *  wiring, both single-active-view concerns this composable deliberately stays out of (this
    *  file's own header comment), reach the live editor through it. */
   editor: Ref<import('monaco-editor').editor.IStandaloneDiffEditor | null>;
+  /** Hash of the uncommitted worktree text the models were filled from; the caller keeps it in
+   *  step when it rewrites them. Undefined for a diff that is not an uncommitted review read. */
+  contentHash: Ref<string | undefined>;
   mount(): Promise<void>;
   /** onUnmounted — disposes the widget only; the model(s) survive in editors.ts (unmountEditor's
    *  own contract) until dropResources actually closes the tab. */
@@ -205,6 +208,7 @@ export function useDiffEditor(
 ): DiffEditorHandle {
   const state = ref<DiffEditorState>('loading');
   const errorMessage = ref('');
+  const contentHash = ref<string | undefined>();
   const editor = shallowRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null);
   let goToFileImpl: (() => void) | null = null;
   let stopLayoutWatch: WatchStopHandle | null = null;
@@ -256,6 +260,7 @@ export function useDiffEditor(
     const language = monacoLanguageFor(path);
     const original = getOrCreateModel(mod, headUri.toString(), diff.head.text, language);
     const modified = getOrCreateModel(mod, worktreeUri.toString(), diff.worktree.text, language);
+    contentHash.value = diff.contentHash;
 
     const created = mod.editor.createDiffEditor(container.value, {
       theme: KIRA_EDITOR_THEME,
@@ -321,5 +326,5 @@ export function useDiffEditor(
     goToFileImpl?.();
   }
 
-  return { state, errorMessage, editor, mount, dispose, goToFile };
+  return { state, errorMessage, editor, contentHash, mount, dispose, goToFile };
 }

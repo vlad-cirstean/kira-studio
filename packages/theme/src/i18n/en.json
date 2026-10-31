@@ -8342,6 +8342,9 @@
           }
         },
         "working": {
+          "markRefused": {
+            "body": "The file changed on disk, so the mark was not saved. Reloaded; mark it again."
+          },
           "right": {
             "label": "Working tree"
           }

@@ -253,7 +253,7 @@ func (b *TaskBoard) ReviewWorking(ctx context.Context, branchID string) (adewire
 	}
 	if worktree == "" {
 		return adewire.ReviewWorking{
-			Files: []porcelain.FileChange{}, Reviews: map[string]gitsession.ReviewFileStatus{}, Promoted: []string{},
+			Files: []porcelain.FileChange{}, Reviews: map[string]gitsession.ReviewFileStatus{}, Promoted: []string{}, ContentHashes: map[string]string{},
 		}, nil
 	}
 	w, err := b.workingReview(ctx, branchID)
@@ -272,13 +272,33 @@ func (b *TaskBoard) ReviewWorking(ctx context.Context, branchID string) (adewire
 	for i, f := range files {
 		paths[i] = f.Path
 	}
-	reviews, err := entry.WorkingReviewStates(ctx, w.branch, paths, func(path string) (gitsession.WorkingContent, error) {
-		return w.current(ctx, path)
-	})
+	// One read per file serves both the review states and the hashes a list mark echoes back.
+	read := make(map[string]gitsession.WorkingContent, len(paths))
+	current := func(path string) (gitsession.WorkingContent, error) {
+		if c, ok := read[path]; ok {
+			return c, nil
+		}
+		c, err := w.current(ctx, path)
+		if err == nil {
+			read[path] = c
+		}
+		return c, err
+	}
+	reviews, err := entry.WorkingReviewStates(ctx, w.branch, paths, current)
 	if err != nil {
 		return adewire.ReviewWorking{}, err
 	}
-	return adewire.ReviewWorking{Worktree: worktree, Head: head, Files: files, Reviews: reviews, Promoted: promoted}, nil
+	hashes := make(map[string]string, len(paths))
+	for _, path := range paths {
+		c, err := current(path)
+		if err != nil {
+			return adewire.ReviewWorking{}, err
+		}
+		hashes[path] = wireHash(c)
+	}
+	return adewire.ReviewWorking{
+		Worktree: worktree, Head: head, Files: files, Reviews: reviews, Promoted: promoted, ContentHashes: hashes,
+	}, nil
 }
 
 // ReviewWorkingDiff reads one uncommitted file: the worktree HEAD side against the file on disk.
@@ -301,7 +321,12 @@ func (b *TaskBoard) ReviewWorkingDiff(ctx context.Context, branchID, path string
 	if cf == nil {
 		return codeworkspace.DiffContent{}, invalid("the repo is closing")
 	}
-	return codeworkspace.ReadDiffAt(ctx, cf, worktree, head, path)
+	d, err := codeworkspace.ReadDiffAt(ctx, cf, worktree, head, path)
+	if err != nil {
+		return d, err
+	}
+	d.ContentHash = wireHash(workingSide(d.Worktree))
+	return d, nil
 }
 
 // closeReviewWindows closes the task's review windows and drops their records (Archive). Review

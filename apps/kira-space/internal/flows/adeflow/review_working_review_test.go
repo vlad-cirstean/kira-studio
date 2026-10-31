@@ -1,6 +1,7 @@
 package adeflow_test
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -46,22 +47,27 @@ func TestReviewWorkingReview(t *testing.T) {
 	}
 	app.Contract(t, contract, "AdeTaskService.ReviewWorkingFile#unreviewed", file)
 
-	if file.ContentHash == "" {
-		t.Fatal("file review has no content hash")
+	shown, err := app.W.AdeTask.ReviewWorkingDiff(ctx, fileArgs)
+	if err != nil || shown.ContentHash == "" {
+		t.Fatalf("diff = %+v, %v, want a content hash", shown, err)
 	}
+	app.Contract(t, contract, "AdeTaskService.ReviewWorkingDiff", shown)
 	staleArgs := adewire.ReviewWorkingMarkArgs{
-		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}}, ContentHash: "stale",
+		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}},
+		ContentHashes: map[string]string{"base.txt": "stale"},
 	}
-	if _, err := app.W.AdeTask.ReviewWorkingMark(ctx, staleArgs); errCode(err) != "E_CONFLICT" {
+	_, err = app.W.AdeTask.ReviewWorkingMark(ctx, staleArgs)
+	if errCode(err) != "E_CONFLICT" {
 		t.Fatalf("mark on changed content = %v, want E_CONFLICT", err)
 	}
+	app.Contract(t, contract, "error:AdeTaskService.ReviewWorkingMark#changed", err.Error())
 	if _, err := app.W.AdeTask.ReviewWorkingCommentAdd(ctx, adewire.ReviewWorkingCommentAddArgs{
 		BranchID: br.ID, Path: "base.txt", Range: gitreview.LineRange{Start: 3, End: 3}, Body: "x", Kind: "change", ContentHash: "stale",
 	}); errCode(err) != "E_CONFLICT" {
 		t.Fatalf("comment on changed content = %v, want E_CONFLICT", err)
 	}
 	markArgs := adewire.ReviewWorkingMarkArgs{
-		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}}, ContentHash: file.ContentHash,
+		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}}, ContentHashes: map[string]string{"base.txt": shown.ContentHash},
 	}
 	app.Contract(t, contract, "args:AdeTaskService.ReviewWorkingMark", markArgs)
 	marked, err := app.W.AdeTask.ReviewWorkingMark(ctx, markArgs)
@@ -85,8 +91,30 @@ func TestReviewWorkingReview(t *testing.T) {
 	app.Contract(t, contract, "AdeTaskService.ReviewWorking", working,
 		flowharness.Mask("head", "reviewedAt", "reviewedAtSha"), flowharness.Replace(wt, "<worktree>"))
 
+	// A list mark guards every path: one stale hash refuses the whole call and marks nothing.
+	if working.ContentHashes["base.txt"] != shown.ContentHash {
+		t.Fatalf("list hash = %q, want the diff's %q", working.ContentHashes["base.txt"], shown.ContentHash)
+	}
+	writeIn(t, wt, "fresh.txt", "new\n")
+	listHashes, err := app.W.AdeTask.ReviewWorking(ctx, adewire.BranchArgs{BranchID: br.ID})
+	if err != nil || listHashes.ContentHashes["fresh.txt"] == "" {
+		t.Fatalf("list hashes = %+v, %v, want a hash for fresh.txt", listHashes.ContentHashes, err)
+	}
+	if _, err := app.W.AdeTask.ReviewWorkingMark(ctx, adewire.ReviewWorkingMarkArgs{
+		BranchID: br.ID, Paths: []string{"fresh.txt", "base.txt"}, Reviewed: true,
+		ContentHashes: map[string]string{"fresh.txt": listHashes.ContentHashes["fresh.txt"], "base.txt": "stale"},
+	}); errCode(err) != "E_CONFLICT" {
+		t.Fatalf("list mark with a stale hash = %v, want E_CONFLICT", err)
+	}
+	if after, err := app.W.AdeTask.ReviewWorking(ctx, adewire.BranchArgs{BranchID: br.ID}); err != nil || after.Reviews["fresh.txt"].Kind != "none" || after.Reviews["base.txt"].Kind != "partial" {
+		t.Fatalf("after refused list mark = %+v, %v, want nothing marked", after.Reviews, err)
+	}
+	if err := os.Remove(filepath.Join(wt, "fresh.txt")); err != nil {
+		t.Fatal(err)
+	}
+
 	addArgs := adewire.ReviewWorkingCommentAddArgs{
-		BranchID: br.ID, Path: "base.txt", Range: gitreview.LineRange{Start: 3, End: 3}, Body: "why bang?", Kind: "question", ContentHash: file.ContentHash,
+		BranchID: br.ID, Path: "base.txt", Range: gitreview.LineRange{Start: 3, End: 3}, Body: "why bang?", Kind: "question", ContentHash: shown.ContentHash,
 	}
 	app.Contract(t, contract, "args:AdeTaskService.ReviewWorkingCommentAdd", addArgs)
 	added, err := app.W.AdeTask.ReviewWorkingCommentAdd(ctx, addArgs)

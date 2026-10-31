@@ -58,6 +58,15 @@ func workingSide(s codeworkspace.DiffSide) gitsession.WorkingContent {
 	return gitsession.NewWorkingContent(gitreview.ContentAbsent, nil, 0)
 }
 
+// wireHash is the content hash the client echoes back. Absent content hashes to a fixed token,
+// so "" always means the client sent none.
+func wireHash(c gitsession.WorkingContent) string {
+	if c.Hash == "" {
+		return "absent"
+	}
+	return c.Hash
+}
+
 // read returns path's HEAD side and current worktree content.
 func (w *workingReview) read(ctx context.Context, path string) (head, cur gitsession.WorkingContent, err error) {
 	if _, err := codeworkspace.ValidateRelPath(w.worktree, path); err != nil {
@@ -126,7 +135,6 @@ func (b *TaskBoard) ReviewWorkingFile(ctx context.Context, branchID, path string
 	}
 	return adewire.ReviewWorkingFileReview{
 		Path: res.Path, Body: res.Body, ReviewedRanges: res.ReviewedRanges, LineCount: res.LineCount, ContentKind: res.ContentKind,
-		ContentHash: cur.Hash,
 	}, nil
 }
 
@@ -140,16 +148,21 @@ func (b *TaskBoard) ReviewWorkingMark(ctx context.Context, args adewire.ReviewWo
 	if _, err := w.promote(ctx); err != nil {
 		return adewire.ReviewWorkingMarkResult{}, err
 	}
-	files := make([]adewire.ReviewWorkingMarkFile, 0, len(args.Paths))
-	for _, path := range args.Paths {
-		_, cur, err := w.read(ctx, path)
+	// Read and check every path before writing any, so a conflict marks nothing.
+	cur := make([]gitsession.WorkingContent, len(args.Paths))
+	for i, path := range args.Paths {
+		c, err := w.current(ctx, path)
 		if err != nil {
 			return adewire.ReviewWorkingMarkResult{}, err
 		}
-		if args.ContentHash != "" && args.ContentHash != cur.Hash {
+		if want, ok := args.ContentHashes[path]; ok && want != wireHash(c) {
 			return adewire.ReviewWorkingMarkResult{}, ErrWorkingChanged
 		}
-		st, err := w.entry.MarkWorkingFile(ctx, w.branch, path, cur, w.head, args.Reviewed, args.Ranges)
+		cur[i] = c
+	}
+	files := make([]adewire.ReviewWorkingMarkFile, 0, len(args.Paths))
+	for i, path := range args.Paths {
+		st, err := w.entry.MarkWorkingFile(ctx, w.branch, path, cur[i], w.head, args.Reviewed, args.Ranges)
 		if err != nil {
 			return adewire.ReviewWorkingMarkResult{}, err
 		}
@@ -189,7 +202,7 @@ func (b *TaskBoard) ReviewWorkingCommentAdd(ctx context.Context, args adewire.Re
 	if err != nil {
 		return gitsession.CommentEntry{}, err
 	}
-	if args.ContentHash != "" && args.ContentHash != cur.Hash {
+	if args.ContentHash != "" && args.ContentHash != wireHash(cur) {
 		return gitsession.CommentEntry{}, ErrWorkingChanged
 	}
 	return w.entry.AddWorkingComment(ctx, w.branch, args.Path, cur, w.head, args.Range, args.Body, args.Kind)

@@ -1,5 +1,8 @@
 {
   "AdeTaskService.ReviewWorking": {
+    "contentHashes": {
+      "base.txt": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55"
+    },
     "files": [
       {
         "kind": "modified",
@@ -58,6 +61,23 @@
       }
     ]
   },
+  "AdeTaskService.ReviewWorkingDiff": {
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
+    "head": {
+      "bytes": 10,
+      "kind": "found",
+      "limitBytes": 8388608,
+      "text": "a\nb\nc\nd\ne\n"
+    },
+    "language": "plaintext",
+    "path": "base.txt",
+    "worktree": {
+      "bytes": 11,
+      "kind": "found",
+      "limitBytes": 8388608,
+      "text": "a\nb\nC!\nd\ne\n"
+    }
+  },
   "AdeTaskService.ReviewWorkingFile#reviewed": {
     "body": {
       "hunks": [
@@ -113,7 +133,6 @@
       ],
       "kind": "text"
     },
-    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
     "contentKind": "text",
     "lineCount": 5,
     "path": "base.txt",
@@ -179,7 +198,6 @@
       ],
       "kind": "text"
     },
-    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
     "contentKind": "text",
     "lineCount": 5,
     "path": "base.txt",
@@ -218,7 +236,9 @@
   },
   "args:AdeTaskService.ReviewWorkingMark": {
     "branchId": "<id:1>",
-    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
+    "contentHashes": {
+      "base.txt": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55"
+    },
     "paths": [
       "base.txt"
     ],
@@ -229,5 +249,6 @@
       }
     ],
     "reviewed": true
-  }
+  },
+  "error:AdeTaskService.ReviewWorkingMark#changed": "{\"code\":\"E_CONFLICT\",\"message\":\"The file changed while you reviewed it. Refresh the diff.\"}"
 }

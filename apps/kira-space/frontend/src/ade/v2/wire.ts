@@ -729,6 +729,7 @@ export interface ReviewWorking {
   files: FileChange[];
   reviews: Record<string, ReviewFileStatus> /* uncommitted review status by path */;
   promoted: string[] /* paths whose uncommitted review moved onto a commit in this call */;
+  contentHashes: Record<string, string> /* worktree content hash by path; echo it on a list mark */;
 }
 export interface ReviewWorkingDiffArgs {
   branchId: string;
@@ -740,14 +741,16 @@ export interface ReviewWorkingFileReview {
   reviewedRanges: LineRange[] /* worktree line numbers */;
   lineCount: number;
   contentKind: string /* 'text' | 'binary' | 'tooLarge' | 'absent' */;
-  contentHash: string /* worktree content the diff shows; echo it on mark and comment */;
 }
 export interface ReviewWorkingMarkArgs {
   branchId: string;
   paths: string[];
   reviewed: boolean;
   ranges: LineRange[] | null /* one path only; null = the whole file */;
-  contentHash?: string /* one path only; E_CONFLICT when the file changed since */;
+  contentHashes?: Record<
+    string,
+    string
+  > /* hash the user saw by path; E_CONFLICT, nothing marked, when any changed */;
 }
 export interface ReviewWorkingMarkResult {
   files: { path: string; review: ReviewFileStatus }[];

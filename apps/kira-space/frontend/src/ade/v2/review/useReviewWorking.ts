@@ -13,6 +13,11 @@ const reviewWorkingPrefix = ['adetask', 'reviewWorking'] as const;
 
 const reviewWorkingKey = (branchId: string) => [...reviewWorkingPrefix, branchId] as const;
 
+/** Re-reads the uncommitted list and every open diff; a refused write calls it to show the disk. */
+export function invalidateReviewWorking(): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: reviewWorkingPrefix });
+}
+
 export function reviewWorkingDiffOptions(branchId: string, path: string) {
   return queryOptions({
     queryKey: [...reviewWorkingKey(branchId), 'diff', path] as const,
@@ -59,7 +64,7 @@ function isInside(cwd: string, root: string): boolean {
  *  agent activity inside the worktree. There is no polling; an edit made elsewhere shows on refocus. */
 export function useReviewWorkingSync(target: () => ReviewWindowTarget | null): void {
   const invalidate = (): void => {
-    void queryClient.invalidateQueries({ queryKey: reviewWorkingPrefix });
+    void invalidateReviewWorking();
   };
   const invalidateSoon = useDebounceFn(invalidate, TIMING.fileSettle);
   const focused = useWindowFocus();

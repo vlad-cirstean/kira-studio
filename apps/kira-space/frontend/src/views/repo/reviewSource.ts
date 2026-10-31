@@ -15,6 +15,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { logError } from '@workbench/bridge/log';
+import { invalidateReviewWorking } from '../../ade/v2/review/useReviewWorking';
 import type { ReviewWindowTarget } from '../../ade/v2/wire';
 import { control } from '../../bridge/control';
 import { gitTransportFor, notifyReviewRepaint, onReviewRepaint } from '../../repo/git/transport';
@@ -199,29 +200,25 @@ export function committedReviewSource(deps: CommittedReviewDeps): ReviewSource {
 export function workingReviewSource(args: {
   readonly target: ReviewWindowTarget;
   readonly path: string;
+  /** Hash of the worktree text the editor shows right now; the server refuses a write if the file moved on. */
+  readonly shownHash: () => string | undefined;
+  /** A mark the server refused because the file changed; the view has been reloaded. */
+  readonly onMarkRefused: () => void;
 }): ReviewSource {
-  const { target, path } = args;
+  const { target, path, shownHash, onMarkRefused } = args;
   const { gitRepoId, branch, branchId } = target;
   let transport: Transport | null = null;
   const lease = (): Transport => {
     transport ??= gitTransportFor(target.codeRepoId);
     return transport;
   };
-  // Hash of the content the user last saw; the server refuses a write built on newer content.
-  let contentHash: string | undefined;
+  // On E_CONFLICT the diff query re-reads, which rewrites the editor's text, hunks and hash together.
+  const isConflict = (err: unknown): boolean => (err as { code?: string }).code === 'E_CONFLICT';
   const reloadOnConflict = async (write: () => Promise<unknown>): Promise<void> => {
     try {
       await write();
     } catch (err) {
-      if ((err as { code?: string }).code === 'E_CONFLICT') {
-        notifyReviewRepaint({
-          kind: 'mark',
-          scope: 'working',
-          repoId: gitRepoId,
-          branch,
-          paths: [path],
-        });
-      }
+      if (isConflict(err)) void invalidateReviewWorking();
       throw err;
     }
   };
@@ -229,7 +226,6 @@ export function workingReviewSource(args: {
     branch,
     async loadDiff() {
       const r = await control.adeTaskReviewWorkingFile({ branchId, path });
-      contentHash = r.contentHash;
       return toLoad(r.body, r.reviewedRanges, r.lineCount);
     },
     async loadComments() {
@@ -243,15 +239,21 @@ export function workingReviewSource(args: {
       );
     },
     async mark(range, reviewed) {
-      await reloadOnConflict(() =>
-        control.adeTaskReviewWorkingMark({
-          branchId,
-          paths: [path],
-          reviewed,
-          ranges: [range],
-          contentHash,
-        }),
-      );
+      const hash = shownHash();
+      try {
+        await reloadOnConflict(() =>
+          control.adeTaskReviewWorkingMark({
+            branchId,
+            paths: [path],
+            reviewed,
+            ranges: [range],
+            ...(hash === undefined ? {} : { contentHashes: { [path]: hash } }),
+          }),
+        );
+      } catch (err) {
+        if (isConflict(err)) onMarkRefused();
+        throw err;
+      }
       notifyReviewRepaint({
         kind: 'mark',
         scope: 'working',
@@ -262,7 +264,14 @@ export function workingReviewSource(args: {
     },
     async addComment(range, body, kind) {
       await reloadOnConflict(() =>
-        control.adeTaskReviewWorkingCommentAdd({ branchId, path, range, body, kind, contentHash }),
+        control.adeTaskReviewWorkingCommentAdd({
+          branchId,
+          path,
+          range,
+          body,
+          kind,
+          contentHash: shownHash(),
+        }),
       );
       notifyReviewRepaint({ kind: 'comments', repoId: gitRepoId, branch });
     },

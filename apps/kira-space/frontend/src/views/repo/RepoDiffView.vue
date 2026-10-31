@@ -2,9 +2,12 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { useTimeoutFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
@@ -119,6 +122,16 @@ function onGoToFile(): void {
 
 let diffEditor: ReturnType<typeof useDiffEditor> | null = null;
 
+// A mark the server refused: the file changed on disk, and the view reloaded to show it.
+const markRefused = ref(false);
+const hideRefused = useTimeoutFn(() => (markRefused.value = false), TIMING.postedStatus, {
+  immediate: false,
+});
+function onMarkRefused(): void {
+  markRefused.value = true;
+  hideRefused.start();
+}
+
 async function mount(): Promise<void> {
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
@@ -185,7 +198,12 @@ async function mount(): Promise<void> {
     reviewDecorations = attachReviewDecorations(
       mod,
       editor,
-      workingReviewSource({ target: workingTarget, path: props.tab.path }),
+      workingReviewSource({
+        target: workingTarget,
+        path: props.tab.path,
+        shownHash: () => diffEditor?.contentHash.value,
+        onMarkRefused,
+      }),
     );
   }
 
@@ -215,6 +233,8 @@ watch(
     if (models.modified.getValue() !== diff.worktree.text) {
       models.modified.setValue(diff.worktree.text);
     }
+    // The hash travels with the text it was read with, never ahead of what the editor shows.
+    if (diffEditor) diffEditor.contentHash.value = diff.contentHash;
     reviewDecorations?.reload();
   },
 );
@@ -292,6 +312,9 @@ onUnmounted(() => {
         </template>
       </SecondaryTabs>
     </ViewToolbar>
+    <Alert v-if="markRefused" variant="warn" data-testid="repo-diff-mark-refused">
+      <AlertDescription>{{ t('space.ade.review.working.markRefused.body') }}</AlertDescription>
+    </Alert>
     <div
       v-if="state === 'loading' || state === 'found'"
       ref="container"

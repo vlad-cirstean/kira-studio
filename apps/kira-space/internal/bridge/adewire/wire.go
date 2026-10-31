@@ -1014,6 +1014,8 @@ type ReviewWorking struct {
 	Files    []porcelain.FileChange                 `json:"files"`
 	Reviews  map[string]gitsession.ReviewFileStatus `json:"reviews"`
 	Promoted []string                               `json:"promoted"`
+	// ContentHashes is each listed file's worktree content hash; echo it on a list mark.
+	ContentHashes map[string]string `json:"contentHashes"`
 }
 
 // ReviewWorkingFileReview is one uncommitted file's diff with the lines already marked reviewed.
@@ -1023,8 +1025,6 @@ type ReviewWorkingFileReview struct {
 	ReviewedRanges []gitreview.LineRange  `json:"reviewedRanges"`
 	LineCount      int                    `json:"lineCount"`
 	ContentKind    string                 `json:"contentKind"`
-	// ContentHash identifies the worktree content the diff shows; send it back with a mark or comment.
-	ContentHash string `json:"contentHash"`
 }
 
 // ReviewWorkingMarkArgs marks or unmarks uncommitted files. Ranges (one path only, worktree line
@@ -1034,9 +1034,10 @@ type ReviewWorkingMarkArgs struct {
 	Paths    []string              `json:"paths"`
 	Reviewed bool                  `json:"reviewed"`
 	Ranges   []gitreview.LineRange `json:"ranges"`
-	// ContentHash, when set (one path only), is the ReviewWorkingFileReview hash the caller saw;
-	// E_CONFLICT when the file has changed since.
-	ContentHash string `json:"contentHash,omitempty"`
+	// ContentHashes maps a path to the hash of the content the caller saw (ReviewWorkingDiff's
+	// contentHash, or ReviewWorking's); E_CONFLICT, nothing marked, when any listed path changed.
+	// A path with no entry is not checked.
+	ContentHashes map[string]string `json:"contentHashes,omitempty"`
 }
 
 // ReviewWorkingMarkFile is the status of one path after a mark.
@@ -1063,7 +1064,7 @@ type ReviewWorkingCommentAddArgs struct {
 	Range    gitreview.LineRange `json:"range"`
 	Body     string              `json:"body"`
 	Kind     string              `json:"kind"`
-	// ContentHash, when set, is the ReviewWorkingFileReview hash the caller saw; E_CONFLICT when
+	// ContentHash, when set, is the ReviewWorkingDiff hash the caller saw; E_CONFLICT when
 	// the file has changed since.
 	ContentHash string `json:"contentHash,omitempty"`
 }

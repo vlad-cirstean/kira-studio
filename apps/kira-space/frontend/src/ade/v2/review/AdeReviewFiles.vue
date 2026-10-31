@@ -2,7 +2,9 @@
 import type { ReviewComment } from '@kira/git-ipc';
 import type { MountHandle, ReviewApi } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { useWindowFocus } from '@vueuse/core';
+import { t } from '@theme/i18n';
+import { useTimeoutFn, useWindowFocus } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { logError } from '@workbench/bridge/log';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
@@ -12,7 +14,11 @@ import { ensureRepoOpen } from '../../../state/repoOpenHold';
 import { openRepoWorkingReviewTab } from '../../../state/repoTabs';
 import { useReviewNavigationStore } from '../../../state/reviewNavigation';
 import type { ReviewWindowTarget } from '../wire';
-import { useReviewWorking, useReviewWorkingMark } from './useReviewWorking';
+import {
+  invalidateReviewWorking,
+  useReviewWorking,
+  useReviewWorkingMark,
+} from './useReviewWorking';
 
 // The review window's left pane: git-ui's review view locked to this window's branch and base.
 const props = defineProps<{ target: ReviewWindowTarget }>();
@@ -53,16 +59,33 @@ function repaintWorking(paths: readonly string[]): void {
   });
 }
 
+// The server refused a list mark because a file changed after the list was read.
+const markRefused = ref(false);
+const hideRefused = useTimeoutFn(() => (markRefused.value = false), TIMING.postedStatus, {
+  immediate: false,
+});
+
 async function toggleWorking(paths: readonly string[], reviewed: boolean): Promise<void> {
+  // Hashes of the list the user is looking at; a file with none (a list still loading) is unchecked.
+  const shown = working.data.value?.contentHashes ?? {};
+  const contentHashes = Object.fromEntries(
+    paths.flatMap((p) => (shown[p] === undefined ? [] : [[p, shown[p]]])),
+  );
   try {
     await mark.mutateAsync({
       branchId: props.target.branchId,
       paths: [...paths],
       reviewed,
       ranges: null,
+      contentHashes,
     });
   } catch (err) {
     logError('adeReviewFiles', 'uncommitted review mark failed', err);
+    if ((err as { code?: string }).code === 'E_CONFLICT') {
+      markRefused.value = true;
+      hideRefused.start();
+      void invalidateReviewWorking();
+    }
     return;
   }
   repaintWorking(paths);
@@ -147,7 +170,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!errorMessage" ref="container" class="h-full w-full" data-testid="ade-review-files" />
+  <div v-if="!errorMessage" class="flex h-full w-full flex-col">
+    <Alert v-if="markRefused" variant="warn" data-testid="ade-review-files-mark-refused">
+      <AlertDescription>{{ t('space.ade.review.working.markRefused.body') }}</AlertDescription>
+    </Alert>
+    <div ref="container" class="min-h-0 w-full flex-auto" data-testid="ade-review-files" />
+  </div>
   <Alert v-else variant="info">
     <AlertDescription>{{ errorMessage }}</AlertDescription>
   </Alert>
