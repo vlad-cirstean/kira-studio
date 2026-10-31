@@ -61,7 +61,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Generic capture from any app: copy, press a global hotkey, Kira Space opens a quick-capture popup and reads the clipboard. No Accessibility permission; no selection reading.
 - Popup recognises the content and preselects an action so Enter confirms: GitHub or Azure PR link opens the PR view, Jira key or link opens the issue viewer, anything else goes to Later.
 - Global hotkey needs no Accessibility on macOS (`RegisterEventHotKey`); Wayland uses a portal or the desktop's shortcut settings.
-- Out of scope: clipboard watcher (reads every copy), URL scheme, Share/Services menu, browser extension.
+- No tray icon. The hotkey works while the app process runs (macOS keeps it running with no window). On Windows and Linux it works only while the app is running; no background mode.
+- Out of scope: tray icon, clipboard watcher (reads every copy), URL scheme, Share/Services menu, browser extension.
 
 ### P431 Operations panel overhaul: looks and interactions
 
