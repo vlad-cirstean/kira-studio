@@ -3,6 +3,7 @@ package adeflow_test
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -231,4 +232,70 @@ func TestRestartSession(t *testing.T) {
 	if _, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: "missing"}); err == nil {
 		t.Fatal("RestartSession of an unknown session succeeded")
 	}
+}
+
+// P414 status bar agents. Contract ade-sessions-running: tests/ui/status-agents.spec.ts reads this
+// list: a headless run and an interactive session running, one finished run stopped.
+func TestRunningSessionsList(t *testing.T) {
+	dir := t.TempDir()
+	flag := func(n string) string { return filepath.Join(dir, n) }
+	app := flowharness.New(t, flowharness.WithTrackerGrace(time.Second))
+	// Call 1 finishes at once; call 2 (headless) and call 3 (interactive) are held open.
+	claude(app, map[string][]fakeagent.Action{"*": {
+		{Name: "done"}, {WaitFile: flag("run")}, {WaitFile: flag("tui")},
+	}})
+	t.Cleanup(func() {
+		for _, n := range []string{"run", "tui"} {
+			_ = os.WriteFile(flag(n), nil, 0o644)
+		}
+	})
+	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
+	rec := importRepo(t, app, repo.Dir)
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
+	app.WindowMgr.OpenWindow(shell.WindowRecord{Key: sessionWindow})
+
+	startRun := func(title, branch, state string) adewire.Run {
+		task := createTask(t, app, title, "flow", rec.ID)
+		row := branchOf(t, board(t, app), task.ID, rec.ID)
+		if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{row.ID: branch}}); err != nil {
+			t.Fatal(err)
+		}
+		return waitRun(t, app, task.ID, "one", state)
+	}
+	finished := startRun("Fix login", "feat/api-login", "done")
+	waitSession(t, app, finished.SessionID, "stopped")
+	held := startRun("Add search", "feat/api-search", "running")
+	waitSession(t, app, held.SessionID, "running")
+
+	task := createTask(t, app, "Tidy docs", "flow", rec.ID)
+	row := branchOf(t, board(t, app), task.ID, rec.ID)
+	br, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: row.ID, Name: "feat/api-docs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	launch, err := app.W.AdeTask.StartAdHoc(ctx, adewire.BranchArgs{BranchID: br.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	openLaunch(t, app, launch)
+	waitSession(t, app, launch.SessionID, "running")
+
+	res, err := app.W.AdeTask.Sessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var running, stopped []string
+	for _, s := range res.Sessions {
+		if s.State == "running" {
+			running = append(running, s.Mode)
+		} else {
+			stopped = append(stopped, s.State)
+		}
+	}
+	sort.Strings(running)
+	if strings.Join(running, ",") != "headless,tui" || len(stopped) != 1 || stopped[0] != "stopped" {
+		t.Fatalf("sessions running %v stopped %v, want headless+tui running and one stopped:\n%+v", running, stopped, res.Sessions)
+	}
+	app.Contract(t, "ade-sessions-running", "AdeTaskService.Sessions#mixed", res,
+		flowharness.Mask("id", "agentSessionId", "terminalId", "taskId", "branchId", "stepId", "runId", "resumes", "cwd", "startedAt", "lastActiveAt"))
 }

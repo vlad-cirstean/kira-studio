@@ -1,0 +1,63 @@
+{
+  "AdeTaskService.Sessions#mixed": {
+    "sessions": [
+      {
+        "activity": "",
+        "agentSessionId": "<masked>",
+        "branchId": "<masked>",
+        "cwd": "<masked>",
+        "cwdMissing": false,
+        "id": "<masked>",
+        "lastActiveAt": 0,
+        "mode": "tui",
+        "provider": "claude",
+        "purpose": "",
+        "resumes": "<masked>",
+        "runId": "<masked>",
+        "startedAt": 0,
+        "state": "running",
+        "stepId": "<masked>",
+        "taskId": "<masked>",
+        "terminalId": "<masked>"
+      },
+      {
+        "activity": "working",
+        "agentSessionId": "<masked>",
+        "branchId": "<masked>",
+        "cwd": "<masked>",
+        "cwdMissing": false,
+        "id": "<masked>",
+        "lastActiveAt": 0,
+        "mode": "headless",
+        "provider": "claude",
+        "purpose": "",
+        "resumes": "<masked>",
+        "runId": "<masked>",
+        "startedAt": 0,
+        "state": "running",
+        "stepId": "<masked>",
+        "taskId": "<masked>",
+        "terminalId": "<masked>"
+      },
+      {
+        "activity": "idle",
+        "agentSessionId": "<masked>",
+        "branchId": "<masked>",
+        "cwd": "<masked>",
+        "cwdMissing": false,
+        "id": "<masked>",
+        "lastActiveAt": 0,
+        "mode": "headless",
+        "provider": "claude",
+        "purpose": "",
+        "resumes": "<masked>",
+        "runId": "<masked>",
+        "startedAt": 0,
+        "state": "stopped",
+        "stepId": "<masked>",
+        "taskId": "<masked>",
+        "terminalId": "<masked>"
+      }
+    ]
+  }
+}
