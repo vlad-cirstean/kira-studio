@@ -1,13 +1,11 @@
 package repos
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 )
 
 var _ oplog.ForeignStore = (*OpLogRepo)(nil)
@@ -33,8 +31,7 @@ func (r *OpLogRepo) MaxRowID() (int64, error) {
 // ForeignAfter returns rows written by another process (their id holds a '.') with a rowid past
 // rowid or an id in ids, oldest first, and the newest rowid seen (rowid when none is newer).
 func (r *OpLogRepo) ForeignAfter(rowid int64, ids []string) ([]oplog.Record, int64, error) {
-	q := `SELECT rowid, id, started_ms, duration_ms, category, kind, status, module, trigger_, source, subject,
-		repo_root, repo_name, task_id, parent_id, command, error, steps_json, steps_dropped, background, repeat_count
+	q := `SELECT rowid, ` + opColumns + `
 		FROM op_log WHERE instr(id, '.') > 0 AND (rowid > ?`
 	args := []any{rowid}
 	if len(ids) > 0 {
@@ -50,23 +47,9 @@ func (r *OpLogRepo) ForeignAfter(rowid int64, ids []string) ([]oplog.Record, int
 	defer rows.Close()
 	out, top := []oplog.Record{}, rowid
 	for rows.Next() {
-		var rec oplog.Record
-		var steps string
-		var bg int
-		var startedMs, rid int64
-		if err := rows.Scan(&rid, &rec.ID, &startedMs, &rec.DurationMs, &rec.Category, &rec.Kind, &rec.Status, &rec.Module,
-			&rec.Trigger, &rec.Source, &rec.Subject, &rec.RepoRoot, &rec.RepoName, &rec.TaskID, &rec.ParentID,
-			&rec.Command, &rec.Error, &steps, &rec.StepsDropped, &bg, &rec.Repeat); err != nil {
-			return nil, rowid, fmt.Errorf("repos: scan foreign op: %w", err)
-		}
-		rec.StartedAt = kiratime.FormatISO(time.UnixMilli(startedMs))
-		rec.Background = bg != 0
-		rec.Steps = []oplog.Step{}
-		if err := json.Unmarshal([]byte(steps), &rec.Steps); err != nil {
-			return nil, rowid, fmt.Errorf("repos: decode op steps %s: %w", rec.ID, err)
-		}
-		if rec.Steps == nil {
-			rec.Steps = []oplog.Step{}
+		rec, rid, err := scanOp(rows, true)
+		if err != nil {
+			return nil, rowid, err
 		}
 		top = max(top, rid)
 		out = append(out, rec)

@@ -46,36 +46,51 @@ func (r *OpLogRepo) Upsert(rec oplog.Record) error {
 
 // Recent returns up to limit rows, newest first.
 func (r *OpLogRepo) Recent(limit int) ([]oplog.Record, error) {
-	rows, err := r.DB.Query(`SELECT id, started_ms, duration_ms, category, kind, status, module, trigger_, source, subject,
-		repo_root, repo_name, task_id, parent_id, command, error, steps_json, steps_dropped, background, repeat_count
-		FROM op_log ORDER BY started_ms DESC, id DESC LIMIT ?`, limit)
+	rows, err := r.DB.Query(`SELECT `+opColumns+` FROM op_log ORDER BY started_ms DESC, id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("repos: list ops: %w", err)
 	}
 	defer rows.Close()
 	out := []oplog.Record{}
 	for rows.Next() {
-		var rec oplog.Record
-		var steps string
-		var bg int
-		var startedMs int64
-		if err := rows.Scan(&rec.ID, &startedMs, &rec.DurationMs, &rec.Category, &rec.Kind, &rec.Status, &rec.Module,
-			&rec.Trigger, &rec.Source, &rec.Subject, &rec.RepoRoot, &rec.RepoName, &rec.TaskID, &rec.ParentID,
-			&rec.Command, &rec.Error, &steps, &rec.StepsDropped, &bg, &rec.Repeat); err != nil {
-			return nil, fmt.Errorf("repos: scan op: %w", err)
-		}
-		rec.StartedAt = kiratime.FormatISO(time.UnixMilli(startedMs))
-		rec.Background = bg != 0
-		rec.Steps = []oplog.Step{}
-		if err := json.Unmarshal([]byte(steps), &rec.Steps); err != nil {
-			return nil, fmt.Errorf("repos: decode op steps %s: %w", rec.ID, err)
-		}
-		if rec.Steps == nil {
-			rec.Steps = []oplog.Step{}
+		rec, _, err := scanOp(rows, false)
+		if err != nil {
+			return nil, err
 		}
 		out = append(out, rec)
 	}
 	return out, rows.Err()
+}
+
+// opColumns is the column list scanOp reads.
+const opColumns = `id, started_ms, duration_ms, category, kind, status, module, trigger_, source, subject,
+	repo_root, repo_name, task_id, parent_id, command, error, steps_json, steps_dropped, background, repeat_count`
+
+// scanOp reads one row of opColumns; withRowID means the query selected rowid first.
+func scanOp(rows *sql.Rows, withRowID bool) (oplog.Record, int64, error) {
+	var rec oplog.Record
+	var steps string
+	var bg int
+	var startedMs, rid int64
+	dest := []any{&rec.ID, &startedMs, &rec.DurationMs, &rec.Category, &rec.Kind, &rec.Status, &rec.Module,
+		&rec.Trigger, &rec.Source, &rec.Subject, &rec.RepoRoot, &rec.RepoName, &rec.TaskID, &rec.ParentID,
+		&rec.Command, &rec.Error, &steps, &rec.StepsDropped, &bg, &rec.Repeat}
+	if withRowID {
+		dest = append([]any{&rid}, dest...)
+	}
+	if err := rows.Scan(dest...); err != nil {
+		return rec, 0, fmt.Errorf("repos: scan op: %w", err)
+	}
+	rec.StartedAt = kiratime.FormatISO(time.UnixMilli(startedMs))
+	rec.Background = bg != 0
+	rec.Steps = []oplog.Step{}
+	if err := json.Unmarshal([]byte(steps), &rec.Steps); err != nil {
+		return rec, 0, fmt.Errorf("repos: decode op steps %s: %w", rec.ID, err)
+	}
+	if rec.Steps == nil {
+		rec.Steps = []oplog.Step{}
+	}
+	return rec, rid, nil
 }
 
 // Prune deletes rows older than cutoff, then the oldest beyond maxRows.
