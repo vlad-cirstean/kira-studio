@@ -332,7 +332,7 @@ export function registerRecurringScenarios(
     await expect(page.locator('[data-testid="schedule-confirm"]')).toHaveCount(0);
   });
 
-  test('contract: the runs list shows Skipped with its reason; a headless run opens its tab', async ({
+  test('contract: Operations shows Skipped with its reason; a headless run opens its tab', async ({
     relaunch,
   }) => {
     const overlap = contract<{ outcome: { reason: string } }>(
@@ -349,11 +349,13 @@ export function registerRecurringScenarios(
         outcome: overlap.outcome,
       }),
     );
-    const skipped = page.locator('[data-testid="run-row"][data-state="skipped"]');
-    await expect(skipped.locator('[data-testid="run-status"]')).toHaveText('Skipped');
-    await expect(skipped.locator('[data-testid="run-trigger"]')).toContainText('Scheduled');
-    await skipped.locator('button').first().click();
-    await expect(skipped.locator('[data-testid="run-outcome-reason"]')).toContainText(
+    await expect(page.locator('[data-testid="run-row"][data-state="skipped"]')).toHaveCount(0);
+    await page.locator('[data-testid="toggle-operations-panel"]').click();
+    const skipped = page.locator('[data-op-id="run:run-s"]');
+    await expect(skipped.locator('[data-testid="op-status-note"]')).toHaveText('Skipped');
+    await expect(skipped.locator('[data-testid="op-source-cell"]')).toContainText('Scheduled');
+    await skipped.click();
+    await expect(page.locator('[data-testid="operations-panel"]')).toContainText(
       overlap.outcome.reason,
     );
 
@@ -427,10 +429,14 @@ export function registerRecurringScenarios(
       ...CONTRACT_TIMES,
       finishedAt: 3_000,
     });
-    await expect(
-      page.locator('[data-testid="run-row"][data-state="done"] [data-testid="run-status"]'),
-    ).toHaveText('Succeeded');
-    await page.locator('[data-testid="run-row"][data-state="done"] button').first().click();
+    await expect(page.locator('[data-testid="run-row"][data-state="done"]')).toHaveCount(0);
+    await page.locator('[data-testid="toggle-operations-panel"]').click();
+    await expect(page.locator(`[data-op-id="run:${done.id}"]`)).toHaveAttribute(
+      'data-status',
+      'ok',
+    );
+    await page.locator(`[data-op-id="run:${done.id}"]`).click({ button: 'right' });
+    await page.locator('[data-testid="menu-item-open-run"]').click();
     await expect(
       page.locator('[data-testid="script-run-view"] [data-testid="run-log"]'),
     ).toContainText(log.chunks[0].text);

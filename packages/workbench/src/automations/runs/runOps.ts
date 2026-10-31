@@ -38,7 +38,7 @@ export function automationOp(run: ScriptRun): AutomationOp {
   const status = STATUS[run.state];
   const reason = run.outcome?.reason ?? '';
   const error =
-    status === 'error' ? [reason, run.outcome?.lastError ?? ''].filter(Boolean).join(' · ') : '';
+    run.state === 'done' ? '' : [reason, run.outcome?.lastError ?? ''].filter(Boolean).join(' · ');
   return {
     id: `${ID_PREFIX}${run.id}`,
     startedAt: new Date(runStartedAt(run)).toISOString(),

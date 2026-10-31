@@ -327,7 +327,11 @@ const AUTOMATIONS: ControlSnapshot[] = [
   { channel: IPC.scriptRunsPreview, response: PREVIEW },
   {
     channel: IPC.scriptRunsList,
-    response: [run('r-a', 'done', 3_000), run('r-b', 'failed', 2_000)],
+    response: [
+      run('r-c', 'running', 4_000),
+      run('r-a', 'done', 3_000),
+      run('r-b', 'failed', 2_000),
+    ],
   },
   { channel: IPC.scriptRunsReadLog, response: { chunks: [], truncated: false } },
   { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
@@ -351,13 +355,17 @@ test('Automations panel, row menu and runs section use catalog text', async ({ r
 
   await expectCatalogText(tid(page, 'automations-panel'), { allow: AUTOMATIONS_DATA });
 
-  await expect(tid(page, 'run-row')).toHaveCount(2);
+  await expect(tid(page, 'run-row')).toHaveCount(1);
   await expectCatalogText(tid(page, 'runs-section'), { allow: AUTOMATIONS_DATA });
-  await tid(page, 'runs-filter-failed').click();
-  await expectCatalogText(tid(page, 'runs-section'), { allow: AUTOMATIONS_DATA });
-  await tid(page, 'runs-filter-running').click();
-  await expect(tid(page, 'runs-empty')).toBeVisible();
-  await expectCatalogText(tid(page, 'runs-section'), { allow: AUTOMATIONS_DATA });
+
+  await tid(page, 'toggle-operations-panel').click();
+  await expect(page.locator('[data-op-id="run:r-b"]')).toBeVisible();
+  await page.locator('[data-op-id="run:r-b"]').click();
+  await expectCatalogText(tid(page, 'operations-panel'), { allow: AUTOMATIONS_DATA });
+  await page.locator('[data-op-id="run:r-b"]').click({ button: 'right' });
+  await expectCatalogText(tid(page, 'context-menu'));
+  await page.keyboard.press('Escape');
+  await tid(page, 'toggle-operations-panel').click();
 
   await tid(page, `script-${SCRIPT.id}`).click({ button: 'right' });
   await expect(tid(page, 'context-menu')).toBeVisible();

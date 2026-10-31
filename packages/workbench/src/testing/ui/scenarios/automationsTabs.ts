@@ -289,7 +289,7 @@ export function registerTabScenarios(env: Env, options: Options): void {
     expect(opens(control)).toHaveLength(2);
   });
 
-  test('a smart script keeps one run tab; history opens an older run in it', async ({
+  test('a smart script keeps one run tab; Operations opens an older run in it', async ({
     relaunch,
   }) => {
     const { window: page, control } = await relaunch({ control: BASE });
@@ -317,7 +317,11 @@ export function registerTabScenarios(env: Env, options: Options): void {
     await expect(tabs(page)).toHaveCount(1);
     await expect(page.locator('[data-testid="run-outcome-summary"]')).toHaveText('second');
 
-    await page.locator('[data-testid="run-row"] button').nth(1).click();
+    // Finished runs live in the Operations panel.
+    await expect(page.locator('[data-testid="run-row"]')).toHaveCount(0);
+    await page.locator('[data-testid="toggle-operations-panel"]').click();
+    await page.locator('[data-op-id="run:run-1"]').click({ button: 'right' });
+    await page.locator('[data-testid="menu-item-open-run"]').click();
     await expect(tabs(page)).toHaveCount(1);
     await expect(page.locator('[data-testid="run-outcome-summary"]')).toHaveText('first');
   });

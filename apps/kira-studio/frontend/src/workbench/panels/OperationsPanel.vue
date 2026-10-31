@@ -162,7 +162,7 @@ function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
 
 // Counts the preconnect delay down in the command cell; falls back to the command once it elapses.
 function preconnectNote(record: OpRecord | AutomationOp, now: number): string | null {
-  if (isAutomationOp(record)) return null;
+  if (isAutomationOp(record)) return auto.runningNote(record);
   if (record.kind !== 'preconnect' || !record.delayMs) return null;
   const left = Date.parse(record.startedAt) + record.delayMs - now;
   if (left <= 0) return null;
@@ -183,6 +183,7 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
     :menu-for="menuFor"
     :running-note="preconnectNote"
     :can-cancel="(record) => (isAutomationOp(record) ? auto.canCancel(record) : true)"
+    :kind-label="(record) => (isAutomationOp(record) ? auto.kindLabel() : record.kind)"
     :status-note="(record) => (isAutomationOp(record) ? auto.statusNote(record) : null)"
     :detail-lines="(record) => (isAutomationOp(record) ? auto.detailLines(record) : [])"
     @clear="opsStore.clearOps"

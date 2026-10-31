@@ -67,6 +67,9 @@ export interface AutomationOps {
   /** Live runs, for the panel's running count. */
   runningCount: ComputedRef<number>;
   merge<R extends OpLogRecord>(ops: readonly R[]): (R | AutomationOp)[];
+  kindLabel(): string;
+  /** Shown in place of the command while a run waits for its confirmation. */
+  runningNote(op: AutomationOp): string | null;
   statusNote(op: AutomationOp): string | null;
   detailLines(op: AutomationOp): OpLogDetailLine[];
   canCancel(op: AutomationOp): boolean;
@@ -165,9 +168,11 @@ export function useAutomationOps(filters: OpFilterState): AutomationOps {
 
   function statusNote(op: AutomationOp): string | null {
     const { state } = op.run;
-    return state === 'waiting' || state === 'blocked' || state === 'skipped'
-      ? stateLabel(state)
-      : null;
+    return state === 'blocked' || state === 'skipped' ? stateLabel(state) : null;
+  }
+
+  function runningNote(op: AutomationOp): string | null {
+    return op.run.state === 'waiting' ? stateLabel('waiting') : null;
   }
 
   function detailLines(op: AutomationOp): OpLogDetailLine[] {
@@ -192,6 +197,8 @@ export function useAutomationOps(filters: OpFilterState): AutomationOps {
   return {
     runningCount,
     merge: (ops) => mergeNewestFirst(ops, visible.value),
+    kindLabel: () => t('common.module.automations.label'),
+    runningNote,
     statusNote,
     detailLines,
     canCancel,

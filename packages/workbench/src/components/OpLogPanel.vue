@@ -44,6 +44,8 @@ interface Props {
   menuFor?: (record: R) => MenuItem[];
   /** Replaces the command cell of a running row while non-null; `now` is the shared clock. */
   runningNote?: (record: R, now: number) => string | null;
+  /** Replaces the raw `kind` in the kind cell. */
+  kindLabel?: (record: R) => string;
   /** Short text after the status label, e.g. a repeat count. */
   statusNote?: (record: R) => string | null;
   /** Extra detail rows under an expanded record, one fixed-height line each. */
@@ -289,7 +291,9 @@ function elapsedText(record: R): string {
                 <span v-if="column.id === 'time'" class="font-data" data-testid="op-time-cell">{{
                   formatClockTime(listItems[vi.index].record.startedAt)
                 }}</span>
-                <span v-else-if="column.id === 'kind'">{{ listItems[vi.index].record.kind }}</span>
+                <span v-else-if="column.id === 'kind'">{{
+                  kindLabel?.(listItems[vi.index].record) ?? listItems[vi.index].record.kind
+                }}</span>
                 <span v-else-if="column.id === 'status'" class="flex items-center gap-1">
                   <Spinner v-if="listItems[vi.index].record.status === 'running'" label="" />
                   {{ t(STATUS_LABEL[listItems[vi.index].record.status]) }}

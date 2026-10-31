@@ -49,6 +49,10 @@ function parentTool(record: SpaceOpRecord): string | null {
   return record.parentId ? (byId.value.get(record.parentId)?.kind ?? null) : null;
 }
 
+function runningNote(record: Row): string | null {
+  return isAutomationOp(record) ? auto.runningNote(record) : null;
+}
+
 function statusNote(record: Row): string | null {
   if (isAutomationOp(record)) return auto.statusNote(record);
   return record.repeat > 1 ? t('space.operations.repeat.label', { count: record.repeat }) : null;
@@ -105,6 +109,8 @@ function menuFor(record: Row): MenuItem[] {
     :clear-hint="t('space.operations.clearHint.hint')"
     :can-cancel="canCancel"
     :menu-for="menuFor"
+    :kind-label="(record) => (isAutomationOp(record) ? auto.kindLabel() : record.kind)"
+    :running-note="runningNote"
     :status-note="statusNote"
     :detail-lines="detailLines"
     @clear="opsStore.clearOps"
@@ -122,9 +128,7 @@ function menuFor(record: Row): MenuItem[] {
     </template>
     <template #cell="{ column, record }">
       <template v-if="isAutomationOp(record)">
-        <span v-if="column.id === 'module'" class="truncate min-w-0">{{
-          t('common.module.automations.label')
-        }}</span>
+        <span v-if="column.id === 'module'" class="truncate min-w-0">{{ auto.kindLabel() }}</span>
         <span v-else-if="column.id === 'source'" class="truncate min-w-0">{{
           triggerLabel(record.run)
         }}</span>
