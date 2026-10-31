@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/harness"
@@ -68,6 +69,9 @@ type TrackerDeps struct {
 	PendingTTL time.Duration
 	// Agent resolves the provider of a new launch.
 	Agent harness.Selector
+	// Ops and OpSubject, when set, record session stops; the task board attaches them at construction.
+	Ops       *oplog.Log
+	OpSubject func(taskID string) string
 	// AgentBin defaults to the provider's CLI name when empty. Exists only so ade_test.go's
 	// integration test can point it at an absolute path to a fake script — this container's own
 	// login-shell PATH always resolves a bare "claude" to the real installed CLI ahead of anything
@@ -90,6 +94,8 @@ type pendingIntent struct {
 	Purpose                           string
 	// Provider is the id of the provider that composed Command; its listener hooks the launch.
 	Provider string
+	// Op is the session op Prepare was given; Compose ends it ok, an expired intent ends it as an error.
+	Op *oplog.Op
 }
 
 // PrepareArgs is Prepare's own argument shape. TaskID is required: the row is keyed to the task,
@@ -110,6 +116,8 @@ type PrepareArgs struct {
 	AllowedTools                      []string
 	// Purpose is "" or model.AdeSessionPurposeReview for the task's review agent.
 	Purpose string
+	// Op is the op-log entry for this launch; nil records nothing.
+	Op *oplog.Op
 }
 
 // PrepareResult is Prepare's own return shape. SessionID is the agent session id (stable across
@@ -224,6 +232,7 @@ func (t *Tracker) pruneExpiredPendingLocked(now time.Time) []string {
 		if now.Sub(intent.CreatedAt) > t.deps.PendingTTL {
 			delete(t.pending, id)
 			expired = append(expired, intent.RecordID)
+			intent.Op.Finish(oplog.StatusError, opTerminalLost)
 		}
 	}
 	return expired
@@ -316,7 +325,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		RecordID: recordID, AgentSessionID: agentSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
 		TaskID: args.TaskID, BranchID: args.BranchID, StepID: args.StepID, Resumes: args.Resumes, Purpose: args.Purpose,
-		Provider: agent.ID(),
+		Provider: agent.ID(), Op: args.Op,
 	}
 
 	t.mu.Lock()
@@ -352,6 +361,9 @@ func (t *Tracker) expirePending(terminalID string) {
 	}
 	closed := t.closed
 	t.mu.Unlock()
+	if ok {
+		intent.Op.Finish(oplog.StatusError, opTerminalLost)
+	}
 	if ok && !closed {
 		t.releaseExpired([]string{intent.RecordID})
 	}
@@ -379,7 +391,7 @@ func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 // calls it for every agent launch, composed or not. No intent for terminalID (an agent
 // launch not started through Prepare; this app has none today) means hooks-only composition, no
 // record — the explicit fallback.
-func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, error) {
+func (t *Tracker) Compose(terminalID, cwd, command string) (_ string, _ []string, composeErr error) {
 	t.mu.Lock()
 	intent, ok := t.pending[terminalID]
 	if ok {
@@ -396,6 +408,13 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 		return composed, env, nil
 	}
 
+	defer func() {
+		if composeErr != nil {
+			intent.Op.Finish(oplog.StatusError, composeErr.Error())
+			return
+		}
+		intent.Op.Finish(oplog.StatusOK, "")
+	}()
 	if command != intent.Command {
 		return "", nil, ErrCommandMismatch
 	}
@@ -501,6 +520,7 @@ func (t *Tracker) Abort(terminalID string) {
 	}
 	now := t.deps.Now().UnixMilli()
 	t.mu.Unlock()
+	t.recordSessionEnd(recordID, oplog.TriggerAuto, oplog.StatusError, opTerminalLost)
 
 	var err error
 	if fresh {
@@ -589,6 +609,7 @@ func (t *Tracker) Stop(recordID string) error {
 	t.mu.Lock()
 	t.forgetLocked(recordID, t.deps.Now())
 	t.mu.Unlock()
+	t.recordSessionEnd(recordID, oplog.TriggerUser, oplog.StatusOK, "")
 	if t.deps.OnChange != nil {
 		t.deps.OnChange()
 	}
@@ -642,6 +663,9 @@ func (t *Tracker) Reconcile() {
 			continue
 		}
 		stopped = append(stopped, recordID)
+	}
+	for _, recordID := range stopped {
+		t.recordSessionEnd(recordID, oplog.TriggerAuto, oplog.StatusOK, "")
 	}
 	if len(stopped) > 0 && t.deps.OnChange != nil {
 		t.deps.OnChange()

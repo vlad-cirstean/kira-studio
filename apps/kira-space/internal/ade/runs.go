@@ -599,6 +599,18 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 			return run, err
 		}
 		b.notifySessions()
+		kind := opRun
+		if spec.ResumeID != "" {
+			kind = opResume
+		}
+		op := b.startSessionOp(ctx, kind, tc.task.ID, agent.Label(), "")
+		b.sessionOps.put(sessionID, op)
+		b.cancelRunOp(op, run.ID)
+		defer func() {
+			if !started {
+				b.finishRunOp(sessionID, outcome{state: model.AdeRunFailed, note: "The run did not start."})
+			}
+		}()
 	}
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, patch)
 	if err != nil {
@@ -1011,6 +1023,7 @@ func (b *TaskBoard) completeRun(run model.AdeRun, sessionID string, out outcome)
 // (route.go), any other outcome moves the task on unless it was a user stop. The task mutex is held.
 func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out outcome) {
 	now := b.deps.Now().UnixMilli()
+	b.finishRunOp(sessionID, out)
 	if sessionID != "" {
 		if err := b.deps.Sessions.MarkStopped(sessionID, now); err != nil {
 			slog.Warn("ade: stop headless session", "scope", "ade", "session", sessionID, "err", err)

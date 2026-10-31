@@ -62,6 +62,8 @@ type TaskBoardDeps struct {
 	Workflows *adeflow.Reader
 	// Runner spawns git for repo identification (folder import).
 	Runner gitclient.Runner
+	// Ops is the operation log: agent sessions, worktree setups and MCP tool calls land in it.
+	Ops *oplog.Log
 	// Scripts runs the environment deploy-sha scripts; nil = the OS runner.
 	Scripts gitprepare.Runner
 	// Logs stores run and worktree-setup logs; OnLog pushes each stored batch.
@@ -125,11 +127,13 @@ type TaskBoardDeps struct {
 // TaskBoard is the v2 engine: one gitsession.Conn holding every repo a live task touches, a per-repo
 // mutex serializing writes and remote ops, and per-repo fact caches.
 type TaskBoard struct {
-	deps    TaskBoardDeps
-	conn    *gitsession.Conn
-	checker *rebaseChecker
-	ctx     context.Context
-	cancel  context.CancelFunc
+	deps TaskBoardDeps
+	// sessionOps holds the op of each live headless agent session until its outcome lands.
+	sessionOps sessionOps
+	conn       *gitsession.Conn
+	checker    *rebaseChecker
+	ctx        context.Context
+	cancel     context.CancelFunc
 
 	importMu sync.Mutex // serializes repo imports (folder add, folder watch rescans)
 	// afterImport runs after each repo a folder scan imports; tests flip state mid-scan with it.
@@ -187,7 +191,10 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]agentmcp.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
 	}
-	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Git: b, Handover: b, Prompts: b.prompts()})
+	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Git: b, Handover: b, Prompts: b.prompts(), OnToolCall: b.mcpRecorder})
+	if deps.Tracker != nil {
+		deps.Tracker.deps.Ops, deps.Tracker.deps.OpSubject = deps.Ops, b.opSubject
+	}
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.Module = oplog.ModuleADE
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {

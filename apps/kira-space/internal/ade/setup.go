@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -400,6 +401,8 @@ func (b *TaskBoard) claimSetup(branchID string) (context.Context, func(), bool) 
 }
 
 func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.AdeTaskBranch, name, path, script string, timeout time.Duration, timeoutText string, sink *logSink, startedAt int64, onReady func(string)) {
+	op := b.startSessionOp(ctx, opSetup, sb.TaskID, "", script)
+	op.SetCancel(func() bool { return b.cancelLive(b.setupLive, sb.ID, errStopped) != nil })
 	commonDir := rec.Root
 	if entry, err := b.openRepo(ctx, sb.CodeRepoID); err == nil {
 		commonDir = entry.Summary.CommonDir
@@ -422,6 +425,7 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 	switch {
 	case res.Cancelled && err == nil && b.ctx.Err() != nil:
 		sink.flush()
+		op.Finish(oplog.StatusCancelled, "")
 		return // app quit: the row stays running (R18)
 	case res.Cancelled && err == nil:
 		fail("cancelled: " + context.Cause(ctx).Error())
@@ -433,6 +437,14 @@ func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.A
 		fail(runoutcome.ForProcess(runoutcome.Process{ExitCode: res.ExitCode}).Reason)
 	}
 	sink.flush()
+	switch {
+	case res.Cancelled:
+		op.Finish(oplog.StatusCancelled, "")
+	case state == model.AdeSetupFailed:
+		op.Finish(oplog.StatusError, note)
+	default:
+		op.Finish(oplog.StatusOK, "")
+	}
 	finished := b.deps.Now().UnixMilli()
 	row := model.AdeWorktreeSetup{BranchID: sb.ID, State: state, StartedAt: startedAt, FinishedAt: &finished, ExitCode: &exit, Note: note}
 	if err := b.deps.Tasks.UpsertSetup(row); err != nil {

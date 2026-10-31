@@ -38,7 +38,7 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 	note := ""
 	if row != nil {
 		if info, serr := os.Stat(row.Cwd); serr == nil && info.IsDir() {
-			l, err := b.prepareWithGrant(tr, tc, PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, AddDirs: extra, Provider: row.Provider}, "", stepID)
+			l, err := b.prepareWithGrant(ctx, tr, tc, PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, AddDirs: extra, Provider: row.Provider}, opReviewAgent, "", stepID)
 			if err != nil {
 				return adewire.Launch{}, false, "", err
 			}
@@ -61,9 +61,9 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 			message += "\n" + substitute(step.Prompt, repoVars(title, tc.task.JiraKey, lines), false)
 		}
 	}
-	l, err := b.prepareWithGrant(tr, tc, PrepareArgs{
+	l, err := b.prepareWithGrant(ctx, tr, tc, PrepareArgs{
 		TaskID: tc.task.ID, Cwd: cwd, Message: message, AddDirs: extra, Purpose: model.AdeSessionPurposeReview,
-	}, "", stepID)
+	}, opReviewAgent, "", stepID)
 	if err != nil {
 		return adewire.Launch{}, false, "", err
 	}

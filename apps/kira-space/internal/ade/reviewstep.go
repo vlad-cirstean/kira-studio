@@ -610,7 +610,7 @@ func (b *TaskBoard) launchRound(ctx context.Context, tc *taskCtx, run model.AdeR
 	return out, err
 }
 
-func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
+func (b *TaskBoard) startRound(ctx context.Context, tc *taskCtx, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
 	if path == "" {
 		return run, invalid("worktree of %s is missing", sb.Name)
 	}
@@ -645,6 +645,13 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 		return run, err
 	}
 	b.notifySessions()
+	b.sessionOps.put(sessionID, b.startSessionOp(ctx, opReview, tc.task.ID, agent.Label(), ""))
+	b.cancelRunOp(b.sessionOps.peek(sessionID), run.ID)
+	defer func() {
+		if !started {
+			b.finishRunOp(sessionID, outcome{state: model.AdeRunFailed, note: "The review round did not start."})
+		}
+	}()
 	if spec.Route == adewire.ReviewSendNew {
 		if err := b.deps.Tasks.SetReviewDedicated(spec.ReviewRunID, agentSessionID); err != nil {
 			return run, err
@@ -686,6 +693,7 @@ func (b *TaskBoard) completeReviewRound(run model.AdeRun, sessionID string, out 
 	mu.Lock()
 	defer mu.Unlock()
 	now := b.deps.Now().UnixMilli()
+	b.finishRunOp(sessionID, out)
 	if sessionID != "" {
 		if err := b.deps.Sessions.MarkStopped(sessionID, now); err != nil {
 			slog.Warn("ade: stop headless session", "scope", "ade", "session", sessionID, "err", err)
