@@ -79,6 +79,11 @@ func decorateTask(out *adewire.Task, t model.AdeTask, live func(id string) liveI
 	if err := json.Unmarshal([]byte(t.WorkflowJSON), &wf); err != nil {
 		return
 	}
+	for i := range wf.Steps {
+		if wf.Steps[i].Settings == nil {
+			wf.Steps[i].Settings = map[string]map[string]string{}
+		}
+	}
 	out.Workflow = &wf
 	if li.ok {
 		out.WorkflowOutdated = li.hash != t.WorkflowHash

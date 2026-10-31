@@ -1222,6 +1222,12 @@
         "setupPending": {
           "body": "The worktree is still being set up."
         },
+        "stageSettings": {
+          "autoCompactWindow": {
+            "hint": "Tokens of context before Claude Code compacts the conversation, {min} to {max}. Empty uses Claude Code’s default.",
+            "label": "Auto compact limit"
+          }
+        },
         "taskMoved": {
           "body": "The task moved on. Refresh and retry."
         },

@@ -116,6 +116,8 @@ type PrepareArgs struct {
 	AllowedTools                      []string
 	// Purpose is "" or model.AdeSessionPurposeReview for the task's review agent.
 	Purpose string
+	// Settings are the step's stage settings per provider id; nil = provider defaults.
+	Settings map[string]map[string]string
 	// Op is the op-log entry for this launch; nil records nothing.
 	Op *oplog.Op
 }
@@ -318,6 +320,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	command := agent.InteractiveCommand(harness.InteractiveSpec{
 		Bin: agentBin, SessionID: agentSessionID, Resume: args.Resume != "" || args.Resumes != "",
 		AddDirs: args.AddDirs, MCPConfig: args.MCPConfig, AllowedTools: args.AllowedTools,
+		Stage: stageValues(args.Settings, agent),
 	})
 
 	terminalID := uuid.NewString()

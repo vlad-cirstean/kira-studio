@@ -669,7 +669,7 @@ func (b *TaskBoard) startRound(ctx context.Context, tc *taskCtx, run model.AdeRu
 	def := stepDef{ID: run.StepID, Timeout: "", AllowedTools: spec.AllowedTools}
 	for _, s := range workflowSteps(*tc.wf) {
 		if s.ID == run.StepID {
-			def.Name, def.Timeout, def.Sandbox = s.Name, s.Timeout, s.Sandbox
+			def.Name, def.Timeout, def.Sandbox, def.Settings = s.Name, s.Timeout, s.Sandbox, s.Settings
 		}
 	}
 	prompt := composeResumePrompt(b.prompts(), launch.Prompt, nil)

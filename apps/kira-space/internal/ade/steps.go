@@ -31,6 +31,8 @@ type stepDef struct {
 	Review *adewire.ReviewStepConfig
 	// Sandbox is what the step's agent may do on the machine.
 	Sandbox adewire.StepSandbox
+	// Settings are the stage settings per provider id.
+	Settings map[string]map[string]string
 }
 
 // manual says the step is the user's own work: no runs, no branch targets.
@@ -50,9 +52,9 @@ func workflowSteps(wf adewire.Workflow) []stepDef {
 		}
 		out[i] = stepDef{ID: s.ID, Name: s.Name, Kind: s.Kind, RunsOn: s.RunsOn, Before: s.Before, Timeout: s.Timeout, Prompt: prompt,
 			Skip: s.Skip, Session: s.Session, Results: results, ReturnLimit: s.MaxReturns, AllowedTools: s.AllowedTools,
-			SmartScript: s.SmartScript, Params: s.Params, Review: s.Review, Sandbox: s.Sandbox.Normalized()}
+			SmartScript: s.SmartScript, Params: s.Params, Review: s.Review, Sandbox: s.Sandbox.Normalized(), Settings: s.Settings}
 		if s.Kind == adewire.KindScript || s.Kind == adewire.KindManual {
-			out[i].Sandbox = adewire.DefaultSandbox()
+			out[i].Sandbox, out[i].Settings = adewire.DefaultSandbox(), nil
 		}
 	}
 	return out

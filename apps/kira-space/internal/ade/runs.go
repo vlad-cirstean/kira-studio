@@ -783,7 +783,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	spec := harness.HeadlessSpec{
 		Bin: b.deps.AgentBin, Dir: l.path, Prompt: l.prompt, SessionID: b.sessionAgentID(sessionID),
 		Resume: l.resume, MCPConfigs: []string{cfg}, Config: b.configScope(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
-		Timeout: l.timeout,
+		Timeout: l.timeout, Stage: stageValues(def.Settings, agent),
 	}
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
 	if rebase {
