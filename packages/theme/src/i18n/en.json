@@ -8553,6 +8553,22 @@
       "takeOverTaskConfirm": {
         "body": "“{step}” is still running. Taking over stops it, marks it stuck and continues it in {product}."
       },
+      "taskLaunch": {
+        "agent": {
+          "label": "{agent} session"
+        },
+        "reason": {
+          "noWorktree": {
+            "label": "No worktree yet"
+          },
+          "sessionOpen": {
+            "label": "Session open"
+          }
+        },
+        "trigger": {
+          "tooltip": "New terminal or agent session"
+        }
+      },
       "taskPanel": {
         "reviewNote": {
           "body": "{owner}’s work. Read-only here; you can keep your own notes."

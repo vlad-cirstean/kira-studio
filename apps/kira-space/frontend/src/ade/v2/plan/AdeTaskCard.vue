@@ -24,6 +24,7 @@ import { changeBaseChoices } from '../board/changeBase';
 import { taskReviewTip } from '../board/reviewCode';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
+import AdeTaskLaunchMenu from '../sessions/AdeTaskLaunchMenu.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
@@ -253,6 +254,11 @@ const boxClass = computed(() => {
             <VarText :parts="reviewTip" />
             <Kbd>{{ formatShortcut('ade.reviewCode') }}</Kbd>
           </TooltipIconButton>
+          <AdeTaskLaunchMenu
+            v-if="card.rows.some((r) => r.branch.name !== '')"
+            :task-id="card.task.id"
+            size="card"
+          />
         </div>
         <AdeTip :text="card.title">
           <Button
