@@ -23,7 +23,8 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
-| P420 | Kira Studio: validation proof MCP tool and window | Todo |
+| P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Todo |
+| P420 Part 2 | Kira Studio validation proof: window UI, view-state persistence, screenshot, UI spec, visual baselines, docs | Todo |
 | P421 | Code review (2 rounds) | Todo |
 | P422 | Close chapter v0.2.23 | Todo |
 
@@ -165,7 +166,9 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - Save via a Save button or a keyboard shortcut.
 - No autocomplete or other editor extras.
 
-### P420 Kira Studio: validation proof MCP tool and window
+### P420 Part 1: Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests
+
+Split into Part 1 (backend, plumbing) and Part 2 (window UI, screenshot, baselines); see plans/P420.md. Spec below covers both.
 
 App: Kira Studio (not Kira Space). Dedicated MCP tool for validation proof, shaped like the query editor: query plus results.
 
