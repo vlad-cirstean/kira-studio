@@ -20,7 +20,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Done |
 | P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
-| P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
+| P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
 | P420 | Kira Studio: validation proof MCP tool and window | Todo |
@@ -145,6 +145,8 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - From a Jira ID or link, fetch only: title, status, and the associated PRs from the dedicated section.
 - Put `acli` behind an issue-tracker abstraction: more trackers come later.
 - Settings gets a section on how to install and log in to `gh` and `acli`.
+
+**Result.** `internal/issuetracker` abstraction mirrors `githost`; Jira provider shells to `acli` (version, auth status, workitem view), credentials stay in acli. acli returns title, status and PR count only, so PR rows come from code host search by key plus the head-branch index; a gap shows Jira's count against rows found. Commit-only links are a known limitation (Known open items). `githost` gains optional `ChangeRequestSearch` and `CLISetup`. `IssueTrackerService` (TaskIssue, Trackers, Tools); Settings "CLI tools" pane for gh and acli; issue line in task tab; Jira artifacts with per-gap reasons. Every acli call is a background op-log row via `oplog.RecordingToolRunner` (category `tracker`). Tests: jira units over hand-written fixtures (running a downloaded acli was refused), `TestTaskIssueTracker`, `TestCliTools`, 2 new UI specs, 4 Settings baselines re-recorded. Full Go flows, lint, `lint:dead`, `lint:go`, ui, mobile, visual and claude row green before the rebase; targeted rerun green after.
 
 ### P418 Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default
 
