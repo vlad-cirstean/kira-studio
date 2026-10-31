@@ -9533,10 +9533,10 @@
           "label": "Session (5-hour)"
         },
         "sourceRun": {
-          "status": "From a background ADE run, {when}"
+          "hint": "From a background ADE run, {when}."
         },
         "sourceSession": {
-          "status": "From a {product} session, {when}"
+          "hint": "From a {product} session, {when}."
         },
         "unavailable": {
           "status": "Usage unavailable"

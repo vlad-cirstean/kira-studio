@@ -83,8 +83,8 @@ const sourceLine = computed(() => {
   const when = formatRelative(d.updatedAt, now.value.getTime());
   return t(
     d.source === 'run'
-      ? 'space.settings.agentUsage.sourceRun.status'
-      : 'space.settings.agentUsage.sourceSession.status',
+      ? 'space.settings.agentUsage.sourceRun.hint'
+      : 'space.settings.agentUsage.sourceSession.hint',
     { when },
   );
 });
