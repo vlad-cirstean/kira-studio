@@ -68,13 +68,13 @@ func (s *Service) openPrompt(id, name string, edit bool) {
 	if s.d.Prompts == nil {
 		return
 	}
-	key := "backend.prompt.proof.title"
+	title := i18n.T("backend.prompt.proof.title", map[string]string{"name": name})
 	if edit {
-		key = "backend.prompt.proofEdit.title"
+		title = i18n.T("backend.prompt.proofEdit.title", map[string]string{"name": name})
 	}
 	s.d.Prompts.Open(prompts.Prompt{
 		ID: promptID(id), Kind: prompts.KindProof, Ref: id,
-		Title: i18n.T(key, map[string]string{"name": name}),
+		Title: title,
 	})
 }
 

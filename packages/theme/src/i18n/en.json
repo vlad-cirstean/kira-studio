@@ -1844,6 +1844,15 @@
         }
       },
       "proof": {
+        "notPng": {
+          "body": "The screenshot is not a PNG image."
+        },
+        "tooLarge": {
+          "body": "The screenshot is too large to save."
+        },
+        "unavailable": {
+          "body": "The proof window is not available."
+        },
         "window": {
           "title": "Validation proof"
         }

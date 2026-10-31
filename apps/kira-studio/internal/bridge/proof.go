@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/google/renameio/v2"
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/proof"
@@ -267,7 +267,7 @@ func (s *ProofService) OpenWindow(args ProofOpenArgs) (ProofOpenResult, error) {
 		}
 	}
 	if s.Shell == nil {
-		return ProofOpenResult{}, ipcerr.BadRequest("the proof window is not available")
+		return ProofOpenResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.proof.unavailable.body", nil)
 	}
 	s.openMu.Lock()
 	defer s.openMu.Unlock()
@@ -315,11 +315,11 @@ func (s *ProofService) WindowTarget(args ProofWindowKeyArgs) (ProofWindowTarget,
 // SavePng asks where to save a screenshot and writes it there.
 func (s *ProofService) SavePng(args ProofSavePngArgs) (ProofSavePngResult, error) {
 	if len(args.PngBase64) > maxPngBase64 {
-		return ProofSavePngResult{}, ipcerr.BadRequest("the screenshot is too large to save")
+		return ProofSavePngResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.proof.tooLarge.body", nil)
 	}
 	data, err := base64.StdEncoding.DecodeString(args.PngBase64)
 	if err != nil || len(data) > maxPngBytes || !bytes.HasPrefix(data, pngMagic) {
-		return ProofSavePngResult{}, ipcerr.BadRequest("the screenshot is not a PNG image")
+		return ProofSavePngResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.proof.notPng.body", nil)
 	}
 	path, err := s.Dialogs.SaveFile(SaveFileRequest{Directory: downloadsDir(), Filename: safePngName(args.Filename)})
 	if err != nil {
@@ -328,7 +328,7 @@ func (s *ProofService) SavePng(args ProofSavePngArgs) (ProofSavePngResult, error
 	if path == "" {
 		return ProofSavePngResult{}, nil
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := renameio.WriteFile(path, data, 0o644); err != nil {
 		return ProofSavePngResult{}, ipcerr.InternalErr(err)
 	}
 	return ProofSavePngResult{Saved: true, Path: &path}, nil
