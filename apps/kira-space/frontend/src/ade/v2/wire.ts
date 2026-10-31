@@ -438,7 +438,7 @@ export interface ArtifactGap {
   /** Change requests the tracker reports beyond the ones found (changeRequestsMissing). */
   count?: number;
 }
-export interface IssueChangeRequest {
+interface IssueChangeRequest {
   title: string;
   url: string;
   ref: string;

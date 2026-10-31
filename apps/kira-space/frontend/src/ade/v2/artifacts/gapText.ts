@@ -15,7 +15,7 @@ const REASON_KEY: Record<string, MessageKey> = {
 };
 
 /** A tracker's display name; an unknown provider shows its id. */
-export function trackerName(id: string): string {
+function trackerName(id: string): string {
   const key = TRACKER_LABEL[id];
   return key ? t(key) : id;
 }
