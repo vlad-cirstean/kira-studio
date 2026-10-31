@@ -12,6 +12,7 @@ import { useAdeWorkflowDraftStore } from '../../state/adeWorkflowDraft';
 import { useAdeWorkflowsUiStore } from '../../state/adeWorkflowsUi';
 import type { WorkflowStep } from '../../wire';
 import AdeStepSandbox from './AdeStepSandbox.vue';
+import AdeStepSettings from './AdeStepSettings.vue';
 
 const props = defineProps<{ step: WorkflowStep }>();
 const emit = defineEmits<{ patch: [p: Partial<WorkflowStep>] }>();
@@ -130,5 +131,11 @@ function onTools(v: string | number): void {
     :sandbox="step.sandbox"
     :step-id="step.id"
     @patch="(sandbox) => emit('patch', { sandbox })"
+  />
+  <AdeStepSettings
+    v-if="step.kind === 'agent' || step.kind === 'review' || (step.kind === 'manual' && step.session)"
+    :settings="step.settings"
+    :step-id="step.id"
+    @patch="(settings) => emit('patch', { settings })"
   />
 </template>

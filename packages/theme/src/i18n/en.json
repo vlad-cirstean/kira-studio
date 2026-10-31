@@ -9091,6 +9091,14 @@
             "hint": "Saved edits apply to work not yet started."
           }
         },
+        "settings": {
+          "range": {
+            "error": "Enter a whole number from {min} to {max}, or leave it empty."
+          },
+          "title": {
+            "label": "Agent settings"
+          }
+        },
         "step": {
           "defaultName": {
             "label": "New step"
