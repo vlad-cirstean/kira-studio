@@ -1,7 +1,9 @@
 package adeflow_test
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
@@ -121,4 +123,55 @@ func TestOpsAde(t *testing.T) {
 		f.app.Contract(t, opsScenario, "record#mcp", call, opMask)
 		noAppModule(t, opsNow(t, f.app))
 	})
+}
+
+func TestOpsBackgroundDedupe(t *testing.T) {
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("one", ""))
+	if err := os.WriteFile(filepath.Join(f.repo.Dir, ".git", "HEAD"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		_, _ = f.app.W.AdeTask.Refresh(ctx, adewire.RefreshArgs{CodeRepoIDs: []string{f.repoID}})
+	}
+	var failed []oplog.Record
+	for _, r := range opsNow(t, f.app) {
+		if r.Status == oplog.StatusError && r.Background {
+			failed = append(failed, r)
+		}
+	}
+	if len(failed) != 1 || failed[0].Repeat != 3 || failed[0].Error == nil {
+		t.Fatalf("background failures = %+v, want one row repeated 3 times", failed)
+	}
+	testx.WaitUntil(t, waitFor, func() bool {
+		var n int
+		_ = f.app.DB().QueryRow(`SELECT COUNT(*) FROM op_log WHERE id = ? AND repeat_count = 3`, failed[0].ID).Scan(&n)
+		return n == 1
+	})
+	f.app.Contract(t, opsScenario, "record#repeated", failed[0], opMask, flowharness.Mask("error"), flowharness.Replace(f.repo.Dir, "<repo>"))
+}
+
+func TestOpsCheckRefFormat(t *testing.T) {
+	f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, agentStep("one", ""))
+	br := branchOf(t, board(t, f.app), f.taskID, f.repoID)
+	if _, err := f.app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: br.ID, Name: "bad..name"}); err == nil {
+		t.Fatal("an invalid branch name was accepted")
+	}
+	var found []oplog.Record
+	for _, r := range opsNow(t, f.app) {
+		cmd := ""
+		if r.Command != nil {
+			cmd = *r.Command
+		}
+		if strings.Contains(cmd, "check-ref-format") {
+			found = append(found, r)
+		}
+	}
+	if len(found) == 0 {
+		t.Fatal("no check-ref-format spawn recorded")
+	}
+	for _, r := range found {
+		if r.Status != oplog.StatusOK || r.Module != oplog.ModuleADE {
+			t.Errorf("check-ref-format op = %+v, want ok in module ade (an expected non-zero exit)", r)
+		}
+	}
 }
