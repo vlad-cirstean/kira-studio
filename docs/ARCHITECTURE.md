@@ -802,7 +802,9 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ScriptLauncher.Begin records a running run when a script terminal opens; a blocked folder records a failed run with source start and refuses the open.
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
-- The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list.
+- The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list. The Automations panel (RunsSection.vue) lists only running and waiting runs; finished runs live in the Operations panel.
+- `runoutcome.Outcome.outputTail` holds the last 40 sanitized lines (8 KiB cap) of a failed terminal or headless script run. A `termtext.Tail` on the script session tap (`ScriptLauncher.Output`) feeds terminal runs; the headless log sink feeds the rest. It lives in `outcome_json`, so it survives tab close and restart. Copy for agent falls back to it once the terminal tab is gone.
+- `internal/termtext` is the one ANSI stripper and line sanitizer (gitprepare and scriptruns).
 - A script keeps one tab per key {scriptId, taskId, branchId} ('' when none), stored in terminal (launchKind script) and script-run tab state; packages/workbench/src/automations/scriptTabs.ts holds the rule.
 - A start for a key whose tab is live (terminal session and run still running, or run running|waiting) focuses that tab and starts nothing; a finished key tab is replaced in place (new tab id, same strip slot, so terminal ids stay per run); no key tab opens a new one.
 - Viewing a run (history, chip, resume, agent reveal) uses the same placement: tab already on that run activates, finished key tab is replaced, live key tab with another run opens a new tab.
@@ -849,6 +851,10 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - OpLogPanel.vue shows a live elapsed clock (op-elapsed, m:ss) for every running row, ticked by one shared VueUse interval paused while runningCount is 0; finished rows show the formatted durationMs.
 - opLogMenuItems supplies the three generic menu items (copy-command, copy-error, cancel) in a fixed order so a consumer can destructure them.
 - toggleOperationsPanel/setOperationsHeight moved from Kira Studio's state/layout.ts into the shared createLayoutStore.ts core, used by both apps.
+- Automation runs show in both apps' Operations panel as a projection of `script_runs` (`automationOp`, id `run:<id>`), never rows in `op_log`. Panel retention for them is `script_runs`: newest 500 finished kept, newest 200 loaded.
+- `useAutomationOps` merges them into each app's panel list. Cancel maps to Stop (running) or Decline (waiting); the menu adds Copy for agent, Open run, Resume and Run again. A waiting run shows its state in the command cell, not the status cell, so Cancel stays reachable.
+- `opLogMatches` is the one filter predicate for op rows and automation rows. Clear sets `clearedAt`; automation runs started before it stay hidden in that window.
+- `AutomationsModuleContext.showOperations` opens the Operations dock; the Automations panel's empty state links to it.
 - No Kira-Studio import (MonacoHost, a connections store, kira-studio) may reach the shared package; this was verified by a closing-audit grep in P132 Part 1 §7.
 
 - WorkbenchShell.vue (shared) always mounts #dock; hasDock is removed, opsVisible/opsHeight are required props, and the status bar is always mt-1.
