@@ -21,8 +21,9 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P416 | Move automation runs into Operations panel | Todo |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
-| P419 | Code review (1 round) | Todo |
-| P420 | Close chapter v0.2.23 | Todo |
+| P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
+| P420 | Code review (1 round) | Todo |
+| P421 | Close chapter v0.2.23 | Todo |
 
 ## Rows
 
@@ -133,10 +134,17 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - Clear separation between committed and uncommitted work.
 - Agent panel in the review window is off by default.
 
-### P419 Code review (1 round)
+### P419 Git module: editable files (read only by default, Edit button, save button or shortcut)
+
+- Git module lets the user edit files; today it has no editing.
+- Read only by default; an Edit button switches to edit mode.
+- Save via a Save button or a keyboard shortcut.
+- No autocomplete or other editor extras.
+
+### P420 Code review (1 round)
 
 One Opus review over the full diff since `main` (base: the chapter's branch point). Findings file under `plans/`, then one Sonnet fixer.
 
-### P420 Close chapter v0.2.23
+### P421 Close chapter v0.2.23
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
