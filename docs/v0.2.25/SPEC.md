@@ -10,8 +10,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P437 | ADE sessions dropdown redesign | Todo |
 | P438 | Rename Automations to Runs; icon-only module tabs | Todo |
 | P439 | Kubernetes module (read only) | Todo |
-| P440 | Code review (2 rounds) | Todo |
-| P441 | Close chapter v0.2.25 | Todo |
+| P440 | Kubernetes MCP tools with per-cluster approval | Todo |
+| P441 | Code review (2 rounds) | Todo |
+| P442 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -39,10 +40,17 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - UI design consistent with the app, taking its cues from the Studio (database) module.
 - Read only: no create, edit, delete, exec or port-forward.
 
-### P440 Code review (2 rounds)
+### P440 Kubernetes MCP tools with per-cluster approval
+
+- Expose the P439 read operations (list namespaces, kinds, resources; describe; logs) through the Kira Studio DB MCP server, so the AI can request read data.
+- Per-cluster setting decides whether each AI request shows an approve dialog first or runs without asking. Default: ask.
+- Read only, same as P439: no write, exec or port-forward tools.
+- Reuse the existing DB MCP approval flow and P415 op-log origin stamping where they fit; the plan decides.
+
+### P441 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P441 Close chapter v0.2.25
+### P442 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
