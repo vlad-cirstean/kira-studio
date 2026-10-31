@@ -72,4 +72,16 @@ func TestChangeRequestReviewActions(t *testing.T) {
 	if n := len(forge.Reviews(7)); n != 1 {
 		t.Fatalf("Reviews after refusal = %d, want 1", n)
 	}
+
+	forge.SetAuthor(7, "alice")
+	hostHead := strings.Repeat("b", 40)
+	forge.SetHead(7, hostHead)
+	stale := state()
+	if stale.Kind != "ok" || stale.ChangeRequestReview == nil {
+		t.Fatalf("stale reviewState = %+v", stale)
+	}
+	if sv := stale.ChangeRequestReview; sv.HeadSha != hostHead || sv.LocalHeadSha != r.tip || sv.Own {
+		t.Fatalf("stale payload = %+v", sv)
+	}
+	r.app.Contract(t, scenario, "git:changeRequest.reviewState#stale", stale, sha)
 }
