@@ -2147,7 +2147,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - Headless runs execute via a login shell running claude -p with --output-format stream-json, --verbose, --session-id, --mcp-config and --setting-sources, cwd the worktree, prompt on stdin, using Setsid and procgroup.GracefulCancel; no --permission-mode and no --strict-mcp-config.
 - App setting ade.headlessSettingSources is either all (the default, meaning user,project,local) or user.
-- The finish_step MCP server (internal/agentmcp) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit. Its summary is the run's handover (P407).
+- The finish_step MCP server (internal/agentmcp) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit. Its summary is the run's handover (P407). Its reply lists the task's artifacts (P409).
 - The per-run MCP config is <home>/ade/runs/<runId>.mcp.json with mode 0600, deleted at process exit; the token is never put on argv.
 - A grant with declared results (P247) gets its own per-run mcp.Server whose status enum is the result ids plus needs_input; implicit grants keep the shared servers and done|failed|needs_input.
 - suffix.go holds the text appended to the message; FinishStepSuffixFor(results) names the result ids, and the TS mirror is finishStepSuffix.
@@ -2445,6 +2445,7 @@ Stage = workflow step. A handover is text one stage leaves for the next. Table `
 - Next-stage input: `handoverFor(tc, stepId)` returns the newest handed row only when its target is that stage. The step prompt gets Notes, Handover and HandoverFrom outside the `Message` block, so an edited Run dialog message keeps them; manual, review and start messages gain the same block (fragment `ade.handoverBlock`) and the tool line (`ade.handoverLine`).
 - Wire: `Task.handoverIn` (newest handed row), `Task.handoverDrafts`; `AdeTaskService.Handovers` (history), `UpdateHandover` (empty body deletes), `DismissHandover`; `StepDoneArgs.notes` and `SetTaskStepArgs.notes` (the mobile `POST /api/ade/tasks/step` passes `notes` through). Notes over the limit fail with `backend.space.ade.handoverTooLong.body`.
 - Frontend: `state/adeStageDialog.ts` (one store) drives `stage/AdeStageDialog.vue`. Every step move opens it: step mover, step block menu, task menu, the Done action and the routed `stage/AdeHandoverPrompt.vue`. Moving a manual step to its natural next stage calls `StepDone`; any other move calls `SetTaskStep` with `fromStepId`. `notes/AdeHandoverList.vue` lists drafts and history in the Notes tab and the archived panel. The session dialog's `compose.ts` mirrors the server's handover block and tool line.
+- A `handover` call with `finished: true` replies with the task's artifacts (see Task artifacts).
 - Tests: flows/adeflow `TestStageHandover` (contract `ade-handover`) and tests/ui/ade-v2-handover.spec.ts.
 
 ### Branch requests (P408)
@@ -2468,6 +2469,18 @@ An agent asks the user to approve branches and worktrees. `request_branches` blo
 - Desktop only: the answer comes from the dialog (`AdeBranchRequestDialog`, store `adeBranchRequest`), the routed prompt or the Task tab row. Escape hides the dialog and never answers. Mobile has no approval surface.
 - Bridge: `AdeTaskService.BranchRequest`, `ApproveBranchRequest` (non-empty subset, rest denied), `DenyBranchRequest`; `resolved` is false when the request is already gone.
 - Tests: flows/adeflow `TestBranchRequest` (contract `ade-branch-request`) and tests/ui/ade-v2-branch-request.spec.ts.
+
+### Task artifacts (P409)
+
+An artifact is a change request, issue, branch, commit, deployment, doc or link a task produced. Table `ade_task_artifacts` (migration 0058) holds only reported ones: `agent` (MCP) or `user` (Artifacts tab). Detected ones derive on read, never stored.
+
+- Aggregator `ade/artifacts.go`: `TaskArtifacts` runs every `ArtifactSource` under a 5 s timeout via errgroup. A failed source becomes an `ArtifactGap` (source, repo nickname), never an error. Built-ins: `taskLinkSource` (tracker link), `repoSource` (branch, commits, change request, deployments through the code host), `storedSource`. Extra sources plug in through `TaskBoardDeps.ArtifactSources`.
+- Dedup by URL, else (kind, repo, ref). A detected row wins over a stored one. Sorted by kind.
+- Stored rows: unique on (task, url) when url is set; a re-report updates kind, title, ref. Limits in `agentmcp`: 20 per call, 200 per task, title 200, url 2048, ref 512; url must be absolute http or https.
+- MCP tool `report_artifacts` (`artifacts`: kind, title, url, ref) is in `SpaceToolIDs`. `finish_step` and `handover` with `finished: true` append the full list as text: header line, then compact JSON `{"artifacts","gaps"}`, at most 100 rows plus a "more" line. A list failure appends an unavailable line and never fails the call.
+- Wire: `AdeTaskService.Artifacts`, `AddArtifact`, `RemoveArtifact` (stored rows only). Board pushes invalidate the artifacts query.
+- Frontend: Artifacts tab in `AdeTaskPanel.vue` and `AdeArchivedPanel.vue` (read-only); `AdeArtifactList.vue` also shows in the stage dialog when moving to Done.
+- Tests: flows/adeflow `TestTaskArtifacts` (contract `ade-artifacts`), tests/ui/ade-v2-artifacts.spec.ts, real `claude` `TestAdeReportArtifacts`.
 
 ### Tests
 
