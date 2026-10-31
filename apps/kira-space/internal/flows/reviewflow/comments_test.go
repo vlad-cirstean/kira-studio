@@ -7,6 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
 func lr(start, end int) gitreview.LineRange { return gitreview.LineRange{Start: start, End: end} }
@@ -237,4 +238,44 @@ func TestCommentKindStateExport(t *testing.T) {
 	if !set(question.ID, "open") || listComments(t, gs, id, "feature")[1].State != "open" {
 		t.Fatal("reopen failed")
 	}
+}
+
+// Contract git-review-edit; UI half: tests/ui/ade-v2-review.spec.ts.
+func TestCommentEdit(t *testing.T) {
+	app := flowharness.New(t)
+	gs := app.OpenGitStream()
+	repo, tip := twoFileFeature(app)
+	id := openRepo(t, gs, repo.Dir)
+
+	c := addComment(t, gs, id, "feature", "a.txt", tip, lr(1, 1), "rename this")
+	maskOpts := []flowharness.ContractOption{flowharness.Mask("at", "createdAt", "anchorSha")}
+	before := call[gitsession.CommentListResult](t, gs, "review.comment.list", gitrpc.ReviewCommentListParams{RepoID: id, Branch: "feature"})
+	app.Contract(t, "git-review-edit", "git:review.comment.list#before", before, maskOpts...)
+
+	edit := func(cid int64, body, kind string) gitrpc.ReviewCommentEditResult {
+		return call[gitrpc.ReviewCommentEditResult](t, gs, "review.comment.edit",
+			gitrpc.ReviewCommentEditParams{RepoID: id, Branch: "feature", ID: cid, Body: body, Kind: kind})
+	}
+	ok := edit(c.ID, "why?\r\nsecond", "question")
+	if !ok.Changed {
+		t.Fatal("edit answered changed=false for an existing id")
+	}
+	app.Contract(t, "git-review-edit", "git:review.comment.edit#ok", ok)
+
+	edited := call[gitsession.CommentListResult](t, gs, "review.comment.list", gitrpc.ReviewCommentListParams{RepoID: id, Branch: "feature"})
+	app.Contract(t, "git-review-edit", "git:review.comment.list#edited", edited, maskOpts...)
+	if len(edited.Comments) != 1 {
+		t.Fatalf("list = %+v, want one comment", edited.Comments)
+	}
+	got := edited.Comments[0]
+	if got.ID != c.ID || got.Body != "why?\nsecond" || got.Kind != "question" || got.State != "open" || got.Range != c.Range {
+		t.Fatalf("edited = %+v, want body %q, kind question, state open, id and range of %+v", got, "why?\nsecond", c)
+	}
+
+	if edit(9999, "x", "change").Changed {
+		t.Fatal("edit on a missing id answered changed=true")
+	}
+	badRequest(t, gs, "review.comment.edit", gitrpc.ReviewCommentEditParams{RepoID: id, Branch: "feature", ID: c.ID, Body: "  ", Kind: "change"}, "empty")
+	badRequest(t, gs, "review.comment.edit", gitrpc.ReviewCommentEditParams{RepoID: id, Branch: "feature", ID: c.ID, Body: "x", Kind: "bogus"}, "kind")
+	badRequest(t, gs, "review.comment.edit", gitrpc.ReviewCommentEditParams{RepoID: id, Branch: "feature", ID: 0, Body: "x", Kind: "change"}, "id")
 }
