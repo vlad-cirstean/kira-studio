@@ -39,7 +39,8 @@ func proofErr(code ProofCode, format string, args ...any) error {
 }
 
 // ProofRepo reads and writes the proof_* tables (P420). Every multi-row change is one transaction;
-// the pool holds one connection, so no query runs while a transaction is open.
+// the pool holds one connection with foreign_keys ON (internal/sqlitex), so cascades fire and no
+// query runs while a transaction is open.
 type ProofRepo struct {
 	DB *sql.DB
 }

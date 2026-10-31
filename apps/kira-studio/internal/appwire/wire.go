@@ -25,6 +25,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/proof"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -140,7 +141,7 @@ type embeddedWired struct {
 // event bus, attached to every producer built so far. deps is taken by value, since every call
 // site here is at or after the point main's own deps.Events assignment (the emitter) has already
 // run.
-func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, agents harness.Selector, opts Options) embeddedWired {
+func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, agents harness.Selector, proofSvc *proof.Service, opts Options) embeddedWired {
 	// The DB MCP server's embedded instance — owned by this app's own lifecycle.
 	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
 	// The approval broker outlives the server's own start/stop (constructed here, not
@@ -148,7 +149,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, kee
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
 	dbMcpApprovals.Prompts = promptRouter
-	dbMcpSvc := bridge.NewDbMcpService(deps, installer, dbMcpApprovals)
+	dbMcpSvc := bridge.NewDbMcpService(deps, installer, dbMcpApprovals, proofSvc)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
 	// P87 §3/§4: one keep-awake assertion for the whole app, driven by the titlebar toggle. The

@@ -1,0 +1,159 @@
+{
+  "ProofService.Session": {
+    "closedAt": 0,
+    "current": {
+      "createdAt": 0,
+      "reason": "",
+      "rev": 1,
+      "steps": [
+        {
+          "bytes": 209,
+          "description": "Orders before",
+          "diff": "added",
+          "language": "sql",
+          "ordinal": 1,
+          "originOrdinal": null,
+          "source": "postgres",
+          "view": "table"
+        },
+        {
+          "bytes": 102,
+          "description": "Doc hit",
+          "diff": "added",
+          "language": "json",
+          "ordinal": 2,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "document"
+        },
+        {
+          "bytes": 80,
+          "description": "Stats",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 3,
+          "originOrdinal": null,
+          "source": "",
+          "view": "keyvalue"
+        }
+      ]
+    },
+    "id": "<masked>",
+    "name": "Checkout fix",
+    "pending": null,
+    "removed": [],
+    "summary": ""
+  },
+  "ProofService.Sessions": [
+    {
+      "closedAt": 0,
+      "id": "<masked>",
+      "name": "Checkout fix",
+      "pending": false,
+      "seen": false,
+      "steps": 3
+    }
+  ],
+  "ProofService.Step#document": {
+    "bytes": 102,
+    "data": {
+      "documents": [
+        {
+          "body": {
+            "a": {
+              "nested": true
+            },
+            "z": 1
+          },
+          "id": "<masked>"
+        },
+        {
+          "body": {
+            "title": "Second"
+          },
+          "id": "<masked>"
+        }
+      ]
+    },
+    "description": "Doc hit",
+    "diff": "added",
+    "language": "json",
+    "ordinal": 2,
+    "originOrdinal": null,
+    "query": "{\"query\":{\"match_all\":{}}}",
+    "source": "elasticsearch",
+    "view": "document"
+  },
+  "ProofService.Step#keyvalue": {
+    "bytes": 80,
+    "data": {
+      "entries": [
+        {
+          "field": "status",
+          "value": "ok"
+        },
+        {
+          "field": "latencyMs",
+          "value": 12.5
+        }
+      ]
+    },
+    "description": "Stats",
+    "diff": "added",
+    "language": "text",
+    "ordinal": 3,
+    "originOrdinal": null,
+    "query": "",
+    "source": "",
+    "view": "keyvalue"
+  },
+  "ProofService.Step#table": {
+    "bytes": 209,
+    "data": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "number"
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "tags",
+          "type": "json"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "alpha",
+          [
+            "a",
+            "b"
+          ]
+        ],
+        [
+          2,
+          null,
+          null
+        ],
+        [
+          9007199254740992,
+          "<b>bold</b>",
+          {
+            "k": 1
+          }
+        ]
+      ]
+    },
+    "description": "Orders before",
+    "diff": "added",
+    "language": "sql",
+    "ordinal": 1,
+    "originOrdinal": null,
+    "query": "select id, name, tags from orders",
+    "source": "postgres",
+    "view": "table"
+  }
+}

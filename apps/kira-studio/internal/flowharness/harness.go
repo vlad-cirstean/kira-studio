@@ -94,6 +94,7 @@ type App struct {
 	McpInstaller *McpInstaller
 	OSAuth       *OSAuth
 	Focus        *WindowFocus
+	ProofWindows *ProofShell
 
 	mu         sync.Mutex
 	newWindows int
@@ -110,7 +111,7 @@ func New(t *testing.T, opts ...Opt) *App {
 		t: t, Home: filepath.Join(root, "home"), KiraHome: filepath.Join(root, "kira"),
 		BinDir: filepath.Join(root, "bin"), FakeDir: filepath.Join(root, "fake"),
 		Events: flowtest.NewEvents(), Dialogs: &Dialogs{}, Browser: &Browser{}, KeepAwake: &KeepAwakeDriver{},
-		McpInstaller: &McpInstaller{}, OSAuth: &OSAuth{}, Focus: &WindowFocus{},
+		McpInstaller: &McpInstaller{}, OSAuth: &OSAuth{}, Focus: &WindowFocus{}, ProofWindows: &ProofShell{},
 	}
 	for _, opt := range opts {
 		opt(&a.opts)
@@ -186,6 +187,7 @@ func (a *App) build() {
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)
 	}
+	w.Proof.Shell = a.ProofWindows
 	w.WindowsSvc.OpenNewWindow = func() {
 		a.mu.Lock()
 		defer a.mu.Unlock()

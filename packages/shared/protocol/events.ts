@@ -106,6 +106,10 @@ export const CHANNEL = {
   adeTaskSessions: 'kira:adetask:sessions',
   adeTaskOpenSession: 'kira:adetask:openSession',
   adeTaskReview: 'kira:adetask:review',
+  // P420: validation-proof sessions changed (Emit, app-wide), {sessionId}; a request for the proof
+  // window to show one session (EmitTo), {sessionId}.
+  proofChanged: 'kira:proof:changed',
+  proofSelect: 'kira:proof:select',
 } as const;
 
 /** Summed across every process metrics.Sample covers — a single app-wide readout

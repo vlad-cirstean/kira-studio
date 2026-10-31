@@ -2926,6 +2926,23 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Protected tokens checked by -compare are actions, numbers, quoted spans, identifiers, tool argument names and negations.
 - The P289 terse rewrite reduced the registry from 126 entries' 30567 to 29507 characters (-3.5 %), -6.0 % over the 52 rewritten entries; memory texts were already at the P285 Part 2 floor.
 
+## Validation proof (P420)
+
+Agent-written evidence the user reviews in a dedicated window. Part 1 is storage, tools, bridge and window plumbing.
+
+- **Tools on kira-db.** `proof_start_session`, `proof_edit_session`, `proof_add_step`, `proof_close_session`, `proof_list_sessions` (`internal/dbmcp/proof_tools.go`). Logic in `internal/proof`, storage in `storage/repos/proof.go`, migration 0046.
+- **Draft/revision model.** A session has `current_rev` and at most one `pending_rev`. Steps are added to a draft; close publishes it. An edit draft closes into the pending revision. User accepts (copies view state of unchanged steps, drops old revision) or rejects.
+- **Provenance diff.** `keepOrdinal` marks `unchanged`, `replacesOrdinal` marks `changed`, neither marks `added`. Old steps no draft step references are `removed`. Computed at read time in `Service.Session`, never stored.
+- **Retention.** Newest 30 closed sessions kept, pruned in the close transaction. `closed_at` is strictly monotonic (+1 ms bump on tie) so order is total. Delete frees the name. Names compare trimmed and lower-cased.
+- **Limits.** 100 steps, 5 open drafts, 32 MiB per session, per-field caps in `proof/validate.go`. Open drafts older than 24 h purge at startup and on start. HTTP body capped at 8 MiB.
+- **Payload precision.** The MCP SDK decodes arguments into a map, losing number precision and key order. `data` is read from the raw request JSON instead, so integers beyond 2^53 and key order survive.
+- **Timestamps.** `*_at` columns are INTEGER unix ms (convention N7), not TEXT.
+- **No op_log rows.** Proof tools read nothing from a connection and run no statement; the agent supplies the evidence. Nothing to audit as a data access.
+- **Prompt.** Close raises a `proof` prompt (`prompts.KindProof`, ref = session id). Startup re-raises it for closed sessions never seen or with a pending edit.
+- **Window.** Ephemeral windows keyed `proof-*` (`proof.IsWindowKey`). Their `windows` rows are purged at startup, so a restart never restores one. `ProofService.OpenWindow` raises the live one or opens a new one; `WindowTarget` tells it which session. `kira:proof:changed` (app-wide) and `kira:proof:select` (to one window) are the events.
+- **Studio DB.** `PRAGMA foreign_keys` is ON per connection (DSN `_foreign_keys=1`, `internal/sqlitex`) and `SetMaxOpenConns(1)`. Proof cascades rely on both. Multi-row changes run in one transaction with no query issued meanwhile, which the single connection would deadlock on.
+- **Boot audit for the proof window.** `frontend/src/main.ts` boots layout, connections, tabs, terminals, DB MCP, ops and schema sync stores. The proof window needs only i18n, Pinia, Vue Query, settings hydration (theme) and `windowsEnsure`. Part 2 skips the rest.
+
 ## Renderer security surface
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what

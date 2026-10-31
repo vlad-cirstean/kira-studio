@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/shell"
 )
 
 // Browser records OpenURL calls.
@@ -247,4 +248,58 @@ func (w *WindowFocus) Keys() []string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return append([]string(nil), w.keys...)
+}
+
+// ProofShell stands in for the window manager under the proof window: it records opens and
+// raises, and a window it opened stays live until Close.
+type ProofShell struct {
+	mu     sync.Mutex
+	live   map[string]bool
+	Opened []shell.WindowRecord
+	Raised []string
+	Titles map[string]string
+}
+
+func (p *ProofShell) Keys() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	keys := make([]string, 0, len(p.live))
+	for k := range p.live {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (p *ProofShell) Focus(key string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Raised = append(p.Raised, key)
+	return p.live[key]
+}
+
+func (p *ProofShell) SetTitle(key, title string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.Titles == nil {
+		p.Titles = map[string]string{}
+	}
+	p.Titles[key] = title
+	return p.live[key]
+}
+
+func (p *ProofShell) Open(rec shell.WindowRecord) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.live == nil {
+		p.live = map[string]bool{}
+	}
+	p.live[rec.Key] = true
+	p.Opened = append(p.Opened, rec)
+}
+
+// Close ends a window the way the user closing it does.
+func (p *ProofShell) Close(key string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.live, key)
 }

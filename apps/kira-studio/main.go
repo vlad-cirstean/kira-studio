@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/proof"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -187,8 +189,14 @@ func wireWindowsAndMenu(d postAppDeps) {
 		Terminal: d.w.TerminalRegistry, Repo: windowStore{d.w.Repos.Windows},
 		OnWindowClosing: d.w.OnWindowClosing,
 		Cfg:             shell.Config{AppName: "Kira Studio", WindowTitle: "Kira Studio"},
+		// The proof window is never restored and never counts as the last window.
+		Ephemeral: proof.IsWindowKey,
 	}
 	openNew := func() { shell.OpenNewWindow(deps) }
+	d.w.BindProofShell(func(rec shell.WindowRecord) {
+		rec.Bounds = shell.CascadeFrom(app.Window.Current())
+		shell.OpenWindow(deps, rec)
+	})
 	d.w.WindowsSvc.OpenNewWindow = openNew
 	d.w.SetReopen(func() { shell.ReopenWindows(deps) })
 	shell.AttachReopen(app, func() { shell.ReopenWindows(deps) })
@@ -205,6 +213,7 @@ func wireWindowsAndMenu(d postAppDeps) {
 	// Startup: one window per stored record (C1's migration guarantees at least the "main" row on
 	// a fresh database), in order — the first time this app has ever been able to open more than
 	// one.
+	purgeProofWindows(d.w.Repos.Windows)
 	records, err := d.w.Repos.Windows.List()
 	if err != nil {
 		d.reporter.Fatal(startupfail.StepWindowList, err)
@@ -223,6 +232,22 @@ func wireWindowsAndMenu(d postAppDeps) {
 			bounds = &b
 		}
 		shell.OpenWindow(deps, shell.ToWindowRecord(rec.Key, rec.Order, bounds))
+	}
+}
+
+// purgeProofWindows drops proof window rows a previous run left behind: they are never restored.
+func purgeProofWindows(windows *repos.WindowsRepo) {
+	records, err := windows.List()
+	if err != nil {
+		slog.Warn("list windows to purge proof rows", "scope", "startup", "err", err)
+		return
+	}
+	for _, rec := range records {
+		if proof.IsWindowKey(rec.Key) {
+			if err := windows.Delete(rec.Key); err != nil {
+				slog.Warn("purge proof window row", "scope", "startup", "key", rec.Key, "err", err)
+			}
+		}
 	}
 }
 
