@@ -53,6 +53,11 @@ type RememberVars struct {
 	Text string `json:"text"`
 }
 
+// CountVars fills a text with a count.
+type CountVars struct {
+	Count int `json:"count"`
+}
+
 // MaxVars fills an argument description with an upper bound.
 type MaxVars struct {
 	Max int `json:"max"`
@@ -832,7 +837,7 @@ var HeadlessSpaceInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.headlessSpaceInstructions.title",
 	PurposeKey: "llmPrompts.entry.headlessSpaceInstructions.description",
 	UsedByKey:  "llmPrompts.entry.headlessSpaceInstructions.usedBy.body",
-	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches and worktrees only with request_branches, one call for all repos; the user approves it. Never git branch or git worktree. A new worktree may still be preparing: call branch_status before editing there.`,
+	Default:    `Kira Space tools for this task. Call task_info first. Declare repos the work touches with declare_repos before branching. Create branches and worktrees only with request_branches, one call for all repos; the user approves it. Never git branch or git worktree. A new worktree may still be preparing: call branch_status before editing there. Record docs, deployments and links you make with report_artifacts; finishing replies list every artifact.`,
 }, NoVars{})
 
 // HeadlessToolFinishStep describes the finish_step tool.
@@ -965,6 +970,47 @@ var HeadlessHandoverAck = define(Entry{
 	PurposeKey: "llmPrompts.entry.headlessHandoverAck.description",
 	UsedByKey:  "llmPrompts.entry.headlessHandoverAck.usedBy.body",
 	Default:    `Recorded. The user moves the task on.`,
+}, NoVars{})
+
+// HeadlessToolReportArtifacts describes the report_artifacts tool.
+var HeadlessToolReportArtifacts = define(Entry{
+	ID: "headless.tool.report_artifacts", Kind: KindTool, Apps: spaceApp, Applies: NextCall, Name: "report_artifacts",
+	Default: `Record what you made outside the task's git branches: docs, deployments, PRs in other repos, issues, links. The task's branches, their PRs and configured deployments are found already.`,
+}, NoVars{})
+
+var (
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts", spaceApp, NextCall, `1 to {{.Max}} items to record. A url already recorded is updated.`, MaxVars{Max: 20})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.kind", spaceApp, NextCall, `changeRequest, issue, deployment, doc or link.`, NoVars{})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.title", spaceApp, NextCall, `Short name, at most 200 bytes.`, NoVars{})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.url", spaceApp, NextCall, `http or https address. Give url or ref.`, NoVars{})
+	_ = arg(HeadlessToolReportArtifacts.id, "artifacts.ref", spaceApp, NextCall, `What names it without a url, such as a file path.`, NoVars{})
+)
+
+// HeadlessArtifactsHeader opens the artifact list a finishing call returns.
+var HeadlessArtifactsHeader = define(Entry{
+	ID: "headless.artifacts.header", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessArtifactsHeader.title",
+	PurposeKey: "llmPrompts.entry.headlessArtifactsHeader.description",
+	UsedByKey:  "llmPrompts.entry.headlessArtifactsHeader.usedBy.body",
+	Default:    `Every artifact of this task. Name them in your final message to the user.`,
+}, NoVars{})
+
+// HeadlessArtifactsMore ends a list cut short.
+var HeadlessArtifactsMore = define(Entry{
+	ID: "headless.artifacts.more", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessArtifactsMore.title",
+	PurposeKey: "llmPrompts.entry.headlessArtifactsMore.description",
+	UsedByKey:  "llmPrompts.entry.headlessArtifactsMore.usedBy.body",
+	Default:    `{{.Count}} more artifacts not shown.`,
+}, CountVars{Count: 1})
+
+// HeadlessArtifactsUnavailable replaces the artifact list when it could not be read.
+var HeadlessArtifactsUnavailable = define(Entry{
+	ID: "headless.artifacts.unavailable", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.headlessArtifactsUnavailable.title",
+	PurposeKey: "llmPrompts.entry.headlessArtifactsUnavailable.description",
+	UsedByKey:  "llmPrompts.entry.headlessArtifactsUnavailable.usedBy.body",
+	Default:    `Artifacts could not be listed.`,
 }, NoVars{})
 
 // HeadlessToolGit describes the git tool.

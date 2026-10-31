@@ -293,7 +293,7 @@ func toolError(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}, IsError: true}
 }
 
-func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args finishArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) finishStep(ctx context.Context, req *mcp.CallToolRequest, args finishArgs) (*mcp.CallToolResult, any, error) {
 	var info *auth.TokenInfo
 	if req.Extra != nil {
 		info = req.Extra.TokenInfo
@@ -315,7 +315,8 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 		Status: args.Status, Summary: args.Summary, Reason: args.Reason, ConflictedFiles: args.ConflictedFiles,
 		LastGitError: args.LastGitError, Tried: args.Tried,
 	})
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: llmprompts.HeadlessFinishStepAck.Text(s.prompts, llmprompts.NoVars{})}}}, nil, nil
+	ack := llmprompts.HeadlessFinishStepAck.Text(s.prompts, llmprompts.NoVars{})
+	return &mcp.CallToolResult{Content: s.finishContent(ctx, req, ack, g)}, nil, nil
 }
 
 // verify maps a presented bearer token to the registration it was minted for.

@@ -101,6 +101,9 @@ type SpaceTools interface {
 	DeclareRepos(ctx context.Context, taskID string, repos []string) (TaskInfo, error)
 	RequestBranches(ctx context.Context, call SpaceCall, repos []string) (RequestBranchesResult, error)
 	BranchStatus(ctx context.Context, taskID, repo string, wait time.Duration) (BranchInfo, error)
+	ReportArtifacts(ctx context.Context, call SpaceCall, in []ArtifactInput) (ReportArtifactsResult, error)
+	// ListArtifacts lists every artifact of the task; a failing source is a gap, not an error.
+	ListArtifacts(ctx context.Context, taskID string) (TaskArtifacts, error)
 }
 
 type declareArgs struct {
@@ -114,6 +117,10 @@ type requestBranchesArgs struct {
 type branchStatusArgs struct {
 	Repo        string `json:"repo"`
 	WaitSeconds int    `json:"waitSeconds,omitempty"`
+}
+
+type reportArtifactsArgs struct {
+	Artifacts []ArtifactInput `json:"artifacts"`
 }
 
 type noArgs struct{}
@@ -245,5 +252,24 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 			return fail("branch_status", err), BranchInfo{}, nil
 		}
 		return nil, info, nil
+	})
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "report_artifacts",
+		Description: llmprompts.HeadlessToolReportArtifacts.Text(s.prompts, llmprompts.NoVars{}),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[reportArtifactsArgs](s.prompts, llmprompts.HeadlessToolReportArtifacts.ID(), map[string]any{
+			"artifacts": llmprompts.MaxVars{Max: MaxArtifactsPerCall},
+		}), "artifacts"),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args reportArtifactsArgs) (*mcp.CallToolResult, ReportArtifactsResult, error) {
+		call, bad := s.spaceTask(req)
+		if bad != nil {
+			return bad, ReportArtifactsResult{}, nil
+		}
+		ctx, done := s.callCtx(ctx, req)
+		defer done()
+		res, err := s.space.ReportArtifacts(ctx, call, args.Artifacts)
+		if err != nil {
+			return fail("report_artifacts", err), ReportArtifactsResult{}, nil
+		}
+		return nil, res, nil
 	})
 }

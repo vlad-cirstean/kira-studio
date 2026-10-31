@@ -1,9 +1,17 @@
 package agentmcp
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
 // Artifact limits, shared by the tool, the engine and the bridge.
@@ -13,6 +21,10 @@ const (
 	MaxArtifactTitle    = 200
 	MaxArtifactURL      = 2048
 	MaxArtifactRef      = 512
+	// maxArtifactsReply caps the artifacts a finishing reply lists.
+	maxArtifactsReply = 100
+	// artifactsReplyTimeout bounds the listing a finishing reply waits for.
+	artifactsReplyTimeout = 10 * time.Second
 )
 
 // Artifact kinds an agent or the user may report. Detected kinds (branch) are never reported.
@@ -76,7 +88,7 @@ func CleanArtifact(in ArtifactInput) (ArtifactInput, string) {
 	in.URL, in.Ref = strings.TrimSpace(in.URL), strings.TrimSpace(in.Ref)
 	switch {
 	case !ReportableArtifactKind(in.Kind):
-		return in, "kind must be changeRequest, issue, deployment, doc or link."
+		return in, "unknown kind; use one the tool lists."
 	case in.Title == "":
 		return in, "title must not be empty."
 	case len(in.Title) > MaxArtifactTitle:
@@ -95,4 +107,48 @@ func CleanArtifact(in ArtifactInput) (ArtifactInput, string) {
 		}
 	}
 	return in, ""
+}
+
+// artifactsReply is the text block a finishing call appends: the task's artifacts as compact JSON
+// under a heading. A failure becomes a one-line note; the finish itself is never failed by it.
+func (s *Server) artifactsReply(ctx context.Context, req *mcp.CallToolRequest, taskID string) mcp.Content {
+	ctx, done := s.callCtx(ctx, req)
+	defer done()
+	ctx, cancel := context.WithTimeout(ctx, artifactsReplyTimeout)
+	defer cancel()
+	list, err := s.space.ListArtifacts(ctx, taskID)
+	if err != nil {
+		slog.Warn("agentmcp: list artifacts", "scope", "ade", "task", taskID, "err", err)
+		return &mcp.TextContent{Text: llmprompts.HeadlessArtifactsUnavailable.Text(s.prompts, llmprompts.NoVars{})}
+	}
+	more := 0
+	if n := len(list.Artifacts); n > maxArtifactsReply {
+		more, list.Artifacts = n-maxArtifactsReply, list.Artifacts[:maxArtifactsReply]
+	}
+	if list.Artifacts == nil {
+		list.Artifacts = []Artifact{}
+	}
+	if list.Gaps == nil {
+		list.Gaps = []ArtifactGap{}
+	}
+	body, err := json.Marshal(list)
+	if err != nil {
+		slog.Warn("agentmcp: encode artifacts", "scope", "ade", "task", taskID, "err", err)
+		return &mcp.TextContent{Text: llmprompts.HeadlessArtifactsUnavailable.Text(s.prompts, llmprompts.NoVars{})}
+	}
+	text := llmprompts.HeadlessArtifactsHeader.Text(s.prompts, llmprompts.NoVars{}) + "\n" + string(body)
+	if more > 0 {
+		text += "\n" + llmprompts.HeadlessArtifactsMore.Text(s.prompts, llmprompts.CountVars{Count: more})
+	}
+	return &mcp.TextContent{Text: text}
+}
+
+// finishContent is a finishing call's reply: the ack, then the task's artifacts when the grant is a
+// Kira Space task and Space tools are wired.
+func (s *Server) finishContent(ctx context.Context, req *mcp.CallToolRequest, ack string, g Grant) []mcp.Content {
+	out := []mcp.Content{&mcp.TextContent{Text: ack}}
+	if g.Space && g.TaskID != "" && s.space != nil {
+		out = append(out, s.artifactsReply(ctx, req, g.TaskID))
+	}
+	return out
 }

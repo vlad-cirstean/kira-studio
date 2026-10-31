@@ -67,7 +67,7 @@ headless.finishStep.suffix	240
 headless.space.suffix	352
 headless.rebase.reportSuffix	508
 headless.script.reportSuffix	221
-headless.space.instructions	339
+headless.space.instructions	445
 headless.sandbox.note	333
 headless.tool.finish_step	78
 headless.tool.finish_step.arg.status	86
@@ -98,6 +98,15 @@ headless.tool.handover	130
 headless.tool.handover.arg.notes	91
 headless.tool.handover.arg.finished	104
 headless.handover.ack	37
+headless.tool.report_artifacts	184
+headless.tool.report_artifacts.arg.artifacts	59
+headless.tool.report_artifacts.arg.artifacts.kind	46
+headless.tool.report_artifacts.arg.artifacts.title	30
+headless.tool.report_artifacts.arg.artifacts.url	39
+headless.tool.report_artifacts.arg.artifacts.ref	49
+headless.artifacts.header	73
+headless.artifacts.more	27
+headless.artifacts.unavailable	30
 headless.tool.git	325
 headless.tool.git.arg.worktree	36
 headless.tool.git.arg.args	93

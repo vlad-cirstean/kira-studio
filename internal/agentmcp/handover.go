@@ -55,6 +55,10 @@ func (s *Server) addHandoverTool(srv *mcp.Server) {
 		if err := s.handover.RecordHandover(ctx, g.TaskID, g.StepID, args.Notes, args.Finished); err != nil {
 			return fail("handover", err), nil, nil
 		}
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: llmprompts.HeadlessHandoverAck.Text(s.prompts, llmprompts.NoVars{})}}}, nil, nil
+		ack := llmprompts.HeadlessHandoverAck.Text(s.prompts, llmprompts.NoVars{})
+		if !args.Finished {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: ack}}}, nil, nil
+		}
+		return &mcp.CallToolResult{Content: s.finishContent(ctx, req, ack, g)}, nil, nil
 	})
 }

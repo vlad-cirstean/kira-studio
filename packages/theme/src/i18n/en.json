@@ -5538,6 +5538,27 @@
           "body": "Sent to {agent} when it connects to the database MCP server."
         }
       },
+      "headlessArtifactsHeader": {
+        "description": "Opens the artifact list a finishing call returns.",
+        "title": "Artifacts list heading",
+        "usedBy": {
+          "body": "Returned to the agent after finish_step on a Kira Space task or a finished handover."
+        }
+      },
+      "headlessArtifactsMore": {
+        "description": "Ends the artifact list when it holds more than the reply shows.",
+        "title": "Artifacts list cut short",
+        "usedBy": {
+          "body": "Returned to the agent after the artifact list when it is cut short."
+        }
+      },
+      "headlessArtifactsUnavailable": {
+        "description": "Replaces the artifact list when it can’t be read.",
+        "title": "Artifacts unavailable",
+        "usedBy": {
+          "body": "Returned to the agent after finish_step or a finished handover when listing fails."
+        }
+      },
       "headlessFinishStepAck": {
         "description": "The reply to a finish_step call. It tells the agent to stop.",
         "title": "Finish step reply",
