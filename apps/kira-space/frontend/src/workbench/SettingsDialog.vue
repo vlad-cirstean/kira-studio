@@ -13,6 +13,7 @@ import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AgentPane from './settings/AgentPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
+import CliToolsPane from './settings/CliToolsPane.vue';
 import FileTypesPane from './settings/FileTypesPane.vue';
 import GitPane from './settings/GitPane.vue';
 import MemoryPane from './settings/MemoryPane.vue';
@@ -35,6 +36,7 @@ const { info: agentInfo } = useAgentInfo();
 const sectionLabels = computed<Record<Section, string>>(() => ({
   Appearance: t('common.appearance.label'),
   Git: t('common.module.git.label'),
+  'CLI tools': t('space.settings.nav.cliTools.label'),
   'File types': t('space.settings.nav.fileTypes.label'),
   'Mobile access': t('space.settings.nav.mobileAccess.label'),
   Agent: agentInfo.value.productLabel,
@@ -91,6 +93,13 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <GitPane
         :active="s.activeSection === 'Git'"
+        :draft="s.draft"
+        :is-at-default="s.isAtDefault"
+        :reset-leaf="s.resetLeaf"
+        :register-field-error="s.registerFieldError"
+      />
+      <CliToolsPane
+        :active="s.activeSection === 'CLI tools'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"
