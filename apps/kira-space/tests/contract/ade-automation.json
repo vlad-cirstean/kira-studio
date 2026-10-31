@@ -90,7 +90,8 @@
         "mcp__kira-ade__task_info",
         "mcp__kira-ade__declare_repos",
         "mcp__kira-ade__request_branches",
-        "mcp__kira-ade__branch_status"
+        "mcp__kira-ade__branch_status",
+        "mcp__kira-ade__report_artifacts"
       ],
       "mcpServers": [],
       "tools": [
@@ -136,7 +137,8 @@
         "mcp__kira-ade__task_info",
         "mcp__kira-ade__declare_repos",
         "mcp__kira-ade__request_branches",
-        "mcp__kira-ade__branch_status"
+        "mcp__kira-ade__branch_status",
+        "mcp__kira-ade__report_artifacts"
       ],
       "mcpServers": [],
       "tools": [
@@ -163,7 +165,8 @@
       "mcp__kira-ade__task_info",
       "mcp__kira-ade__declare_repos",
       "mcp__kira-ade__request_branches",
-      "mcp__kira-ade__branch_status"
+      "mcp__kira-ade__branch_status",
+      "mcp__kira-ade__report_artifacts"
     ],
     "blocker": "",
     "body": "Audit {branch} on {base} in {worktree} for {task}",

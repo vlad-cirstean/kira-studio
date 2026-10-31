@@ -128,6 +128,13 @@ func (f *Forge) Calls() []string {
 	return slices.Clone(f.calls)
 }
 
+// ResetCalls forgets every recorded call.
+func (f *Forge) ResetCalls() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = nil
+}
+
 // Count returns how many recorded calls start with prefix.
 func (f *Forge) Count(prefix string) int {
 	n := 0
