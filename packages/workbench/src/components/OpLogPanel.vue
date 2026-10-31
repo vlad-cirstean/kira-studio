@@ -433,9 +433,13 @@ function alignClass(column: OpLogColumn): string {
                 </span>
                 <Tooltip v-else-if="column.id === 'time'">
                   <TooltipTrigger as-child>
-                    <span class="font-data tabular-nums" data-testid="op-time-cell">{{
-                      formatOpTime(entry.item.row.record.startedAt, now)
-                    }}</span>
+                    <span
+                      class="font-data tabular-nums whitespace-nowrap"
+                      data-testid="op-time-cell"
+                      >{{
+                        formatOpTime(entry.item.row.record.startedAt, now)
+                      }}</span
+                    >
                   </TooltipTrigger>
                   <TooltipContent>{{ timeTitle(entry.item.row.record) }}</TooltipContent>
                 </Tooltip>

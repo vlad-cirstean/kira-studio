@@ -42,7 +42,7 @@ test('memory rows show the memory module and the MCP tool as source', async ({ r
   const list = window.locator('[data-testid="op-row"]');
   await expect(list).toHaveCount(2);
   const ok = list.filter({ hasText: 'search_memories' });
-  await expect(ok).toContainText('memory');
+  await expect(ok).toContainText('Memory');
   await expect(ok).toContainText('MCP search_memories');
   await expect(ok).toContainText('github.com/acme/billing');
   await expect(ok).toHaveAttribute('data-status', 'ok');

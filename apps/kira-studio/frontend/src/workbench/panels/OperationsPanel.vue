@@ -40,7 +40,7 @@ const runningCount = computed(() => opsStore.runningCount + auto.runningCount.va
 
 const columns = computed<OpLogColumn[]>(() => [
   { id: 'status', label: t('common.field.status.label'), width: '44px' },
-  { id: 'time', label: t('common.field.time.label'), width: '64px', priority: 3 },
+  { id: 'time', label: t('common.field.time.label'), width: '84px', priority: 3 },
   {
     id: 'connection',
     label: t('studio.common.nodeKind.connection.label'),
