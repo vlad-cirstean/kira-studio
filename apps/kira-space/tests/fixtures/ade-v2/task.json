@@ -23,5 +23,6 @@
   "statusId": "todo",
   "statusBy": "auto",
   "handoverIn": null,
+  "branchRequestId": "",
   "handoverDrafts": []
 }

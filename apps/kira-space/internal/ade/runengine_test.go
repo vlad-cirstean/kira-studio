@@ -282,7 +282,17 @@ func (e *engine) task(repoNames ...string) string {
 
 func (e *engine) start(taskID string) []string {
 	e.t.Helper()
-	res, err := e.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: taskID})
+	tc, err := e.board.loadTaskCtx(taskID)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	names := map[string]string{}
+	for _, br := range tc.branches { // the user names each branch at Run; an agent step would leave it to the agent
+		if br.Kind == model.AdeBranchKindMine && br.Name == "" {
+			names[br.ID] = "feat/" + slug(taskTitle(tc.task, tc.branches))
+		}
+	}
+	res, err := e.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: taskID, BranchNames: names})
 	if err != nil {
 		e.t.Fatalf("StartRun: %v", err)
 	}

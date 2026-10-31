@@ -31,7 +31,6 @@ const step = (id: string, results: StepResult[] = defaultResults()): WorkflowSte
 const wfOf = (steps: WorkflowStep[]): Workflow => ({
   id: 'w',
   name: 'w',
-  kiraSpaceMcp: false,
   steps,
 });
 const next = (wf: Workflow, id: string, result: string): string =>

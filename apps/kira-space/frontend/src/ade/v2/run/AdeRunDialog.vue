@@ -31,7 +31,7 @@ import {
 } from '../board/runMessage';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
 import { usePlanModel } from '../plan/usePlanModel';
-import { useAdePromptPreview, useSpaceTools, useStartRun } from '../queries';
+import { useAdePromptPreview, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { ACTION_CLASS } from '../tones';
 
@@ -61,7 +61,7 @@ const numbering = computed(() => {
   const auto = (card.value?.workflow?.steps ?? []).filter((x) => x.kind !== 'manual' && !x.skip);
   return { n: auto.findIndex((x) => x.id === step.value?.id) + 1, of: auto.length };
 });
-// Both texts render in Go (ade.step.prompt, headless.finishStep.suffix), so edits in Settings show here.
+// The texts render in Go (ade.step.prompt, headless.space.suffix, headless.finishStep.suffix), so edits in Settings show here.
 const stepPreview = useAdePromptPreview('ade.step.prompt', () =>
   card.value && step.value
     ? runMessageVars({
@@ -80,8 +80,13 @@ const stepPreview = useAdePromptPreview('ade.step.prompt', () =>
 const suffixPreview = useAdePromptPreview('headless.finishStep.suffix', () =>
   step.value ? finishVars(step.value.results) : null,
 );
-// The finish instruction the step ends with, as its results declare it.
-const suffix = computed(() => previewPlain(suffixPreview.data.value?.parts ?? []));
+const spacePreview = useAdePromptPreview('headless.space.suffix', () => (step.value ? {} : null));
+// The Kira Space note and the finish instruction the step ends with, as ade.step.prompt appends them.
+const suffix = computed(() => {
+  const finish = previewPlain(suffixPreview.data.value?.parts ?? []);
+  const space = previewPlain(spacePreview.data.value?.parts ?? []);
+  return space ? `${space}\n\n${finish}` : finish;
+});
 const initial = computed(() =>
   editablePart(previewPlain(stepPreview.data.value?.parts ?? []), suffix.value),
 );
@@ -103,13 +108,15 @@ const smartBody = computed(() => {
     jira: c.task.jira?.key ?? '',
   });
 });
-const spaceTools = useSpaceTools(() => card.value?.task.workflowId ?? '');
-const pending = computed(
+const named = computed(
   () => card.value?.rows.filter((r) => r.branch.kind === 'mine' && r.branch.name === '') ?? [],
 );
-// With the Kira Space tools on the agent creates its branches (request_branch; Kira Space names them), so no name is asked.
-const named = computed(() => (spaceTools.value ? [] : pending.value));
+// An agent step leaves an empty name to the agent (request_branches; the user approves); another step derives it.
+const askable = computed(() => def.value?.kind === 'agent' || Boolean(def.value?.smartScript));
 const slug = computed(() => `feat/${branchSlug(card.value?.title ?? '')}`);
+const placeholder = computed(() =>
+  askable.value ? t('space.ade.runDialog.branchName.placeholder') : slug.value,
+);
 
 // Setups of the task's branches still running or failed: the runs queue behind them after Start.
 const setups = computed(() =>
@@ -196,7 +203,7 @@ const send = sending.run;
               :id="`ade-run-branch-${r.id}`"
               v-model="names[r.id]"
               class="flex-1 font-data"
-              :placeholder="slug"
+              :placeholder="placeholder"
               data-testid="ade-run-branch"
             />
           </div>

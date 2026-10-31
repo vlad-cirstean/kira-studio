@@ -81,7 +81,6 @@ export function runMessageVars(i: RunMessageInput): Record<string, unknown> {
     jiraURL: i.jira?.url ?? '',
     message: '',
     repo: '{repo}',
-    space: false,
     stepCount: i.stepCount,
     stepName: first.name,
     stepNumber: i.stepNumber,

@@ -4,6 +4,7 @@
   },
   "AdeTaskService.UpdateTask#converted": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "",

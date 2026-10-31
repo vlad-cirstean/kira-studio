@@ -90,6 +90,7 @@
         "branchIds": [
           "<id:2>"
         ],
+        "branchRequestId": "",
         "color": 0,
         "createdAt": 0,
         "entryStepId": "",
@@ -114,6 +115,7 @@
       },
       {
         "branchIds": [],
+        "branchRequestId": "",
         "color": 0,
         "createdAt": 0,
         "entryStepId": "",
@@ -138,6 +140,7 @@
       },
       {
         "branchIds": [],
+        "branchRequestId": "",
         "color": 0,
         "createdAt": 0,
         "entryStepId": "",

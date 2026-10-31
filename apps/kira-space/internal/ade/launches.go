@@ -334,25 +334,17 @@ func (b *TaskBoard) finishableRun(tc *taskCtx, rec *model.AdeSession) string {
 	return run.ID
 }
 
-// spaceEnabled reports whether the task's workflow turns the Kira Space tools on; a started task
-// keeps the flag of its snapshot.
-func (b *TaskBoard) spaceEnabled(task model.AdeTask) bool {
-	wf, ok := b.taskWorkflow(task)
-	return ok && wf.KiraSpaceMcp
-}
-
 // prepareWithGrant registers the agent MCP grant every task TUI launch carries (handover, run_outcome;
-// finish_step for a taken-over run; the Space tools when the workflow enables them) and prepares the
+// finish_step for a taken-over run; the Space tools) and prepares the
 // launch with its flags. grantStep is the stage the session opens for, "" when it has none. The grant
 // lives until the record stops or its launch expires.
 func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, runID, grantStep string) (adewire.Launch, error) {
-	space := b.spaceEnabled(tc.task)
 	agent, err := b.agentFor(pa.Provider)
 	if err != nil {
 		return adewire.Launch{}, err
 	}
 	pa.Provider = agent.ID()
-	grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
+	grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: true, Agent: agent}
 	var ids []harness.MCPTool
 	if runID != "" {
 		grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
@@ -368,9 +360,7 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	if runID == "" {
 		ids = append(ids, agentmcp.Handover)
 	}
-	if space {
-		ids = append(ids, agentmcp.SpaceToolIDs...)
-	}
+	ids = append(ids, agentmcp.SpaceToolIDs...)
 	pa.MCPConfig, pa.AllowedTools = cfg, harness.ToolNames(agent, ids...)
 	res, err := tr.Prepare(pa)
 	if err != nil {

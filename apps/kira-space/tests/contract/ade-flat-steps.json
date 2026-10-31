@@ -97,7 +97,6 @@
     "usedBy": 1,
     "workflow": {
       "id": "flow",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -260,6 +259,7 @@
   },
   "AdeTaskService.Task#created": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "spec",
@@ -284,6 +284,7 @@
   },
   "AdeTaskService.Task#done": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "done",
@@ -418,7 +419,6 @@
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -583,6 +583,7 @@
   },
   "AdeTaskService.Task#manual": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "spec",
@@ -603,7 +604,6 @@
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -768,6 +768,7 @@
   },
   "AdeTaskService.Task#moved": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "implement",
@@ -868,7 +869,6 @@
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -1033,6 +1033,7 @@
   },
   "AdeTaskService.Task#return": {
     "branchIds": [],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "implement",
@@ -1227,7 +1228,6 @@
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -1395,7 +1395,6 @@
     "fileName": "flow.yaml",
     "workflow": {
       "id": "flow",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {

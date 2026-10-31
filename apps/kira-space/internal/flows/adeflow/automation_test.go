@@ -477,7 +477,7 @@ func TestAutomationStep(t *testing.T) {
 		if r.State != "done" {
 			t.Fatalf("run = %+v", r)
 		}
-		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+agentmcp.FinishInstruction(llmprompts.Defaults(), nil); !strings.HasPrefix(got, want) {
+		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+agentmcp.SpaceNote(llmprompts.Defaults())+"\n\n"+agentmcp.FinishInstruction(llmprompts.Defaults(), nil); !strings.HasPrefix(got, want) {
 			t.Fatalf("prompt = %q, want it to start with %q", got, want)
 		}
 		args := fakeFile(t, f.app, "api-1.args")

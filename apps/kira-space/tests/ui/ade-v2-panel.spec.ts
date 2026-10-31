@@ -521,11 +521,7 @@ test('a skipped step is dimmed, cannot be entered, and Skip this step jumps past
   expect(moves()).toHaveLength(0);
 });
 
-test('agent-made branches carry a sparkle and the workflow shows its Kira Space tools', async ({
-  relaunch,
-}) => {
-  const wfs = adeFixture<{ workflows: { workflow: { kiraSpaceMcp: boolean } }[] }>('workflows');
-  for (const w of wfs.workflows) if (w.workflow) w.workflow.kiraSpaceMcp = true;
+test('agent-made branches carry a sparkle', async ({ relaunch }) => {
   const board = adeBoard((b) => {
     const task = b.tasks.find((x) => x.id === 'T_bill');
     const branch = b.branches.find((x) => x.taskId === task?.id && x.name !== '');
@@ -533,10 +529,9 @@ test('agent-made branches carry a sparkle and the workflow shows its Kira Space 
   });
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.adeTaskBoard, response: board },
-    { channel: IPC.adeTaskWorkflows, response: wfs },
   ]);
   await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-workflow-space"]')).toHaveText('Kira Space tools');
+  await expect(page.locator('[data-testid="ade-workflow-space"]')).toHaveCount(0);
   const sparkle = page.locator('[data-testid="ade-branch-agent"]');
   await expect(sparkle).toHaveCount(1);
   await sparkle.hover();

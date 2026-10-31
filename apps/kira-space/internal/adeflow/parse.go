@@ -186,7 +186,7 @@ func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 		v.fail(m["id"], "", "id must be lowercase letters, digits, - or _")
 	}
 	wf.Name = v.str(m, "", "name", true)
-	wf.KiraSpaceMcp = v.boolean(m, "", "kira_space_mcp")
+	v.boolean(m, "", "kira_space_mcp") // legacy switch (P408): still valid, ignored, dropped on save
 	if v.err != nil {
 		return wf
 	}

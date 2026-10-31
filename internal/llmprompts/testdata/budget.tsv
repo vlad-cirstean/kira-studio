@@ -102,7 +102,7 @@ headless.tool.git	325
 headless.tool.git.arg.worktree	36
 headless.tool.git.arg.args	93
 ade.rebase.prompt	338
-ade.step.prompt	550
+ade.step.prompt	904
 ade.manual.message	422
 ade.review.message	500
 ade.start.message	327

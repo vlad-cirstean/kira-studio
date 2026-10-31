@@ -7,7 +7,6 @@
     "usedBy": 0,
     "workflow": {
       "id": "editor",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {
@@ -159,7 +158,6 @@
         "usedBy": 0,
         "workflow": {
           "id": "editor",
-          "kiraSpaceMcp": false,
           "name": "Flow",
           "steps": [
             {

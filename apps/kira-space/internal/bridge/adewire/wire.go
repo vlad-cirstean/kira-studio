@@ -179,11 +179,9 @@ type ReviewStepConfig struct {
 }
 
 type Workflow struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	// KiraSpaceMcp turns on the Kira Space tools (declare repos, request branches) for the work of a task.
-	KiraSpaceMcp bool           `json:"kiraSpaceMcp"`
-	Steps        []WorkflowStep `json:"steps"`
+	ID    string         `json:"id"`
+	Name  string         `json:"name"`
+	Steps []WorkflowStep `json:"steps"`
 }
 
 type WorkflowError struct {

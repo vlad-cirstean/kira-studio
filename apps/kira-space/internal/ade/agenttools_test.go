@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 )
@@ -188,9 +189,11 @@ func (e *engine) branch(t *testing.T, taskID, repo string) model.AdeTaskBranch {
 func TestSpaceTools_startRunCreatesNoBranch(t *testing.T) {
 	e := newEngine(t, map[string][]string{"*": {"done"}})
 	e.repo("api")
-	e.workflow("id: flow\nname: Flow\nkira_space_mcp: true\nsteps:\n" + agentStep("first", ""))
+	e.workflow("id: flow\nname: Flow\nsteps:\n" + agentStep("first", ""))
 	id := e.task("api")
-	e.start(id)
+	if _, err := e.board.StartRun(context.Background(), adewire.StartRunArgs{TaskID: id}); err != nil {
+		t.Fatal(err)
+	}
 	e.waitRun(id, "first/api", model.AdeRunDone)
 	if sb := e.branch(t, id, "api"); sb.Name != "" {
 		t.Fatalf("StartRun created branch %q; want none", sb.Name)

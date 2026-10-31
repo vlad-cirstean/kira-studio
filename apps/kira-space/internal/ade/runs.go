@@ -318,7 +318,7 @@ func (b *TaskBoard) StartRun(ctx context.Context, args adewire.StartRunArgs) (ad
 	if plan[cur].TargetErr != nil {
 		return adewire.StartRunResult{}, invalid("step %q: %v", plan[cur].Def.Name, plan[cur].TargetErr)
 	}
-	paths, err := b.prepareWorktrees(ctx, tc, args.BranchNames)
+	paths, err := b.prepareWorktrees(ctx, tc, args.BranchNames, plan[cur].Def.Kind == adewire.KindAgent || plan[cur].Def.SmartScript != "")
 	if err != nil {
 		return adewire.StartRunResult{}, err
 	}
@@ -347,13 +347,13 @@ func (b *TaskBoard) checkBranchNames(tc *taskCtx, names map[string]string) error
 	return nil
 }
 
-// prepareWorktrees makes every mine branch's worktree exist and starts a setup in each new one. With
-// the Kira Space tools on, an unnamed branch gets none: the run starts in the repo root and the agent
-// creates the branch through request_branches; Kira Space names it.
-func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map[string]string) (map[string]string, error) {
+// prepareWorktrees makes every mine branch's worktree exist and starts a setup in each new one. When the
+// step is run by an agent, an unnamed branch the user did not name gets none: the run starts in the repo
+// root and the agent asks for the branch through request_branches; Kira Space names it. Any other step
+// cannot ask, so its unnamed branch takes a name derived from the task title.
+func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map[string]string, agentStep bool) (map[string]string, error) {
 	paths := map[string]string{}
 	title := taskTitle(tc.task, tc.branches)
-	space := b.spaceEnabled(tc.task)
 	for _, sb := range tc.branches {
 		if sb.Kind != model.AdeBranchKindMine {
 			continue
@@ -365,7 +365,7 @@ func (b *TaskBoard) prepareWorktrees(ctx context.Context, tc *taskCtx, names map
 		if rec == nil {
 			return nil, invalid("code repo %s not found", sb.CodeRepoID)
 		}
-		if space && sb.Name == "" && names[sb.ID] == "" {
+		if agentStep && sb.Name == "" && names[sb.ID] == "" {
 			paths[sb.ID] = rec.Root // the agent creates the branch via request_branches
 			continue
 		}
@@ -587,8 +587,8 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 			prompt = composePrompt(b.prompts(), promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
 				Step: stepN, Of: stepOf, Def: def, Message: b.stepMessage(tc.task.ID, def.ID), Extra: spec.Extra,
-				Space: b.spaceEnabled(tc.task), Context: b.rebaseContext(tc),
-				Notes: tc.task.Notes, Handover: ho.Body, HandoverFrom: ho.From,
+				Context: b.rebaseContext(tc),
+				Notes:   tc.task.Notes, Handover: ho.Body, HandoverFrom: ho.From,
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
@@ -734,10 +734,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	rebase := run.Purpose == model.AdeRunPurposeRebase
 	round := run.Purpose == model.AdeRunPurposeReview
-	space := false
-	if task, err := b.deps.Tasks.GetTask(run.TaskID); err == nil && !rebase && !round {
-		space = b.spaceEnabled(task)
-	}
+	space := !rebase && !round
 	complete := func(out outcome) {
 		if round {
 			b.completeReviewRound(run, sessionID, out)

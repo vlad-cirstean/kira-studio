@@ -3,10 +3,10 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
 import { optimisticUpdate } from '@workbench/behaviour/optimistic';
 import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
-import { computed, toValue } from 'vue';
+import { toValue } from 'vue';
 import { control } from '../../bridge/control';
 import { withShelved } from './board/shelf';
-import { archivedTaskKey, boardKey, runSandboxKey, sessionsKey, useWorkflows } from './readQueries';
+import { archivedTaskKey, boardKey, runSandboxKey, sessionsKey } from './readQueries';
 import type {
   AddExistingBranchArgs,
   AddTaskRepoArgs,
@@ -78,16 +78,6 @@ export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const handoversPrefix = ['adetask', 'handovers'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
-
-/** Whether the workflow turns the Kira Space tools on; the agent then creates its branches through request_branch. */
-export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
-  const workflows = useWorkflows();
-  return computed(
-    () =>
-      workflows.data.value?.workflows.find((e) => e.workflow?.id === toValue(workflowId))?.workflow
-        ?.kiraSpaceMcp ?? false,
-  );
-}
 
 /**
  * Branches that can join the plan, of one repo or ('' ) every repo; refetched on every open so a

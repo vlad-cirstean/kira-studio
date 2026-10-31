@@ -151,7 +151,6 @@ type StepVars struct {
 	Message    string     `json:"message"`
 	Extra      string     `json:"extra"`
 	Context    []string   `json:"context"`
-	Space      bool       `json:"space"`
 	Finish     FinishVars `json:"finish"`
 	// Notes are the task notes; Handover is what the previous stage left, HandoverFrom its stage name.
 	// All arrive capped and outside Message, so a Run dialog edit keeps them.
@@ -1020,9 +1019,9 @@ Step {{.StepNumber}}/{{.StepCount}}: {{.StepName}}{{if .StepPrompt}}
 
 - Notes: {{.Notes}}{{end}}{{if .Handover}}
 
-{{template "ade.handoverBlock" .}}{{end}}{{if .Space}}
+{{template "ade.handoverBlock" .}}{{end}}
 
-{{template "headless.space.suffix"}}{{end}}
+{{template "headless.space.suffix"}}
 
 {{template "headless.finishStep.suffix" .Finish}}
 `,

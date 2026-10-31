@@ -496,7 +496,7 @@ describe('script step recovery', () => {
     });
     const p = buildTaskProgress({
       task: t,
-      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, steps: [script] },
+      workflow: { id: 'w', name: 'w', steps: [script] },
       branch: () => b,
       repoNick: (id) => id,
     });
@@ -540,7 +540,7 @@ describe('Needs you extras (R16)', () => {
     });
     const p = buildTaskProgress({
       task: t,
-      workflow: { id: 'w', name: 'w', kiraSpaceMcp: false, steps: [script] },
+      workflow: { id: 'w', name: 'w', steps: [script] },
       branch: () => b,
       repoNick: (id) => id,
     });

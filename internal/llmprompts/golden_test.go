@@ -60,13 +60,12 @@ func TestGolden(t *testing.T) {
 		{"ade.step.prompt.default-implicit", AdeStepPrompt.id, step(func(*StepVars) {})},
 		{"ade.step.prompt.jira", AdeStepPrompt.id, step(func(v *StepVars) { v.JiraKey, v.JiraURL = jiraKey, jiraURL })},
 		{"ade.step.prompt.message", AdeStepPrompt.id, step(func(v *StepVars) { v.Message = "Do the thing for Add login form." })},
-		{"ade.step.prompt.extra-context-space", AdeStepPrompt.id, step(func(v *StepVars) {
+		{"ade.step.prompt.extra-context", AdeStepPrompt.id, step(func(v *StepVars) {
 			v.Extra = "Verify failed on feat/login: tests red. Fix the implementation."
 			v.Context = []string{
 				"- Last rebase of feat/login failed: conflicts (run r1; call run_outcome for details)",
 				"- Last rebase of feat/b needs input: which base? (run r2; call run_outcome for details)",
 			}
-			v.Space = true
 		})},
 		{"ade.step.prompt.notes-handover-message", AdeStepPrompt.id, step(func(v *StepVars) {
 			v.Message = "Do the thing for Add login form."

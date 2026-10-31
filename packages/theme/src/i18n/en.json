@@ -8196,6 +8196,9 @@
         }
       },
       "runDialog": {
+        "branchName": {
+          "placeholder": "Empty means the agent asks you for one"
+        },
         "handover": {
           "label": "Handover from {stage}"
         },
@@ -8552,12 +8555,6 @@
         },
         "outdatedHint": {
           "hint": "This task runs the version of the workflow it started with."
-        },
-        "spaceTools": {
-          "label": "Kira Space tools"
-        },
-        "spaceToolsHint": {
-          "hint": "Agents in this workflow can declare repositories and request branches."
         }
       },
       "workflowDiscardConfirm": {
@@ -8619,10 +8616,6 @@
           },
           "resize": {
             "aria": "Resize inspector"
-          },
-          "spaceTools": {
-            "label": "Kira Space tools for agents",
-            "tooltip": "Agent steps can declare repositories on the task and request branches and worktrees through Kira Space"
           },
           "stepMenu": {
             "aria": "Step actions"

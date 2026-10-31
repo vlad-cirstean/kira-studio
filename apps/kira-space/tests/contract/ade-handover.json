@@ -92,6 +92,7 @@
         "branchIds": [
           "<id:3>"
         ],
+        "branchRequestId": "",
         "color": 0,
         "createdAt": 0,
         "entryStepId": "one",
@@ -180,7 +181,6 @@
         "title": "Fix login",
         "workflow": {
           "id": "<masked>",
-          "kiraSpaceMcp": false,
           "name": "Flow",
           "steps": [
             {
@@ -361,6 +361,7 @@
     "branchIds": [
       "<id:3>"
     ],
+    "branchRequestId": "",
     "color": 0,
     "createdAt": 0,
     "entryStepId": "two",
@@ -432,7 +433,6 @@
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
-      "kiraSpaceMcp": false,
       "name": "Flow",
       "steps": [
         {

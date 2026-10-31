@@ -113,8 +113,6 @@ export interface ReviewStepConfig {
 export interface Workflow {
   id: string;
   name: string;
-  /** Turns on the Kira Space tools (declare repos, request branches) for the work of a task. */
-  kiraSpaceMcp: boolean;
   steps: WorkflowStep[];
 }
 export interface WorkflowError {
@@ -397,6 +395,8 @@ export interface Task {
   handoverIn: Handover | null;
   /** Open drafts sessions wrote; they become handed on the next stage move. */
   handoverDrafts: Handover[];
+  /** The open request an agent waits on for this task; '' when none. */
+  branchRequestId: string;
 }
 /** The text one stage leaves for the next. A draft has `state: 'draft'` and an empty `toStepId`. */
 export interface Handover {

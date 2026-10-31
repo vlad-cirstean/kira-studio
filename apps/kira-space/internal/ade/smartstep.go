@@ -80,11 +80,7 @@ func (b *TaskBoard) planSmartStep(tc *taskCtx, sb model.AdeTaskBranch, path stri
 		step.dir = dir.Path
 	}
 	body := scripts.PlainText(scripts.Compose(script.Command, rendered))
-	suffix := agentmcp.FinishInstruction(b.prompts(), resultSpecs(def.Results))
-	if b.spaceEnabled(tc.task) {
-		suffix = agentmcp.SpaceNote(b.prompts()) + "\n\n" + suffix
-	}
-	step.prompt = body + "\n\n" + suffix
+	step.prompt = body + "\n\n" + agentmcp.SpaceNote(b.prompts()) + "\n\n" + agentmcp.FinishInstruction(b.prompts(), resultSpecs(def.Results))
 	return step, nil
 }
 

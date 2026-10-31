@@ -10,7 +10,7 @@ interface Preview {
   parts: { text: string; var: string; value: string }[];
 }
 
-const KEYS = ['step', 'finish'] as const;
+const KEYS = ['step', 'space', 'finish'] as const;
 
 export function runPreviewSnapshots(): ControlSnapshot[] {
   return KEYS.map((k) => ({

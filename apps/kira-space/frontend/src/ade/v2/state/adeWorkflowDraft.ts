@@ -79,7 +79,7 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
   }
 
   const wf = (): Workflow | null => draft.value;
-  function patchWorkflow(p: Partial<Pick<Workflow, 'name' | 'kiraSpaceMcp'>>): void {
+  function patchWorkflow(p: Partial<Pick<Workflow, 'name'>>): void {
     if (draft.value) edit({ ...draft.value, ...p });
   }
   function patchStep(stepId: string, p: Partial<WorkflowStep>): void {

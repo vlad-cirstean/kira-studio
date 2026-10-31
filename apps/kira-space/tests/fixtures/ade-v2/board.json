@@ -131,6 +131,7 @@
       "statusId": "in-review",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -243,6 +244,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -544,6 +546,7 @@
       "statusId": "in-review",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -761,6 +764,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -915,6 +919,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -982,6 +987,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1049,6 +1055,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1182,6 +1189,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1209,6 +1217,7 @@
       "statusId": "in-progress",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1236,6 +1245,7 @@
       "statusId": "todo",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1260,6 +1270,7 @@
       "statusId": "in-review",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1284,6 +1295,7 @@
       "statusId": "in-review",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     },
     {
@@ -1308,6 +1320,7 @@
       "statusId": "todo",
       "statusBy": "auto",
       "handoverIn": null,
+      "branchRequestId": "",
       "handoverDrafts": []
     }
   ],

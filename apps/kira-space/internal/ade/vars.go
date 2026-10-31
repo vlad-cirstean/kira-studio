@@ -43,8 +43,6 @@ type promptInput struct {
 	// Notes are the task notes; Handover and HandoverFrom what the previous stage left (the stage name).
 	// They stay when Message replaces the composed header.
 	Notes, Handover, HandoverFrom string
-	// Space adds the Kira Space tools line after the body.
-	Space bool
 	// Context lines (a rebase that did not finish) go after the body.
 	Context []string
 }
@@ -57,7 +55,7 @@ func stepVars(in promptInput) llmprompts.StepVars {
 		Repo: in.Vars.Repo, Branch: in.Vars.Branch, Worktree: in.Vars.Worktree,
 		StepNumber: in.Step, StepCount: in.Of, StepName: in.Def.Name,
 		StepPrompt: strings.TrimRight(substitute(in.Def.Prompt, in.Vars, false), "\n"),
-		Extra:      in.Extra, Context: in.Context, Space: in.Space,
+		Extra:      in.Extra, Context: in.Context,
 		Finish: agentmcp.FinishVars(resultSpecs(in.Def.Results)),
 		Notes:  capNotes(in.Notes), Handover: capNotes(in.Handover), HandoverFrom: in.HandoverFrom,
 	}

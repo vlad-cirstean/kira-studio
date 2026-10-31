@@ -12,7 +12,6 @@ import { mkBranch, mkManual, mkRun, mkStep, mkTask } from './support/adeV2Fixtur
 const workflow: Workflow = {
   id: 'wf',
   name: 'Feature',
-  kiraSpaceMcp: false,
   steps: [
     mkManual({ id: 'spec', name: 'Spec', status: 'in-progress' }),
     mkStep({ id: 'plan', runsOn: 'once' }),

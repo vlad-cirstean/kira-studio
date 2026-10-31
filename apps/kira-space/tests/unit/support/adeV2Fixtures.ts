@@ -78,6 +78,7 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     statusBy: 'auto',
     handoverIn: null,
     handoverDrafts: [],
+    branchRequestId: '',
     ...over,
   };
 }
