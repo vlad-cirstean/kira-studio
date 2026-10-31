@@ -24,7 +24,7 @@ func lr(s, e int) gitreview.LineRange { return gitreview.LineRange{Start: s, End
 // workingFixture is a repo with a.txt committed as workingBase.
 func workingFixture(t *testing.T) (dir, base string, entry *RepoEntry) {
 	t.Helper()
-	dir, base = buildFileDeltaFixture(t)
+	dir, _ = buildFileDeltaFixture(t)
 	writeIncFile(t, dir, "a.txt", workingBase)
 	runInc(t, dir, "add", "a.txt")
 	base = commitInc(t, dir, "base content")

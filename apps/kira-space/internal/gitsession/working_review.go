@@ -433,73 +433,88 @@ func (e *RepoEntry) promoteWorkingMarks(ctx context.Context, tip, branch, path s
 	}
 
 	if rec.ContentKind != gitreview.ContentText {
-		if tipContent.Hash != rec.ContentHash || tipContent.Kind != rec.ContentKind {
-			return false, e.rebaseWorkingRecord(ctx, branch, rec, snapshot, tip)
-		}
-		if rec.State == "full" {
-			if _, err := e.markFileAt(ctx, tip, branch, path, true, nil); err != nil {
-				return false, err
-			}
-		}
-		return true, e.review.DeleteWorking(ctx, e.Summary.RepoID, branch, path)
+		return e.promoteNonTextMark(ctx, tip, branch, path, rec, snapshot, tipContent)
 	}
 
-	// Lines the work changed relative to the head the record was taken on; context stays out of
-	// the committed review.
-	var headText []byte
-	if rec.HeadSHA != "" {
-		headContent, _, err := e.tipWorkingContent(ctx, rec.HeadSHA, path)
-		if err != nil {
-			return false, err
-		}
-		headText = headContent.Text
-	}
-	addHunks, _, _, err := e.contentDelta(ctx, headText, snapshot)
+	landed, exact, err := e.landedWorkingRanges(ctx, rec, snapshot, tipContent, path)
 	if err != nil {
 		return false, err
-	}
-	marked := intersectRanges(workingRecordRanges(rec), addedLines(addHunks))
-
-	var landed []gitreview.LineRange
-	exact := tipContent.Kind == gitreview.ContentText && bytes.Equal(tipContent.Text, snapshot)
-	switch {
-	case len(marked) == 0 || tipContent.Kind != gitreview.ContentText:
-	case exact:
-		landed = marked
-	default:
-		hunks, _, _, err := e.contentDelta(ctx, snapshot, tipContent.Text)
-		if err != nil {
-			return false, err
-		}
-		landed = gitreview.ProjectRanges(marked, hunks, tipContent.lineCount())
 	}
 	if len(landed) > 0 {
 		if _, err := e.markFileAt(ctx, tip, branch, path, true, landed); err != nil {
 			return false, err
 		}
 	}
-
 	if exact {
 		return len(landed) > 0, e.review.DeleteWorking(ctx, e.Summary.RepoID, branch, path)
 	}
+	return len(landed) > 0, e.keepUnlandedWorking(ctx, tip, branch, rec, snapshot, tipContent, landed)
+}
+
+// promoteNonTextMark moves a whole-file mark of a binary, oversized or absent file once the
+// commit holds the same content.
+func (e *RepoEntry) promoteNonTextMark(ctx context.Context, tip, branch, path string, rec gitreview.WorkingRecord, snapshot []byte, tipContent WorkingContent) (bool, error) {
+	if tipContent.Hash != rec.ContentHash || tipContent.Kind != rec.ContentKind {
+		return false, e.rebaseWorkingRecord(ctx, branch, rec, snapshot, tip)
+	}
+	if rec.State == "full" {
+		if _, err := e.markFileAt(ctx, tip, branch, path, true, nil); err != nil {
+			return false, err
+		}
+	}
+	return true, e.review.DeleteWorking(ctx, e.Summary.RepoID, branch, path)
+}
+
+// landedWorkingRanges returns the marked lines the commit holds, in tip coordinates. Only lines
+// the work changed relative to the head the record was taken on count; context stays out of the
+// committed review. exact reports the commit holds the reviewed snapshot byte for byte.
+func (e *RepoEntry) landedWorkingRanges(ctx context.Context, rec gitreview.WorkingRecord, snapshot []byte, tipContent WorkingContent, path string) (landed []gitreview.LineRange, exact bool, err error) {
+	var headText []byte
+	if rec.HeadSHA != "" {
+		headContent, _, err := e.tipWorkingContent(ctx, rec.HeadSHA, path)
+		if err != nil {
+			return nil, false, err
+		}
+		headText = headContent.Text
+	}
+	addHunks, _, _, err := e.contentDelta(ctx, headText, snapshot)
+	if err != nil {
+		return nil, false, err
+	}
+	marked := intersectRanges(workingRecordRanges(rec), addedLines(addHunks))
+
+	exact = tipContent.Kind == gitreview.ContentText && bytes.Equal(tipContent.Text, snapshot)
+	switch {
+	case len(marked) == 0 || tipContent.Kind != gitreview.ContentText:
+		return nil, exact, nil
+	case exact:
+		return marked, true, nil
+	}
+	hunks, _, _, err := e.contentDelta(ctx, snapshot, tipContent.Text)
+	if err != nil {
+		return nil, false, err
+	}
+	return gitreview.ProjectRanges(marked, hunks, tipContent.lineCount()), false, nil
+}
+
+// keepUnlandedWorking rewrites the record to the marks the commit did not take, on the new head,
+// or deletes it when none remain.
+func (e *RepoEntry) keepUnlandedWorking(ctx context.Context, tip, branch string, rec gitreview.WorkingRecord, snapshot []byte, tipContent WorkingContent, landed []gitreview.LineRange) error {
 	remaining := workingRecordRanges(rec)
 	if len(landed) > 0 {
 		hunks, _, _, err := e.contentDelta(ctx, tipContent.Text, snapshot)
 		if err != nil {
-			return false, err
+			return err
 		}
 		back := gitreview.ProjectRanges(landed, hunks, rec.LineCount)
 		remaining = gitreview.Subtract(remaining, back)
 	}
 	if len(remaining) == 0 {
-		return len(landed) > 0, e.review.DeleteWorking(ctx, e.Summary.RepoID, branch, path)
+		return e.review.DeleteWorking(ctx, e.Summary.RepoID, branch, rec.Path)
 	}
 	state, ranges := normalizeState(remaining, rec.LineCount)
 	rec.State, rec.Ranges, rec.HeadSHA = state, ranges, tip
-	if err := e.review.PutWorking(ctx, e.Summary.RepoID, branch, rec, snapshot); err != nil {
-		return false, err
-	}
-	return len(landed) > 0, nil
+	return e.review.PutWorking(ctx, e.Summary.RepoID, branch, rec, snapshot)
 }
 
 // rebaseWorkingRecord moves a record whose content did not reach the tip onto the new head.
