@@ -187,7 +187,7 @@ func (r *Reader) New(name string) (adewire.WorkflowEntry, error) {
 		id = fmt.Sprintf("%s-%d", base, n)
 	}
 	wf := adewire.Workflow{ID: id, Name: name, Steps: []adewire.WorkflowStep{
-		{ID: "work", Name: "Work", Kind: adewire.KindManual, Status: adewire.DefaultStatus(adewire.KindManual), Results: []adewire.StepResult{}},
+		{ID: "work", Name: "Work", Kind: adewire.KindManual, Results: []adewire.StepResult{}},
 	}}
 	out, err := encodeWorkflow(&yaml.Node{}, wf)
 	if err != nil {
@@ -498,8 +498,7 @@ func applyStep(m *yaml.Node, s adewire.WorkflowStep) {
 	setScalar(m, "id", kText, s.ID, true, stepOrder)
 	setScalar(m, "name", kText, s.Name, true, stepOrder)
 	setScalar(m, "kind", kText, s.Kind, true, stepOrder)
-	def := adewire.DefaultStatus(s.Kind)
-	setScalar(m, "status", kText, defaultStr(s.Status, def), s.Status != "" && s.Status != def, stepOrder)
+	setScalar(m, "status", kText, s.Status, s.Status != "", stepOrder)
 	if s.Skip {
 		setScalar(m, "skip", kBool, "true", true, stepOrder)
 	} else {

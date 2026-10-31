@@ -102,7 +102,7 @@ type WorkflowStep struct {
 	ID      string       `json:"id"`
 	Name    string       `json:"name"`
 	Kind    StepKind     `json:"kind"`
-	Status  TaskStatus   `json:"status"`
+	Status  TaskStatus   `json:"status"` // '' uses the default of the step's kind
 	Skip    bool         `json:"skip"`
 	Session bool         `json:"session"` // manual: open a Claude Code session
 	Command string       `json:"command"` // script
@@ -450,6 +450,8 @@ type Task struct {
 	// StatusID is the task's status; StatusBy says who set it last: 'auto' (a step change) or 'user'.
 	StatusID string `json:"statusId"`
 	StatusBy string `json:"statusBy"`
+	// StatusStep is the workflow step id whose position set the status; empty before the task starts.
+	StatusStep string `json:"statusStep"`
 	// HandoverIn is the newest handed handover (what the last stage move left); nil before any.
 	// HandoverDrafts are the open drafts sessions wrote, never nil. Full history comes from Handovers.
 	HandoverIn     *Handover  `json:"handoverIn"`
@@ -532,13 +534,22 @@ type StepDoneArgs struct {
 	Notes  *string `json:"notes,omitempty"`
 }
 
-// TaskStatusDef is one status of the user's set. Category is 'todo' | 'active' | 'review' | 'done'
-// and decides which status automation picks; Tone is an ADE tone name.
+// TaskStatusDef is one status of the user's set: a label. Color is one of the 16 status colours.
 type TaskStatusDef struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Tone     string `json:"tone"`
-	Category string `json:"category"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+// StatusDefaults names the status of each automatic change; an empty field keeps the current status.
+// New is required: it is the status of a new task and of a task back at its first step with nothing run.
+// Step applies when a step starts that sets no status, Review when a review step without one starts,
+// Finished when the workflow finishes.
+type StatusDefaults struct {
+	New      string `json:"new"`
+	Step     string `json:"step"`
+	Review   string `json:"review"`
+	Finished string `json:"finished"`
 }
 
 type Plan struct {
@@ -608,6 +619,7 @@ type RepoState struct {
 type Board struct {
 	Tasks            []Task          `json:"tasks"`
 	Statuses         []TaskStatusDef `json:"statuses"`
+	StatusDefaults   StatusDefaults  `json:"statusDefaults"`
 	Branches         []Branch        `json:"branches"`
 	Plan             Plan            `json:"plan"`
 	Pairs            []Pair          `json:"pairs"`
@@ -781,16 +793,18 @@ type TaskPatch struct {
 	StatusID *string `json:"statusId"`
 }
 
-// SaveStatusesArgs rewrites the status set in order. A status with an empty ID is new. Reassign maps a
-// removed status id to the id its tasks move to; a removed id without an entry goes to the first kept
-// status of its category.
+// SaveStatusesArgs rewrites the status set in order and the defaults. A status with an empty ID is new.
+// Reassign maps every removed status id to the id its tasks move to; a defaults field naming a removed
+// status moves there too.
 type SaveStatusesArgs struct {
 	Statuses []TaskStatusDef   `json:"statuses"`
+	Defaults StatusDefaults    `json:"defaults"`
 	Reassign map[string]string `json:"reassign"`
 }
 
 type SaveStatusesResult struct {
 	Statuses []TaskStatusDef `json:"statuses"`
+	Defaults StatusDefaults  `json:"defaults"`
 }
 
 type UpdateTaskArgs struct {

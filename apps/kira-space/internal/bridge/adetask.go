@@ -279,9 +279,17 @@ func validateSaveStatuses(a adewire.SaveStatusesArgs) error {
 		return adeTaskInvalid("statuses must hold 1 to 20 entries")
 	}
 	for _, st := range a.Statuses {
-		if err := (model.AdeTaskStatus{ID: st.ID, Name: strings.TrimSpace(st.Name), Tone: st.Tone, Category: st.Category}).Validate(); err != nil {
+		if err := (model.AdeTaskStatus{ID: st.ID, Name: strings.TrimSpace(st.Name), Color: st.Color}).Validate(); err != nil {
 			return adeTaskInvalid(err.Error())
 		}
+	}
+	for _, id := range []string{a.Defaults.New, a.Defaults.Step, a.Defaults.Review, a.Defaults.Finished} {
+		if id != "" && !model.ValidAdeStatusID(id) {
+			return adeTaskInvalid("defaults must name status ids")
+		}
+	}
+	if a.Defaults.New == "" {
+		return adeTaskInvalid("new tasks need a status")
 	}
 	if len(a.Reassign) > model.AdeStatusMax {
 		return adeTaskInvalid("reassign is too long")

@@ -212,11 +212,7 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day
 		since = t.SinceJSON
 	}
 	if t.StatusID == "" {
-		category := model.AdeStatusTodo
-		if t.Kind == model.AdeTaskKindReview {
-			category = model.AdeStatusReview
-		}
-		id, err := firstStatusOf(tx, category)
+		id, err := statusForNew(tx, t.Kind == model.AdeTaskKindReview)
 		if err != nil {
 			return model.AdeTask{}, err
 		}
@@ -339,7 +335,7 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 		}
 	}
 	if prevKind == model.AdeTaskKindReview && cur.Kind == model.AdeTaskKindTask {
-		id, err := firstStatusOf(tx, model.AdeStatusTodo)
+		id, err := statusForNew(tx, false)
 		if err != nil {
 			return model.AdeTask{}, err
 		}

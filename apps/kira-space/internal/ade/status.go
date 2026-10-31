@@ -9,26 +9,16 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
-// firstOf is the lowest-position status of the category in set, "" when none.
-func firstOf(set []model.AdeTaskStatus, category string) string {
-	for _, s := range set {
-		if s.Category == category {
-			return s.ID
-		}
-	}
-	return ""
-}
-
-// resolveStepStatus is the status a step applies: its own when the set still holds it, else the first
-// status of the category its kind defaults to.
-func resolveStepStatus(set []model.AdeTaskStatus, step adewire.WorkflowStep) string {
+// resolveStepStatus is the status a step applies: its own when the set still holds it, else the
+// default of its kind; "" keeps the current status.
+func resolveStepStatus(set []model.AdeTaskStatus, defaults model.AdeStatusDefaults, step adewire.WorkflowStep) string {
 	if slices.ContainsFunc(set, func(s model.AdeTaskStatus) bool { return s.ID == step.Status }) {
 		return step.Status
 	}
 	if step.Kind == adewire.KindReview {
-		return firstOf(set, model.AdeStatusReview)
+		return defaults.Review
 	}
-	return firstOf(set, model.AdeStatusActive)
+	return defaults.Step
 }
 
 // notStarted says the task sits at its first non-skipped step with nothing run in the pass.
@@ -91,18 +81,23 @@ func (b *TaskBoard) syncStatus(taskID string) {
 		slog.Warn("ade: read task statuses", "scope", "ade", "task", taskID, "err", err)
 		return
 	}
+	defaults, err := b.deps.Statuses.Defaults()
+	if err != nil {
+		slog.Warn("ade: read task status defaults", "scope", "ade", "task", taskID, "err", err)
+		return
+	}
 	var target string
 	switch key {
 	case "":
-		target = firstOf(set, model.AdeStatusTodo)
+		target = defaults.New
 	case entryDone:
-		target = firstOf(set, model.AdeStatusDone)
+		target = defaults.Finished
 	default:
 		i := slices.IndexFunc(tc.wf.Steps, func(st adewire.WorkflowStep) bool { return st.ID == key })
 		if i < 0 {
 			return
 		}
-		target = resolveStepStatus(set, tc.wf.Steps[i])
+		target = resolveStepStatus(set, defaults, tc.wf.Steps[i])
 	}
 	if target == "" {
 		return
@@ -122,24 +117,29 @@ func (b *TaskBoard) OnTUIStarted(taskID string) {
 	b.syncStatus(taskID)
 }
 
-// SaveStatuses rewrites the status set; tasks on a removed status move in the same transaction.
+// SaveStatuses rewrites the status set and defaults; tasks on a removed status move in the same transaction.
 func (b *TaskBoard) SaveStatuses(_ context.Context, args adewire.SaveStatusesArgs) (adewire.SaveStatusesResult, error) {
 	set := make([]model.AdeTaskStatus, len(args.Statuses))
 	for i, s := range args.Statuses {
-		set[i] = model.AdeTaskStatus{ID: s.ID, Name: s.Name, Tone: s.Tone, Category: s.Category}
+		set[i] = model.AdeTaskStatus{ID: s.ID, Name: s.Name, Color: s.Color}
 	}
-	saved, err := b.deps.Statuses.Save(set, args.Reassign)
+	d := model.AdeStatusDefaults{New: args.Defaults.New, Step: args.Defaults.Step, Review: args.Defaults.Review, Finished: args.Defaults.Finished}
+	saved, savedDefaults, err := b.deps.Statuses.Save(set, d, args.Reassign)
 	if err != nil {
 		return adewire.SaveStatusesResult{}, err
 	}
 	b.notifyBoard()
-	return adewire.SaveStatusesResult{Statuses: toWireStatuses(saved)}, nil
+	return adewire.SaveStatusesResult{Statuses: toWireStatuses(saved), Defaults: toWireDefaults(savedDefaults)}, nil
 }
 
 func toWireStatuses(set []model.AdeTaskStatus) []adewire.TaskStatusDef {
 	out := make([]adewire.TaskStatusDef, len(set))
 	for i, s := range set {
-		out[i] = adewire.TaskStatusDef{ID: s.ID, Name: s.Name, Tone: s.Tone, Category: s.Category}
+		out[i] = adewire.TaskStatusDef{ID: s.ID, Name: s.Name, Color: s.Color}
 	}
 	return out
+}
+
+func toWireDefaults(d model.AdeStatusDefaults) adewire.StatusDefaults {
+	return adewire.StatusDefaults{New: d.New, Step: d.Step, Review: d.Review, Finished: d.Finished}
 }
