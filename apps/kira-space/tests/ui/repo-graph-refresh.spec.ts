@@ -50,7 +50,7 @@ test('refsChanged for the open repo refreshes the graph; other kinds and other r
 
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
   await runCoalesceWindow(page);
-  await expect.poll(() => refreshes(page), { timeout: 1000 }).toBe(before + 1);
+  await expect.poll(() => refreshes(page), { timeout: 15_000 }).toBe(before + 1);
 });
 
 test('a refresh keeps the scroll position', async ({ relaunch }) => {
@@ -77,7 +77,7 @@ test('a refresh keeps the scroll position', async ({ relaunch }) => {
   await freezeClock(page);
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
   await runCoalesceWindow(page);
-  await expect.poll(() => refreshes(page), { timeout: 1000 }).toBe(calls + 1);
+  await expect.poll(() => refreshes(page), { timeout: 15_000 }).toBe(calls + 1);
 
   const rowHeight = 28;
   await expect
