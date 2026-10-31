@@ -57,6 +57,7 @@
       "since": {},
       "statusBy": "auto",
       "statusId": "todo",
+      "statusStep": "",
       "title": "Fix login",
       "workflow": null,
       "workflowId": "",

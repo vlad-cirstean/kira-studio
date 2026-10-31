@@ -1,29 +1,31 @@
 {
   "AdeTaskService.SaveStatuses#saved": {
+    "defaults": {
+      "finished": "done",
+      "new": "todo",
+      "review": "in-review",
+      "step": "in-progress"
+    },
     "statuses": [
       {
-        "category": "todo",
+        "color": "grey",
         "id": "todo",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
-        "id": "qa",
-        "name": "QA",
-        "tone": "purple"
+        "color": "orange",
+        "id": "in-progress",
+        "name": "Doing"
       },
       {
-        "category": "review",
+        "color": "blue",
         "id": "in-review",
-        "name": "Code review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "green",
         "id": "done",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ]
   },
@@ -47,39 +49,68 @@
     "since": {},
     "statusBy": "user",
     "statusId": "in-review",
+    "statusStep": "",
     "title": "Fix login",
     "workflow": null,
     "workflowId": "flow",
     "workflowOutdated": false
   },
   "args:AdeTaskService.SaveStatuses": {
+    "defaults": {
+      "finished": "done",
+      "new": "todo",
+      "review": "in-review",
+      "step": "in-progress"
+    },
+    "reassign": null,
+    "statuses": [
+      {
+        "color": "grey",
+        "id": "todo",
+        "name": "To do"
+      },
+      {
+        "color": "orange",
+        "id": "in-progress",
+        "name": "Doing"
+      },
+      {
+        "color": "blue",
+        "id": "in-review",
+        "name": "In review"
+      },
+      {
+        "color": "green",
+        "id": "done",
+        "name": "Done"
+      }
+    ]
+  },
+  "args:AdeTaskService.SaveStatuses#delete": {
+    "defaults": {
+      "finished": "",
+      "new": "todo",
+      "review": "done",
+      "step": "in-progress"
+    },
     "reassign": {
-      "in-progress": "qa"
+      "in-progress": "todo"
     },
     "statuses": [
       {
-        "category": "todo",
+        "color": "grey",
         "id": "todo",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
-        "id": "",
-        "name": "QA",
-        "tone": "purple"
-      },
-      {
-        "category": "review",
+        "color": "blue",
         "id": "in-review",
-        "name": "Code review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "green",
         "id": "done",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ]
   },

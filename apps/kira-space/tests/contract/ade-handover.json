@@ -61,30 +61,32 @@
         "remote": "origin"
       }
     ],
+    "statusDefaults": {
+      "finished": "done",
+      "new": "todo",
+      "review": "in-review",
+      "step": "in-progress"
+    },
     "statuses": [
       {
-        "category": "todo",
+        "color": "grey",
         "id": "<masked>",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
+        "color": "amber",
         "id": "<masked>",
-        "name": "In progress",
-        "tone": "amber"
+        "name": "In progress"
       },
       {
-        "category": "review",
+        "color": "blue",
         "id": "<masked>",
-        "name": "In review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "green",
         "id": "<masked>",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ],
     "tasks": [
@@ -178,6 +180,7 @@
         "since": {},
         "statusBy": "auto",
         "statusId": "in-progress",
+        "statusStep": "work",
         "title": "Fix login",
         "workflow": {
           "id": "<masked>",
@@ -220,7 +223,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "in-progress",
+              "status": "",
               "timeout": "1m"
             },
             {
@@ -285,7 +288,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "in-progress",
+              "status": "",
               "timeout": "1m"
             },
             {
@@ -310,7 +313,7 @@
               "session": false,
               "skip": false,
               "smartScript": "",
-              "status": "in-progress",
+              "status": "",
               "timeout": ""
             }
           ]
@@ -430,6 +433,7 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "in-progress",
+    "statusStep": "two",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
@@ -472,7 +476,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -537,7 +541,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -562,7 +566,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": ""
         }
       ]

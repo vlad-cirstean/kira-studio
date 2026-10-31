@@ -161,7 +161,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -211,7 +211,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -251,7 +251,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -277,6 +277,7 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "todo",
+    "statusStep": "",
     "title": "Fix login",
     "workflow": null,
     "workflowId": "flow",
@@ -416,6 +417,7 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "done",
+    "statusStep": "done",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
@@ -483,7 +485,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -533,7 +535,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -573,7 +575,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -601,6 +603,7 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "todo",
+    "statusStep": "",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
@@ -668,7 +671,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -718,7 +721,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -758,7 +761,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -866,6 +869,7 @@
     },
     "statusBy": "auto",
     "statusId": "in-progress",
+    "statusStep": "implement",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
@@ -933,7 +937,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -983,7 +987,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1023,7 +1027,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -1225,6 +1229,7 @@
     },
     "statusBy": "auto",
     "statusId": "in-review",
+    "statusStep": "review",
     "title": "Fix login",
     "workflow": {
       "id": "<masked>",
@@ -1292,7 +1297,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1342,7 +1347,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1382,7 +1387,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]
@@ -1459,7 +1464,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1509,7 +1514,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-review",
+          "status": "",
           "timeout": "1m"
         },
         {
@@ -1549,7 +1554,7 @@
           "session": false,
           "skip": false,
           "smartScript": "",
-          "status": "in-progress",
+          "status": "",
           "timeout": "1m"
         }
       ]

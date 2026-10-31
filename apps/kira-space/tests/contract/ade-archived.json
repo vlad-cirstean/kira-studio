@@ -51,28 +51,24 @@
     ],
     "statuses": [
       {
-        "category": "todo",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In progress",
-        "tone": "amber"
+        "name": "In progress"
       },
       {
-        "category": "review",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ],
     "task": {
@@ -135,6 +131,7 @@
       "since": {},
       "statusBy": "auto",
       "statusId": "done",
+      "statusStep": "done",
       "title": "Fix login",
       "workflow": {
         "id": "<masked>",
@@ -177,7 +174,7 @@
             "session": false,
             "skip": false,
             "smartScript": "",
-            "status": "in-progress",
+            "status": "",
             "timeout": "1m"
           }
         ]
@@ -238,28 +235,24 @@
     ],
     "statuses": [
       {
-        "category": "todo",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "To do",
-        "tone": "grey"
+        "name": "To do"
       },
       {
-        "category": "active",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In progress",
-        "tone": "amber"
+        "name": "In progress"
       },
       {
-        "category": "review",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "In review",
-        "tone": "blue"
+        "name": "In review"
       },
       {
-        "category": "done",
+        "color": "<masked>",
         "id": "<masked>",
-        "name": "Done",
-        "tone": "green"
+        "name": "Done"
       }
     ],
     "task": {
@@ -322,6 +315,7 @@
       "since": {},
       "statusBy": "auto",
       "statusId": "done",
+      "statusStep": "done",
       "title": "Fix login",
       "workflow": {
         "id": "<masked>",
@@ -364,7 +358,7 @@
             "session": false,
             "skip": false,
             "smartScript": "",
-            "status": "in-progress",
+            "status": "",
             "timeout": "1m"
           }
         ]

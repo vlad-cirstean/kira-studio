@@ -27,6 +27,7 @@
     "since": {},
     "statusBy": "auto",
     "statusId": "todo",
+    "statusStep": "",
     "title": "first",
     "workflow": null,
     "workflowId": "",
