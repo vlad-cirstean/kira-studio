@@ -20,6 +20,7 @@ import { type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useAddTaskRepo, useUpdateTask } from '../queries';
 import { useAdeAddUiStore } from '../state/adeAddUi';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeBranchRequestStore } from '../state/adeBranchRequest';
 import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
@@ -34,6 +35,7 @@ const { liveNow } = usePlanModel();
 
 const ui = useAdeBoardUiStore();
 const addUi = useAdeAddUiStore();
+const requestStore = useAdeBranchRequestStore();
 const update = useUpdateTask();
 const addRepo = useAddTaskRepo();
 
@@ -187,6 +189,21 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
             >
           </dd>
         </template>
+      </template>
+      <template v-if="task.branchRequestId">
+        <dt>{{ t('space.ade.taskTab.branchRequest.label') }}</dt>
+        <dd class="flex min-h-row items-center gap-2" data-testid="ade-task-branch-request-row">
+          <span class="text-kira-md">{{ t('space.ade.taskTab.branchRequest.status') }}</span>
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="ade-task-branch-request-open"
+            @click="requestStore.open({ id: task.branchRequestId })"
+            >{{
+              t('space.ade.board.branchTag.review.label')
+            }}</Button
+          >
+        </dd>
       </template>
       <template v-if="!review">
         <dt />

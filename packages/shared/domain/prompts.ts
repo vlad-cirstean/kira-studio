@@ -10,6 +10,7 @@ export const promptKindSchema = /*#__PURE__*/ z.enum([
   'update',
   'quit',
   'handover',
+  'branch-request',
 ]);
 export type PromptKind = z.infer<typeof promptKindSchema>;
 

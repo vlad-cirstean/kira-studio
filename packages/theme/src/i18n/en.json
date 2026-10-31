@@ -7419,6 +7419,39 @@
           "status": "Up to date"
         }
       },
+      "branchRequest": {
+        "approve": {
+          "label": "Approve ({count})"
+        },
+        "item": {
+          "branch": {
+            "label": "New branch from {base}"
+          },
+          "branchMain": {
+            "label": "New branch from the repository’s main branch"
+          },
+          "worktree": {
+            "label": "Worktree for {branch}"
+          }
+        },
+        "naming": {
+          "hint": "Kira Space names new branches kira/ plus a random ID. The agent then works in the worktrees."
+        },
+        "source": {
+          "automation": {
+            "label": "Automation"
+          },
+          "run": {
+            "label": "Run · {step}"
+          },
+          "session": {
+            "label": "Session · {step}"
+          }
+        },
+        "title": {
+          "title": "Branches for {task}"
+        }
+      },
       "changes": {
         "uncommitted": {
           "label": "Uncommitted"
@@ -8503,6 +8536,10 @@
           "trigger": {
             "aria": "Repository and branch actions"
           }
+        },
+        "branchRequest": {
+          "label": "Branch request",
+          "status": "An agent waits for your approval"
         },
         "handover": {
           "label": "Handover"

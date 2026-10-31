@@ -12,6 +12,7 @@ import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
 import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
 import { usePlanModel } from '../plan/usePlanModel';
+import AdeBranchRequestDialog from '../request/AdeBranchRequestDialog.vue';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
 import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
@@ -155,5 +156,6 @@ onScopeDispose(() => offReviewCode?.());
     <AdeAbortRebaseDialog />
     <AdeTakeOverDialog />
     <AdeStageDialog :routed="false" />
+    <AdeBranchRequestDialog :routed="false" />
   </Tabs>
 </template>
