@@ -445,6 +445,12 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 - A `bun run ... &` job dies with its tool call; start long suites with `setsid nohup`.
 - Complete-gated flow tests that write contracts need `KIRA_FLOW_COMPLETE=1 KIRA_FLOW_DOCKER=require`.
 
+## acli fixtures (P417)
+
+- `apps/kira-space/internal/issuetracker/jira/testdata/*.json` are hand-written from acli's documented output. Running a downloaded `acli` binary was refused in the sandbox, so no real output was captured.
+- Refresh by hand against a real site: `acli jira workitem view KEY --json --fields '*all,-comment,-attachment,-worklog,-description'`, then redact. Keep both Development field forms (string and object).
+- Flow tests use `flowharness/fakeacli`; no test needs `acli` installed.
+
 ## Kira Space flow suites (P231)
 
 - Go flows: `bun run test:flows:space`. Complete suite: `bun run test:flows:space:complete`
