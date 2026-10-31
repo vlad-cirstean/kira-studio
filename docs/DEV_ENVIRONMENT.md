@@ -149,6 +149,14 @@ rather than hand-written. This section is only about running it here.
   `apps/kira-studio/tests/ipc/`. Capturing a fresh shape for a new `tests/ui/` fixture needs that
   mode written first.
 
+## Kibana and Elasticsearch — testing in this environment (P424)
+
+- Fixture starts Elasticsearch plus Kibana (`kibana:9.5.3`, `elasticsearch:9.5.3`, plain Hub names; `bun run test:images` pulls both) on one Docker network. Needs about 1.5 GB of memory. Cold start takes 1 to 3 minutes; seeding adds seconds. Never run two heavy jobs beside it: a concurrent `vue-tsc` run OOM-killed Kibana (exit 137) on a 16 GB box.
+- Run from `apps/kira-studio`: `CGO_ENABLED=1 go test ./internal/adapters/kibana/ -count=1 -timeout 40m` (conformance, search, KQL, interval). Complete suite: `KIRA_TEST_MATRIX=1 ... -run TestKibana_AuthMatrix`. Flow test: `go test ./internal/flows/dbflow -run TestKibanaDiscoverJourney`; `KIRA_CONTRACT=write` regenerates `tests/contract/kibana-discover.json`.
+- Compat overrides: `KIRA_COMPAT_IMAGE_KIBANA` and `KIRA_COMPAT_IMAGE_ELASTICSEARCH`. Keep both on the same version.
+- Elasticsearch runs with `cluster.routing.allocation.disk.threshold_enabled=false`. On a near-full disk the watermark otherwise leaves every shard unassigned and Kibana hangs on startup.
+- A low-privilege Kibana user on 9.x gets no version from `/api/status`; tests do not assert one for that user.
+
 ## ClickHouse — testing in this environment (P36, its workaround resolved P58f)
 
 See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design facts.

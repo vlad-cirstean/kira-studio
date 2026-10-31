@@ -350,6 +350,16 @@ whatever sandbox a session happens to be in),
 - go-redis Protocol: 2 is pinned explicitly because the RESP3 default changes HGETALL/CONFIG GET and console generic dispatch replies from a flat array to a map.
 - The Redis console runs bounded forms only of commands that can return unbounded replies; other commands (SUNION, SINTER, SDIFF, EVAL/FCALL, module commands, GET of a huge string) are read whole by go-redis before the page cap applies.
 
+### Kibana (P424)
+
+- Talks to the Kibana HTTP API only; read-only kind. A data view is a leaf `collection` tree node; its path segment is the data view id. A connection `database` value names a Kibana space (non-default spaces prefix every route with `/s/<space>`).
+- Routes: `GET /api/status` (version; absent for low-privilege users on 9.x, then the 8.19 floor is unchecked), `GET /api/spaces/space/{id}`, `GET /api/data_views`, `GET /api/data_views/data_view/{id}`, `POST /internal/search/es`. Every request sends `kbn-xsrf`; internal routes also send `elastic-api-version: 1` and `x-elastic-internal-origin: Kibana`.
+- Auth: username plus password is Basic; blank username with a password is `Authorization: ApiKey` (encoded key); both blank sends no header. `/api/status` answers anyone, so listing data views is what proves credentials (401 and 403 map to `E_AUTH`).
+- Execute statement is one JSON `KibanaDiscoverRequest` (`dataView`, `query`, `language`, `timeRange`, `filters`, `sort`, `size`, `timeZone`), decoded with `DisallowUnknownFields`. One statement per run; `_id` and `_index` merge into each hit's document body. Results are `document` pages. Tab and operations-panel re-run send the raw JSON, never split on `;`.
+- KQL compiles to Elasticsearch query DSL in Go (`adapters/kibana/kql`). Hand-rolled: no Go KQL library exists and the Kibana parser is TypeScript under a non-OSI license. Lucene syntax goes through `query_string`.
+- Histogram interval: `auto` picks the nearest of the standard intervals that yields at most 100 and closest to 50 buckets; `1w`, `1M`, `1y` are calendar intervals. The response reports the interval used and whether it was scaled up. Value suggestions are a `terms` aggregation over the current query and time range; `Complete` is false when more distinct values exist than returned.
+- ES|QL and saved objects are not supported. Fixture: Elasticsearch plus Kibana 9.5.3 (floor 8.19), about 1.5 GB of memory (see DEV_ENVIRONMENT.md).
+
 ### `sslmode` semantics per engine (P21 round 1)
 
 - Options["sslmode"] is the app's own vocabulary layered over five different native TLS conventions, so the same string means different things depending on the engine.
@@ -2445,6 +2455,13 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Plan board colour: status colour (16-colour palette, `--kira-status-*`) on the task status tag, red failures and amber needs-you/stale; branch tags other than red/amber render grey; task colour is the head dot and a 3px left card edge; the branch row repo badge wears the repo colour (repoTint). Plan pane ground is bg-chrome (terminal ground); cards of one day have no line between, 16px apart; weekend and day-off bands carry no tint. Task cards have a 1px border-badge edge. The task open in the panel wears a focus frame (border-focus ring-1) and aria-current; its head, branch row, span and history rows use bg-select.
 - Plan window: shows today plus 6 days (`WINDOW_DAYS` in `timeline.ts`). Work scheduled later sits in Later, in date order before unscheduled and parked items; its card meta starts with the date. No horizon setting, no add-day control. Past bands come only from history or overdue work.
 
+### Kibana Discover (P424)
+
+- A Discover tab is a console tab carrying `kibana` state (data view, language, time, filters, sort, sample size, interval); the query text is the tab's own `text`. `ConsoleTabView.vue` dispatches on connection kind: kibana opens `views/kibana/KibanaDiscoverView.vue`, everything else `ConsoleView.vue`.
+- `MonacoHost` props added for it: `monacoLanguage` (`{id, register(m)}`, registered once per id), `triggerCharacters`, `asyncCompletionSources` (abortable, may return `incomplete`), plus a `submit` emit on Enter in single-line hosts.
+- `kqlContext.ts` is a tolerant lexer that classifies the cursor as field, operator, value or conjunction. `kqlCompletion.ts` serves fields, operators and conjunctions synchronously; values come from the `kibanaSuggest` bridge call through `queryClient.fetchQuery` (30 s stale, 150 ms debounce, aborted via `opsCancel`).
+- Charts use Apache ECharts 6.1.0 with vue-echarts 8.3.2 (exact pins, Apache-2.0 and MIT, tree-shaken in `charts/echarts.ts`, SVG renderer so P426 can capture exact vector output). Declined: the shadcn-vue chart (Unovis; registry files carry a second plain `<script>` block and `@unovis/ts` pulls `three`, `maplibre-gl`, `leaflet`, `elkjs`), Chart.js (no brush range select), a hand-rolled SVG histogram (brush, ticks, tooltips, time axis).
+
 ### Review code (P150)
 
 - The per-branch Review code button opens an ephemeral Wails window via OpenReviewWindow; a second call returns false and only focuses the window. The focus path (WindowRegistry.Focus) dispatches the App-level unhide to the main thread via InvokeSync, because AppKit aborts the process on it off-thread (P354).
@@ -2825,6 +2842,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Each connection has three independent permission modes (read, write, DDL), each allow, deny or prompt, defaulting to allow/prompt/deny (migration 0021).
 - OpClass in internal/adapters/classify.go is one of read, write, ddl or unknown.
 - Statement classification is exposed through an optional StatementClassifier interface rather than a required Adapter method, because only kinds with a console can answer it.
+- Discover-style engines implement the optional `adapters.Discoverer` interface (`Histogram`, `Suggest`; adapters/discover.go), type-asserted by the Router like `StatementClassifier`. Only kibana implements it.
 - ClassifySQL is shared by the five SQL kinds: postgres, mysql, mariadb, sqlite and clickhouse. Mongo and Redis reuse their own existing statement/command inspection.
 - Kafka, S3 and SQS implement no classifier, so calls against them resolve to unknown with no error.
 - run_query gate order (tools.go): resolve, refuse before connecting if all three modes deny, clamp maxRows, connect, classify, verdict (a deny refuses before any EXPLAIN work), forced EXPLAIN when mcp_auto_explain is on, heavy check, at most one approval, execute, render.
@@ -3184,6 +3202,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Kibana search uses an internal route (P424).** `POST /internal/search/es` is not a public API; a Kibana upgrade can change its body or headers. The conformance suite runs against 9.5.3 and the 8.19 floor via `KIRA_COMPAT_IMAGE_KIBANA`.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
