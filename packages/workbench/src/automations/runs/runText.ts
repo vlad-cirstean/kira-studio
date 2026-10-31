@@ -23,7 +23,7 @@ export function runElapsedMs(run: ScriptRun, now: number): number | null {
   return end === null ? null : end - start;
 }
 
-/** Plain-text report a person pastes to an agent. `tail` is the last terminal lines, if any. */
+/** Plain-text report a person pastes to an agent. `tail` is the live terminal tail; the stored output tail backs it once the tab is gone. */
 export function runReportText(run: ScriptRun, tail: string): string {
   const out = run.outcome;
   const smart = run.kind === 'smart';
@@ -49,6 +49,7 @@ export function runReportText(run: ScriptRun, tail: string): string {
     lines.push(t('automations.run.report.exitCode.label', { value: out.exitCode }));
   if (out?.lastError)
     lines.push(t('automations.run.report.lastError.label', { value: out.lastError }));
-  if (tail !== '') lines.push('', t('automations.run.report.lastOutput.label'), tail);
+  const output = tail !== '' ? tail : (out?.outputTail ?? '');
+  if (output !== '') lines.push('', t('automations.run.report.lastOutput.label'), output);
   return lines.join('\n');
 }

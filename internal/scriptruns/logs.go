@@ -5,11 +5,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/termtext"
 )
 
 const (
 	logFlushInterval = 250 * time.Millisecond
 	maxLogLineBytes  = 2 << 10
+	tailLines        = 40
 )
 
 // LogPush is what a run's log pushes carry: the chunks just stored.
@@ -30,6 +33,7 @@ type logSink struct {
 	pending []LogChunk
 	timer   *time.Timer
 	lastErr string
+	tail    []string
 }
 
 func newLogSink(svc *Service, runID string) *logSink { return &logSink{svc: svc, runID: runID} }
@@ -39,6 +43,10 @@ func (l *logSink) add(stream, text string) {
 		text = strings.ToValidUTF8(text[:maxLogLineBytes], "") + "…"
 	}
 	l.mu.Lock()
+	l.tail = append(l.tail, text)
+	if len(l.tail) > tailLines {
+		l.tail = l.tail[1:]
+	}
 	l.seq++
 	l.pending = append(l.pending, LogChunk{Seq: l.seq, Stream: stream, Text: text})
 	if stream == "stderr" && strings.TrimSpace(text) != "" {
@@ -55,6 +63,19 @@ func (l *logSink) lastStderr() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.lastErr
+}
+
+// outputTail is the last added lines, sanitized, blank ones dropped.
+func (l *logSink) outputTail() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]string, 0, len(l.tail))
+	for _, t := range l.tail {
+		if t = strings.TrimSpace(termtext.SanitizeLine(t)); t != "" {
+			out = append(out, t)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // flush stores and pushes what is pending; also the final flush when a run ends.

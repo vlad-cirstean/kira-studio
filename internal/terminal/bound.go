@@ -57,6 +57,8 @@ type ScriptLauncher interface {
 	Failed(runID string, err error)
 	// Exited records how the run's session ended.
 	Exited(terminalID string, code int, cause CloseCause)
+	// Output sees each chunk of the run's session on the reader goroutine; it must not block.
+	Output(terminalID string, b []byte)
 }
 
 // Arbiter lets one other party take over an agent terminal's input and size from its window.
@@ -184,6 +186,15 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		id := args.TerminalID
 		tap = func(data []byte) { b.Arbiter.Output(id, data) }
 		onExit = func() { b.Arbiter.Exited(id) }
+	}
+	if scriptRun != "" {
+		id, agentTap := args.TerminalID, tap
+		tap = func(data []byte) {
+			if agentTap != nil {
+				agentTap(data)
+			}
+			b.Scripts.Output(id, data)
+		}
 	}
 	var onEnd func(int, CloseCause)
 	if scriptRun != "" {
