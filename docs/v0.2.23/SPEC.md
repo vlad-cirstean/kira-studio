@@ -10,7 +10,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P405 | Later and Backlog: move tasks between Plan, Later, Backlog | Done |
 | P406 | Nanoid branch names for agent-created worktrees | Done |
 | P407 | Stage handover: session context notes and stage-change dialogs | Done |
-| P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Todo |
+| P408 | Branch and worktree requests: approval dialog, multi-branch MCP tool | Done |
 | P409 | Finishing a task returns every artifact via MCP | Todo |
 | P410 | Task plus button: terminal or ad hoc Claude session in worktree | Todo |
 | P411 | Task statuses: move to Workflow page, fully customizable | Todo |
@@ -68,6 +68,8 @@ Worktrees the agent creates use a nanoid as branch name. Agent-chosen names caus
 - MCP tool accepts multiple branches in one call, so the user usually sees one prompt.
 - Remove the "Kira space tools" check; always on.
 - Agent prompt states branches are created only via this MCP tool.
+
+**Result.** Tool `request_branch` is now `request_branches` (`repos`, 1 to 20): one blocking call, one routed `branch-request` prompt, per repo `created`, `existing`, `denied`, `timeout` or `failed`. Engine `ade/branchrequest.go`: validate under the task lock, wait unlocked (30 min, one request per task, one resolver), create approved repos under the lock again. Grant release, session stop, archive and quit abandon it. Kira Space tools always on: `kira_space_mcp` is ignored on load and dropped on save; Run on an agent step leaves an unnamed branch to the agent, script and review steps derive `feat/<slug>`. Prompts say create branches only with `request_branches`; budgets and goldens updated. Desktop dialog (`AdeBranchRequestDialog`, store `adeBranchRequest`, routed prompt, Task tab row); Escape only hides. Tests: flows/adeflow `TestBranchRequest` (contract `ade-branch-request`), `ade-v2-branch-request.spec.ts`, real `claude` `TestAdeBranchRequest`; `go test ./...`, `bun run test:unit`, `ui` 799, mobile 83, visual (5 workflow editor snapshots re-recorded for the removed switch), lint, `lint:dead`, `lint:go`, `lint:claude` pass. Real `claude` ADE, smart script, memory and DB MCP rows pass (`TestMemoryMcpFollowsDocs` failed once on a haiku-chosen project, passed on rerun). 65 s question: the CLI does not wait; it cuts an MCP call at 60 s ("timed out after 60s"). `MCP_TOOL_TIMEOUT=2100000` lifts it, so every `claude` launch now sets it (headless env, `hooks.Server.Env` for TUI); `TestAdeBranchRequest` holds the call 65 s and passes. No long-poll fallback needed. The same test found a second gap: a run at a repo root could not write the new worktree, so the run sandbox now allows the per-repo `wt/<repo>` folders for unnamed branches (macOS Seatbelt not verifiable here). Deviations: adewire types, `branchRequestId` and fixtures landed in commits 2 and 3; the always-on space note also reaches manual, review and start messages and the Run dialog suffix; a smart-script step counts as an agent step for the unnamed-branch rule; ARCHITECTURE known open items: P199 unnamed-branch item removed, `declare_repos` item narrowed.
 
 ### P409 Finishing a task returns every artifact via MCP
 
