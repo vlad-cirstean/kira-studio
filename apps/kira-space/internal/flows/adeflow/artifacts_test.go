@@ -48,7 +48,7 @@ func mcpReply(t *testing.T, app *flowharness.App, name string) (text string, lis
 	testx.WaitUntil(t, waitFor, func() bool {
 		var err error
 		raw, err = os.ReadFile(filepath.Join(app.FakeDir, name))
-		return err == nil
+		return err == nil && json.Valid(raw)
 	})
 	var errRes struct {
 		IsError bool   `json:"isError"`
