@@ -152,6 +152,10 @@ to the orchestrator before editing.
   needs it), `apps/kira-studio/frontend/src/workbench/panels/OperationsPanel.vue`,
   `apps/kira-studio/frontend/src/state/ops.ts`.
 - `docs/ARCHITECTURE.md` sections: "Workflows", "Agent harness (P316)", op-log panel text.
+- Amendment (P431 plan): new `apps/kira-space/tests/ui/ade-v2-stage-settings.spec.ts`, new
+  `tests/contract/ade-stage-settings.json`, new `tests/claude/stagesettings_test.go` (C adds only this file there; B's
+  `tests/claude/**` claim is "none expected"), ADE-only fixtures `tests/fixtures/ade-v2/workflows.json` and
+  `tests/unit/support/adeV2Fixtures.ts`. B touches none of them.
 
 Consequences named so no stream drifts across:
 
