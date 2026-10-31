@@ -4,11 +4,13 @@
 </script>
 
 <template>
-  <div class="h-statusbar shrink-0 flex items-center px-1.5 text-muted-foreground">
-    <div v-if="$slots['left-extra']" class="flex items-center gap-0.5">
+  <div
+    class="h-statusbar shrink-0 flex items-center gap-2 px-2 font-ui text-kira-sm text-muted-foreground"
+  >
+    <div v-if="$slots['left-extra']" class="flex items-center gap-1">
       <slot name="left-extra" />
     </div>
-    <div class="ml-auto flex items-center gap-0.5">
+    <div class="ml-auto flex items-center gap-1">
       <slot name="right" />
     </div>
   </div>

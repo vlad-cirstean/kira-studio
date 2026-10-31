@@ -39,7 +39,7 @@ export const buttonVariants = cva(
           'h-control-lg gap-1.5 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         'kira-icon': 'size-control',
         // Status-bar items, mobile touch targets and bare inline buttons: one size per role.
-        status: 'h-control-sm gap-1 px-1.5 text-kira-sm font-normal',
+        status: 'h-control-sm gap-1 px-1.5 font-ui text-kira-sm font-normal tabular-nums',
         touch: 'h-touch px-4 text-kira-touch',
         'touch-icon': 'size-touch',
         inline: 'h-auto p-0',

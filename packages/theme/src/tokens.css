@@ -80,7 +80,7 @@
   --kira-bar-h: 34px;
   --kira-titlebar-h: 34px;
   --kira-tabbar-h: var(--kira-bar-h);
-  --kira-statusbar-h: 20px;
+  --kira-statusbar-h: 22px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
