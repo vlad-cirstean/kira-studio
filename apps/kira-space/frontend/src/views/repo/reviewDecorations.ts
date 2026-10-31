@@ -36,7 +36,7 @@ import type {
 } from '@kira/git-ipc';
 import { i18n, t } from '@theme/i18n';
 import { logError } from '@workbench/bridge/log';
-import { type App, createApp, nextTick } from 'vue';
+import { type App, createApp } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
 import ReviewBanner from './ReviewBanner.vue';
@@ -46,6 +46,7 @@ type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 type ModifiedEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type DeltaDecoration = import('monaco-editor').editor.IModelDeltaDecoration;
 type ViewZone = import('monaco-editor').editor.IViewZone;
+type OverlayWidget = import('monaco-editor').editor.IOverlayWidget;
 
 // Pinned monaco-editor@0.56.0's own `view.js` appends `.view-zones` BEFORE `.view-lines` in
 // `.lines-content`, and `viewLines.js` sizes `.view-lines` to the full scroll width/height with no
@@ -53,6 +54,10 @@ type ViewZone = import('monaco-editor').editor.IViewZone;
 // `z-index: auto` loses every hit test to it. `10` is VS Code's own value for the view-zone
 // widgets it mounts the same way; without it, a zone paints but nothing in it can ever be clicked.
 const VIEW_ZONE_Z_INDEX = '10';
+
+// A thread's height cap: the larger of 12 lines and 80% of the editor, as VS Code's ZoneWidget does.
+const THREAD_MIN_LINES = 12;
+const THREAD_MAX_FRACTION = 0.8;
 
 export interface ReviewDecorationsDeps {
   readonly transport: Transport;
@@ -159,41 +164,74 @@ export function attachReviewDecorations(
 
   let hoverLine: number | null = null;
   let openThreadCommentId: number | null = null;
-  let zoneId: string | null = null;
-  let zoneApp: App | null = null;
+  let closeThread: (() => void) | null = null;
 
   function closeZone(): void {
-    if (zoneId === null) return;
-    const id = zoneId;
-    modifiedEditor.changeViewZones((accessor) => accessor.removeZone(id));
-    zoneApp?.unmount();
-    zoneApp = null;
-    zoneId = null;
+    const close = closeThread;
+    closeThread = null;
     openThreadCommentId = null;
+    close?.();
   }
 
-  function openZone(afterLine: number, mount: (container: HTMLElement) => App): void {
+  // VS Code's ZoneWidget mechanics over public API (`ZoneWidget` itself is not exported): an empty
+  // view zone reserves the vertical space, the content lives in an overlay widget outside Monaco's
+  // scrollable element. That keeps the content at the visible editor width, lets the wheel scroll
+  // it, and lets its height be capped to the viewport.
+  let threadSeq = 0;
+  function openZone(
+    afterLine: number,
+    mount: (container: HTMLElement, onResize: (height: number) => void) => App,
+  ): void {
     closeZone();
     const domNode = document.createElement('div');
-    domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
-    const zone: ViewZone = { afterLineNumber: afterLine, heightInPx: 120, domNode };
+    domNode.style.top = '-1000px';
+    const widgetId = `kira.review.thread.${++threadSeq}`;
+    const widget: OverlayWidget = {
+      getId: () => widgetId,
+      getDomNode: () => domNode,
+      getPosition: () => null,
+    };
+    let contentHeight = 0;
+    let zoneId = '';
+    const zone: ViewZone = {
+      afterLineNumber: afterLine,
+      ordinal: 0,
+      heightInPx: 120,
+      domNode: document.createElement('div'),
+      onDomNodeTop: (top) => {
+        domNode.style.top = `${top}px`;
+      },
+      onComputedHeight: (height) => {
+        domNode.style.height = `${height}px`;
+      },
+    };
+    const layout = (): void => {
+      const info = modifiedEditor.getLayoutInfo();
+      domNode.style.left = '0px';
+      domNode.style.width = `${info.width - info.minimap.minimapWidth - info.verticalScrollbarWidth}px`;
+      const lineHeight = modifiedEditor.getOption(mod.editor.EditorOption.lineHeight);
+      const cap = Math.max(THREAD_MIN_LINES * lineHeight, THREAD_MAX_FRACTION * info.height);
+      const wanted = Math.ceil(Math.min(contentHeight || zone.heightInPx || 0, cap));
+      if (wanted === zone.heightInPx) return;
+      zone.heightInPx = wanted;
+      modifiedEditor.changeViewZones((accessor) => accessor.layoutZone(zoneId));
+    };
+    modifiedEditor.addOverlayWidget(widget);
     modifiedEditor.changeViewZones((accessor) => {
       zoneId = accessor.addZone(zone);
     });
-    zoneApp = mount(domNode);
-    // §3.2: 120 predates the compose form's final shape — measure the mounted app's own root
-    // (`.review-thread`, already `overflow: auto`) once it has rendered and re-lay the zone out,
-    // so a long existing comment scrolls inside its own box instead of being clipped by a guess.
-    const id = zoneId;
-    if (id === null) return; // addZone's own callback ran synchronously just above; defensive only.
-    void nextTick(() => {
-      if (zoneId !== id || disposed) return;
-      const measured = domNode.firstElementChild?.scrollHeight;
-      if (measured && measured !== zone.heightInPx) {
-        zone.heightInPx = measured;
-        modifiedEditor.changeViewZones((accessor) => accessor.layoutZone(id));
-      }
+    const layoutDisposable = modifiedEditor.onDidLayoutChange(layout);
+    layout();
+    const app = mount(domNode, (height) => {
+      contentHeight = height;
+      layout();
     });
+    closeThread = () => {
+      layoutDisposable.dispose();
+      app.unmount();
+      modifiedEditor.removeOverlayWidget(widget);
+      modifiedEditor.changeViewZones((accessor) => accessor.removeZone(zoneId));
+    };
   }
 
   // resolveBase's own failure (a transient index.lock conflict, most likely) used to be
@@ -522,29 +560,31 @@ export function attachReviewDecorations(
       closeZone();
       return;
     }
-    openThreadCommentId = comment.id;
-    openZone(comment.range.start, (container) => {
+    openZone(comment.range.start, (container, onResize) => {
       const app = createApp(ReviewThread, {
         mode: 'view' as const,
         comment,
         branch: deps.review.branch,
         onClose: () => closeZone(),
-        onDelete: () => void handleDelete(comment),
-        onSetState: (state: ReviewCommentState) => void handleSetState(comment, state),
+        onResize,
+        onDelete: () => handleDelete(comment),
+        onSetState: (state: ReviewCommentState) => handleSetState(comment, state),
       });
       app.use(i18n);
       app.mount(container);
       return app;
     });
+    openThreadCommentId = comment.id;
   }
 
   function openCompose(line: number): void {
-    openZone(line, (container) => {
+    openZone(line, (container, onResize) => {
       const app = createApp(ReviewThread, {
         mode: 'compose' as const,
         branch: deps.review.branch,
         onCancel: () => closeZone(),
-        onSubmit: (body: string, kind: ReviewCommentKind) => void handleSubmit(line, body, kind),
+        onResize,
+        onSubmit: (body: string, kind: ReviewCommentKind) => handleSubmit(line, body, kind),
       });
       app.use(i18n);
       app.mount(container);
@@ -552,9 +592,26 @@ export function attachReviewDecorations(
     });
   }
 
-  async function handleSubmit(line: number, body: string, kind: ReviewCommentKind): Promise<void> {
+  /** Runs one thread action. A failure is logged and rethrown for the thread to show inline. */
+  async function runThreadAction(
+    name: string,
+    call: () => Promise<unknown>,
+    closeAfter = true,
+  ): Promise<void> {
     try {
-      await deps.transport.request('review.comment.add', {
+      await call();
+    } catch (err) {
+      logError('reviewDecorations', `${name} failed`, err);
+      throw err;
+    }
+    if (closeAfter) closeZone();
+    // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
+    // editor already (C12-4).
+  }
+
+  function handleSubmit(line: number, body: string, kind: ReviewCommentKind): Promise<void> {
+    return runThreadAction('review.comment.add', () =>
+      deps.transport.request('review.comment.add', {
         repoId: deps.gitRepoId,
         branch: deps.review.branch,
         path: deps.path,
@@ -562,45 +619,29 @@ export function attachReviewDecorations(
         range: { start: line, end: line },
         body,
         kind,
-      });
-    } catch (err) {
-      logError('reviewDecorations', 'review.comment.add failed', err);
-      return;
-    }
-    closeZone();
-    // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
-    // editor already (C12-4).
+      }),
+    );
   }
 
-  async function handleSetState(comment: ReviewComment, state: ReviewCommentState): Promise<void> {
-    try {
-      await deps.transport.request('review.comment.setState', {
+  function handleSetState(comment: ReviewComment, state: ReviewCommentState): Promise<void> {
+    return runThreadAction('review.comment.setState', () =>
+      deps.transport.request('review.comment.setState', {
         repoId: deps.gitRepoId,
         branch: deps.review.branch,
         id: comment.id,
         state,
-      });
-    } catch (err) {
-      logError('reviewDecorations', 'review.comment.setState failed', err);
-      return;
-    }
-    closeZone();
+      }),
+    );
   }
 
-  async function handleDelete(comment: ReviewComment): Promise<void> {
-    try {
-      await deps.transport.request('review.comment.remove', {
+  function handleDelete(comment: ReviewComment): Promise<void> {
+    return runThreadAction('review.comment.remove', () =>
+      deps.transport.request('review.comment.remove', {
         repoId: deps.gitRepoId,
         branch: deps.review.branch,
         id: comment.id,
-      });
-    } catch (err) {
-      logError('reviewDecorations', 'review.comment.remove failed', err);
-      return;
-    }
-    closeZone();
-    // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
-    // editor already (C12-4).
+      }),
+    );
   }
 
   const mouseDownDisposable = modifiedEditor.onMouseDown((e) => {
