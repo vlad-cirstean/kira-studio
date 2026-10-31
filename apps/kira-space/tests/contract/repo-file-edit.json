@@ -1,0 +1,15 @@
+{
+  "CodeWorkspaceService.ReadFileForEdit": {
+    "hash": "df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47",
+    "kind": "found",
+    "language": "go",
+    "text": "package main\n"
+  },
+  "CodeWorkspaceService.WriteFile": {
+    "hash": "55a60bb97151b2b4b680462447ce60ec34511b14fa10d77440c97b9777101566"
+  },
+  "CodeWorkspaceService.WriteFile#conflict": {
+    "code": "E_CONFLICT",
+    "message": "The file changed on disk. Reload it or overwrite it."
+  }
+}

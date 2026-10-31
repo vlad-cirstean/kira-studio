@@ -1251,11 +1251,20 @@
         "bareRepo": {
           "body": "A bare repository has no files to browse."
         },
+        "fileChanged": {
+          "body": "The file changed on disk. Refresh it or overwrite it."
+        },
+        "notRegularFile": {
+          "body": "That path isn’t a regular file."
+        },
         "notRepo": {
           "body": "That folder isn’t a Git repository."
         },
         "repoNotFound": {
           "body": "That repository isn’t in the workspace."
+        },
+        "saveTooLarge": {
+          "body": "The file is too large to save."
         },
         "workspaceClosed": {
           "body": "The workspace was closed. Reopen it and retry."

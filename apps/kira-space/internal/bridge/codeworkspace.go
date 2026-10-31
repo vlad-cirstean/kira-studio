@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,10 +20,10 @@ import (
 )
 
 // CodeWorkspaceService is the whole bound surface: repo import/rename/remove, the two read
-// primitives (ListFiles, ReadFile), and OpenWorkspace/CloseWorkspace/ReadDiff. The read-only
-// guarantee is unchanged — no method in this file writes into a repository's working tree, and
-// every git invocation below goes through internal/codeworkspace, which builds every Spec with
-// ReadOnly: true.
+// primitives (ListFiles, ReadFile), and OpenWorkspace/CloseWorkspace/ReadDiff. WriteFile is the
+// only method that writes into a repository's working tree (an edited file, hash-guarded and
+// atomic); every git invocation below goes through internal/codeworkspace, which builds every
+// Spec with ReadOnly: true.
 type CodeWorkspaceService struct {
 	Deps appcore.Deps
 	// Discovery/Runner mirror gitrpc's own seam (Deps.Discovery/Deps.Runner) rather than reusing
@@ -34,6 +35,9 @@ type CodeWorkspaceService struct {
 	Registry *codeworkspace.Registry
 	// OnReposChanged fires after a successful repo-list mutation so other windows re-read the list.
 	OnReposChanged func()
+
+	// writeMu serializes WriteFile's hash-compare-and-replace across windows (one process).
+	writeMu sync.Mutex
 }
 
 func (s *CodeWorkspaceService) reposChanged() {
@@ -430,6 +434,77 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 		return codeworkspace.FileContent{}, ipcerr.Contract("%s", err.Error())
 	}
 	return ipcerr.InternalResult(codeworkspace.ReadFile(absPath, args.Path))
+}
+
+// CodeWorkspaceWriteFileArgs saves Text over Path when the file's current hash equals BaseHash
+// ("" expects the file absent).
+type CodeWorkspaceWriteFileArgs struct {
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	Text     string `json:"text"`
+	BaseHash string `json:"baseHash"`
+}
+
+type CodeWorkspaceWriteResult struct {
+	Hash string `json:"hash"`
+}
+
+// ReadFileForEdit is ReadFile plus the content hash a later WriteFile must present, and a
+// `notUtf8` kind for text that cannot round-trip through JSON.
+func (s *CodeWorkspaceService) ReadFileForEdit(ctx context.Context, args CodeWorkspaceReadFileArgs) (codeworkspace.EditContent, error) {
+	ctx = filesCtx(ctx)
+	if args.ID == "" {
+		return codeworkspace.EditContent{}, ipcerr.Required("id")
+	}
+	if args.Path == "" {
+		return codeworkspace.EditContent{}, ipcerr.Required("path")
+	}
+	sess, _, err := s.session(ctx, args.ID)
+	if err != nil {
+		return codeworkspace.EditContent{}, err
+	}
+	absPath, err := codeworkspace.ValidateRelPath(sess.Root, args.Path)
+	if err != nil {
+		return codeworkspace.EditContent{}, ipcerr.Contract("%s", err.Error())
+	}
+	return ipcerr.InternalResult(codeworkspace.ReadFileForEdit(absPath, args.Path))
+}
+
+// WriteFile saves an edited worktree file: same path check as ReadFile, then an atomic replace
+// guarded by the base hash. A changed or deleted file answers E_CONFLICT and is left untouched.
+func (s *CodeWorkspaceService) WriteFile(ctx context.Context, args CodeWorkspaceWriteFileArgs) (CodeWorkspaceWriteResult, error) {
+	ctx = filesCtx(ctx)
+	if args.ID == "" {
+		return CodeWorkspaceWriteResult{}, ipcerr.Required("id")
+	}
+	if args.Path == "" {
+		return CodeWorkspaceWriteResult{}, ipcerr.Required("path")
+	}
+	sess, _, err := s.session(ctx, args.ID)
+	if err != nil {
+		return CodeWorkspaceWriteResult{}, err
+	}
+	absPath, err := codeworkspace.ValidateRelPath(sess.Root, args.Path)
+	if err != nil {
+		return CodeWorkspaceWriteResult{}, ipcerr.Contract("%s", err.Error())
+	}
+	s.writeMu.Lock()
+	hash, err := codeworkspace.WriteFile(absPath, args.Text, args.BaseHash)
+	s.writeMu.Unlock()
+	switch {
+	case errors.Is(err, codeworkspace.ErrConflict):
+		return CodeWorkspaceWriteResult{}, ipcerr.T(ipcerr.CodeConflict, "backend.space.codeWorkspace.fileChanged.body", nil)
+	case errors.Is(err, codeworkspace.ErrTooLarge):
+		return CodeWorkspaceWriteResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.codeWorkspace.saveTooLarge.body", nil)
+	case errors.Is(err, codeworkspace.ErrNotRegular):
+		return CodeWorkspaceWriteResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.codeWorkspace.notRegularFile.body", nil)
+	case errors.Is(err, codeworkspace.ErrInvalidUTF8):
+		return CodeWorkspaceWriteResult{}, ipcerr.Contract("text is not valid UTF-8")
+	}
+	if err != nil {
+		return CodeWorkspaceWriteResult{}, ipcerr.Internal(err.Error())
+	}
+	return CodeWorkspaceWriteResult{Hash: hash}, nil
 }
 
 // OpenWorkspace opens args.ID's own session (§2/§12) — the registry entry CloseWorkspace pairs
