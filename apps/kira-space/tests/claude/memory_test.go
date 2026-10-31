@@ -6,10 +6,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
@@ -50,6 +53,33 @@ func TestMemoryMcpThroughClaude(t *testing.T) {
 	}
 	storeThroughClaude(t, app, cfg)
 	searchScoredThroughClaude(t, app, cfg)
+	wantMemoryOps(t, app, "search_memories", "store_memory", "memory_context")
+}
+
+// wantMemoryOps waits for the app to list an ok memory-module op row per tool: the server wrote
+// them into kira.db and the app ingested them.
+func wantMemoryOps(t *testing.T, app *realApp, tools ...string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		rows, err := app.W.Ops.Recent(bridge.OpsRecentArgs{Limit: 500})
+		if err != nil {
+			t.Fatal(err)
+		}
+		missing := slices.Clone(tools)
+		for _, r := range rows {
+			if r.Module == oplog.ModuleMemory && r.Status == oplog.StatusOK {
+				missing = slices.DeleteFunc(missing, func(k string) bool { return k == r.Kind })
+			}
+		}
+		if len(missing) == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no ok memory op row for %v in %d rows", missing, len(rows))
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // searchScoredThroughClaude has claude search from the billing repo: every meta line carries the
