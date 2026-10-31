@@ -428,7 +428,7 @@ export interface Artifact {
   createdAt: number;
 }
 /** A source that failed or timed out; the list is partial. */
-export interface ArtifactGap {
+interface ArtifactGap {
   source: string;
   repo: string;
 }
