@@ -38,6 +38,7 @@ type Forge struct {
 	authors  map[int]string
 	reviews  map[int][]githost.Review
 	comments map[int][]string
+	details  map[int]githost.ChangeRequestDetail
 }
 
 var (
@@ -46,6 +47,7 @@ var (
 
 	_ githost.ChangeRequestReviews = (*Forge)(nil)
 	_ githost.ChangeRequestSearch  = (*Forge)(nil)
+	_ githost.ChangeRequestDetails = (*Forge)(nil)
 	_ githost.CLISetup             = (*Forge)(nil)
 )
 
@@ -53,6 +55,7 @@ var (
 func New() *Forge {
 	return &Forge{
 		account: "forger", authors: map[int]string{}, reviews: map[int][]githost.Review{}, comments: map[int][]string{},
+		details: map[int]githost.ChangeRequestDetail{},
 	}
 }
 
@@ -424,6 +427,53 @@ func (f *Forge) SearchChangeRequests(_ context.Context, text string, limit int) 
 		out = out[:limit]
 	}
 	return out, st
+}
+
+var detailLinkPattern = regexp.MustCompile(`^https://forge\.test/([\w.-]+)/([\w.-]+)/-/merge_requests/(\d+)/?(?:[?#].*)?$`)
+
+// ParseChangeRequestLink reads a merge request link; issue links miss. It has no BranchLinks role, so
+// the branch link text other flows assert stays unchanged.
+func (f *Forge) ParseChangeRequestLink(_ context.Context, raw string) (githost.Repo, int, bool) {
+	m := detailLinkPattern.FindStringSubmatch(strings.TrimSpace(raw))
+	if m == nil {
+		return githost.Repo{}, 0, false
+	}
+	n, err := strconv.Atoi(m[3])
+	if err != nil || n <= 0 {
+		return githost.Repo{}, 0, false
+	}
+	return githost.Repo{Host: Host, Owner: m[1], Name: m[2]}, n, true
+}
+
+// SetDetail stores the detail ChangeRequestDetail answers for number. The merge request row and the
+// author set with SetAuthor override the stored ChangeRequest and Author.
+func (f *Forge) SetDetail(number int, d githost.ChangeRequestDetail) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.details[number] = d
+}
+
+func (f *Forge) ChangeRequestDetail(_ context.Context, _ githost.Repo, number int) (githost.ChangeRequestDetail, githost.Status) {
+	f.record("detail:" + strconv.Itoa(number))
+	if st, limited := f.rateLimit(); limited {
+		return githost.ChangeRequestDetail{}, st
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.offline {
+		return githost.ChangeRequestDetail{}, githost.Status{Kind: githost.KindUnauthenticated, Host: Host, Reason: "offline"}
+	}
+	cr, ok := f.find(number)
+	if !ok {
+		return githost.ChangeRequestDetail{}, f.goneStatus()
+	}
+	d := f.details[number]
+	d.ChangeRequest = cr
+	if login, set := f.authors[number]; set {
+		d.Author = githost.Person{Login: login}
+	}
+	d.Normalize()
+	return d, githost.Status{Kind: githost.KindOK, Host: Host}
 }
 
 func (f *Forge) Setup() clisetup.Setup {
