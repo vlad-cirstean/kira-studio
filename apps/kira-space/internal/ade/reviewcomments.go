@@ -29,6 +29,10 @@ type storedComment struct {
 	CreatedAt     int64  `json:"createdAt"`
 	RepliedAt     *int64 `json:"repliedAt"`
 	SentAt        *int64 `json:"sentAt"`
+	// Origin and AnchorContent keep an uncommitted comment intact; older snapshots lack both and
+	// read as commit-origin.
+	Origin        string `json:"origin,omitempty"`
+	AnchorContent []byte `json:"anchorContent,omitempty"`
 }
 
 // reviewSession is the review session key of the row: repo id and the branch spelling reviews use.
@@ -75,6 +79,7 @@ func (b *TaskBoard) snapshotRowComments(ctx context.Context, store *gitreview.St
 		sc := storedComment{
 			Path: c.Path, Start: c.Range.Start, End: c.Range.End, Body: c.Body, AnchorSHA: c.AnchorSHA,
 			AnchorBlobOID: c.AnchorBlobOID, Kind: c.Kind, State: c.State, Reply: c.Reply, CreatedAt: c.CreatedAt.UnixMilli(),
+			Origin: c.Origin, AnchorContent: c.AnchorContent,
 		}
 		if c.RepliedAt != nil {
 			v := c.RepliedAt.UnixMilli()
@@ -143,6 +148,7 @@ func (b *TaskBoard) restoreRowComments(ctx context.Context, store *gitreview.Sto
 		added, err := store.AddComment(ctx, repoID, branch, gitreview.Comment{
 			Path: sc.Path, Range: gitreview.LineRange{Start: sc.Start, End: sc.End}, Body: sc.Body,
 			AnchorSHA: sc.AnchorSHA, AnchorBlobOID: sc.AnchorBlobOID, CreatedAt: time.UnixMilli(sc.CreatedAt), Kind: sc.Kind,
+			Origin: sc.Origin, AnchorContent: sc.AnchorContent,
 		})
 		if err != nil {
 			return err

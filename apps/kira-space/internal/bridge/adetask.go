@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
@@ -93,6 +94,9 @@ var adeTaskCatalog = []struct {
 	key  string
 }{
 	{ade.ErrStale, ipcerr.CodeConflict, "backend.space.ade.taskMoved.body"},
+	{gitsession.ErrRangedMarkOnNonText, ipcerr.CodeBadRequest, "backend.space.gitrpc.rangedMarkNeedsText.body"},
+	{gitsession.ErrCommentNotText, ipcerr.CodeBadRequest, "backend.space.gitrpc.commentNeedsText.body"},
+	{gitsession.ErrCommentRangeOutOfFile, ipcerr.CodeBadRequest, "backend.space.gitrpc.commentRangePastEnd.body"},
 	{ade.ErrWorkflowChanged, ipcerr.CodeConflict, "backend.space.ade.workflowChanged.body"},
 	{ade.ErrSetupPending, ipcerr.CodePreparing, "backend.space.ade.setupPending.body"},
 	{repos.ErrBranchOnTask, ipcerr.CodeConflict, "backend.space.ade.branchOnTask.body"},

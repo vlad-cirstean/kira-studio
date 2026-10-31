@@ -416,7 +416,8 @@ func commentVars(comments []gitreview.Comment) []llmprompts.ReviewCommentVar {
 		if c.Range.End > c.Range.Start {
 			lines = fmt.Sprintf("%d-%d", c.Range.Start, c.Range.End)
 		}
-		out[i] = llmprompts.ReviewCommentVar{ID: c.ID, Kind: c.Kind, Path: c.Path, Lines: lines, Body: c.Body}
+		out[i] = llmprompts.ReviewCommentVar{ID: c.ID, Kind: c.Kind, Path: c.Path, Lines: lines, Body: c.Body,
+			Uncommitted: c.Origin == gitreview.OriginWorking}
 	}
 	return out
 }

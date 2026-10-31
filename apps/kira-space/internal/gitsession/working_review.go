@@ -205,17 +205,25 @@ func (e *RepoEntry) markWorkingLocked(ctx context.Context, branch, path string, 
 	return workingStatus(out, true, false), nil
 }
 
-// WorkingReviewStates reports the working review status of each given file. A file without a
-// record is "none".
-func (e *RepoEntry) WorkingReviewStates(ctx context.Context, branch string, files map[string]WorkingContent) (map[string]ReviewFileStatus, error) {
+// WorkingReviewStates reports the working review status of each given path. read supplies the
+// current content, and is called only for paths with a record; the rest are "none".
+func (e *RepoEntry) WorkingReviewStates(ctx context.Context, branch string, paths []string, read func(path string) (WorkingContent, error)) (map[string]ReviewFileStatus, error) {
 	records, err := e.review.WorkingRecords(ctx, e.Summary.RepoID, branch)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]ReviewFileStatus, len(files))
-	for path, cur := range files {
+	out := make(map[string]ReviewFileStatus, len(paths))
+	for _, path := range paths {
 		rec, found := records[path]
-		out[path] = workingStatus(rec, found, found && rec.ContentHash != cur.Hash)
+		if !found {
+			out[path] = workingStatus(rec, false, false)
+			continue
+		}
+		cur, err := read(path)
+		if err != nil {
+			return nil, err
+		}
+		out[path] = workingStatus(rec, true, rec.ContentHash != cur.Hash)
 	}
 	return out, nil
 }

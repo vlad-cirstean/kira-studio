@@ -163,6 +163,9 @@ func (b *TaskBoard) OpenReviewWindow(ctx context.Context, branchID string) (Revi
 	if err != nil {
 		return ReviewWindowOpen{}, err
 	}
+	if err := b.promoteBranchReview(ctx, sb); err != nil {
+		warnPromote(sb.ID, err)
+	}
 	if err := b.deps.Registry.Review.SetPinned(ctx, tgt.GitRepoID, tgt.Branch, true); err != nil {
 		return ReviewWindowOpen{}, err
 	}
@@ -240,21 +243,42 @@ func (b *TaskBoard) reviewWorktree(ctx context.Context, branchID string) (*gitse
 	return entry, sb, worktree, err
 }
 
-// ReviewWorking lists the staged, unstaged and untracked changes of the branch's worktree. The
-// worktree path comes from the branch row, never from the caller.
+// ReviewWorking lists the staged, unstaged and untracked changes of the branch's worktree with
+// their uncommitted review status, after moving review state onto commits made since. The worktree
+// path comes from the branch row, never from the caller.
 func (b *TaskBoard) ReviewWorking(ctx context.Context, branchID string) (adewire.ReviewWorking, error) {
 	entry, _, worktree, err := b.reviewWorktree(ctx, branchID)
 	if err != nil {
 		return adewire.ReviewWorking{}, err
 	}
 	if worktree == "" {
-		return adewire.ReviewWorking{Files: []porcelain.FileChange{}}, nil
+		return adewire.ReviewWorking{
+			Files: []porcelain.FileChange{}, Reviews: map[string]gitsession.ReviewFileStatus{}, Promoted: []string{},
+		}, nil
+	}
+	w, err := b.workingReview(ctx, branchID)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	promoted, err := w.promote(ctx)
+	if err != nil {
+		return adewire.ReviewWorking{}, err
 	}
 	head, files, err := entry.WorktreeChanges(ctx, worktree)
 	if err != nil {
 		return adewire.ReviewWorking{}, err
 	}
-	return adewire.ReviewWorking{Worktree: worktree, Head: head, Files: files}, nil
+	paths := make([]string, len(files))
+	for i, f := range files {
+		paths[i] = f.Path
+	}
+	reviews, err := entry.WorkingReviewStates(ctx, w.branch, paths, func(path string) (gitsession.WorkingContent, error) {
+		return w.current(ctx, path)
+	})
+	if err != nil {
+		return adewire.ReviewWorking{}, err
+	}
+	return adewire.ReviewWorking{Worktree: worktree, Head: head, Files: files, Reviews: reviews, Promoted: promoted}, nil
 }
 
 // ReviewWorkingDiff reads one uncommitted file: the worktree HEAD side against the file on disk.

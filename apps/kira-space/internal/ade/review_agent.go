@@ -114,6 +114,9 @@ func (b *TaskBoard) forwardMessage(ctx context.Context, tc *taskCtx, sb model.Ad
 	if err != nil {
 		return "", nil, none, nil, err
 	}
+	if err := b.promoteBranchReview(ctx, sb); err != nil {
+		return "", nil, none, nil, err
+	}
 	open, err := store.OpenComments(ctx, tgt.GitRepoID, tgt.Branch)
 	if err != nil {
 		return "", nil, none, nil, err

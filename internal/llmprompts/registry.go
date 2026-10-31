@@ -223,6 +223,8 @@ type ReviewCommentVar struct {
 	Path  string `json:"path"`
 	Lines string `json:"lines"`
 	Body  string `json:"body"`
+	// Uncommitted marks a comment written against worktree content no commit holds yet.
+	Uncommitted bool `json:"uncommitted"`
 }
 
 // ReviewRoundVars fills the review round messages and the comment list fragment.
@@ -1137,6 +1139,7 @@ var reviewRoundExample = ReviewRoundVars{
 	Comments: []ReviewCommentVar{
 		{ID: 3, Kind: "change", Path: "src/login.ts", Lines: "12-14", Body: "Rename this to isValid."},
 		{ID: 4, Kind: "question", Path: "src/login.ts", Lines: "30", Body: "Why retry twice?"},
+		{ID: 5, Kind: "change", Path: "src/login.ts", Lines: "41", Body: "Drop this log line.", Uncommitted: true},
 	},
 }
 
@@ -1146,7 +1149,7 @@ var AdeReviewComments = define(Entry{
 	TitleKey:   "llmPrompts.entry.adeReviewComments.title",
 	PurposeKey: "llmPrompts.entry.adeReviewComments.description",
 	UsedByKey:  "llmPrompts.entry.adeReviewComments.usedBy.body",
-	Default: `{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}
+	Default: `{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}{{if .Uncommitted}} (uncommitted){{end}}
 {{.Body}}
 {{end}}Per comment, call reply_review_comment once.
 change: make the change, commit it, reply what changed, resolved true.
@@ -1187,7 +1190,7 @@ var AdeReviewForwardMessage = define(Entry{
 	PurposeKey: "llmPrompts.entry.adeReviewForwardMessage.description",
 	UsedByKey:  "llmPrompts.entry.adeReviewForwardMessage.usedBy.body",
 	Default: `My review comments on {{.Repo}} {{.Branch}} (base {{.Base}}):
-{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}
+{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}{{if .Uncommitted}} (uncommitted){{end}}
 {{.Body}}
 {{end}}Answer each question. Make the change a change comment asks for.`,
 }, reviewRoundExample)

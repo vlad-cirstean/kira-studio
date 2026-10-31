@@ -7,6 +7,8 @@ package adewire
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
@@ -1003,11 +1005,59 @@ type ReviewWindowTarget struct {
 }
 
 // ReviewWorking is the uncommitted work of a branch's worktree against its HEAD (P384). Worktree
-// is "" when the branch has none, with no Files. Head is "" for an unborn HEAD.
+// is "" when the branch has none, with no Files. Head is "" for an unborn HEAD. Reviews holds each
+// file's uncommitted review status by path (P418); Promoted lists paths whose uncommitted review
+// moved onto a commit during this call.
 type ReviewWorking struct {
-	Worktree string                 `json:"worktree"`
-	Head     string                 `json:"head"`
-	Files    []porcelain.FileChange `json:"files"`
+	Worktree string                                 `json:"worktree"`
+	Head     string                                 `json:"head"`
+	Files    []porcelain.FileChange                 `json:"files"`
+	Reviews  map[string]gitsession.ReviewFileStatus `json:"reviews"`
+	Promoted []string                               `json:"promoted"`
+}
+
+// ReviewWorkingFileReview is one uncommitted file's diff with the lines already marked reviewed.
+type ReviewWorkingFileReview struct {
+	Path           string                 `json:"path"`
+	Body           porcelain.FileDiffBody `json:"body"`
+	ReviewedRanges []gitreview.LineRange  `json:"reviewedRanges"`
+	LineCount      int                    `json:"lineCount"`
+	ContentKind    string                 `json:"contentKind"`
+}
+
+// ReviewWorkingMarkArgs marks or unmarks uncommitted files. Ranges (one path only, worktree line
+// numbers) null marks whole files.
+type ReviewWorkingMarkArgs struct {
+	BranchID string                `json:"branchId"`
+	Paths    []string              `json:"paths"`
+	Reviewed bool                  `json:"reviewed"`
+	Ranges   []gitreview.LineRange `json:"ranges"`
+}
+
+// ReviewWorkingMarkFile is the status of one path after a mark.
+type ReviewWorkingMarkFile struct {
+	Path   string                      `json:"path"`
+	Review gitsession.ReviewFileStatus `json:"review"`
+}
+
+// ReviewWorkingMarkResult lists the marked paths in request order.
+type ReviewWorkingMarkResult struct {
+	Files []ReviewWorkingMarkFile `json:"files"`
+}
+
+// ReviewWorkingCommentsResult is every uncommitted-origin comment of the branch, anchored against
+// the current worktree.
+type ReviewWorkingCommentsResult struct {
+	Comments []gitsession.CommentEntry `json:"comments"`
+}
+
+// ReviewWorkingCommentAddArgs adds a comment on uncommitted text.
+type ReviewWorkingCommentAddArgs struct {
+	BranchID string              `json:"branchId"`
+	Path     string              `json:"path"`
+	Range    gitreview.LineRange `json:"range"`
+	Body     string              `json:"body"`
+	Kind     string              `json:"kind"`
 }
 
 // ReviewWorkingDiffArgs names one uncommitted file of a branch's worktree.
