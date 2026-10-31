@@ -14,9 +14,11 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P428 | Jira issue viewer | Todo |
 | P429 | PR and issue comments: post, attachments, drag and drop | Todo |
 | P430 | Clipboard capture hotkey: link or text into Kira Space | Todo |
-| P431 | Operations panel overhaul: looks and interactions | Todo |
-| P432 | Code review (2 rounds) | Todo |
-| P433 | Close chapter v0.2.24 | Todo |
+| P431 | Stage settings injection in the workflow editor (auto compact limit) | Todo |
+| P432 | Operations panel overhaul: looks and interactions | Todo |
+| P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Todo |
+| P434 | Code review (2 rounds) | Todo |
+| P435 | Close chapter v0.2.24 | Todo |
 
 ## Rows
 
@@ -64,14 +66,27 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - No tray icon. The hotkey works while the app process runs (macOS keeps it running with no window). On Windows and Linux it works only while the app is running; no background mode.
 - Out of scope: tray icon, clipboard watcher (reads every copy), URL scheme, Share/Services menu, browser extension.
 
-### P431 Operations panel overhaul: looks and interactions
+### P431 Stage settings injection in the workflow editor (auto compact limit)
+
+- Workflow editor can inject settings per stage. First and only setting for now: the auto compact limit.
+- Provider-neutral: Claude is the only provider today, more come. Settings are a provider-keyed catalog (each provider declares which stage settings it supports, their types, ranges and how they map onto its launch config/env/flags); the editor renders from the catalog.
+- Applied when the stage's agent session launches; absent means provider default.
+
+### P432 Operations panel overhaul: looks and interactions
 
 - Panel works but looks and interactions feel off and clunky. Redesign both.
 
-### P432 Code review (2 rounds)
+### P433 Frontend data and memory sweep: keep state across tabs, minimal RAM
+
+- Deep sweep over how the frontend handles data.
+- Switching tabs never loses state or data, and never refetches only because the user interacts with the UI.
+- Memory use is as low as practical: audit kept-alive views, query caches (TanStack gcTime/staleTime), stores, large lists and editors, and release what is not needed.
+- Measure before and after (heap per tab/view); goal is a great experience with the least RAM.
+
+### P434 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P433 Close chapter v0.2.24
+### P435 Close chapter v0.2.24
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
