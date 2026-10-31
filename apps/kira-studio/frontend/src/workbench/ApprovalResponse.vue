@@ -3,6 +3,7 @@ import { dbMcpRunQueryResultSchema } from '@shared/domain/dbmcp';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SecondaryTabs, { type SecondaryTabItem } from '@theme/components/SecondaryTabs.vue';
+import TooltipDetails from '@theme/components/TooltipDetails.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { FieldDescription } from '@theme/components/ui/field';
@@ -208,9 +209,11 @@ const padBottom = computed(() => {
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {{
-                        [col.title, col.masked ? t('studio.dbMcp.preview.masked.tooltip') : ''].filter(Boolean).join(' · ')
-                      }}
+                      <TooltipDetails
+                        :title="col.label"
+                        :rows="col.title ? [{ label: t('common.field.type.label'), value: col.title }] : []"
+                        :hint="col.masked ? t('studio.dbMcp.preview.masked.hint') : undefined"
+                      />
                     </TooltipContent>
                   </Tooltip>
                 </TableHead>

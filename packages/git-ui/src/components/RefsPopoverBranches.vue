@@ -74,7 +74,7 @@ function changeRequestFor(
 function changeRequestTooltip(shortName: string): string {
   const pr = changeRequestFor(shortName);
   if (!pr) return '';
-  return t('common.dashPair.label', { first: pr.title, second: changeRequestStateLabel(pr.state) });
+  return `${pr.title}\n${changeRequestStateLabel(pr.state)}`;
 }
 
 async function checkoutBranch(row: RefRow): Promise<void> {

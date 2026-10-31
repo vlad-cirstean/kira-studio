@@ -331,11 +331,10 @@ function fileIconStyle(path: string): Record<string, string> {
 function fileTitle(change: FileChange): string {
   const rename = renameDisplay(change);
   if (rename && change.similarity !== undefined) {
-    return t('git.fileTree.similar.tooltip', {
-      percent: change.similarity,
-      from: rename.from,
-      to: rename.to,
-    });
+    return [
+      t('git.fileTree.renamed.tooltip', { from: rename.from, to: rename.to }),
+      t('git.fileTree.similar.tooltip', { percent: change.similarity }),
+    ].join('\n');
   }
   return change.path;
 }

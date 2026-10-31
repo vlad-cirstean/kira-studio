@@ -24,6 +24,7 @@ import type { ChangeRequestLookup, ChangeRequestRecord, GitHostInfo } from '@kir
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
+import TooltipDetails from '@theme/components/TooltipDetails.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
@@ -345,13 +346,17 @@ const changeRequestIcon = computed(() => {
             <CodiconIcon name="git-pull-request" :size="13" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{
-          t('git.changeRequest.summary.tooltip', {
-            number: String(changeRequestIcon!.number),
-            title: changeRequestIcon!.title,
-            state: changeRequestIcon!.stateLabel,
-          })
-        }}</TooltipContent>
+        <TooltipContent>
+          <TooltipDetails
+            :title="
+              t('git.changeRequest.summary.tooltip', {
+                number: String(changeRequestIcon!.number),
+                title: changeRequestIcon!.title,
+              })
+            "
+            :rows="[{ label: t('git.changeRequest.state.label'), value: changeRequestIcon!.stateLabel }]"
+          />
+        </TooltipContent>
       </Tooltip>
     </ViewToolbar>
 

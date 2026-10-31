@@ -3591,8 +3591,11 @@
       "open": {
         "aria": "Open {changeRequestNoun} #{number} on {label}"
       },
+      "state": {
+        "label": "State"
+      },
       "summary": {
-        "tooltip": "#{number} {title} — {state}"
+        "tooltip": "#{number} {title}"
       }
     },
     "commit": {
@@ -4215,8 +4218,11 @@
       "parentNoSubject": {
         "label": "Parent {number} · {sha}"
       },
+      "renamed": {
+        "tooltip": "Renamed from {from} to {to}"
+      },
       "similar": {
-        "tooltip": "{percent}% similar — {from} → {to}"
+        "tooltip": "{percent}% similar"
       },
       "tree": {
         "aria": "File tree"
@@ -4884,7 +4890,7 @@
     },
     "refBadge": {
       "changeRequestMore": {
-        "tooltip": "{title} — {state} (and {count} more)"
+        "tooltip": "And {count} more"
       }
     },
     "review": {
@@ -11077,7 +11083,7 @@
           "body": "{connection} ({kind}) ran this statement. Check its result before the AI gets it."
         },
         "masked": {
-          "tooltip": "A masking rule applies to this column"
+          "hint": "A masking rule applies to this column."
         },
         "ran": {
           "body": "This statement already ran. Withhold hides the result from the AI; it does not undo the change."
