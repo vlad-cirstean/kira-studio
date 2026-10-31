@@ -33,7 +33,7 @@ func (p *Provider) Comment(ctx context.Context, r githost.Repo, number int, body
 		"status":   1, // active
 	}
 	route := []string{"project=" + project, "repositoryId=" + r.Name, "pullRequestId=" + strconv.Itoa(number)}
-	return p.client.invoke(ctx, orgURL(org), true, "pullRequestThreads", route, thread, nil)
+	return p.client.invoke(ctx, orgURL(org), true, "POST", "pullRequestThreads", route, "", thread, nil)
 }
 
 // SubmitReview posts the body as a new thread, then casts the vote.

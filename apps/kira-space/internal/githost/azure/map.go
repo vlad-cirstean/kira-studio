@@ -29,6 +29,10 @@ type rawPR struct {
 type rawReviewer struct {
 	Vote     int  `json:"vote"`
 	Required bool `json:"required"`
+	// Name, Login and Team are printed by the detail projection only.
+	Name  string `json:"name"`
+	Login string `json:"login"`
+	Team  bool   `json:"team"`
 }
 
 // rawRESTPR is the same pull request as the REST API prints it, for `az devops invoke`, which has

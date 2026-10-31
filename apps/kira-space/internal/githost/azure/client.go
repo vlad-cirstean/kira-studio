@@ -36,10 +36,10 @@ func argv(sub []string, org string, extra ...string) []string {
 
 // Projections keep output small under the 1 MiB toolexec cap.
 const (
-	prFields = `id:pullRequestId,title:title,status:status,draft:isDraft,src:sourceRefName,dst:targetRefName,` +
+	prBaseFields = `id:pullRequestId,title:title,status:status,draft:isDraft,src:sourceRefName,dst:targetRefName,` +
 		`head:lastMergeSourceCommit.commitId,created:creationDate,closed:closedDate,author:createdBy.uniqueName,` +
-		`forkRepo:forkSource.repository.name,forkProject:forkSource.repository.project.name,` +
-		`reviewers:reviewers[].{vote:vote,required:isRequired}`
+		`forkRepo:forkSource.repository.name,forkProject:forkSource.repository.project.name`
+	prFields      = prBaseFields + `,reviewers:reviewers[].{vote:vote,required:isRequired}`
 	prListQuery   = `[].{` + prFields + `}`
 	prShowQuery   = `{` + prFields + `}`
 	prSearchQuery = `[].{` + prFields + `,repo:repository.name}`
@@ -155,7 +155,7 @@ func (c *Client) forCommit(ctx context.Context, r githost.Repo, sha string) ([]g
 	var res struct {
 		Results []map[string][]rawRESTPR `json:"results"`
 	}
-	st := c.invoke(ctx, orgURL(org), false, "pullRequestQuery", []string{"project=" + project, "repositoryId=" + r.Name}, body, &res)
+	st := c.invoke(ctx, orgURL(org), false, "POST", "pullRequestQuery", []string{"project=" + project, "repositoryId=" + r.Name}, "", body, &res)
 	if !st.OK() {
 		return nil, st
 	}
@@ -179,25 +179,31 @@ func (c *Client) forCommit(ctx context.Context, r githost.Repo, sha string) ([]g
 	return out, st
 }
 
-// invoke POSTs body to a git-area REST resource with `az devops invoke`. The body travels in a
-// private temp file removed after the call.
-func (c *Client) invoke(ctx context.Context, org string, write bool, resource string, route []string, body, out any) githost.Status {
-	f, err := os.CreateTemp("", "kira-az-*.json")
-	if err != nil {
-		return status(org, githost.KindForbidden, "could not write the request body: "+err.Error())
+// invoke calls a git-area REST resource with `az devops invoke`. A non-nil body travels in a private
+// temp file removed after the call; query, when set, projects the response (az caps stdout at 1 MiB).
+func (c *Client) invoke(ctx context.Context, org string, write bool, method, resource string, route []string, query string, body, out any) githost.Status {
+	extra := append(append([]string{"--area", "git", "--resource", resource, "--route-parameters"}, route...),
+		"--http-method", method)
+	if body != nil {
+		f, err := os.CreateTemp("", "kira-az-*.json")
+		if err != nil {
+			return status(org, githost.KindForbidden, "could not write the request body: "+err.Error())
+		}
+		defer os.Remove(f.Name())
+		if err := json.NewEncoder(f).Encode(body); err != nil {
+			f.Close()
+			return status(org, githost.KindForbidden, "could not write the request body: "+err.Error())
+		}
+		if err := f.Close(); err != nil {
+			return status(org, githost.KindForbidden, "could not write the request body: "+err.Error())
+		}
+		extra = append(extra, "--in-file", f.Name())
 	}
-	defer os.Remove(f.Name())
-	if err := json.NewEncoder(f).Encode(body); err != nil {
-		f.Close()
-		return status(org, githost.KindForbidden, "could not write the request body: "+err.Error())
+	extra = append(extra, "--api-version", apiVersion)
+	if query != "" {
+		extra = append(extra, "--query", query)
 	}
-	if err := f.Close(); err != nil {
-		return status(org, githost.KindForbidden, "could not write the request body: "+err.Error())
-	}
-	args := argv([]string{"devops", "invoke"}, org,
-		append(append([]string{"--area", "git", "--resource", resource, "--route-parameters"}, route...),
-			"--http-method", "POST", "--in-file", f.Name(), "--api-version", apiVersion)...)
-	return c.callJSON(ctx, org, write, args, out)
+	return c.callJSON(ctx, org, write, argv([]string{"devops", "invoke"}, org, extra...), out)
 }
 
 // prShow reads one pull request by id.
