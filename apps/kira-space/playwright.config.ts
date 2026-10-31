@@ -16,7 +16,8 @@ export default defineConfig({
   workers: '100%',
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: 'line',
+  use: { screenshot: 'only-on-failure', trace: 'on-first-retry' },
   outputDir: 'test-results',
   projects: [
     {
