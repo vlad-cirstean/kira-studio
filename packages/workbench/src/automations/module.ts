@@ -97,6 +97,8 @@ export interface AutomationsModuleContext {
   runs: ScriptRunsSeam;
   /** Focuses the Automations module, e.g. from the status bar. */
   showAutomations(): void;
+  /** Opens the Operations dock, where finished runs are listed. */
+  showOperations(): void;
   /** Kira Space: scripts can run for an ADE task. */
   ade: boolean;
   /** Native folder dialog; null when cancelled. */

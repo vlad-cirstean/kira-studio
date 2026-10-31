@@ -1,52 +1,38 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import InlineState from '@theme/components/InlineState.vue';
-import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { usePersistedState } from '@workbench/behaviour/persisted';
-import PanelBar from '@workbench/components/PanelBar.vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
+import { useAutomationsModule } from '../module';
 import { keyOf, useScriptTabs } from '../scriptTabs';
 import SmartBadge from '../smart/SmartBadge.vue';
 import RunElapsed from './RunElapsed.vue';
-import RunOutcomeBlock from './RunOutcomeBlock.vue';
 import RunStatusBadge from './RunStatusBadge.vue';
 import { useScriptRuns, useStopScriptRun } from './runsQueries';
 
-const emit = defineEmits<{ rerun: [run: ScriptRun] }>();
+// Live runs only; finished ones are in the Operations panel.
+const ctx = useAutomationsModule();
 const tabs = useScriptTabs();
-
-type Filter = 'all' | 'running' | 'failed';
 const open = usePersistedState('kira.automations.runsOpen', true);
-const filter = ref<Filter>('all');
-const FILTER_ITEMS = computed(() => [
-  { value: 'all', label: t('common.state.all.option'), testid: 'runs-filter-all' },
-  { value: 'running', label: t('common.state.running.status'), testid: 'runs-filter-running' },
-  { value: 'failed', label: t('common.state.failed.status'), testid: 'runs-filter-failed' },
-]);
-const expanded = ref<string | null>(null);
 const { data } = useScriptRuns();
 const stop = useStopScriptRun();
 
-const rows = computed(() => {
-  const all = data.value ?? [];
-  if (filter.value === 'running') return all.filter((r) => r.state === 'running');
-  if (filter.value === 'failed')
-    return all.filter((r) => r.state === 'failed' || r.state === 'blocked');
-  return all;
-});
+const rows = computed(() =>
+  (data.value ?? []).filter((r) => r.state === 'running' || r.state === 'waiting'),
+);
 
-function toggle(run: ScriptRun): void {
-  // A run without a terminal (smart or headless) lives in its own tab; a skipped one only has a reason.
-  if (run.state !== 'skipped' && (run.kind === 'smart' || run.terminalId === '')) {
+function show(run: ScriptRun): void {
+  // A run without a terminal (smart or headless) lives in its own tab; a terminal run focuses its tab.
+  if (run.kind === 'smart' || run.terminalId === '') {
     tabs.openRun({ ...keyOf(run), runId: run.id, label: run.scriptName });
     return;
   }
-  expanded.value = expanded.value === run.id ? null : run.id;
+  if (ctx.tabs.list().some((tab) => tab.id === run.terminalId)) ctx.tabs.activate(run.terminalId);
 }
 </script>
 
@@ -56,25 +42,29 @@ function toggle(run: ScriptRun): void {
     data-testid="runs-section"
   >
     <SectionHeading
-      :label="t('automations.runs.title.label')"
+      :label="t('common.state.running.status')"
       collapsible
       :expanded="open"
-      :count="data?.length ?? 0"
+      :count="rows.length"
       data-testid="runs-toggle"
       @toggle="open = !open"
     />
     <div v-if="open" class="flex min-h-0 flex-col overflow-y-auto">
-      <PanelBar>
-        <SecondaryTabs
-          variant="segmented"
-          :model-value="filter"
-          :items="FILTER_ITEMS"
-          @update:model-value="(v) => (filter = v as Filter)"
-        />
-      </PanelBar>
-      <InlineState v-if="rows.length === 0" kind="empty" data-testid="runs-empty">
-        {{ t('automations.runs.none.emptyHint') }}
-      </InlineState>
+      <template v-if="rows.length === 0">
+        <InlineState kind="empty" data-testid="runs-empty">
+          {{ t('automations.runs.none.emptyHint') }}
+        </InlineState>
+        <div class="px-1.5 pb-1.5">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="runs-show-history"
+            @click="ctx.showOperations()"
+          >
+            {{ t('automations.runs.showHistory.label') }}
+          </Button>
+        </div>
+      </template>
       <div
         v-for="run in rows"
         :key="run.id"
@@ -86,8 +76,7 @@ function toggle(run: ScriptRun): void {
           <button
             type="button"
             class="flex min-w-0 flex-1 items-center gap-1 border-0 bg-transparent p-0 text-left text-inherit"
-            :aria-expanded="expanded === run.id"
-            @click="toggle(run)"
+            @click="show(run)"
           >
             <RunStatusBadge :state="run.state" />
             <SmartBadge v-if="run.kind === 'smart'" />
@@ -119,9 +108,6 @@ function toggle(run: ScriptRun): void {
           >
             {{ t('common.action.stop.label') }}
           </Button>
-        </div>
-        <div v-if="expanded === run.id" class="px-1.5 pb-1.5">
-          <RunOutcomeBlock :run="run" @rerun="emit('rerun', run)" />
         </div>
       </div>
     </div>

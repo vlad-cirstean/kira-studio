@@ -2,6 +2,7 @@ import type { AutomationsModuleContext } from '@workbench/automations/module';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { control } from '../bridge/control';
 import { useCustomScriptsStore } from '../state/customScripts';
+import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
@@ -19,6 +20,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
   const terminalsStore = useTerminalsStore();
   const modeStore = useModeStore();
   const tabsStore = useTabsStore();
+  const layoutStore = useLayoutStore();
 
   return {
     defaultCwd: () => terminalsStore.terminalDefaults.cwd,
@@ -76,6 +78,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
     },
     ade: true,
     showAutomations: () => modeStore.setMode('automations'),
+    showOperations: () => layoutStore.showOperationsPanel(),
     chooseFolder: async (title) => {
       const chosen = await control.filesChooseFolder(title);
       return chosen.canceled ? null : chosen.path;

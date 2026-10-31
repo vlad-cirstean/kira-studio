@@ -160,6 +160,9 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
     function toggleOperationsPanel(): void {
       patchLayout({ panel: { operations: { visible: !state.panel.operations.visible } } });
     }
+    function showOperationsPanel(): void {
+      if (!state.panel.operations.visible) toggleOperationsPanel();
+    }
     function setOperationsHeight(mode: string, height: number): void {
       patchLayout({ modes: { [mode]: { operations: { height } } } });
     }
@@ -174,6 +177,7 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       setProjectWidth,
       ensureReviewPanelWidth,
       toggleOperationsPanel,
+      showOperationsPanel,
       setOperationsHeight,
       ...extra,
     };
