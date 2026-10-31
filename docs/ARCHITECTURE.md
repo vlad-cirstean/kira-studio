@@ -2929,7 +2929,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 
 ## Validation proof (P420)
 
-Agent-written evidence the user reviews in a dedicated window. Part 1 is storage, tools, bridge and window plumbing.
+Agent-written evidence the user reviews in a dedicated window. Part 1 is storage, tools, bridge and window plumbing. Part 2 is the window UI.
 
 - **Tools on kira-db.** `proof_start_session`, `proof_edit_session`, `proof_add_step`, `proof_close_session`, `proof_list_sessions` (`internal/dbmcp/proof_tools.go`). Logic in `internal/proof`, storage in `storage/repos/proof.go`, migration 0046.
 - **Draft/revision model.** A session has `current_rev` and at most one `pending_rev`. Steps are added to a draft; close publishes it. An edit draft closes into the pending revision. User accepts (copies view state of unchanged steps, drops old revision) or rejects.
@@ -2942,7 +2942,11 @@ Agent-written evidence the user reviews in a dedicated window. Part 1 is storage
 - **Prompt.** Close raises a `proof` prompt (`prompts.KindProof`, ref = session id). Startup re-raises it for closed sessions never seen or with a pending edit.
 - **Window.** Ephemeral windows keyed `proof-*` (`proof.IsWindowKey`). Their `windows` rows are purged at startup, so a restart never restores one. `ProofService.OpenWindow` raises the live one or opens a new one; `WindowTarget` tells it which session. `kira:proof:changed` (app-wide) and `kira:proof:select` (to one window) are the events.
 - **Studio DB.** `PRAGMA foreign_keys` is ON per connection (DSN `_foreign_keys=1`, `internal/sqlitex`) and `SetMaxOpenConns(1)`. Proof cascades rely on both. Multi-row changes run in one transaction with no query issued meanwhile, which the single connection would deadlock on.
-- **Boot audit for the proof window.** `frontend/src/main.ts` boots layout, connections, tabs, terminals, DB MCP, ops and schema sync stores. The proof window needs only i18n, Pinia, Vue Query, settings hydration (theme) and `windowsEnsure`. Part 2 skips the rest.
+- **Boot audit for the proof window.** `frontend/src/main.ts` boots layout, connections, tabs, terminals, DB MCP, ops and schema sync stores. The proof window needs only i18n, Pinia, Vue Query, settings hydration (theme) and `windowsEnsure`. The window boots through `src/proof/boot.ts` (`windowKey.startsWith('proof-')` in `main.ts`).
+- **Window UI.** `frontend/src/proof/`. Three panes like the Kira Space review window: history list, tab strip plus step body, and a change panel while an edit is pending. Pane widths persist (`kira.proof.leftWidth`, `kira.proof.rightWidth`). Server state is TanStack Query (`['proof', ...]` keys); `kira:proof:changed` invalidates all but view state. One Pinia store (`useProofWindowStore`) holds the open session, side (current/proposed/compare) and active tab.
+- **Result views reuse the console.** Each step builds a page with the console page builders (`pages.ts`) and renders `ConsoleResultGrid`; the query shows in a read-only `MonacoHost`. No separate renderer.
+- **View state.** Per step and revision: query scroll, result scroll, highlighted cell or row, expanded document ids, column widths. `ConsoleResultGrid` takes a `viewState` prop and emits `update:viewState`; `useStepViewState` seeds from the backend once, mirrors into the query cache on each change, and writes the backend after `TIMING.scrollPersist` or on unmount.
+- **Screenshot.** `modern-screenshot` (`screenshot.ts`) clones the step element to a canvas; `restoreScrollPosition` makes the clone match the live scroll. `includeStyleProperties` must list painted properties only; without it a clone of a 160-row grid takes minutes in WebKit. Capture waits for every `[data-step-key]` to report `data-ready`. Default action copies a PNG to the clipboard; the dropdown saves via `ProofService.SavePng`. All tabs stack in order.
 
 ## Renderer security surface
 
