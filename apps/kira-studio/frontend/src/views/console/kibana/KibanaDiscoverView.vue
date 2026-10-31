@@ -81,12 +81,10 @@ function onInsertField(name: string): void {
   queryBar.value?.insertText(`${quoteField(name)}: `);
 }
 function onExists(name: string): void {
-  d.patch({
-    filters: [
-      ...d.state.value.filters,
-      { field: name, operator: 'exists', values: [], disabled: false },
-    ],
-  });
+  filters.value = [
+    ...filters.value,
+    { field: name, operator: 'exists', values: [], disabled: false },
+  ];
 }
 
 function onHistogramRange(from: string, to: string): void {

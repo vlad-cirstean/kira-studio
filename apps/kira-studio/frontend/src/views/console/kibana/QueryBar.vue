@@ -72,19 +72,21 @@ defineExpose({ insertText: (text: string) => editorHost.value?.insertText(text) 
       data-testid="kibana-language"
     />
     <InputGroup class="min-w-0 flex-1" data-testid="kibana-query">
-      <MonacoHost
-        ref="editorHost"
-        v-model:doc="doc"
-        language="plain"
-        single-line
-        autocomplete
-        auto-close-brackets
-        :monaco-language="grammar"
-        :trigger-characters="triggers"
-        :completion-sources="completionSources"
-        :async-completion-sources="asyncCompletionSources"
-        @submit="onSubmit"
-      />
+      <div class="kibana-query-host min-w-0 flex-1">
+        <MonacoHost
+          ref="editorHost"
+          v-model:doc="doc"
+          language="plain"
+          single-line
+          autocomplete
+          auto-close-brackets
+          :monaco-language="grammar"
+          :trigger-characters="triggers"
+          :completion-sources="completionSources"
+          :async-completion-sources="asyncCompletionSources"
+          @submit="onSubmit"
+        />
+      </div>
     </InputGroup>
     <slot />
     <Button
@@ -112,3 +114,21 @@ defineExpose({ insertText: (text: string) => editorHost.value?.insertText(text) 
     </Button>
   </div>
 </template>
+
+<style scoped>
+@reference "@theme/base.css";
+
+/* A single-line host sizes to the editor's own height, so give Monaco one line. */
+.kibana-query-host :deep(.monaco-editor) {
+  @apply h-control!;
+}
+
+.kibana-query-host :deep(.monaco-scrollable-element) {
+  @apply overflow-hidden;
+}
+
+.kibana-query-host :deep(.scrollbar),
+.kibana-query-host :deep(.decorationsOverviewRuler) {
+  @apply hidden;
+}
+</style>
