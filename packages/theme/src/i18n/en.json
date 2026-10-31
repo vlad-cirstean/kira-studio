@@ -12446,6 +12446,14 @@
         "tooltip": "Upload a file"
       }
     },
+    "kibana": {
+      "minVersion": {
+        "hint": "Requires Kibana 8.19 or newer."
+      },
+      "space": {
+        "label": "Space"
+      }
+    },
     "mode": {
       "api": {
         "label": "API"

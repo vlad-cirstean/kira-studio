@@ -11,6 +11,7 @@ export const KIND_LABEL: Record<ConnectionKind, string> = {
   kafka: 'Kafka',
   sqs: 'SQS',
   s3: 'S3',
+  kibana: 'Kibana',
 };
 
 // Each engine owns a hue distinct from the engines it most often sits beside in the list.
@@ -25,6 +26,7 @@ export const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {
   kafka: 'text-conn-amber',
   sqs: 'text-conn-magenta',
   s3: 'text-conn-olive',
+  kibana: 'text-conn-indigo',
 };
 
 export const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
@@ -38,4 +40,5 @@ export const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'kafka',
   'sqs',
   's3',
+  'kibana',
 ]);

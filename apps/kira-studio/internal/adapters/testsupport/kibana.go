@@ -173,7 +173,7 @@ func (f *KibanaFixture) buildConfigs() {
 	host, port := f.Host, f.Port
 	base := model.ResolvedConnectionConfig{
 		ID: "test-kibana", CreatedAt: now, UpdatedAt: now,
-		Name: "Test Kibana", Kind: "kibana", Color: "pink", Mode: "fields", ReadOnly: true,
+		Name: "Test Kibana", Kind: "kibana", Color: "indigo", Mode: "fields", ReadOnly: true,
 		Host: &host, Port: &port, Username: Strp(kibanaRoUser), Options: map[string]any{}, Password: Strp(f.Password),
 	}
 	f.Config = base

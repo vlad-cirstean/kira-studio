@@ -42,6 +42,7 @@ const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {
   kafka: 'text-conn-amber',
   sqs: 'text-conn-magenta',
   s3: 'text-conn-olive',
+  kibana: 'text-conn-indigo',
 };
 
 const OUTLOOK_KEY: Record<string, MessageKey> = {
