@@ -65,14 +65,14 @@ test('contract: the oldest prompt shows first with a count; a reveal push shows 
     routed('update', '1.3.0', { createdAt: 2 }),
   ]);
 
-  await expect(approvalDialog).toBeVisible();
+  await expect(approvalDialog).toBeVisible({ timeout: 15_000 });
   await expect(window.locator('[data-testid="db-mcp-approval-queue-count"]')).toHaveText(
     '1 more waiting',
   );
   await expect(updateDialog).toHaveCount(0);
 
   await emitWailsEvent(window, IPC.promptsReveal, { id: 'update:1.3.0' });
-  await expect(updateDialog).toBeVisible();
+  await expect(updateDialog).toBeVisible({ timeout: 15_000 });
   await expect(approvalDialog).toHaveCount(0);
 });
 

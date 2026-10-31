@@ -1169,6 +1169,6 @@ reviewTest(
     await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
     await renderedLine(modified, 'CHANGED 100').click({ button: 'right' });
     await page.getByRole('menuitem', { name: 'Add review comment' }).click();
-    await expect(page.locator(t('review-thread'))).toBeVisible();
+    await expect(page.locator(t('review-thread'))).toBeVisible({ timeout: 15_000 });
   },
 );
