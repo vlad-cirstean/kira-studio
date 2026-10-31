@@ -1350,7 +1350,11 @@ export type CommentAnchor =
   /** The commented lines no longer exist; `range` is as of `anchorSha`. */
   | 'removed'
   /** History was rewritten and no mapping exists; `range` is as of `anchorSha`. */
-  | 'stale';
+  | 'stale'
+  /** Written against uncommitted worktree content; `range` is as of that content. */
+  | 'uncommitted';
+
+export type ReviewCommentOrigin = 'commit' | 'working';
 
 export interface ReviewComment {
   readonly id: number;
@@ -1370,6 +1374,8 @@ export interface ReviewComment {
   readonly repliedAt: number | null; // unix millis
   /** Last send to an agent, unix millis. */
   readonly sentAt: number | null;
+  /** P418: `working` = written on uncommitted worktree content. */
+  readonly origin: ReviewCommentOrigin;
 }
 
 export type ReviewCommentKind = 'change' | 'question';

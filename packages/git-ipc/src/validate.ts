@@ -200,7 +200,9 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P370: 53 -> 54, additive. New requests 'changeRequest.reviewState', 'changeRequest.submitReview' and 'changeRequest.comment' (review a change request, comment on its conversation).
 // P392: 54 -> 55, additive. 'changeRequest.reviewState' gains optional 'number' (a known change request skips the branch lookup).
 // P413: 55 -> 56, additive. New request 'review.comment.edit' (replace a comment's body and kind).
-export const CONTRACT_VERSION = 56;
+// P418: 56 -> 57, additive. 'ReviewComment' gains 'origin' ('commit' | 'working'); 'CommentAnchor' gains
+// 'uncommitted' (a comment written on uncommitted worktree content).
+export const CONTRACT_VERSION = 57;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

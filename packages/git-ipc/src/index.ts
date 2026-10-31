@@ -79,6 +79,7 @@ export type {
   RevertPreflight,
   ReviewComment,
   ReviewCommentKind,
+  ReviewCommentOrigin,
   ReviewCommentState,
   ReviewDeltaSource,
   ReviewDiffMode,
