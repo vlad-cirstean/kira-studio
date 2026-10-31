@@ -7,11 +7,12 @@ import { t } from '@theme/i18n';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import QueryState from '@workbench/components/QueryState.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
-import { computed, watch } from 'vue';
+import { computed, useTemplateRef, watch } from 'vue';
 import ProofChangePanel from './ProofChangePanel.vue';
 import ProofCompare from './ProofCompare.vue';
 import ProofHeader from './ProofHeader.vue';
 import ProofHistory from './ProofHistory.vue';
+import ProofScreenshotMenu from './ProofScreenshotMenu.vue';
 import ProofStepView from './ProofStepView.vue';
 import { useProofSession, useProofSessions, useProofSync } from './queries';
 import { useProofWindowStore } from './state';
@@ -19,6 +20,7 @@ import { createProofTabHost, type ProofTab, proofTabId } from './tabHost';
 
 // Three panes like the Kira Space review window: sessions (left) and the step tabs (centre).
 const store = useProofWindowStore();
+const centre = useTemplateRef<HTMLElement>('centre');
 useProofSync();
 const sessions = useProofSessions();
 const session = useProofSession(() => store.sessionId);
@@ -106,7 +108,9 @@ const right = useLiveSize(
 
 <template>
   <div class="flex h-full flex-col" data-testid="proof-window">
-    <ProofHeader v-if="detail" :detail="detail" :steps="revision?.steps.length ?? 0" />
+    <ProofHeader v-if="detail" :detail="detail" :steps="revision?.steps.length ?? 0">
+      <ProofScreenshotMenu :target="centre" :tabs="tabs" :session-name="detail.name" />
+    </ProofHeader>
     <div v-else class="h-titlebar shrink-0 bg-chrome" />
     <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
       <section
@@ -125,6 +129,7 @@ const right = useLiveSize(
         v-bind="left.bind"
       />
       <section
+        ref="centre"
         class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-kira border border-border bg-bg"
         :aria-label="t('studio.proof.session.aria')"
         data-testid="proof-centre"

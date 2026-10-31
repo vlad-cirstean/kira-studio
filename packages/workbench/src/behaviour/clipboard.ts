@@ -63,6 +63,23 @@ export async function copyOrReportErrorLazy(
   }
 }
 
+/**
+ * Copies a PNG that is still being rendered. The clipboard item holds the pending blob, so the
+ * write starts inside the user gesture while the screenshot is taken.
+ */
+export async function copyImageOrReportErrorLazy(
+  png: Promise<Blob>,
+  onError: (message: string) => void,
+  onSuccess?: () => void,
+): Promise<void> {
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    onSuccess?.();
+  } catch (err) {
+    onError(errorText(err));
+  }
+}
+
 /** Reads clipboard text; throws when the permission is denied or the window is unfocused. */
 export function readClipboardText(): Promise<string> {
   return navigator.clipboard.readText();

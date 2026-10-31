@@ -13211,6 +13211,33 @@
           "label": "{count} step | {count} steps"
         }
       },
+      "shot": {
+        "copied": {
+          "announce": "Screenshot copied"
+        },
+        "copy": {
+          "label": "Copy screenshot",
+          "tooltip": "Copy a screenshot of this tab"
+        },
+        "copyAll": {
+          "label": "Copy all tabs"
+        },
+        "failed": {
+          "error": "Couldn’t take the screenshot: {error}"
+        },
+        "more": {
+          "aria": "Screenshot options"
+        },
+        "save": {
+          "label": "Save tab as PNG…"
+        },
+        "saveAll": {
+          "label": "Save all tabs as PNG…"
+        },
+        "saved": {
+          "announce": "Saved to {path}"
+        }
+      },
       "tabs": {
         "aria": "Proof steps"
       }

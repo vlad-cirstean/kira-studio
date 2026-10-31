@@ -57,6 +57,7 @@ watch(
       pageMounted.value = true;
     } catch (err) {
       pageError.value = errorText(err);
+      store.markReady(key);
     }
   },
   { immediate: true },
@@ -77,7 +78,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col" data-testid="proof-step" :data-step-key="key">
+  <div
+    class="flex h-full min-h-0 flex-col"
+    data-testid="proof-step"
+    :data-step-key="key"
+    :data-ready="store.ready[key] ? 'true' : 'false'"
+  >
     <QueryState :query="step">
       <template #default="{ data }">
         <EmptyState
