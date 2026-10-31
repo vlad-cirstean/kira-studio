@@ -3,6 +3,7 @@ package adeflow_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -111,15 +112,24 @@ func TestOpsAde(t *testing.T) {
 		if call.Module != oplog.ModuleADE || call.Trigger != oplog.TriggerMCP || call.Source != "MCP request_branches" || call.Command == nil {
 			t.Fatalf("mcp op = %+v", call)
 		}
-		var child bool
+		var child oplog.Record
 		for _, r := range opsNow(t, f.app) {
 			if r.Category == oplog.CategoryGit && r.ParentID == call.ID {
-				child = true
+				child = r
 			}
 		}
-		if !child {
-			t.Error("no git op is a child of the MCP call")
+		if child.ID == "" {
+			t.Fatal("no git op is a child of the MCP call")
 		}
+		if child.Kind != "worktreeAdd" || child.Module != oplog.ModuleADE || len(child.Steps) == 0 || child.Command == nil {
+			t.Fatalf("child op = %+v, want an ade worktreeAdd with steps", child)
+		}
+		slug := regexp.MustCompile(`kira/(\w+)`).FindStringSubmatch(*child.Command)
+		if slug == nil {
+			t.Fatalf("no kira/<id> branch in %q", *child.Command)
+		}
+		f.app.Contract(t, opsScenario, "record#child", child, flowharness.Mask("id", "startedAt", "durationMs", "parentId", "taskId"),
+			flowharness.Replace(f.app.Work, "<work>"), flowharness.Replace(slug[1], "<branch-id>"))
 		f.app.Contract(t, opsScenario, "record#mcp", call, opMask)
 		noAppModule(t, opsNow(t, f.app))
 	})

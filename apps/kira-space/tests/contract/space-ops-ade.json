@@ -1,4 +1,68 @@
 {
+  "record#child": {
+    "background": false,
+    "cancellable": false,
+    "category": "git",
+    "command": "git worktree add -b kira/<branch-id> -- <home>/wt/api/<branch-id> refs/remotes/origin/main",
+    "durationMs": 0,
+    "error": null,
+    "id": "<masked>",
+    "kind": "worktreeAdd",
+    "module": "ade",
+    "parentId": "<masked>",
+    "repeat": 1,
+    "repoName": "api",
+    "repoRoot": "<work>/api",
+    "source": "Kira Space ade board",
+    "startedAt": "<masked>",
+    "status": "ok",
+    "steps": [
+      {
+        "argv": "git for-each-ref '--format=%(refname)%00%(objectname)%00%(objecttype)%00%(upstream)%00%(upstream:track)%00%(committerdate:unix)%00%(HEAD)%00%(*objectname)%00%(worktreepath)%00%(taggername)%00%(taggerdate:unix)%00' --sort=-committerdate '--exclude=refs/remotes/*/HEAD' refs/heads refs/remotes",
+        "durationMs": 0,
+        "exitCode": 0,
+        "readOnly": true,
+        "status": "ok",
+        "stderr": null
+      },
+      {
+        "argv": "git for-each-ref '--format=%(refname)%00%(objectname)%00%(objecttype)%00%(upstream)%00%(upstream:track)%00%(committerdate:unix)%00%(HEAD)%00%(*objectname)%00%(worktreepath)%00%(taggername)%00%(taggerdate:unix)%00%(contents:subject)%00%(contents:body)%00' --sort=-v:refname refs/tags",
+        "durationMs": 0,
+        "exitCode": 0,
+        "readOnly": true,
+        "status": "ok",
+        "stderr": null
+      },
+      {
+        "argv": "git show -s --decorate=full -z --format=%H%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%D%x00%s refs/remotes/origin/main --",
+        "durationMs": 0,
+        "exitCode": 0,
+        "readOnly": true,
+        "status": "ok",
+        "stderr": null
+      },
+      {
+        "argv": "git worktree add -b kira/<branch-id> -- <home>/wt/api/<branch-id> refs/remotes/origin/main",
+        "durationMs": 0,
+        "exitCode": 0,
+        "readOnly": false,
+        "status": "ok",
+        "stderr": null
+      },
+      {
+        "argv": "git status --porcelain=v2 --branch --untracked-files=normal -z",
+        "durationMs": 0,
+        "exitCode": 0,
+        "readOnly": true,
+        "status": "ok",
+        "stderr": null
+      }
+    ],
+    "stepsDropped": 0,
+    "subject": "",
+    "taskId": "<masked>",
+    "trigger": "mcp"
+  },
   "record#mcp": {
     "background": false,
     "cancellable": false,
