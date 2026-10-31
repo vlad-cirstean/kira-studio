@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude/hooks"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/linewriter"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -142,6 +144,7 @@ func (p *Provider) RunHeadless(ctx context.Context, spec harness.HeadlessSpec, h
 	if cmd.Env == nil {
 		cmd.Env = os.Environ()
 	}
+	cmd.Env = append(slices.Clone(cmd.Env), hooks.MCPToolTimeoutEnv)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdin = strings.NewReader(spec.Prompt)
 	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)

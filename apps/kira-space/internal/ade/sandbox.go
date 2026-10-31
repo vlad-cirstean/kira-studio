@@ -81,6 +81,13 @@ func (b *TaskBoard) sandboxInput(run model.AdeRun, l agentLaunch, sd adewire.Ste
 		return in, err
 	}
 	in.Branch = map[string]string{l.worktree: sb.Name}
+	if sb.Name == "" {
+		allow, err := b.requestedWorktreeDirs(sb.TaskID)
+		if err != nil {
+			return in, err
+		}
+		in.Allow = append(slices.Clone(in.Allow), allow...)
+	}
 	switch {
 	case l.path == l.worktree:
 		in.Worktrees = []string{l.worktree}
@@ -90,6 +97,37 @@ func (b *TaskBoard) sandboxInput(run model.AdeRun, l agentLaunch, sd adewire.Ste
 		in.Worktrees, in.Read = []string{l.worktree}, append(slices.Clone(in.Read), l.path)
 	}
 	return in, nil
+}
+
+// requestedWorktreeDirs are the per-repo folders new worktrees land in, for every unnamed branch of the
+// task. A run that starts at a repo root asks for its branches later through request_branches and must
+// reach the worktrees it gets; the folders are created so the policy can resolve them.
+func (b *TaskBoard) requestedWorktreeDirs(taskID string) ([]string, error) {
+	rows, err := b.deps.Tasks.BranchesOfTask(taskID)
+	if err != nil {
+		return nil, err
+	}
+	var dirs []string
+	for _, row := range rows {
+		if row.Kind != model.AdeBranchKindMine || row.Name != "" {
+			continue
+		}
+		rec, err := b.deps.CodeRepos.Get(row.CodeRepoID)
+		if err != nil {
+			return nil, err
+		}
+		if rec == nil {
+			continue
+		}
+		dir := filepath.Join(b.deps.HomeDir, "wt", safeSegment(rec.Name))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		if !slices.Contains(dirs, dir) {
+			dirs = append(dirs, dir)
+		}
+	}
+	return dirs, nil
 }
 
 // prepareSandbox resolves and prepares the run's sandbox and stores its row. It returns nil when the
