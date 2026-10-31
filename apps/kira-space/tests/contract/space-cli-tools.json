@@ -34,6 +34,52 @@
         }
       },
       {
+        "cli": "Azure CLI (az)",
+        "kind": "host",
+        "label": "Azure Repos",
+        "provider": "azure",
+        "setup": {
+          "docsUrl": "https://learn.microsoft.com/azure/devops/cli/",
+          "steps": [
+            {
+              "command": "brew install azure-cli",
+              "purpose": "install"
+            },
+            {
+              "command": "az extension add --name azure-devops",
+              "purpose": "extension"
+            },
+            {
+              "command": "az login",
+              "purpose": "login"
+            },
+            {
+              "command": "az devops login --organization https://dev.azure.com/<your-org>",
+              "purpose": "loginToken"
+            },
+            {
+              "command": "az devops configure --defaults organization=https://dev.azure.com/<your-org> project=<your-project>",
+              "purpose": "defaults"
+            },
+            {
+              "command": "az devops project list --top 1",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "",
+          "kind": "notFound",
+          "path": "<masked>",
+          "probed": [
+            "az (on PATH)"
+          ],
+          "reason": "Azure CLI is unavailable — install `az` to see Azure Repos pull requests",
+          "site": "",
+          "version": ""
+        }
+      },
+      {
         "cli": "Atlassian CLI (acli)",
         "kind": "tracker",
         "label": "Jira",
@@ -110,6 +156,52 @@
         }
       },
       {
+        "cli": "Azure CLI (az)",
+        "kind": "host",
+        "label": "Azure Repos",
+        "provider": "azure",
+        "setup": {
+          "docsUrl": "https://learn.microsoft.com/azure/devops/cli/",
+          "steps": [
+            {
+              "command": "brew install azure-cli",
+              "purpose": "install"
+            },
+            {
+              "command": "az extension add --name azure-devops",
+              "purpose": "extension"
+            },
+            {
+              "command": "az login",
+              "purpose": "login"
+            },
+            {
+              "command": "az devops login --organization https://dev.azure.com/<your-org>",
+              "purpose": "loginToken"
+            },
+            {
+              "command": "az devops configure --defaults organization=https://dev.azure.com/<your-org> project=<your-project>",
+              "purpose": "defaults"
+            },
+            {
+              "command": "az devops project list --top 1",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "",
+          "kind": "notFound",
+          "path": "<masked>",
+          "probed": [
+            "az (on PATH)"
+          ],
+          "reason": "Azure CLI is unavailable — install `az` to see Azure Repos pull requests",
+          "site": "",
+          "version": ""
+        }
+      },
+      {
         "cli": "Atlassian CLI (acli)",
         "kind": "tracker",
         "label": "Jira",
@@ -179,6 +271,52 @@
           "reason": "",
           "site": "",
           "version": "2.42.0"
+        }
+      },
+      {
+        "cli": "Azure CLI (az)",
+        "kind": "host",
+        "label": "Azure Repos",
+        "provider": "azure",
+        "setup": {
+          "docsUrl": "https://learn.microsoft.com/azure/devops/cli/",
+          "steps": [
+            {
+              "command": "brew install azure-cli",
+              "purpose": "install"
+            },
+            {
+              "command": "az extension add --name azure-devops",
+              "purpose": "extension"
+            },
+            {
+              "command": "az login",
+              "purpose": "login"
+            },
+            {
+              "command": "az devops login --organization https://dev.azure.com/<your-org>",
+              "purpose": "loginToken"
+            },
+            {
+              "command": "az devops configure --defaults organization=https://dev.azure.com/<your-org> project=<your-project>",
+              "purpose": "defaults"
+            },
+            {
+              "command": "az devops project list --top 1",
+              "purpose": "check"
+            }
+          ]
+        },
+        "status": {
+          "account": "",
+          "kind": "notFound",
+          "path": "<masked>",
+          "probed": [
+            "az (on PATH)"
+          ],
+          "reason": "Azure CLI is unavailable — install `az` to see Azure Repos pull requests",
+          "site": "",
+          "version": ""
         }
       },
       {

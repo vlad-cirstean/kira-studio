@@ -62,8 +62,8 @@ func TestCliTools(t *testing.T) {
 	// 1. gh is ready, acli is installed but signed out; hosts come before trackers, each with its steps.
 	app.Contract(t, "space-cli-tools", "args:IssueTrackerService.Tools", bridge.ToolsArgs{Refresh: true})
 	first := tools(false)
-	if len(first.Tools) != 2 || first.Tools[0].Kind != "host" || first.Tools[1].Kind != "tracker" {
-		t.Fatalf("tools = %+v, want the host then the tracker", first.Tools)
+	if len(first.Tools) != 3 || first.Tools[0].Kind != "host" || first.Tools[1].Kind != "host" || first.Tools[2].Kind != "tracker" {
+		t.Fatalf("tools = %+v, want the hosts then the tracker", first.Tools)
 	}
 	gh, jr := toolOf(t, first, "github"), toolOf(t, first, "jira")
 	if gh.Status.Kind != "ok" || gh.Status.Account != "octocat" || gh.Status.Version != "2.42.0" || gh.Label != "GitHub" || gh.CLI != "GitHub CLI (gh)" {

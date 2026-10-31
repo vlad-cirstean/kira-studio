@@ -437,4 +437,6 @@ func (f *Forge) Setup() clisetup.Setup {
 	}
 }
 
-func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status { return f.Status(ctx, githost.Repo{Host: Host}) }
+func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status {
+	return f.Status(ctx, githost.Repo{Host: Host})
+}

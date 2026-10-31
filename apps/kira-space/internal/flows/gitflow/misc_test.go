@@ -235,8 +235,8 @@ func TestNoRemoteAndPr(t *testing.T) {
 	if info := call[gitrpc.GitHostInfoResult](t, r.gs, "gitHost.info", gitrpc.GitHostInfoParams{RepoID: id}); info.Host != nil {
 		t.Fatalf("gitHost.info without a remote = %+v, want null", info.Host)
 	}
-	if p := call[githost.Providers](t, r.gs, "gitHost.providers", struct{}{}); len(p.Providers) != 1 || p.Providers[0].ID != "github" {
-		t.Fatalf("gitHost.providers = %+v, want github", p)
+	if p := call[githost.Providers](t, r.gs, "gitHost.providers", struct{}{}); len(p.Providers) != 2 || p.Providers[0].ID != "github" || p.Providers[1].ID != "azure" {
+		t.Fatalf("gitHost.providers = %+v, want github, azure", p)
 	}
 
 	repo.AddRemote("https://gitlab.example.com/team/proj.git")

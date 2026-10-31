@@ -27,6 +27,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/azure"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
+	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
@@ -77,7 +80,7 @@ type Options struct {
 	MobileDetect func() (lannet.Network, error)
 	MobileFind   func(lannet.Identity) (lannet.Network, error)
 	MobilePoll   time.Duration
-	// GitHosts are the registered code-host providers; nil means the real GitHub provider alone.
+	// GitHosts are the registered code-host providers; nil means GitHub and Azure Repos with their real CLIs.
 	GitHosts *githost.Registry
 	// IssueTracker seams the Jira provider's acli locator, runner and clock; the zero value is production's
 	// (a flow-test seam). Its ChangeRequests is set by the wiring.
@@ -206,7 +209,11 @@ func Build(opts Options) *Wired {
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()
 	w.SetAppFocused(w.Windows.AnyFocused)
-	git := wireGit(repositories, opts.Locator, opts.GitHosts, opts.ChangeRequestSync)
+	hosts := opts.GitHosts
+	if hosts == nil {
+		hosts = githostproviders.New(github.Options{}, azure.New(azure.Options{}))
+	}
+	git := wireGit(repositories, opts.Locator, hosts, opts.ChangeRequestSync)
 	git.trackers = wireTrackers(repositories, git.registry.Hosts.Registry, git.opLog, opts.IssueTracker)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
