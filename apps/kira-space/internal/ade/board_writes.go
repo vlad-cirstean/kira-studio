@@ -27,6 +27,10 @@ var ErrInvalidInput = errors.New("ade: invalid input")
 // maps it to E_CONFLICT.
 var ErrStale = errors.New("ade: task moved on")
 
+// ErrWorkingChanged marks a working-review write built from file content that has since changed;
+// the bridge maps it to E_CONFLICT.
+var ErrWorkingChanged = errors.New("ade: working file changed")
+
 func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidInput, fmt.Sprintf(format, args...))
 }

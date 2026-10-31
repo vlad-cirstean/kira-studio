@@ -207,10 +207,29 @@ export function workingReviewSource(args: {
     transport ??= gitTransportFor(target.codeRepoId);
     return transport;
   };
+  // Hash of the content the user last saw; the server refuses a write built on newer content.
+  let contentHash: string | undefined;
+  const reloadOnConflict = async (write: () => Promise<unknown>): Promise<void> => {
+    try {
+      await write();
+    } catch (err) {
+      if ((err as { code?: string }).code === 'E_CONFLICT') {
+        notifyReviewRepaint({
+          kind: 'mark',
+          scope: 'working',
+          repoId: gitRepoId,
+          branch,
+          paths: [path],
+        });
+      }
+      throw err;
+    }
+  };
   return {
     branch,
     async loadDiff() {
       const r = await control.adeTaskReviewWorkingFile({ branchId, path });
+      contentHash = r.contentHash;
       return toLoad(r.body, r.reviewedRanges, r.lineCount);
     },
     async loadComments() {
@@ -224,12 +243,15 @@ export function workingReviewSource(args: {
       );
     },
     async mark(range, reviewed) {
-      await control.adeTaskReviewWorkingMark({
-        branchId,
-        paths: [path],
-        reviewed,
-        ranges: [range],
-      });
+      await reloadOnConflict(() =>
+        control.adeTaskReviewWorkingMark({
+          branchId,
+          paths: [path],
+          reviewed,
+          ranges: [range],
+          contentHash,
+        }),
+      );
       notifyReviewRepaint({
         kind: 'mark',
         scope: 'working',
@@ -239,7 +261,9 @@ export function workingReviewSource(args: {
       });
     },
     async addComment(range, body, kind) {
-      await control.adeTaskReviewWorkingCommentAdd({ branchId, path, range, body, kind });
+      await reloadOnConflict(() =>
+        control.adeTaskReviewWorkingCommentAdd({ branchId, path, range, body, kind, contentHash }),
+      );
       notifyReviewRepaint({ kind: 'comments', repoId: gitRepoId, branch });
     },
     ...idMutations(lease, gitRepoId, branch),

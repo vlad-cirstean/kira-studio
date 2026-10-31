@@ -1023,6 +1023,8 @@ type ReviewWorkingFileReview struct {
 	ReviewedRanges []gitreview.LineRange  `json:"reviewedRanges"`
 	LineCount      int                    `json:"lineCount"`
 	ContentKind    string                 `json:"contentKind"`
+	// ContentHash identifies the worktree content the diff shows; send it back with a mark or comment.
+	ContentHash string `json:"contentHash"`
 }
 
 // ReviewWorkingMarkArgs marks or unmarks uncommitted files. Ranges (one path only, worktree line
@@ -1032,6 +1034,9 @@ type ReviewWorkingMarkArgs struct {
 	Paths    []string              `json:"paths"`
 	Reviewed bool                  `json:"reviewed"`
 	Ranges   []gitreview.LineRange `json:"ranges"`
+	// ContentHash, when set (one path only), is the ReviewWorkingFileReview hash the caller saw;
+	// E_CONFLICT when the file has changed since.
+	ContentHash string `json:"contentHash,omitempty"`
 }
 
 // ReviewWorkingMarkFile is the status of one path after a mark.
@@ -1058,6 +1063,9 @@ type ReviewWorkingCommentAddArgs struct {
 	Range    gitreview.LineRange `json:"range"`
 	Body     string              `json:"body"`
 	Kind     string              `json:"kind"`
+	// ContentHash, when set, is the ReviewWorkingFileReview hash the caller saw; E_CONFLICT when
+	// the file has changed since.
+	ContentHash string `json:"contentHash,omitempty"`
 }
 
 // ReviewWorkingDiffArgs names one uncommitted file of a branch's worktree.

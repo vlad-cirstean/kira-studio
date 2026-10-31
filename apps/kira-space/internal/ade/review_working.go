@@ -126,6 +126,7 @@ func (b *TaskBoard) ReviewWorkingFile(ctx context.Context, branchID, path string
 	}
 	return adewire.ReviewWorkingFileReview{
 		Path: res.Path, Body: res.Body, ReviewedRanges: res.ReviewedRanges, LineCount: res.LineCount, ContentKind: res.ContentKind,
+		ContentHash: cur.Hash,
 	}, nil
 }
 
@@ -144,6 +145,9 @@ func (b *TaskBoard) ReviewWorkingMark(ctx context.Context, args adewire.ReviewWo
 		_, cur, err := w.read(ctx, path)
 		if err != nil {
 			return adewire.ReviewWorkingMarkResult{}, err
+		}
+		if args.ContentHash != "" && args.ContentHash != cur.Hash {
+			return adewire.ReviewWorkingMarkResult{}, ErrWorkingChanged
 		}
 		st, err := w.entry.MarkWorkingFile(ctx, w.branch, path, cur, w.head, args.Reviewed, args.Ranges)
 		if err != nil {
@@ -184,6 +188,9 @@ func (b *TaskBoard) ReviewWorkingCommentAdd(ctx context.Context, args adewire.Re
 	cur, err := w.current(ctx, args.Path)
 	if err != nil {
 		return gitsession.CommentEntry{}, err
+	}
+	if args.ContentHash != "" && args.ContentHash != cur.Hash {
+		return gitsession.CommentEntry{}, ErrWorkingChanged
 	}
 	return w.entry.AddWorkingComment(ctx, w.branch, args.Path, cur, w.head, args.Range, args.Body, args.Kind)
 }

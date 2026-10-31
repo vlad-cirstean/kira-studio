@@ -1249,6 +1249,9 @@
         "workflowUnreadable": {
           "body": "Can’t read the file ({detail})."
         },
+        "workingChanged": {
+          "body": "The file changed while you reviewed it. Refresh the diff."
+        },
         "yamlTooLarge": {
           "body": "The workflow file is too large."
         }

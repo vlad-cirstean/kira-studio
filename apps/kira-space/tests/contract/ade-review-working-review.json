@@ -113,6 +113,7 @@
       ],
       "kind": "text"
     },
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
     "contentKind": "text",
     "lineCount": 5,
     "path": "base.txt",
@@ -178,6 +179,7 @@
       ],
       "kind": "text"
     },
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
     "contentKind": "text",
     "lineCount": 5,
     "path": "base.txt",
@@ -199,6 +201,7 @@
   "args:AdeTaskService.ReviewWorkingCommentAdd": {
     "body": "why bang?",
     "branchId": "<id:1>",
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
     "kind": "question",
     "path": "base.txt",
     "range": {
@@ -215,6 +218,7 @@
   },
   "args:AdeTaskService.ReviewWorkingMark": {
     "branchId": "<id:1>",
+    "contentHash": "d646f59a2a995834b2c0a3ba7096036b9b352bdd20d9aaa4c1783697c7bf8b55",
     "paths": [
       "base.txt"
     ],

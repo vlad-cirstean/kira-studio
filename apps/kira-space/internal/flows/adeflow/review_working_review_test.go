@@ -46,8 +46,22 @@ func TestReviewWorkingReview(t *testing.T) {
 	}
 	app.Contract(t, contract, "AdeTaskService.ReviewWorkingFile#unreviewed", file)
 
+	if file.ContentHash == "" {
+		t.Fatal("file review has no content hash")
+	}
+	staleArgs := adewire.ReviewWorkingMarkArgs{
+		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}}, ContentHash: "stale",
+	}
+	if _, err := app.W.AdeTask.ReviewWorkingMark(ctx, staleArgs); errCode(err) != "E_CONFLICT" {
+		t.Fatalf("mark on changed content = %v, want E_CONFLICT", err)
+	}
+	if _, err := app.W.AdeTask.ReviewWorkingCommentAdd(ctx, adewire.ReviewWorkingCommentAddArgs{
+		BranchID: br.ID, Path: "base.txt", Range: gitreview.LineRange{Start: 3, End: 3}, Body: "x", Kind: "change", ContentHash: "stale",
+	}); errCode(err) != "E_CONFLICT" {
+		t.Fatalf("comment on changed content = %v, want E_CONFLICT", err)
+	}
 	markArgs := adewire.ReviewWorkingMarkArgs{
-		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}},
+		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}}, ContentHash: file.ContentHash,
 	}
 	app.Contract(t, contract, "args:AdeTaskService.ReviewWorkingMark", markArgs)
 	marked, err := app.W.AdeTask.ReviewWorkingMark(ctx, markArgs)
@@ -72,7 +86,7 @@ func TestReviewWorkingReview(t *testing.T) {
 		flowharness.Mask("head", "reviewedAt", "reviewedAtSha"), flowharness.Replace(wt, "<worktree>"))
 
 	addArgs := adewire.ReviewWorkingCommentAddArgs{
-		BranchID: br.ID, Path: "base.txt", Range: gitreview.LineRange{Start: 3, End: 3}, Body: "why bang?", Kind: "question",
+		BranchID: br.ID, Path: "base.txt", Range: gitreview.LineRange{Start: 3, End: 3}, Body: "why bang?", Kind: "question", ContentHash: file.ContentHash,
 	}
 	app.Contract(t, contract, "args:AdeTaskService.ReviewWorkingCommentAdd", addArgs)
 	added, err := app.W.AdeTask.ReviewWorkingCommentAdd(ctx, addArgs)

@@ -97,6 +97,7 @@ var adeTaskCatalog = []struct {
 	{gitsession.ErrRangedMarkOnNonText, ipcerr.CodeBadRequest, "backend.space.gitrpc.rangedMarkNeedsText.body"},
 	{gitsession.ErrCommentNotText, ipcerr.CodeBadRequest, "backend.space.gitrpc.commentNeedsText.body"},
 	{gitsession.ErrCommentRangeOutOfFile, ipcerr.CodeBadRequest, "backend.space.gitrpc.commentRangePastEnd.body"},
+	{ade.ErrWorkingChanged, ipcerr.CodeConflict, "backend.space.ade.workingChanged.body"},
 	{ade.ErrWorkflowChanged, ipcerr.CodeConflict, "backend.space.ade.workflowChanged.body"},
 	{ade.ErrSetupPending, ipcerr.CodePreparing, "backend.space.ade.setupPending.body"},
 	{repos.ErrBranchOnTask, ipcerr.CodeConflict, "backend.space.ade.branchOnTask.body"},

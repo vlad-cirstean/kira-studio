@@ -18,6 +18,7 @@ const file = (variant: 'reviewed' | 'unreviewed') =>
     path: string;
     body: { hunks: { lines: { kind: string; text: string }[] }[] };
     reviewedRanges: { start: number; end: number }[];
+    contentHash: string;
   }>(SCENARIO, `AdeTaskService.ReviewWorkingFile#${variant}`);
 const markResult = contract<{ files: { path: string; review: object }[] }>(
   SCENARIO,
@@ -140,6 +141,7 @@ reviewTest('a working tab is badged and its hunk mark reviews the lines', async 
     paths: [PATH],
     reviewed: true,
     ranges: (markArgs as { ranges: object[] }).ranges,
+    contentHash: file('unreviewed').contentHash,
   });
   // The committed review never hears about it.
   expect(await gitStreamParams(page, 'review.mark')).toHaveLength(0);
@@ -169,6 +171,7 @@ reviewTest(
       branchId: target.branchId,
       path: PATH,
       body: (addArgs as { body: string }).body,
+      contentHash: file('unreviewed').contentHash,
     });
     expect(await gitStreamParams(page, 'review.comment.add')).toHaveLength(0);
   },

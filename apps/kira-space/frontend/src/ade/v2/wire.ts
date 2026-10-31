@@ -740,12 +740,14 @@ export interface ReviewWorkingFileReview {
   reviewedRanges: LineRange[] /* worktree line numbers */;
   lineCount: number;
   contentKind: string /* 'text' | 'binary' | 'tooLarge' | 'absent' */;
+  contentHash: string /* worktree content the diff shows; echo it on mark and comment */;
 }
 export interface ReviewWorkingMarkArgs {
   branchId: string;
   paths: string[];
   reviewed: boolean;
   ranges: LineRange[] | null /* one path only; null = the whole file */;
+  contentHash?: string /* one path only; E_CONFLICT when the file changed since */;
 }
 export interface ReviewWorkingMarkResult {
   files: { path: string; review: ReviewFileStatus }[];
@@ -759,6 +761,7 @@ export interface ReviewWorkingCommentAddArgs {
   range: LineRange;
   body: string;
   kind: ReviewCommentKind;
+  contentHash?: string /* E_CONFLICT when the file changed since */;
 }
 export interface ReviewAgentState {
   session: Session | null;

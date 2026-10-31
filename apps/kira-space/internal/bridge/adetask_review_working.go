@@ -54,6 +54,9 @@ func (s *AdeTaskService) ReviewWorkingMark(ctx context.Context, args adewire.Rev
 			return adewire.ReviewWorkingMarkResult{}, adeTaskInvalid("path is required")
 		}
 	}
+	if args.ContentHash != "" && len(args.Paths) != 1 {
+		return adewire.ReviewWorkingMarkResult{}, adeTaskInvalid("contentHash needs exactly one path")
+	}
 	if args.Ranges != nil {
 		if len(args.Paths) != 1 {
 			return adewire.ReviewWorkingMarkResult{}, adeTaskInvalid("ranges need exactly one path")
