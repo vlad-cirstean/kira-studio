@@ -26,6 +26,7 @@ import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
 import AdeStatusPicker from './AdeStatusPicker.vue';
 import AdeTaskBranchMenu from './AdeTaskBranchMenu.vue';
+import AdeTaskIssueLine from './AdeTaskIssueLine.vue';
 import AdeWorkflowBlock from './AdeWorkflowBlock.vue';
 import { useLinkFields } from './useLinkFields';
 
@@ -140,6 +141,12 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         @save="links.saveJira"
         @clear="links.clearJira"
       />
+      <template v-if="jira">
+        <dt />
+        <dd class="min-w-0"
+          ><AdeTaskIssueLine :task-id="task.id" :link="`${jira.key} ${jira.url}`" /></dd
+        >
+      </template>
       <AdeLinkRow
         id="ade-task-host"
         :label="hostLabels.labels.value"

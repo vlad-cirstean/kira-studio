@@ -7,26 +7,17 @@ import QueryState from '@workbench/components/QueryState.vue';
 import { computed } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeChip from '../AdeChip.vue';
-import type { Tone } from '../board/actions';
 import { useRemoveArtifact, useTaskArtifacts } from '../queries';
 import type { Artifact } from '../wire';
 import AdeArtifactAdd from './AdeArtifactAdd.vue';
+import { gapText } from './gapText';
+import { artifactStatusLabel, artifactStatusTone } from './status';
 
 // Everything a task produced or points at: detected rows (links, branches, change requests,
 // deployments) mirror git and the host; stored rows (agent or user reports) can be removed.
 const props = defineProps<{ taskId: string; readonly?: boolean; compact?: boolean }>();
 const query = useTaskArtifacts(() => props.taskId);
 const remove = useRemoveArtifact();
-
-const STATUS_TONE: Record<string, Tone> = {
-  open: 'blue',
-  merged: 'green',
-  deployed: 'green',
-  pushed: 'blue',
-  closed: 'grey',
-  local: 'grey',
-  stale: 'amber',
-};
 
 const KIND_LABEL = {
   changeRequest: 'common.gitHost.changeRequest.label',
@@ -36,18 +27,10 @@ const KIND_LABEL = {
   doc: 'space.ade.artifacts.kind.doc.label',
   link: 'space.ade.artifacts.kind.link.label',
 } as const;
-const STATUS_LABEL: Record<string, MessageKey> = {
-  open: 'common.action.open.label',
-  merged: 'common.merged.status',
-  closed: 'common.closed.status',
-  deployed: 'space.ade.branchPanel.state.deployed.status',
-  stale: 'common.stale.status',
-  pushed: 'space.ade.artifacts.status.pushed.status',
-  local: 'space.ade.artifacts.status.local.status',
-};
 const SOURCE_LABEL: Record<string, MessageKey> = {
   task: 'common.task.label',
   host: 'common.gitHost.label',
+  jira: 'common.product.jira.label',
   git: 'common.module.git.label',
   agent: 'memory.common.origin.agent.label',
   user: 'common.picker.you.label',
@@ -55,10 +38,6 @@ const SOURCE_LABEL: Record<string, MessageKey> = {
 
 const gaps = computed(() => query.data.value?.gaps ?? []);
 
-function statusLabel(status: string): string {
-  const key = STATUS_LABEL[status];
-  return key ? t(key) : status;
-}
 function sourceLabel(a: Artifact): string {
   const key = SOURCE_LABEL[a.source];
   return key ? t(key) : a.source;
@@ -80,15 +59,11 @@ function openLink(e: MouseEvent, url: string): void {
     <QueryState :query="query">
       <Alert
         v-for="g in gaps"
-        :key="`${g.source}:${g.repo}`"
+        :key="`${g.source}:${g.repo}:${g.reason ?? ''}`"
         variant="warn"
         data-testid="ade-artifact-gap"
       >
-        <AlertDescription>{{
-          g.repo
-            ? t('space.ade.artifacts.gap.body', { source: g.source, repo: g.repo })
-            : t('space.ade.artifacts.gapNoRepo.body', { source: g.source })
-        }}</AlertDescription>
+        <AlertDescription>{{ gapText(g) }}</AlertDescription>
       </Alert>
       <div
         v-if="!query.data.value?.artifacts.length"
@@ -131,8 +106,8 @@ function openLink(e: MouseEvent, url: string): void {
           }}</span>
           <AdeChip
             v-if="a.status"
-            :label="statusLabel(a.status)"
-            :tone="STATUS_TONE[a.status] ?? 'grey'"
+            :label="artifactStatusLabel(a.status)"
+            :tone="artifactStatusTone(a.status)"
           />
           <span
             class="ml-auto shrink-0 text-kira-sm text-subtle"

@@ -24,7 +24,7 @@ interface ArtifactFx {
 }
 interface ResultFx {
   artifacts: ArtifactFx[];
-  gaps: { source: string; repo: string }[];
+  gaps: { source: string; repo: string; reason?: string; count?: number }[];
 }
 
 const recorded = (key: string) => contract<ResultFx>('ade-artifacts', key);
@@ -64,7 +64,7 @@ test('contract: the Artifacts tab lists every row with kind, status and source',
   await expect(deployment).toContainText('Deployed');
   await expect(deployment.locator(t('ade-artifact-source'))).toHaveText('Git');
   await expect(rows.filter({ hasText: 'KIRA-12' }).locator(t('ade-artifact-source'))).toHaveText(
-    'Task',
+    'Jira',
   );
   await expect(
     rows.filter({ hasText: 'Preview env' }).locator(t('ade-artifact-source')),
@@ -73,7 +73,9 @@ test('contract: the Artifacts tab lists every row with kind, status and source',
   const stored = res.artifacts.filter((a) => a.id).length;
   await expect(page.locator(t('ade-artifact-remove'))).toHaveCount(stored);
   await expect(pr.locator(t('ade-artifact-remove'))).toHaveCount(0);
-  await expect(page.locator(t('ade-artifact-gap'))).toHaveCount(0);
+  const gap = page.locator(t('ade-artifact-gap'));
+  await expect(gap).toHaveCount(1);
+  await expect(gap).toContainText('The Jira command line tool isn’t installed');
 });
 
 test('contract: Add sends AddArtifact with the form values', async ({ relaunch }) => {
@@ -125,13 +127,16 @@ test('contract: remove on a stored row sends RemoveArtifact; detected rows have 
 
 test('contract: a failed source shows a warning above the list', async ({ relaunch }) => {
   const res = withIds(recorded('AdeTaskService.Artifacts#gap'));
-  expect(res.gaps).toHaveLength(1);
+  expect(res.gaps).toHaveLength(2);
   const { window: page } = await openPlan(relaunch, [snapshot(res)]);
   await openTask(page, 'T_alerts');
   await page.locator(t('ade-panel-tab-artifacts')).click();
-  const gap = page.locator(t('ade-artifact-gap'));
-  await expect(gap).toHaveCount(1);
-  await expect(gap).toContainText(`Couldn’t read ${res.gaps[0]?.source} for ${res.gaps[0]?.repo}`);
+  const gaps = page.locator(t('ade-artifact-gap'));
+  await expect(gaps).toHaveCount(2);
+  const host = res.gaps.find((g) => !g.reason);
+  await expect(gaps.first()).toContainText(`Couldn’t read ${host?.source} for ${host?.repo}`);
+  await expect(gaps.nth(1)).toContainText('The Jira command line tool isn’t installed');
+  await expect(gaps.nth(1)).toContainText('under CLI tools');
   await expect(page.locator(t('ade-artifact-row'))).not.toHaveCount(0);
 });
 

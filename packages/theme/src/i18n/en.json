@@ -7069,7 +7069,34 @@
           "body": "No artifacts yet. Branches, pull requests and deployments show up as the task produces them."
         },
         "gap": {
-          "body": "Couldn’t read {source} for {repo}. The list may be incomplete."
+          "body": "Couldn’t read {source} for {repo}. The list may be incomplete.",
+          "changeRequestsFailed": {
+            "body": "Couldn’t search the code host for pull requests of {source}. The list may be incomplete."
+          },
+          "changeRequestsMissing": {
+            "body": "{source} counts {count} more pull request than found here. Links made only in commit messages aren’t found. | {source} counts {count} more pull requests than found here. Links made only in commit messages aren’t found."
+          },
+          "changeRequestsUnauthenticated": {
+            "body": "Searching for pull requests needs a sign-in to the code host. Sign in from settings, under CLI tools."
+          },
+          "changeRequestsUnavailable": {
+            "body": "Searching for pull requests needs the code host command line tool. Set it up in settings, under CLI tools."
+          },
+          "notFound": {
+            "body": "{source} has no such issue, or you don’t have access to it."
+          },
+          "otherSite": {
+            "body": "This link is on a different {source} site than the one you’re signed in to."
+          },
+          "timeout": {
+            "body": "{source} didn’t answer in time. The list may be incomplete."
+          },
+          "unauthenticated": {
+            "body": "You’re not signed in to {source}. Sign in from settings, under CLI tools."
+          },
+          "unavailable": {
+            "body": "The {source} command line tool isn’t installed. Set it up in settings, under CLI tools."
+          }
         },
         "gapNoRepo": {
           "body": "Couldn’t read {source}. The list may be incomplete."
@@ -8690,6 +8717,14 @@
         },
         "issue": {
           "label": "Issue"
+        },
+        "issueLine": {
+          "prs": {
+            "label": "{count} pull request | {count} pull requests"
+          },
+          "prsNone": {
+            "label": "No pull requests"
+          }
         },
         "jiraPlaceholder": {
           "placeholder": "Paste Jira link or key"

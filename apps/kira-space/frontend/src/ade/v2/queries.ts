@@ -81,6 +81,7 @@ const candidatesKey = (codeRepoId: string) => ['adetask', 'candidates', codeRepo
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const handoversPrefix = ['adetask', 'handovers'] as const;
 export const artifactsPrefix = ['adetask', 'artifacts'] as const;
+export const issuePrefix = ['adetask', 'issue'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
 
@@ -450,6 +451,18 @@ export function useTaskArtifacts(taskId: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: [...artifactsPrefix, taskId] as const,
     queryFn: () => control.adeTaskArtifacts({ taskId: toValue(taskId) }),
+  });
+}
+
+/**
+ * The issue a task links, as its tracker reports it. The tracker caches for a minute, so the same
+ * window keeps a remount from asking again; a board push refetches it.
+ */
+export function useTaskIssue(taskId: MaybeRefOrGetter<string>, link: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...issuePrefix, taskId, link] as const,
+    queryFn: () => control.adeTaskIssue({ taskId: toValue(taskId) }),
+    staleTime: 60_000,
   });
 }
 
