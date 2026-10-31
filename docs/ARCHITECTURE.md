@@ -727,7 +727,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - The tone vocabulary is ok, warn, error, info (Badge, Alert, StatusDot); neutral is muted text. Chips tint /16, banners /10 with /20 border; app code never writes a tone alpha.
 - Error sentences use FieldError and list/popover lines use InlineState; Alert takes icon and strip and no layout classes.
 - A boolean that applies on flip is a Switch; an option in a form committed by a button is a Checkbox (14px box).
-- Use Tooltip for hints, never native title; the theme provider owns the 400ms delay. Shortcuts use Kbd.
+- Use Tooltip for hints, never native title; the theme provider owns the 400ms delay. Shortcuts use Kbd. A tooltip with several facts uses TooltipDetails (title, label/value rows, hint); a joined sentence of facts is not allowed.
 - Loading uses Spinner; Skeleton only where the layout is known.
 - Grey has three roles: text-muted-foreground for secondary content, text-subtle for tertiary chrome, text-disabled for absence markers.
 - Card inset holds text only, because its bg-field fill hides an Input, Select or Checkbox; Card section holds controls.
@@ -1320,7 +1320,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - CodiconIcon size must be one of 12, 13, 16, 24; RunState is a Spinner at size 12 or a StatusDot error.
 - .kira-prose in base.css is the one prose layer.
 - Elevation tiers: Popover z-(--kira-z-popover) + shadow-kira; Dialog, overlay, CommandDialog z-(--kira-z-dialog) + shadow-kira-dialog; DropdownMenu z-(--kira-z-menu) + shadow-kira; Tooltip z-(--kira-z-tooltip) with no shadow; in-pane layers z-1..3.
-- TooltipContent has two variants: `default` (inverted ground, arrow, plain text) and `surface` (elevated popover ground, no arrow, no shadow) for rich content using the ADE tones, which are dark-only. A branch chip inside a default tooltip renders neutral via `data-chip="branch"`.
+- TooltipContent has two variants sharing one ground (elevated, ring, shadow, no arrow, sideOffset 4, fade only): `default` (padded, max-w-sm, plain text, `\n` breaks lines) and `surface` (layout only, caller pads) for rich content using the ADE tones, which are dark-only. A branch chip inside a default tooltip renders neutral via `data-chip="branch"`.
 - Density scale is 0.5, 1, 1.5, 2, 3, 4; 0.25/1.25/1.75/2.5/3.5 are not allowed anywhere. Dialog width uses size variants only.
 - With DialogContent dirty, outside click is ignored, and Esc and the header X ask the discard confirm; footer Cancel never asks.
 - Every host (Studio, Space, Space mobile, git-ui mount()) calls provideShellServices(app) from bootstrapShell.ts once per createApp, providing CONFIRM_DISCARD_KEY backed by the confirm store, because theme cannot import the store.
@@ -1564,13 +1564,14 @@ packaged app does not), where the identical application code runs unchanged over
 - On darwin the memory metric is ri_phys_footprint read via proc_pid_rusage(pid, RUSAGE_INFO_V2) per pid per tick, matching Activity Monitor's "Memory" column, rather than pti_resident_size (RSS), because summing RSS counts shared pages (dyld shared cache, WebKit framework text) once per process.
 - On non-darwin platforms the memory metric sums RSS.
 - The status bar CPU readout uses the normalized convention (0…100, share of the machine's whole capacity, matching Activity Monitor's CPU-load pane), not the per-process "% CPU" column's unnormalized per-core sum (0…100×N).
-- The normalized status bar CPU figure is up to logicalCPUs times smaller than Activity Monitor's per-process % CPU column; this is expected, not a bug. The hover tooltip (StatusBar.vue) shows only numbers (cores/memory/process count/interval) since P22 D11.
+- The normalized status bar CPU figure is up to logicalCPUs times smaller than Activity Monitor's per-process % CPU column; this is expected, not a bug. The hover tooltip (AppMetricsItem) is a TooltipDetails listing app name, CPU, cores, memory, processes and the 5s interval.
 
 - A normalized CPU percentage is a share of total core-seconds, not of compute capability, so four E cores at 1 GHz and four P cores at 4.5 GHz can both read 400%.
 - The app matches Activity Monitor's CPU accounting, which ignores core frequency and P/E asymmetry; the limitation is in the underlying % CPU/ri_user_time accounting and cannot be fixed by reading something else.
 - The old Node-engine-over-stdio hop JSON.stringify'd every frame; a TypedArray serialized as an object keyed "0","1",…, which is why a reviveChunks decode step existed.
 - P58a M2 measured the Node engine's index-keyed JSON inflating a chunk 10.872x on the wire and 40.9x in transient heap, versus 1.334x and 6.86x for Go's base64 encoding (P58 D5).
 - P11 replaced base64 with a FlatBuffers frame decoded as zero-copy typed-array views, adding +0.01–1.7% over raw buffer bytes with no transient heap copy on decode; no kind uses base64 today.
+- The status bar is 22px (`--kira-statusbar-h`); every item is a StatusBarItem (icon, tone, text, `tip` slot) in the interface font. Kira Space's right group is agents, runs, update, metrics. The agents item (`ade/v2/status/`) shows `N agents · M needs input` from `useSessions` and opens a popover list sorted by activity rank; a row opens the session through `useOpenSession`, the footer opens the needs page with `adeBoardUi.showAllSessions`.
 - The update check and in-app install (P66, P119) are shared by both apps. The status bar's right-hand group can show an update-available item, placed first so the app-metrics readout keeps its position.
 - Clicking the update item, or a new version becoming available while the app is open, opens a modal UpdateDialog.vue with an Update button. P119 deliberately replaced Kira Studio's click-opens-the-release-page behavior with this dialog.
 - Repo-root internal/appupdate.Checker, moved out of Kira Studio's internal/ at P119 so Kira Space can share it, makes one plain net/http GET against the kira-studio GitHub releases/latest API and imports nothing under either app's internal/.
@@ -2363,7 +2364,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - A usage window whose reset time has passed is dropped on read.
 - The last usage numbers persist atomically to <KIRA_SPACE_HOME>/agent-usage.json (0600) and reload at start.
 - Setting agent.usageEnabled (default on): when off, no statusLine is injected into new launches, the usage item is hidden, and Get returns off; it applies only to launches after the change.
-- Frontend usage display: state/agentUsage.ts (TanStack Query, 60 s poll, push replaces the cache) and workbench/AgentUsageItem.vue (tones at 80 and 95 percent), shown in ADE mode only.
+- Frontend usage display: state/agentUsage.ts (TanStack Query, 60 s poll, push replaces the cache) and workbench/AgentUsageItem.vue (StatusBarItem; tooltip rows for session window and weekly, tones at 80 and 95 percent), shown in ADE mode only.
 - Usage limit tests: flows/usageflow (statusline through the real shim and socket, run stream through the board) and tests/ui/agent-usage.spec.ts.
 
 ### Worktree setup
@@ -2396,6 +2397,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Hiding is bound to CodeWorkspaceService.SetRepoHidden and AdeTaskService.SetFolderHidden.
 - "Remove repository…" lives in the dialog's repo head (ViewToolbar) and always goes through confirmRemoveCodeRepo, which names the scan folder that would re-import the repo.
 - Session tabs (P193) are named "<step> · <repo>" (headless) or "<step> · <repo|spec>" (TUI), from the session's own stepId; review keeps "Review agent".
+- `sessions/useOpenSession.ts` is the one path that opens a session (terminal id from `useSessions`); needs actions and the status bar agents list call it.
 - Session tabs show state and age in a tooltip. Right-click menu (`sessions/useSessionMenu.ts`) has Copy session ID and, for a running TUI, Restart: `AdeTaskService.RestartSession` stops the record (`Tracker.Stop`, no grace wait), closes the terminal, then runs Take over on it.
 - The task context menu (P198, board/taskMenu.ts, plan/useTaskMenu.ts) opens by right-click, Shift+F10 or the panel tab row's More actions button, and is built on existing calls.
 - The menu primitive is the workbench singleton ContextMenu.vue (shadcn-vue DropdownMenu), used by every right-click menu in both apps.
