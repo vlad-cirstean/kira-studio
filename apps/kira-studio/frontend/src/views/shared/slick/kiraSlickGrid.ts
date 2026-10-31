@@ -704,6 +704,13 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     return { top: start, bottom: end, leftPx, rightPx };
   }
 
+  /** Re-reads the viewport's scroll offsets and renders for them: after a caller set
+   *  `scrollTop`/`scrollLeft` directly (restoring a saved position), before the scroll event lands. */
+  syncToViewportScroll(): void {
+    this.handleScroll();
+    this.render();
+  }
+
   /** `render()` is fully synchronous (no `await`, no `setTimeout`, no `requestIdleCallback`
    *  anywhere between `_handleScroll` and `onRendered` firing), so the caller already has the
    *  duration in hand; report it straight to `scrollTrace.noteRenderMs` instead of approximating
