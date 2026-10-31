@@ -26,7 +26,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Done |
 | P420 Part 2 | Kira Studio validation proof: window UI, view-state persistence, screenshot, UI spec, visual baselines, docs | Done |
 | P421 | Code review (2 rounds) | Done |
-| P422 | Close chapter v0.2.23 | Todo |
+| P422 | Close chapter v0.2.23 | Done |
 
 ## Rows
 
@@ -203,3 +203,5 @@ Two rounds. Each round: one Opus review over the full diff since `main` (base: t
 ### P422 Close chapter v0.2.23
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
+
+**Result.** Chapter closed. Folded by hand into `docs/HISTORY.md`; `docs/v0.2.23/` removed. PR opened to `main` by the orchestrator.
