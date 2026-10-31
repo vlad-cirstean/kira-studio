@@ -10,6 +10,6 @@
   },
   "CodeWorkspaceService.WriteFile#conflict": {
     "code": "E_CONFLICT",
-    "message": "The file changed on disk. Reload it or overwrite it."
+    "message": "The file changed on disk. Refresh it or overwrite it."
   }
 }
