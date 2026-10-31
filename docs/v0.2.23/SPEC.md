@@ -20,8 +20,9 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P415 | Operations panel: shared git primitives, all git ops, session and MCP ops | Todo |
 | P416 | Move automation runs into Operations panel | Todo |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Todo |
-| P418 | Code review (1 round) | Todo |
-| P419 | Close chapter v0.2.23 | Todo |
+| P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
+| P419 | Code review (1 round) | Todo |
+| P420 | Close chapter v0.2.23 | Todo |
 
 ## Rows
 
@@ -126,10 +127,16 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - Put `acli` behind an issue-tracker abstraction: more trackers come later.
 - Settings gets a section on how to install and log in to `gh` and `acli`.
 
-### P418 Code review (1 round)
+### P418 Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default
+
+- Review window also shows uncommitted changes, and they can be reviewed (comments, hunk checks) like committed ones.
+- Clear separation between committed and uncommitted work.
+- Agent panel in the review window is off by default.
+
+### P419 Code review (1 round)
 
 One Opus review over the full diff since `main` (base: the chapter's branch point). Findings file under `plans/`, then one Sonnet fixer.
 
-### P419 Close chapter v0.2.23
+### P420 Close chapter v0.2.23
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
