@@ -38,10 +38,10 @@ var (
 
 // stepKeys are the keys beyond id, name, kind, status and skip that each step kind allows.
 var stepKeys = map[string][]string{
-	adewire.KindAgent:  {"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox"},
+	adewire.KindAgent:  {"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox", "settings"},
 	adewire.KindScript: {"command", "runs_on", "before", "results", "max_returns", "timeout"},
-	adewire.KindReview: {"review", "runs_on", "before", "results", "max_returns", "timeout", "sandbox"},
-	adewire.KindManual: {"session", "prompt"},
+	adewire.KindReview: {"review", "runs_on", "before", "results", "max_returns", "timeout", "sandbox", "settings"},
+	adewire.KindManual: {"session", "prompt", "settings"},
 }
 
 var allStepKeys = func() []string {
@@ -227,7 +227,7 @@ func (v *validator) workflow(root *yaml.Node) adewire.Workflow {
 
 // step reads one step. It returns the step and its declared result nodes (nil when it declares none).
 func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[string]bool) (adewire.WorkflowStep, *resultNodes) {
-	step := adewire.WorkflowStep{Results: []adewire.StepResult{}, AllowedTools: make([]string, 0), Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
+	step := adewire.WorkflowStep{Results: []adewire.StepResult{}, AllowedTools: make([]string, 0), Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(), Settings: map[string]map[string]string{}}
 	sm := v.fields(sn, sp, allStepKeys...)
 	if v.err != nil {
 		return step, nil
@@ -249,7 +249,7 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 		v.fail(sm["kind"], sp, "kind must be agent, script, review or manual")
 		return step, nil
 	}
-	for _, k := range []string{"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox", "review", "command", "session"} {
+	for _, k := range []string{"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox", "settings", "review", "command", "session"} {
 		if n, has := sm[k]; has && !slices.Contains(allowed, k) {
 			v.fail(n, sp, "%s is not allowed on %s steps", k, step.Kind)
 			return step, nil
@@ -269,6 +269,13 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 			step.Prompt = v.str(sm, sp, "prompt", false)
 		} else if n, has := sm["prompt"]; has {
 			v.fail(n, sp, "prompt is not allowed on %s steps without a session", step.Kind)
+		}
+		if n, has := sm["settings"]; has && v.err == nil {
+			if step.Session {
+				step.Settings = v.settings(n, sp)
+			} else {
+				v.fail(n, sp, "settings is not allowed on %s steps without a session", step.Kind)
+			}
 		}
 		return step, nil
 	}
@@ -300,6 +307,9 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 	v.maxReturns(sm, sp, &step)
 	if n, has := sm["sandbox"]; has && v.err == nil {
 		step.Sandbox = v.sandbox(n, sp)
+	}
+	if n, has := sm["settings"]; has && v.err == nil {
+		step.Settings = v.settings(n, sp)
 	}
 	return step, rn
 }
@@ -422,6 +432,81 @@ func (v *validator) sandbox(n *yaml.Node, sp string) adewire.StepSandbox {
 		v.fail(n, sp, "sandbox off takes no other keys")
 	}
 	return sb
+}
+
+// stageCatalog is every registered agent's stage settings. The set is static, so parsing needs no registry.
+var stageCatalog = providers.StageCatalog()
+
+// settings reads a step's settings block: agent id, then setting key, then value. An empty block reads as none.
+func (v *validator) settings(n *yaml.Node, sp string) map[string]map[string]string {
+	out := map[string]map[string]string{}
+	if n.Kind != yaml.MappingNode {
+		v.fail(n, sp, "settings must be a mapping")
+		return out
+	}
+	ids := make([]string, len(stageCatalog))
+	for i, set := range stageCatalog {
+		ids[i] = set.ID
+	}
+	if k := unknownKey(n, ids); k != nil {
+		v.fail(k, sp, "settings: unknown agent %q (known: %s)", k.Value, strings.Join(ids, ", "))
+		return out
+	}
+	agents := v.fields(n, sp, ids...)
+	if v.err != nil {
+		return out
+	}
+	for _, set := range stageCatalog {
+		an, has := agents[set.ID]
+		if !has {
+			continue
+		}
+		if an.Kind != yaml.MappingNode {
+			v.fail(an, sp, "settings.%s must be a mapping", set.ID)
+			return out
+		}
+		keys := make([]string, len(set.Settings))
+		for i, s := range set.Settings {
+			keys[i] = s.Key
+		}
+		if k := unknownKey(an, keys); k != nil {
+			v.fail(k, sp, "settings.%s: unknown setting %q", set.ID, k.Value)
+			return out
+		}
+		vals := v.fields(an, sp, keys...)
+		if v.err != nil {
+			return out
+		}
+		for _, s := range set.Settings {
+			vn, has := vals[s.Key]
+			if !has {
+				continue
+			}
+			val, ok := "", false
+			if vn.Kind == yaml.ScalarNode {
+				val, ok = s.Parse(vn.Value)
+			}
+			if !ok {
+				v.fail(vn, sp, "settings.%s.%s must be a whole number from %d to %d", set.ID, s.Key, s.Min, s.Max)
+				return out
+			}
+			if out[set.ID] == nil {
+				out[set.ID] = map[string]string{}
+			}
+			out[set.ID][s.Key] = val
+		}
+	}
+	return out
+}
+
+// unknownKey returns the first plain-word key of mapping n outside allowed, nil when none.
+func unknownKey(n *yaml.Node, allowed []string) *yaml.Node {
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if k := n.Content[i]; k.Kind == yaml.ScalarNode && !slices.Contains(allowed, k.Value) {
+			return k
+		}
+	}
+	return nil
 }
 
 // sandboxPaths reads a list of absolute or ~/ paths.
