@@ -22,7 +22,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P416 | Move automation runs into Operations panel | Done |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
-| P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
+| P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Done |
 | P420 Part 1 | Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests | Todo |
 | P420 Part 2 | Kira Studio validation proof: window UI, view-state persistence, screenshot, UI spec, visual baselines, docs | Todo |
 | P421 | Code review (2 rounds) | Todo |
@@ -165,6 +165,8 @@ Historical runs, success or failed, live in the Operations panel. Automation pan
 - Read only by default; an Edit button switches to edit mode.
 - Save via a Save button or a keyboard shortcut.
 - No autocomplete or other editor extras.
+
+**Result.** Git module files are editable. Files open read only; Edit on a worktree `repo-file` tab (not revision-pinned, diff or local-file) switches Monaco to `EDIT_OPTIONS` with every editor extra off (incl. Ctrl/Cmd+Space no-ops). Save via button or Cmd/Ctrl+S; Done asks to discard when dirty. `CodeWorkspaceService.ReadFileForEdit` returns content plus SHA-256 hash (kind `notUtf8` for non-UTF-8); `WriteFile` checks the base hash under a mutex, answers `E_CONFLICT` for changed or deleted files, replaces atomically via renameio keeping mode, BOM and EOL, refuses text over 8 MiB. Conflict alert offers Refresh or Overwrite (Overwrite on a deleted file recreates it). Edit state in `state/fileEdit.ts`; draft survives tab switches in the cached Monaco model; dirty tabs ask on close and show a badge. External changes caught by a window-focus re-check, no watcher. Tests: `repoflow.TestEditFile` (contract `repo-file-edit.json`, concurrent-save race), `repo-file-edit.spec.ts` 9; Go, Space UI 870, mobile, visual, lint pass. Fixed flaky `repo-graph-refresh.spec.ts` (1 s polls to 15 s). Quit with unsaved edit discards silently: Known open item.
 
 ### P420 Part 1: Kira Studio validation proof: storage, MCP tools, bridge, window plumbing, notification, flow + claude tests
 
