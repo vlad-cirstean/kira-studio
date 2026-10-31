@@ -5,28 +5,38 @@ import type { Page } from '@playwright/test';
 
 /**
  * `lazy` also captures `clipboard.write` of ClipboardItems (console "Copy all"). Off by default:
- * Monaco's own copy calls `write` too and fails on the stub.
+ * Monaco's own copy calls `write` too and fails on the stub. `image` captures `image/png` items
+ * as blobs in `window.__clipboardImages` instead (the proof window's screenshot copy).
  */
 export async function installClipboardSpy(
   page: Page,
-  opts: { lazy?: boolean } = {},
+  opts: { lazy?: boolean; image?: boolean } = {},
 ): Promise<void> {
-  await page.evaluate((lazy) => {
-    const w = window as unknown as { __clipboard: string[] };
-    w.__clipboard = [];
-    navigator.clipboard.writeText = (text: string) => {
-      w.__clipboard.push(text);
-      return Promise.resolve();
-    };
-    if (lazy) {
-      navigator.clipboard.write = async (items: ClipboardItem[]) => {
-        for (const item of items) {
-          const blob = await item.getType('text/plain');
-          w.__clipboard.push(await blob.text());
-        }
+  await page.evaluate(
+    ({ lazy, image }) => {
+      const w = window as unknown as { __clipboard: string[]; __clipboardImages: Blob[] };
+      w.__clipboard = [];
+      w.__clipboardImages = [];
+      navigator.clipboard.writeText = (text: string) => {
+        w.__clipboard.push(text);
+        return Promise.resolve();
       };
-    }
-  }, opts.lazy ?? false);
+      if (lazy) {
+        navigator.clipboard.write = async (items: ClipboardItem[]) => {
+          for (const item of items) {
+            const blob = await item.getType('text/plain');
+            w.__clipboard.push(await blob.text());
+          }
+        };
+      }
+      if (image) {
+        navigator.clipboard.write = async (items: ClipboardItem[]) => {
+          for (const item of items) w.__clipboardImages.push(await item.getType('image/png'));
+        };
+      }
+    },
+    { lazy: opts.lazy ?? false, image: opts.image ?? false },
+  );
 }
 
 export async function lastClipboardWrite(page: Page): Promise<string> {
