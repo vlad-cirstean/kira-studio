@@ -24,7 +24,7 @@ const (
 	ReasonFailed          = "failed"
 )
 
-// Reason maps an Issue error to its reason word; nil maps to ''.
+// Reason maps an Issue error to its reason word; nil maps to the empty string.
 func Reason(err error) string {
 	switch {
 	case err == nil:

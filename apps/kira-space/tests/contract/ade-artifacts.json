@@ -29,7 +29,7 @@
         "kind": "issue",
         "ref": "<masked>",
         "repo": "",
-        "source": "task",
+        "source": "jira",
         "status": "",
         "title": "KIRA-12",
         "url": "https://jira.test/browse/KIRA-12"
@@ -90,7 +90,13 @@
         "url": ""
       }
     ],
-    "gaps": []
+    "gaps": [
+      {
+        "reason": "unavailable",
+        "repo": "",
+        "source": "jira"
+      }
+    ]
   },
   "AdeTaskService.Artifacts#archived": {
     "artifacts": [
@@ -111,7 +117,7 @@
         "kind": "issue",
         "ref": "<masked>",
         "repo": "",
-        "source": "task",
+        "source": "jira",
         "status": "",
         "title": "KIRA-12",
         "url": "https://jira.test/browse/KIRA-12"
@@ -165,6 +171,11 @@
       {
         "repo": "api",
         "source": "host"
+      },
+      {
+        "reason": "unavailable",
+        "repo": "",
+        "source": "jira"
       }
     ]
   },
@@ -187,7 +198,7 @@
         "kind": "issue",
         "ref": "<masked>",
         "repo": "",
-        "source": "task",
+        "source": "jira",
         "status": "",
         "title": "KIRA-12",
         "url": "https://jira.test/browse/KIRA-12"
@@ -252,6 +263,11 @@
       {
         "repo": "api",
         "source": "host"
+      },
+      {
+        "reason": "unavailable",
+        "repo": "",
+        "source": "jira"
       }
     ]
   },

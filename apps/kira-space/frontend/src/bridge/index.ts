@@ -8,6 +8,7 @@ import * as FileHandlersService from '@bindings/filehandlersservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHostService from '@bindings/githostservice.js';
+import * as IssueTrackerService from '@bindings/issuetrackerservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
@@ -69,6 +70,7 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
+import type { CliToolsResult, IssueTrackers } from '../state/cliToolsDomain';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
@@ -419,6 +421,12 @@ const spaceControl = {
     unwrap(AdeTaskService.DismissHandover(args)),
   adeTaskArtifacts: (args: V2.TaskArgs): Promise<V2.ArtifactsResult> =>
     unwrap(AdeTaskService.Artifacts(args)).then((r) => trust<V2.ArtifactsResult>(r)),
+  adeTaskIssue: (args: V2.TaskArgs): Promise<V2.TaskIssue> =>
+    unwrap(IssueTrackerService.TaskIssue(args)).then((r) => trust<V2.TaskIssue>(r)),
+  cliTools: (refresh: boolean): Promise<CliToolsResult> =>
+    unwrap(IssueTrackerService.Tools({ refresh })).then((r) => trust<CliToolsResult>(r)),
+  issueTrackers: (): Promise<IssueTrackers> =>
+    unwrap(IssueTrackerService.Trackers()).then((r) => trust<IssueTrackers>(r)),
   adeTaskAddArtifact: (args: V2.AddArtifactArgs): Promise<V2.Artifact> =>
     unwrap(AdeTaskService.AddArtifact(args)).then((r) => trust<V2.Artifact>(r)),
   adeTaskRemoveArtifact: (args: V2.RemoveArtifactArgs): Promise<void> =>

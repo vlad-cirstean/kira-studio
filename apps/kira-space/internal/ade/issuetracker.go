@@ -167,6 +167,9 @@ func KeyChangeRequests(hosts *githost.Registry, index HeadIndex) func(ctx contex
 				continue
 			}
 			crs, st := s.SearchChangeRequests(ctx, key, keySearchLimit)
+			if st.Kind == githost.KindNotFound {
+				continue // a host whose CLI is not installed is a host the user does not use; Settings shows it
+			}
 			if !st.OK() {
 				if failed == nil {
 					failed = searchError(st)
@@ -202,11 +205,8 @@ func keyBoundary(key string) *regexp.Regexp {
 }
 
 func searchError(st githost.Status) error {
-	switch st.Kind {
-	case githost.KindUnauthenticated:
+	if st.Kind == githost.KindUnauthenticated {
 		return fmt.Errorf("%w: %s", issuetracker.ErrUnauthenticated, st.Reason)
-	case githost.KindNotFound:
-		return fmt.Errorf("%w: %s", issuetracker.ErrUnavailable, st.Reason)
 	}
 	return errors.New(st.Reason)
 }

@@ -36,6 +36,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
 	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -56,6 +57,7 @@ type options struct {
 	scheduleTimeout time.Duration
 	clock           scriptruns.Clock
 	noGh            bool
+	issueTracker    *jira.Options
 	gitHosts        []githost.Provider
 	noClaude        bool
 	fileHandlers    filehandlers.Registry
@@ -78,6 +80,10 @@ func WithFileHandlers(r filehandlers.Registry) Opt { return func(o *options) { o
 
 // WithoutGh leaves gh off PATH entirely, system installs included (claude stays the fake).
 func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
+
+// WithIssueTracker replaces the Jira provider's acli seams. Without it the harness finds no acli, so a
+// flow never reaches the host's real one. ChangeRequests is the harness's own.
+func WithIssueTracker(o jira.Options) Opt { return func(opts *options) { opts.issueTracker = &o } }
 
 // WithGitHost registers an extra code-host provider after GitHub.
 func WithGitHost(p githost.Provider) Opt {
@@ -129,6 +135,11 @@ func WithSeed(seed func(*App)) Opt { return func(o *options) { o.seed = seed } }
 
 // noGhLocator finds no gh anywhere, system installs included.
 type noGhLocator struct{}
+
+// noAcliLocator finds no acli anywhere.
+type noAcliLocator struct{}
+
+func (noAcliLocator) Locate() (string, []string, bool) { return "", []string{"acli (on PATH)"}, false }
 
 func (noGhLocator) Locate() (string, []string, bool) { return "", []string{"gh (on PATH)"}, false }
 
@@ -320,9 +331,13 @@ func (a *App) build() {
 	if a.opts.provider != nil {
 		registry = providers.New(a.opts.provider)
 	}
+	tracker := jira.Options{Locator: noAcliLocator{}}
+	if a.opts.issueTracker != nil {
+		tracker = *a.opts.issueTracker
+	}
 	a.W = appwire.Build(appwire.Options{
-		Providers: registry,
-		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, BranchRequestWait: a.opts.branchWait, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
+		Providers: registry, IssueTracker: tracker,
+		GitHosts: githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, BranchRequestWait: a.opts.branchWait, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake, FileHandlers: a.opts.fileHandlers,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

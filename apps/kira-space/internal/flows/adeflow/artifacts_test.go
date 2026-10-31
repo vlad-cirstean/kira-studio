@@ -158,8 +158,8 @@ func TestTaskArtifacts(t *testing.T) {
 	if kinds["changeRequest"] != 1 || kinds["issue"] != 2 || kinds["branch"] != 1 || kinds["deployment"] != 2 || kinds["doc"] != 1 || kinds["link"] != 0 || len(list.Artifacts) != 7 {
 		t.Fatalf("finish_step artifacts = %+v", list.Artifacts)
 	}
-	if len(list.Gaps) != 0 {
-		t.Fatalf("gaps = %+v, want none", list.Gaps)
+	if len(list.Gaps) != 1 || list.Gaps[0].Source != "jira" || list.Gaps[0].Reason != "unavailable" {
+		t.Fatalf("gaps = %+v, want the jira gap only (the harness has no acli)", list.Gaps)
 	}
 	res := artifactsOf(t, app, f.taskID)
 	pr, ok := findArtifact(res, "changeRequest", "Fix login")
@@ -172,7 +172,7 @@ func TestTaskArtifacts(t *testing.T) {
 	if a, ok := findArtifact(res, "deployment", "prod"); !ok || a.Source != "git" || a.Status != "deployed" || len(a.Ref) != 7 {
 		t.Fatalf("deployment = %+v", a)
 	}
-	if a, ok := findArtifact(res, "issue", "KIRA-12"); !ok || a.Source != "task" {
+	if a, ok := findArtifact(res, "issue", "KIRA-12"); !ok || a.Source != "jira" || a.Status != "" {
 		t.Fatalf("jira = %+v", a)
 	}
 	if a, ok := findArtifact(res, "issue", "api#3"); !ok || a.Source != "task" || a.URL != artIssue {
@@ -278,8 +278,8 @@ func TestTaskArtifacts(t *testing.T) {
 	}
 	openLaunch(t, app, second)
 	_, list = mcpReply(t, app, "mcp-handover-2.json")
-	if len(list.Gaps) != 1 || list.Gaps[0].Source != "host" || list.Gaps[0].Repo != "api" {
-		t.Fatalf("gaps = %+v, want one host gap for api", list.Gaps)
+	if len(list.Gaps) != 2 || list.Gaps[0].Source != "host" || list.Gaps[0].Repo != "api" || list.Gaps[1].Source != "jira" {
+		t.Fatalf("gaps = %+v, want a host gap for api and the jira gap", list.Gaps)
 	}
 	if err := os.WriteFile(hold2, nil, 0o644); err != nil {
 		t.Fatal(err)

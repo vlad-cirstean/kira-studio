@@ -24,6 +24,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
+	trackerproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -93,6 +96,14 @@ type gitWired struct {
 	askpassBroker *gitaskpass.Broker
 	router        *gitrpc.Router
 	opLog         *oplog.Log
+	trackers      *issuetracker.Registry
+}
+
+// wireTrackers builds the issue tracker registry. Jira finds the pull requests that name an issue key
+// through the code hosts' search and the change request index.
+func wireTrackers(repositories *repos.Repos, hosts *githost.Registry, o jira.Options) *issuetracker.Registry {
+	o.ChangeRequests = ade.KeyChangeRequests(hosts, repositories.GitHostChangeRequests)
+	return trackerproviders.New(o)
 }
 
 // wireTracker constructs and starts the ade.Tracker and the harness.Hooks hub it drives, wired
@@ -199,6 +210,7 @@ func wireAdeTask(
 		Tasks: repositories.AdeTasks, Statuses: repositories.AdeStatuses, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
 		Registry:        git.registry,
+		Trackers:        git.trackers,
 		GitStatus:       func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
 		Askpass:         git.askpassBroker,
 		Workflows:       &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
