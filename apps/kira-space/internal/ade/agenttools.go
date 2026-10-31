@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"strings"
 	"time"
 
@@ -459,4 +460,21 @@ func (b *TaskBoard) automationOutcomes(taskID string, q agentmcp.OutcomeQuery) (
 		out = append(out, entry)
 	}
 	return out, nil
+}
+
+// RunGit runs one checked git command of the agent git tool through the shared runner, so it uses
+// the git.gitPath setting, the spawn hygiene and the op log like every other git spawn. Output is
+// stdout then stderr, not interleaved.
+func (b *TaskBoard) RunGit(ctx context.Context, dir string, argv []string) (string, int, error) {
+	status := b.deps.GitStatus(ctx)
+	if status.Kind != "ok" && status.Kind != "tooOld" {
+		return "", 0, fmt.Errorf("git is unavailable: %s", status.Kind)
+	}
+	res, err := gitclient.Run(ctx, b.deps.Runner, status.Path, gitclient.Spec{
+		Dir: dir, Args: append([]string{"--no-pager"}, argv...), Setsid: true,
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	return string(res.Stdout) + string(res.Stderr), res.ExitCode, nil
 }

@@ -1,12 +1,9 @@
 package agentmcp
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -285,30 +282,20 @@ func checkPush(rest []string) error {
 	return nil
 }
 
+// GitRunner runs one checked git command in a worktree through the app's shared git runner.
+// argv is the subcommand and its arguments (no -C, no --no-pager: the runner adds them). A non-zero
+// exit is reported through exitCode with a nil err; err means git did not run to completion.
+type GitRunner interface {
+	RunGit(ctx context.Context, dir string, argv []string) (output string, exitCode int, err error)
+}
+
 // gitArgv is the argv after `git` for a checked args.
-func gitArgv(worktree string, args []string) []string {
-	out := []string{"-C", worktree, "--no-pager"}
-	out = append(out, args[0])
+func gitArgv(args []string) []string {
+	out := []string{args[0]}
 	if c, ok := gitCmds[args[0]]; ok && c.plain {
 		out = append(out, "--no-ext-diff", "--no-textconv")
 	}
 	return append(out, args[1:]...)
-}
-
-func runGit(ctx context.Context, worktree string, args []string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, gitTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", gitArgv(worktree, args)...)
-	cmd.Env = append(os.Environ(), "GIT_EDITOR=true", "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat")
-	cmd.WaitDelay = 5 * time.Second
-	var buf bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &buf, &buf
-	err := cmd.Run()
-	out := buf.String()
-	if len(out) > maxGitOutput {
-		out = out[:maxGitOutput] + "\n[output truncated]"
-	}
-	return out, err
 }
 
 func (s *Server) addGitTool(srv *mcp.Server) {
@@ -332,7 +319,15 @@ func (s *Server) addGitTool(srv *mcp.Server) {
 		if err := CheckGitArgs(a.Args, g.Git.Push); err != nil {
 			return toolError(err.Error()), nil, nil
 		}
-		out, err := runGit(ctx, wt, a.Args)
+		runCtx, cancel := context.WithTimeout(ctx, gitTimeout)
+		defer cancel()
+		out, code, err := s.git.RunGit(runCtx, wt, gitArgv(a.Args))
+		if len(out) > maxGitOutput {
+			out = out[:maxGitOutput] + "\n[output truncated]"
+		}
+		if err == nil && code != 0 {
+			err = fmt.Errorf("exit status %d", code)
+		}
 		if err != nil {
 			return toolError(fmt.Sprintf("git %s failed: %v\n%s", a.Args[0], err, out)), nil, nil
 		}

@@ -117,6 +117,8 @@ type Server struct {
 	outcomes Outcomes
 	review   ReviewReplier
 	sandbox  SandboxGit
+	git      GitRunner
+	onCall   func(ctx context.Context, c ToolCall) (context.Context, func(isError bool, text string, err error))
 	handover HandoverRecorder
 	prompts  llmprompts.Source
 
@@ -142,6 +144,11 @@ type Options struct {
 	Review ReviewReplier
 	// SandboxGit runs fetch_remote and push_branch; nil refuses sandbox grants.
 	SandboxGit SandboxGit
+	// Git runs the git tool's commands; nil refuses git grants.
+	Git GitRunner
+	// OnToolCall, when set, records each tools/call: it returns the ctx the handler runs under and
+	// the func that reports the outcome (isError and the tool's text, or a Go error).
+	OnToolCall func(ctx context.Context, c ToolCall) (context.Context, func(isError bool, text string, err error))
 	// Handover stores handover calls; nil means no grant lists the handover tool.
 	Handover HandoverRecorder
 	// Prompts resolves tool and instruction texts; nil means the registry defaults.
@@ -153,7 +160,7 @@ func NewServer(o Options) *Server {
 	if o.Prompts == nil {
 		o.Prompts = llmprompts.Defaults()
 	}
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, handover: o.Handover, prompts: o.Prompts}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, git: o.Git, onCall: o.OnToolCall, handover: o.Handover, prompts: o.Prompts}
 }
 
 type finishArgs struct {
@@ -262,6 +269,7 @@ func (s *Server) buildMCPServer(finish, space, outcomes, git, review, sandbox, h
 	if handover {
 		s.addHandoverTool(srv)
 	}
+	s.recordCalls(srv)
 	return srv
 }
 
@@ -392,6 +400,9 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 		return "", nil, errors.New("agentmcp: grant needs a provider")
 	}
 	if g.Git != nil {
+		if s.git == nil {
+			return "", nil, errors.New("agentmcp: git grant needs a git runner")
+		}
 		wts := make([]string, len(g.Git.Worktrees))
 		for i, w := range g.Git.Worktrees {
 			wts[i] = filepath.Clean(w)
