@@ -14,6 +14,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/mcpcall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
@@ -77,6 +78,8 @@ type Options struct {
 	// Prompts resolves the texts the server shows; nil means the registry defaults. Instructions,
 	// tool and argument descriptions are read once here, so an edit reaches the next session.
 	Prompts llmprompts.Source
+	// OnToolCall, when set, sees every tools/call; nil records nothing.
+	OnToolCall mcpcall.Hook
 }
 
 // Build registers the tools and the prompt. Pure registration: no I/O.
@@ -163,6 +166,7 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 			Content: &mcp.TextContent{Text: rememberText(src, r.Params.Arguments["text"])},
 		}}}, nil
 	})
+	mcpcall.Record(srv, opts.OnToolCall)
 	return srv
 }
 
