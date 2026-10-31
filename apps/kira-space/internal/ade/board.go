@@ -102,6 +102,8 @@ type TaskBoardDeps struct {
 	// policy and denials.
 	Sandbox    agentsandbox.Enforcer
 	RunSandbox *repos.AdeRunSandboxRepo
+	// ArtifactSources append to the built-in task artifact sources (P417's issue tracker).
+	ArtifactSources []ArtifactSource
 	// BranchRequestWait is how long an agent's branch request waits for the user; 0 = defaultBranchRequestWait.
 	BranchRequestWait time.Duration
 	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.

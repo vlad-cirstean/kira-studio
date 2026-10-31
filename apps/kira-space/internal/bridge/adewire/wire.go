@@ -1160,3 +1160,41 @@ type RepoBranches struct {
 	Previous string     `json:"previous"`
 	Branches []BasePick `json:"branches"`
 }
+
+// Artifact is something a task produced or points at: a change request, issue, branch, deployment, doc
+// or link. Detected artifacts (ID "") are derived on read; stored ones carry the row id.
+type Artifact struct {
+	ID        string `json:"id"`
+	Kind      string `json:"kind"` // changeRequest | issue | branch | deployment | doc | link
+	Title     string `json:"title"`
+	URL       string `json:"url"` // '' none
+	Ref       string `json:"ref"` // display ref: #12, PROJ-7, worktree path, short sha, file path
+	Status    string `json:"status"`
+	Repo      string `json:"repo"`   // repo nickname, '' none
+	Source    string `json:"source"` // task | host | git | agent | user, or a tracker id
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// ArtifactGap names a source that failed or timed out; the list is partial.
+type ArtifactGap struct {
+	Source string `json:"source"` // host | git | a tracker id
+	Repo   string `json:"repo"`   // '' when not repo-bound
+}
+
+type ArtifactsResult struct {
+	Artifacts []Artifact    `json:"artifacts"`
+	Gaps      []ArtifactGap `json:"gaps"`
+}
+
+type AddArtifactArgs struct {
+	TaskID string `json:"taskId"`
+	Kind   string `json:"kind"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Ref    string `json:"ref"`
+}
+
+type RemoveArtifactArgs struct {
+	TaskID string `json:"taskId"`
+	ID     string `json:"id"`
+}
