@@ -100,6 +100,27 @@ func (b *TaskBoard) linkedChangeRequest(ctx context.Context, entry *gitsession.R
 	return 0
 }
 
+// changeRequestURL is the web link of the branch's change request: the task link's when it names
+// this repo's, else the host's lookup by branch name. Empty when there is none; a host that is off
+// or down never fails the caller.
+func (b *TaskBoard) changeRequestURL(ctx context.Context, sb model.AdeTaskBranch, hostURL string) string {
+	if sb.Name == "" || (sb.Kind != model.AdeBranchKindMine && sb.Kind != model.AdeBranchKindReview) {
+		return ""
+	}
+	entry, err := b.openRepo(ctx, sb.CodeRepoID)
+	if err != nil {
+		return ""
+	}
+	if n := b.linkedChangeRequest(ctx, entry, hostURL); n > 0 {
+		url, _ := entry.ChangeRequestURL(ctx, n)
+		return url
+	}
+	if res := entry.ResolveBranchChangeRequest(ctx, sb.Name); res.Kind == "ok" && len(res.ChangeRequests) > 0 {
+		return res.ChangeRequests[0].URL
+	}
+	return ""
+}
+
 // reviewableBranch rejects a branch a review cannot target: archived, not mine or review, or not created.
 func (b *TaskBoard) reviewableBranch(tc *taskCtx, sb model.AdeTaskBranch) error {
 	if sb.ArchivedAt != nil {

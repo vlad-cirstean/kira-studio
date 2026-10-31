@@ -421,6 +421,13 @@ func commentVars(comments []gitreview.Comment) []llmprompts.ReviewCommentVar {
 	return out
 }
 
+// roundMessage is the first message of a dedicated review round, with the branch's change request link.
+func (b *TaskBoard) roundMessage(ctx context.Context, rc *reviewCtx, tgt adewire.ReviewWindowTarget, round int, comments []gitreview.Comment) string {
+	v := b.roundVars(rc, tgt, round, comments)
+	v.ChangeRequestURL = b.changeRequestURL(ctx, rc.sb, rc.tc.task.HostURL)
+	return llmprompts.AdeReviewRoundMessage.Text(b.prompts(), v)
+}
+
 func (b *TaskBoard) roundVars(rc *reviewCtx, tgt adewire.ReviewWindowTarget, round int, comments []gitreview.Comment) llmprompts.ReviewRoundVars {
 	return llmprompts.ReviewRoundVars{
 		Title: taskTitle(rc.tc.task, rc.tc.branches), JiraKey: rc.tc.task.JiraKey, JiraURL: rc.tc.task.JiraURL,
@@ -508,7 +515,7 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 		launch.ResumeID = rc.rev.DedicatedClaudeID
 		launch.Prompt = llmprompts.AdeReviewFollowupMessage.Text(b.prompts(), b.roundVars(rc, tgt, round, open))
 	default:
-		launch.Prompt = llmprompts.AdeReviewRoundMessage.Text(b.prompts(), b.roundVars(rc, tgt, round, open))
+		launch.Prompt = b.roundMessage(ctx, rc, tgt, round, open)
 	}
 	if entry, err := b.openRepo(ctx, rc.sb.CodeRepoID); err == nil {
 		if _, tip, err := entry.WorktreeHead(ctx, tgt.Worktree); err == nil {
@@ -781,7 +788,7 @@ func (b *TaskBoard) queueFallback(lost model.AdeRun, spec model.AdeReviewSpec) {
 	next := spec
 	next.Route, next.Fallback, next.HeadAfter, next.AllowedTools = adewire.ReviewSendNew, true, "", nil
 	launch := model.AdeRunLaunch{Note: i18n.T("backend.space.ade.reviewStep.fallback.body", nil)}
-	launch.Prompt = llmprompts.AdeReviewRoundMessage.Text(b.prompts(), b.roundVars(&reviewCtx{tc: tc, sb: sb}, tgt, spec.Round, comments))
+	launch.Prompt = b.roundMessage(b.ctx, &reviewCtx{tc: tc, sb: sb}, tgt, spec.Round, comments)
 	if _, err := b.queueRound(b.ctx, tc, sb, tgt.Worktree, next, launch); err != nil && !errors.Is(err, errBoardClosed) {
 		slog.Warn("ade: review fallback round", "scope", "ade", "run", rv.ID, "err", err)
 	}

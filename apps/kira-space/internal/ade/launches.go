@@ -545,7 +545,7 @@ func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLi
 			if err != nil {
 				return nil, "", nil, err
 			}
-			lines = append(lines, repoLine{Nick: nick, Branch: sb.Name, Base: sb.Base, Worktree: path})
+			lines = append(lines, repoLine{Nick: nick, Branch: sb.Name, Base: sb.Base, Worktree: path, BranchID: sb.ID})
 			if firstOwn < 0 {
 				firstOwn = len(dirs)
 			}
@@ -559,7 +559,7 @@ func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLi
 		if rec == nil {
 			return nil, "", nil, invalid("code repo %s not found", sb.CodeRepoID)
 		}
-		lines = append(lines, repoLine{Nick: nick, ReadOnlyRoot: rec.Root})
+		lines = append(lines, repoLine{Nick: nick, ReadOnlyRoot: rec.Root, BranchID: sb.ID})
 		dirs = append(dirs, rec.Root)
 	}
 	if len(dirs) == 0 {

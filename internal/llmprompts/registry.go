@@ -126,6 +126,8 @@ type RepoLineVars struct {
 	Worktree     string `json:"worktree"`
 	Base         string `json:"base"`
 	ReadOnlyRoot string `json:"readOnlyRoot"`
+	// ChangeRequestURL is the branch's pull or merge request link, in review messages only.
+	ChangeRequestURL string `json:"changeRequestURL"`
 }
 
 // HandoverBlockVars fills the handover block fragment.
@@ -234,6 +236,8 @@ type ReviewRoundVars struct {
 	Worktree string             `json:"worktree"`
 	Round    int                `json:"round"`
 	Comments []ReviewCommentVar `json:"comments"`
+	// ChangeRequestURL is the branch's pull or merge request link, in the round message only.
+	ChangeRequestURL string `json:"changeRequestURL"`
 }
 
 // ResumeVars fills the resume-after-restart message.
@@ -1112,7 +1116,7 @@ var AdeReviewMessage = define(Entry{
 	Default: `Task: {{.Title}}{{if .JiraKey}}
 {{template "ade.jiraLine" .}}{{end}}{{if .Notes}}
 - Notes: {{.Notes}}{{end}}{{range .Repos}}
-{{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{end}}
+{{if .ReadOnlyRoot}}- {{.Repo}}: read only, in {{.ReadOnlyRoot}}{{else}}- {{.Repo}}: {{.Branch}} (base {{.Base}}) worktree {{.Worktree}}{{end}}{{if .ChangeRequestURL}}, PR {{.ChangeRequestURL}}{{end}}{{end}}
 I review these branches in Kira Space and will ask questions about them. Answer from the code; change files only when I ask.{{if .Handover}}
 {{template "ade.handoverBlock" .}}{{end}}
 {{template "headless.space.suffix"}}
@@ -1121,7 +1125,7 @@ I review these branches in Kira Space and will ask questions about them. Answer 
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Notes: "Check the error states.", Handover: "Form wired; validation still missing.", HandoverFrom: "Implement",
 	Repos: []RepoLineVars{
-		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main"},
+		{Repo: "kira-space", Branch: "feat/login", Worktree: "/work/kira-space/feat-login", Base: "main", ChangeRequestURL: "https://github.com/acme/kira-space/pull/42"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
 	},
 })
@@ -1129,6 +1133,7 @@ I review these branches in Kira Space and will ask questions about them. Answer 
 var reviewRoundExample = ReviewRoundVars{
 	Title: "Add login form", JiraKey: "KIRA-42", JiraURL: "https://jira.example.com/browse/KIRA-42",
 	Repo: "kira-space", Branch: "feat/login", Base: "main", Worktree: "/work/kira-space/feat-login", Round: 1,
+	ChangeRequestURL: "https://github.com/acme/kira-space/pull/42",
 	Comments: []ReviewCommentVar{
 		{ID: 3, Kind: "change", Path: "src/login.ts", Lines: "12-14", Body: "Rename this to isValid."},
 		{ID: 4, Kind: "question", Path: "src/login.ts", Lines: "30", Body: "Why retry twice?"},
@@ -1158,7 +1163,8 @@ var AdeReviewRoundMessage = define(Entry{
 	RequiredFragments: []ID{"ade.review.comments"},
 	Default: `Review of task {{.Title}}{{if .JiraKey}}
 {{template "ade.jiraLine" .}}{{end}}
-Repo {{.Repo}}, branch {{.Branch}} (base {{.Base}}), worktree {{.Worktree}}.
+Repo {{.Repo}}, branch {{.Branch}} (base {{.Base}}), worktree {{.Worktree}}.{{if .ChangeRequestURL}}
+PR {{.ChangeRequestURL}}{{end}}
 Read the branch diff against the base first. The reviewer left these comments:
 {{template "ade.review.comments" .}}`,
 }, reviewRoundExample)

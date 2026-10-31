@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -44,6 +45,11 @@ func TestGolden(t *testing.T) {
 		{Repo: "kira-space", Branch: "feat/a", Worktree: "/wt/kira-space/feat-a", Base: "main"},
 		{Repo: "docs", ReadOnlyRoot: "/repos/docs"},
 	}
+	withPR := func(in []RepoLineVars) []RepoLineVars {
+		out := slices.Clone(in)
+		out[0].ChangeRequestURL = "https://github.com/acme/kira-space/pull/42"
+		return out
+	}
 	startCtx := []string{"- Last rebase of feat/a failed: conflicts (run r1; call run_outcome for details)"}
 
 	cases := []struct {
@@ -82,7 +88,7 @@ func TestGolden(t *testing.T) {
 			StepName: "Review", Title: "Add login form", Repos: repos[:1], Handover: "Form wired; validation missing.", HandoverFrom: "Implement",
 		}},
 		{"ade.manual.message.minimal", AdeManualMessage.id, ManualVars{StepName: "Plan", Title: "Add login form", Repos: repos[:1]}},
-		{"ade.review.message.full", AdeReviewMessage.id, ReviewVars{Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: repos}},
+		{"ade.review.message.full", AdeReviewMessage.id, ReviewVars{Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Notes: capped, Repos: withPR(repos)}},
 		{"ade.review.message.minimal", AdeReviewMessage.id, ReviewVars{Title: "Add login form", Repos: repos[:1]}},
 		{"ade.start.message.step", AdeStartMessage.id, StartVars{
 			Title: "Add login form", JiraKey: jiraKey, JiraURL: jiraURL, Repo: "kira-space", Branch: "feat/a",

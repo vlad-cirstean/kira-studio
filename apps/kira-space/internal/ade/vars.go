@@ -84,12 +84,16 @@ type repoLine struct {
 	Base string
 	// ReadOnlyRoot, when set, makes the line a read-only repo in that directory.
 	ReadOnlyRoot string
+	// BranchID is the task branch the line describes.
+	BranchID string
+	// ChangeRequestURL is the branch's pull or merge request link, filled for the review message only.
+	ChangeRequestURL string
 }
 
 func repoLineVars(repos []repoLine) []llmprompts.RepoLineVars {
 	out := make([]llmprompts.RepoLineVars, len(repos))
 	for i, r := range repos {
-		out[i] = llmprompts.RepoLineVars{Repo: r.Nick, Branch: r.Branch, Worktree: r.Worktree, Base: r.Base, ReadOnlyRoot: r.ReadOnlyRoot}
+		out[i] = llmprompts.RepoLineVars{Repo: r.Nick, Branch: r.Branch, Worktree: r.Worktree, Base: r.Base, ReadOnlyRoot: r.ReadOnlyRoot, ChangeRequestURL: r.ChangeRequestURL}
 	}
 	return out
 }

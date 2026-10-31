@@ -1,6 +1,7 @@
 Review of task Add login form
 - Jira: KIRA-42 https://jira.example.com/browse/KIRA-42
 Repo kira-space, branch feat/login (base main), worktree /work/kira-space/feat-login.
+PR https://github.com/acme/kira-space/pull/42
 Read the branch diff against the base first. The reviewer left these comments:
 #3 change src/login.ts:12-14
 Rename this to isValid.

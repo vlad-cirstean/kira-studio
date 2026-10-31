@@ -5846,6 +5846,9 @@
       "cause": {
         "description": "The reason the notice appears."
       },
+      "changeRequestURL": {
+        "description": "The pull or merge request link of the branch. Empty when it has none."
+      },
       "context": {
         "description": "Extra lines added after the prompt, one per entry."
       },
