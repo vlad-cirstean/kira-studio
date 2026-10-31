@@ -160,6 +160,7 @@ type TaskBoard struct {
 	setupLive        map[string]*liveRun        // branch id -> its running prepare script
 	archiving        map[string]int             // task id -> archives in progress; blocks launches
 	taskMus          map[string]*sync.Mutex     // task id -> serializes that task's run transitions
+	envScriptMus     sync.Map                   // code repo id -> *sync.Mutex: one env-script pass per repo at a time
 	finishes         map[string]agentmcp.Finish // run id -> last finish_step call
 	claims           map[string]string          // branch id -> the smart script working in its worktree
 	recoveredRebases []model.AdeRun             // rebase runs Recover interrupted; Start re-reads git for them

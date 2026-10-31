@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -67,6 +68,10 @@ func (b *TaskBoard) RunEnvScripts(ctx context.Context, codeRepoID string) error 
 	if b.deps.Facts == nil {
 		return nil
 	}
+	// A pass that starts after a config edit reads the new config, so the last pass never stores a stale result.
+	mu, _ := b.envScriptMus.LoadOrStore(codeRepoID, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
 	cfg, err := b.repoConfig(codeRepoID)
 	if err != nil {
 		return err
