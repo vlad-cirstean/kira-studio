@@ -13,5 +13,6 @@ export const useOpsStore = createOpLogStore<OpRecord>({
     onUpdate: (cb) => control.onOpUpdate(cb),
     cancel: (id) => control.opsCancel(id),
   },
+  facet: (r) => r.connectionId ?? '',
   searchText: (r) => useConnectionsStore().connectionRecord(r.connectionId)?.name ?? '',
 });
