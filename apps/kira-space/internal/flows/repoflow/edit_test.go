@@ -1,6 +1,7 @@
 package repoflow_test
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -102,7 +103,7 @@ func TestEditFile(t *testing.T) {
 		if _, err := write("win.txt", got.Text, got.Hash); err != nil {
 			t.Fatal(err)
 		}
-		if string(disk("win.txt")) != string(raw) {
+		if !bytes.Equal(disk("win.txt"), raw) {
 			t.Fatalf("disk = %q, want %q", disk("win.txt"), raw)
 		}
 	})
