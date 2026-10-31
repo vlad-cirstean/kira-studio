@@ -8,8 +8,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 |---|---|---|
 | P436 | ADE session tab context menu: close and restart a Claude session | Todo |
 | P437 | ADE sessions dropdown redesign | Todo |
-| P438 | Code review (2 rounds) | Todo |
-| P439 | Close chapter v0.2.25 | Todo |
+| P438 | Rename Automations to Runs | Todo |
+| P439 | Code review (2 rounds) | Todo |
+| P440 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -21,10 +22,16 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 - The sessions dropdown looks ugly and works clunkily. Redesign both looks and interactions.
 
-### P438 Code review (2 rounds)
+### P438 Rename Automations to Runs
+
+- The Automations module is renamed Runs everywhere the user sees it: mode label, tab, panel, dialogs, menus, palette commands, Settings, tooltips, docs.
+- Internal identifiers (mode key `automations`, `<app home>/automations/<id>` folders, DB columns, i18n namespace) stay unless the plan finds a safe, worthwhile rename; the plan decides and justifies each.
+- Check wording collisions with the existing "run" concept (step runs, script runs, Operations panel history) and resolve them in the copy.
+
+### P439 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P439 Close chapter v0.2.25
+### P440 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
