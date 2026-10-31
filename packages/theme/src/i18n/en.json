@@ -12884,6 +12884,11 @@
       "empty": {
         "hint": "Queries, connections and HTTP calls show here."
       },
+      "field": {
+        "path": {
+          "label": "Database path"
+        }
+      },
       "menu": {
         "rerun": {
           "label": "Re-run"
@@ -12891,6 +12896,9 @@
         "revealTab": {
           "label": "Reveal originating tab"
         }
+      },
+      "noConnection": {
+        "label": "No connection"
       },
       "preconnectDelay": {
         "status": "Connecting in {remaining}"
