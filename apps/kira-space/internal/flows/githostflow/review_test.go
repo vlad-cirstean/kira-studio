@@ -1,14 +1,19 @@
 package githostflow_test
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakehost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 func TestChangeRequestReviewActions(t *testing.T) {
@@ -84,4 +89,52 @@ func TestChangeRequestReviewActions(t *testing.T) {
 		t.Fatalf("stale payload = %+v", sv)
 	}
 	r.app.Contract(t, scenario, "git:changeRequest.reviewState#stale", stale, sha)
+}
+
+// reviewAgentPrompt launches the task's review agent and returns its argv, which carries the first message.
+func (r *rig) reviewAgentPrompt() string {
+	r.t.Helper()
+	res, err := r.app.W.AdeTask.LaunchReviewAgent(ctx, adewire.TaskArgs{TaskID: r.taskID()})
+	if err != nil {
+		r.t.Fatalf("LaunchReviewAgent: %v", err)
+	}
+	l := res.Launch
+	if _, err := r.app.W.Terminal.Open(terminal.OpenArgs{
+		TerminalID: l.TerminalID, Cwd: l.Cwd, Cols: 100, Rows: 30, WindowKey: "review", Command: l.Command, LaunchKind: terminal.LaunchKindAgent,
+	}); err != nil {
+		r.t.Fatalf("Terminal.Open: %v", err)
+	}
+	var prompt string
+	testx.WaitUntil(r.t, waitFor, func() bool {
+		files, _ := filepath.Glob(filepath.Join(r.app.FakeDir, "*.args"))
+		for _, f := range files {
+			if raw, _ := os.ReadFile(f); strings.Contains(string(raw), "I review these branches") {
+				prompt = string(raw)
+				return true
+			}
+		}
+		return false
+	})
+	return prompt
+}
+
+func TestReviewAgentLinksChangeRequest(t *testing.T) {
+	const want = "https://forge.test/acme/r/-/merge_requests/7"
+	line := "worktree"
+
+	t.Run("branch lookup", func(t *testing.T) {
+		r := newRig(t, fakehost.New())
+		if p := r.reviewAgentPrompt(); !strings.Contains(p, ", PR "+want+"\n") {
+			t.Fatalf("prompt lacks the PR link after the repo line:\n%s", p)
+		}
+	})
+
+	t.Run("no host, launch still works", func(t *testing.T) {
+		r := newRig(t, fakehost.New())
+		r.setProvider("off")
+		p := r.reviewAgentPrompt()
+		if strings.Contains(p, "PR ") || !strings.Contains(p, line) {
+			t.Fatalf("prompt = %s, want the repo line without a PR link", p)
+		}
+	})
 }

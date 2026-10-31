@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 type hostLinkFixture struct {
@@ -208,6 +209,41 @@ func TestHostLink(t *testing.T) {
 	} {
 		if _, err := f.resolve(t, url); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("resolve %s: err %v, want %q", url, err, want)
+		}
+	}
+}
+
+// TestReviewAgentLinksPR: the review agent's first message names the PR the task link points at, on a
+// writable branch and on a read-only fork review.
+func TestReviewAgentLinksPR(t *testing.T) {
+	f := newHostLinkFixture(t, false)
+	app := f.app
+	for _, c := range []struct{ url, title, repoLine string }{
+		{"https://github.com/acme/api/pull/11", "Fix login", ": feat/login (base "},
+		{"https://github.com/acme/api/pull/12", "Fork change", ": read only, in "},
+	} {
+		added, err := app.W.AdeTask.AddHostLink(ctx, adewire.HostLinkArgs{URL: c.url})
+		if err != nil {
+			t.Fatal(err)
+		}
+		launch, err := app.W.AdeTask.LaunchReviewAgent(ctx, adewire.TaskArgs{TaskID: added.Task.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		openLaunch(t, app, launch.Launch)
+		var args string
+		testx.WaitUntil(t, waitFor, func() bool {
+			files, _ := filepath.Glob(filepath.Join(app.FakeDir, "*.args"))
+			for _, p := range files {
+				if raw, _ := os.ReadFile(p); strings.Contains(string(raw), "Task: "+c.title+"\n") {
+					args = string(raw)
+					return true
+				}
+			}
+			return false
+		})
+		if !strings.Contains(args, c.repoLine) || !strings.Contains(args, ", PR "+c.url+"\n") {
+			t.Fatalf("review message for %s lacks its PR link:\n%s", c.url, args)
 		}
 	}
 }
