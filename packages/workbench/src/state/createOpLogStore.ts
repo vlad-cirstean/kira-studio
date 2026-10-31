@@ -20,6 +20,22 @@ export interface OpLogControl<R extends OpLogRecord> {
   cancel(id: string): Promise<void>;
 }
 
+/** The panel's one filter: status tab, then the free text over command, kind, error and `extra`. */
+export function opLogMatches(
+  record: OpLogRecord,
+  filterText: string,
+  statusFilter: 'all' | 'running' | 'error',
+  extra = '',
+): boolean {
+  if (statusFilter === 'running' && record.status !== 'running') return false;
+  if (statusFilter === 'error' && record.status !== 'error') return false;
+  const text = filterText.trim().toLowerCase();
+  if (!text) return true;
+  const haystack =
+    `${record.command ?? ''} ${record.kind} ${record.error ?? ''} ${extra}`.toLowerCase();
+  return haystack.includes(text);
+}
+
 export interface OpLogStoreOptions<R extends OpLogRecord> {
   control: OpLogControl<R>;
   /** Extra filter text per record, beyond command/kind/error. */
@@ -40,10 +56,13 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       records: [] as R[], // newest first
       filterText: '',
       statusFilter: 'all' as 'all' | 'running' | 'error',
+      // Rows derived from other stores (automation runs) older than this stay hidden after Clear.
+      clearedAt: 0,
     }) as {
       records: R[];
       filterText: string;
       statusFilter: 'all' | 'running' | 'error';
+      clearedAt: number;
     };
 
     const showBackground = usePersistedState('kira.ops.showBackground', false);
@@ -128,6 +147,7 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
     // story.
     function clearOps(): void {
       state.records = [];
+      state.clearedAt = Date.now();
     }
 
     async function cancelOp(id: string): Promise<void> {
@@ -139,18 +159,14 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
     }
 
     const visibleOps = computed<R[]>(() => {
-      const text = state.filterText.trim().toLowerCase();
       return state.records.filter((record) => {
         if (background?.(record) && !showBackground.value) return false;
-        if (state.statusFilter === 'running' && record.status !== 'running') return false;
-        if (state.statusFilter === 'error' && record.status !== 'error') return false;
-        if (text) {
-          const extra = searchText?.(record) ?? '';
-          const haystack =
-            `${record.command ?? ''} ${record.kind} ${record.error ?? ''} ${extra}`.toLowerCase();
-          if (!haystack.includes(text)) return false;
-        }
-        return true;
+        return opLogMatches(
+          record,
+          state.filterText,
+          state.statusFilter,
+          searchText?.(record) ?? '',
+        );
       });
     });
 

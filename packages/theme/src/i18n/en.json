@@ -113,6 +113,14 @@
         "error": "Repeat is required."
       }
     },
+    "ops": {
+      "openRun": {
+        "label": "Open run"
+      },
+      "triggerManual": {
+        "label": "Manual run"
+      }
+    },
     "panel": {
       "add": {
         "tooltip": "New…"
@@ -281,13 +289,13 @@
     },
     "runs": {
       "none": {
-        "emptyHint": "No runs."
+        "emptyHint": "No automation is running. Finished runs are in the operations panel."
       },
       "running": {
         "label": "Running: {count}"
       },
-      "title": {
-        "label": "Runs"
+      "showHistory": {
+        "label": "Show history"
       }
     },
     "schedule": {
@@ -9217,7 +9225,7 @@
         "label": "Background"
       },
       "clearHint": {
-        "hint": "Clears this window’s list only. History is kept 30 days."
+        "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "copiedDetails": {
         "announce": "Copied details"
@@ -12393,7 +12401,7 @@
     },
     "operations": {
       "clear": {
-        "hint": "Clears the in-memory ring only. Retention of op_log is automatic."
+        "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "commandTruncated": {
         "status": "Command (truncated at 64 kibibytes, can’t be re-run): {command}"

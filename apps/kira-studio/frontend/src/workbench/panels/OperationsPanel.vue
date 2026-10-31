@@ -4,6 +4,8 @@ import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
+import { type AutomationOp, isAutomationOp } from '@workbench/automations/runs/runOps';
+import { triggerLabel, useAutomationOps } from '@workbench/automations/runs/useAutomationOps';
 import { displayValue, formatElapsed } from '@workbench/behaviour/format';
 import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
@@ -28,6 +30,9 @@ const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const modeStore = useModeStore();
 const consoleViewStore = useConsoleViewStore();
+const auto = useAutomationOps(opsStore);
+const records = computed(() => auto.merge(opsStore.visibleOps));
+const runningCount = computed(() => opsStore.runningCount + auto.runningCount.value);
 
 const columns = computed<OpLogColumn[]>(() => [
   { id: 'time', label: t('common.field.time.label'), width: '90px' },
@@ -43,6 +48,11 @@ const columns = computed<OpLogColumn[]>(() => [
 
 function connectionFor(record: OpRecord) {
   return connectionsStore.connectionRecord(record.connectionId);
+}
+
+function onCancel(record: OpRecord | AutomationOp): void {
+  if (isAutomationOp(record)) auto.cancel(record);
+  else void opsStore.cancelOp(record.id);
 }
 
 // P2 D14/F7: TAB_KINDS[...].title — the registry P1 D4 made the per-kind source of truth —
@@ -118,7 +128,8 @@ async function onRerun(record: OpRecord): Promise<void> {
   }
 }
 
-function menuFor(record: OpRecord): MenuItem[] {
+function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
+  if (isAutomationOp(record)) return auto.menuFor(record);
   const hasTab = record.tabId !== null && tabsStore.tabs.some((t) => t.id === record.tabId);
   const canSql = !!record.connectionId && connectionsStore.states[record.connectionId]?.caps?.sql;
   const [copyCommand, copyError, cancel] = opLogMenuItems(record, () =>
@@ -150,7 +161,8 @@ function menuFor(record: OpRecord): MenuItem[] {
 }
 
 // Counts the preconnect delay down in the command cell; falls back to the command once it elapses.
-function preconnectNote(record: OpRecord, now: number): string | null {
+function preconnectNote(record: OpRecord | AutomationOp, now: number): string | null {
+  if (isAutomationOp(record)) return null;
   if (record.kind !== 'preconnect' || !record.delayMs) return null;
   const left = Date.parse(record.startedAt) + record.delayMs - now;
   if (left <= 0) return null;
@@ -164,17 +176,39 @@ function preconnectNote(record: OpRecord, now: number): string | null {
   <OpLogPanel
     v-model:filter-text="opsStore.filterText"
     v-model:status-filter="opsStore.statusFilter"
-    :records="opsStore.visibleOps"
-    :running-count="opsStore.runningCount"
+    :records="records"
+    :running-count="runningCount"
     :columns="columns"
     :clear-hint="t('studio.operations.clear.hint')"
     :menu-for="menuFor"
     :running-note="preconnectNote"
+    :can-cancel="(record) => (isAutomationOp(record) ? auto.canCancel(record) : true)"
+    :status-note="(record) => (isAutomationOp(record) ? auto.statusNote(record) : null)"
+    :detail-lines="(record) => (isAutomationOp(record) ? auto.detailLines(record) : [])"
     @clear="opsStore.clearOps"
-    @cancel="(record) => opsStore.cancelOp(record.id)"
+    @cancel="onCancel"
   >
     <template #cell="{ column, record }">
-      <span v-if="column.id === 'connection'" class="flex items-center min-w-0 gap-1">
+      <template v-if="isAutomationOp(record)">
+        <span
+          v-if="column.id === 'connection'"
+          class="truncate min-w-0"
+          data-testid="op-automation-name"
+          >{{
+            record.run.scriptName
+          }}</span
+        >
+        <span
+          v-else-if="column.id === 'source'"
+          class="truncate min-w-0"
+          data-testid="op-source-cell"
+          >{{
+            triggerLabel(record.run)
+          }}</span
+        >
+        <span v-else-if="column.id === 'tab' || column.id === 'rows'" />
+      </template>
+      <span v-else-if="column.id === 'connection'" class="flex items-center min-w-0 gap-1">
         <span
           v-if="connectionFor(record)"
           :class="colorMarkClass('dot', connectionFor(record)?.color)"
@@ -195,7 +229,16 @@ function preconnectNote(record: OpRecord, now: number): string | null {
       <span v-else-if="column.id === 'rows'">{{ displayValue(record.rows) }}</span>
     </template>
     <template #detail="{ record, part }">
-      <div class="ops-detail-cm h-full min-w-0">
+      <div
+        v-if="isAutomationOp(record)"
+        class="px-2 truncate font-data"
+        data-testid="op-automation-detail"
+      >
+        {{
+          part === 'command' ? t('common.command.label', { value: record.command ?? '' }) : t('workbench.opLog.errorDetail.label', { value: record.error ?? '' })
+        }}
+      </div>
+      <div v-else class="ops-detail-cm h-full min-w-0">
         <MonacoHost
           v-if="part === 'command'"
           :doc="
