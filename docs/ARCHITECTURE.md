@@ -2048,6 +2048,8 @@ The agent CLI sits behind one interface, so a second provider needs no caller ch
   CLI double); real-claude tests (`apps/*/tests/claude`) test the Claude provider; the built-in tool
   vocabulary of scripts and the `--allowedTools` argv use Claude's tool names, which a new provider maps in
   `MCPHost.ToolArgs`; the `--color-agent` CSS token keeps Claude's colour value.
+- Stage settings (P431): `Provider.StageSettings()` declares per-workflow-stage settings (`harness.StageSetting`: key, kind `int`, min, max, i18n label and hint keys). The step's validated values reach the provider as `HeadlessSpec.Stage` and `InteractiveSpec.Stage` (`harness.StageValues`); only the provider maps them onto its CLI. `providers.StageCatalog()` is static, like `ConfigDirs`, and feeds YAML validation and the editor.
+- Claude declares `auto_compact_window` (100000 to 1000000 tokens, CLI 2.1.316) and maps it to `--autocompact <n>` in `Script` and `InteractiveCommand`, ahead of `--setting-sources`/`--add-dir`. Per process, so tools the agent runs do not inherit it. An old CLI without the flag fails the launch loudly. Measured with `claude -p --debug-file` (effective window = setting minus 20000): the flag alone gives 280000 for 300000. An exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000` wins over `--autocompact 300000` (130000). Kira does not strip the variable; see Known open items.
 - Add a provider: implement `harness.Provider` and any optional roles in `internal/harness/<id>`, add it to
   `providers.New`, and keep its CLI strings and error texts inside its package. No caller changes.
 - Test: `flows/harnessflow` `TestSecondProviderRegistered` registers `internal/flowtest/fakeprovider`
@@ -2153,7 +2155,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Workflows are YAML files in <home>/workflows, parsed by adeflow.Reader; no workflow is seeded (D2).
 - The workflows folder is watched with fsnotify; a broken edit keeps the last valid version and reports the line plus a message. The writer keeps key order and comments.
 - A workflow has a flat list `steps` of kind agent|script|review|manual (P293); `kind` is required and each kind allows only its own keys.
-- Allowed keys: agent: runs_on before results max_returns timeout prompt allowed_tools smart_script params sandbox; script: command runs_on before results max_returns timeout; review: review runs_on before results max_returns timeout sandbox; manual: session and, with it, prompt.
+- Allowed keys: agent: runs_on before results max_returns timeout prompt allowed_tools smart_script params sandbox settings; script: command runs_on before results max_returns timeout; review: review runs_on before results max_returns timeout sandbox settings; manual: session and, with it, prompt and settings.
 - A top-level `stages` key fails with the error "stages" is no longer supported: list every step under "steps".
 - Agent `allowed_tools` feeds the headless `--allowedTools` list.
 - Sample workflows in apps/kira-space/internal/adeflow/testdata/ import and validate in the app.
@@ -2173,6 +2175,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The editor mode is graph | yaml; the graph editor loads asynchronously so the board bundle stays free of Vue Flow.
 - Graph layout is locked (P255): top to bottom only, every node 256x104, steps and end node on one spine column, results branches fan to the side, loops dashed in a left gutter entering the target from above, native vertical scroll, no zoom or pan.
 - Workflow edits save explicitly (P196): Save and Discard, Cmd/Ctrl+S, no autosave; leaving with unsaved edits asks through ConfirmDialog. Validation stays debounced.
+- Stage settings (P431): a step's `settings:` block is keyed by agent provider id, then setting key (`settings: {claude: {auto_compact_window: 200000}}`). Allowed on agent, review and manual-with-session steps. The parser checks provider ids and keys against `providers.StageCatalog()`, so an unknown id or key fails with its line. Absent means the provider's default. The writer adds the block only when a value is set and drops it when cleared, so a file without it stays byte-identical. Wire `WorkflowStep.settings` is always a map; `WorkflowsResult.stageSettings` lists the catalog for the editor, whose step inspector (Advanced) renders one field per entry.
 - A review step (P286) has `review: {send_to: implementer|new, implementer}`, takes no prompt, tools or smart script, and `timeout` stays required.
 - On reaching a review step, startRun calls enterReview (ade/reviewstep.go): the run goes to state `review` and the step waits. Wire Run.review carries phase waiting|sent|working|stuck|done, round and note, derived from the latest round.
 - A review send is a round: its own ade_runs row (purpose='review', spec_json = model.AdeReviewSpec) run through superviseAgent with the reply_review_comment tool and implicit results.
@@ -3497,3 +3500,4 @@ Performance:
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
 - **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Failures: `repo-graph-refresh` scroll test 8+ of 40, `repo-graph-paging` 9 of 48 (`graph-svg` wait in `openRepo`), `repo-graph-columns` 3 of 400, `repo-workspace` 4 of 252. All pass idle (`test:ui:space`: 576 passed). Cause: CPU starvation of the whole app boot, not a test step. Delete once the boot is cheaper or the machine faster.
 - **Quitting Kira Space with an unsaved file edit discards it without asking (P419).** The quit confirm is computed in Go from agents, runs and scripts and has no renderer state. Closing the last window only hides it, so the draft survives that path.
+- **A user-exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides a step's auto compact limit (P431).** Claude Code reads the env var before `--autocompact`, and Kira passes its environment through, so the step setting has no effect while the variable is set.
