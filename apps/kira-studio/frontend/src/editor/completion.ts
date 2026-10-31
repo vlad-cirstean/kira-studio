@@ -30,19 +30,31 @@ export interface EditorCompletion {
   snippet?: string;
 }
 
-interface EditorCompletionResult {
+export interface EditorCompletionResult {
   /** Offset the replacement range starts at — the option's own `insert`/`label` replaces
    *  `[from, ctx.offset)`. */
   from: number;
   options: readonly EditorCompletion[];
+  /** The list is partial: Monaco asks the source again as the word grows. */
+  incomplete?: boolean;
+}
+
+export interface EditorCompletionContext {
+  doc: string;
+  offset: number;
+  explicit: boolean;
 }
 
 /** A completion source: pure text + cursor offset in, a replacement range and options out (or
  *  `null` for "no completions here"). `explicit` is true for an explicit trigger (Ctrl+Space) —
  *  every current source ignores it, kept only so a future source can tell the difference without a
  *  signature change. */
-export type EditorCompletionSource = (ctx: {
-  doc: string;
-  offset: number;
-  explicit: boolean;
-}) => EditorCompletionResult | null;
+export type EditorCompletionSource = (
+  ctx: EditorCompletionContext,
+) => EditorCompletionResult | null;
+
+/** Like a source, but resolves later (server-backed values); `signal` aborts when Monaco cancels. */
+export type EditorAsyncCompletionSource = (
+  ctx: EditorCompletionContext,
+  signal: AbortSignal,
+) => Promise<EditorCompletionResult | null>;
