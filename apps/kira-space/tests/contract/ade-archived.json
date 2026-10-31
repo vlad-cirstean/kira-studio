@@ -172,6 +172,7 @@
               "read": []
             },
             "session": false,
+            "settings": {},
             "skip": false,
             "smartScript": "",
             "status": "",
@@ -356,6 +357,7 @@
               "read": []
             },
             "session": false,
+            "settings": {},
             "skip": false,
             "smartScript": "",
             "status": "",
