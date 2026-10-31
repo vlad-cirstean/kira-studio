@@ -36,7 +36,7 @@ A task has a status. The workflow sets it as the task moves between steps. You c
 
 ### Task statuses
 
-Settings > Task statuses edits the set. Add, rename, recolour and reorder statuses, and pick what each one **counts as**: To do, In progress, In review or Done. Every kind needs at least one status. Deleting a status that tasks use asks where those tasks move. A new install has To do, In progress, In review and Done.
+The **Task statuses** row on the Workflows page edits the set. Add, rename, recolour (16 colours) and reorder statuses. A status is only a label: Kira reads nothing into its name, colour or order. Four selects set when a status changes by itself: where new tasks start, and what a step, a review and the finished workflow set. All but the first can keep the current status. Editing a status never changes the tasks that have it. Deleting a status asks where its tasks move. A new install has To do, In progress, In review and Done.
 
 A new task lands in Today with no repositories, so it can start as soon as it has one. Add repositories or existing branches from the task panel, or let the agent declare them. Archiving asks for confirmation. Set, change or clear the estimate at any time, and rename the task in the panel title.
 
@@ -106,7 +106,7 @@ A run that ends with no report takes the step's `failed` result.
 
 The Workflows page edits a workflow as a graph or as YAML. Save with `Cmd+S`. Nothing saves automatically. Leaving with unsaved edits asks first.
 
-Edit on the canvas. `+ Add step` under the graph adds a step of a kind you pick. The `⋯` menu on a step, or a right click, has Add step after, Move up, Move down, Make start, Skip and Remove. Move is off when it would turn a forward route into a return. Select a step to edit it in the inspector. The inspector shows the kind switch and the name, then three sections: what the step does, where and when it runs, and how it ends. **Advanced** holds the timeout, allowed tools, task status, skip and sandbox. The status list is the set from Settings, with an **Edit statuses** link. Changing the kind clears the prompt, command or session prompt, after a confirmation.
+Edit on the canvas. `+ Add step` under the graph adds a step of a kind you pick. The `⋯` menu on a step, or a right click, has Add step after, Move up, Move down, Make start, Skip and Remove. Move is off when it would turn a forward route into a return. Select a step to edit it in the inspector. The inspector shows the kind switch and the name, then three sections: what the step does, where and when it runs, and how it ends. **Advanced** holds the timeout, allowed tools, task status, skip and sandbox. The status list is your set, with an **Edit statuses** link to the Workflows page. A step with no status of its own uses the default for its kind. Changing the kind clears the prompt, command or session prompt, after a confirmation.
 
 A task follows the live file until its first run, session or move. After that it keeps a snapshot, and an updated file applies to new work only.
 
