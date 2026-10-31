@@ -11,8 +11,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P438 | Rename Automations to Runs; icon-only module tabs | Todo |
 | P439 | Kubernetes module (read only) | Todo |
 | P440 | Kubernetes MCP tools with per-cluster approval | Todo |
-| P441 | Code review (2 rounds) | Todo |
-| P442 | Close chapter v0.2.25 | Todo |
+| P441 | Dependency update, incl. Wails | Todo |
+| P442 | Code review (2 rounds) | Todo |
+| P443 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -47,10 +48,18 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Read only, same as P439: no write, exec or port-forward tools.
 - Reuse the existing DB MCP approval flow and P415 op-log origin stamping where they fit; the plan decides.
 
-### P441 Code review (2 rounds)
+### P441 Dependency update, incl. Wails
+
+- Update Go modules, JS packages and tool versions across the monorepo to current releases.
+- Upgrade Wails to the latest release. Regenerate bindings; fix any API or build changes in both apps.
+- Check the license of every changed dependency against the open-source-only rule.
+- Run the full suites after the bump (Go, typecheck, lint, UI, visual). Re-record visual baselines only if the upgrade shifts rendering.
+- Scope for v0.2.25 is closed: no further phases.
+
+### P442 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P442 Close chapter v0.2.25
+### P443 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
