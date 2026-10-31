@@ -24,7 +24,7 @@ import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
-import type { HeadState } from '@kira/git-ipc';
+import type { HeadState, ReviewComment } from '@kira/git-ipc';
 import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type { PaletteColor } from '@shared/domain/color';
 import type { GitCredentialPrompt } from '@shared/domain/git';
@@ -496,6 +496,20 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewWorking(args)).then((r) => trust<V2.ReviewWorking>(r)),
   adeTaskReviewWorkingDiff: (args: V2.ReviewWorkingDiffArgs): Promise<DiffContent> =>
     unwrap(AdeTaskService.ReviewWorkingDiff(args)).then((r) => trust<DiffContent>(r)),
+  adeTaskReviewWorkingFile: (args: V2.ReviewWorkingDiffArgs): Promise<V2.ReviewWorkingFileReview> =>
+    unwrap(AdeTaskService.ReviewWorkingFile(args)).then((r) =>
+      trust<V2.ReviewWorkingFileReview>(r),
+    ),
+  adeTaskReviewWorkingMark: (args: V2.ReviewWorkingMarkArgs): Promise<V2.ReviewWorkingMarkResult> =>
+    unwrap(AdeTaskService.ReviewWorkingMark(args)).then((r) =>
+      trust<V2.ReviewWorkingMarkResult>(r),
+    ),
+  adeTaskReviewWorkingComments: (args: V2.BranchArgs): Promise<V2.ReviewWorkingCommentsResult> =>
+    unwrap(AdeTaskService.ReviewWorkingComments(args)).then((r) =>
+      trust<V2.ReviewWorkingCommentsResult>(r),
+    ),
+  adeTaskReviewWorkingCommentAdd: (args: V2.ReviewWorkingCommentAddArgs): Promise<ReviewComment> =>
+    unwrap(AdeTaskService.ReviewWorkingCommentAdd(args)).then((r) => trust<ReviewComment>(r)),
   adeTaskReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentState> =>
     unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
   adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>

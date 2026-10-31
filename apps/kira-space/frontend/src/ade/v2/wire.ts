@@ -1,7 +1,15 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
 // Changing a key, type or value set is a contract change (docs/HISTORY.md (v2.0 P143) rule 1).
 
-import type { FileChange, GitHostInfo } from '@kira/git-ipc';
+import type {
+  FileChange,
+  FileDiffBody,
+  GitHostInfo,
+  LineRange,
+  ReviewComment,
+  ReviewCommentKind,
+  ReviewFileStatus,
+} from '@kira/git-ipc';
 import type { RunOutcome } from '@shared/domain/runOutcome';
 
 // ---- shared
@@ -719,10 +727,38 @@ export interface ReviewWorking {
   worktree: string /* '' = the branch has no worktree */;
   head: string;
   files: FileChange[];
+  reviews: Record<string, ReviewFileStatus> /* uncommitted review status by path */;
+  promoted: string[] /* paths whose uncommitted review moved onto a commit in this call */;
 }
 export interface ReviewWorkingDiffArgs {
   branchId: string;
   path: string;
+}
+export interface ReviewWorkingFileReview {
+  path: string;
+  body: FileDiffBody;
+  reviewedRanges: LineRange[] /* worktree line numbers */;
+  lineCount: number;
+  contentKind: string /* 'text' | 'binary' | 'tooLarge' | 'absent' */;
+}
+export interface ReviewWorkingMarkArgs {
+  branchId: string;
+  paths: string[];
+  reviewed: boolean;
+  ranges: LineRange[] | null /* one path only; null = the whole file */;
+}
+export interface ReviewWorkingMarkResult {
+  files: { path: string; review: ReviewFileStatus }[];
+}
+export interface ReviewWorkingCommentsResult {
+  comments: ReviewComment[];
+}
+export interface ReviewWorkingCommentAddArgs {
+  branchId: string;
+  path: string;
+  range: LineRange;
+  body: string;
+  kind: ReviewCommentKind;
 }
 export interface ReviewAgentState {
   session: Session | null;

@@ -216,6 +216,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
   adeTaskReviewWorking: 'AdeTaskService.ReviewWorking',
   adeTaskReviewWorkingDiff: 'AdeTaskService.ReviewWorkingDiff',
+  adeTaskReviewWorkingFile: 'AdeTaskService.ReviewWorkingFile',
+  adeTaskReviewWorkingMark: 'AdeTaskService.ReviewWorkingMark',
+  adeTaskReviewWorkingComments: 'AdeTaskService.ReviewWorkingComments',
+  adeTaskReviewWorkingCommentAdd: 'AdeTaskService.ReviewWorkingCommentAdd',
   adeTaskReviewAgent: 'AdeTaskService.ReviewAgent',
   adeTaskForwardReviewComments: 'AdeTaskService.ForwardReviewComments',
   adeTaskReviewForwardText: 'AdeTaskService.ReviewForwardText',
@@ -376,7 +380,14 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
   // main.ts asks every window whether it is a review window; none of the specs' windows is one.
   [IPC.adeTaskReviewWindowTarget]: 'null',
-  [IPC.adeTaskReviewWorking]: JSON.stringify({ worktree: '', head: '', files: [] }),
+  [IPC.adeTaskReviewWorking]: JSON.stringify({
+    worktree: '',
+    head: '',
+    files: [],
+    reviews: {},
+    promoted: [],
+  }),
+  [IPC.adeTaskReviewWorkingComments]: JSON.stringify({ comments: [] }),
   // P286: the review window asks for its branch's review step; none by default.
   [IPC.adeTaskReviewStep]: JSON.stringify({
     run: null,
