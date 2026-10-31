@@ -1,74 +1,29 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, reviewTest, test } from './fixtures';
-import {
-  adeFixture,
-  adeV2Control,
-  emitAgentEvent,
-  emitAgentSessions,
-  openPlan,
-} from './support/adeV2';
+import { adeFixture, emitAgentEvent, emitAgentSessions, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { gitStreamEmit, gitStreamParams, gitStreamRequests } from './support/gitStreamMock';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import {
+  boxOf,
+  change,
+  GIT,
+  HUNK_COMMENT,
+  openHunkDiff,
+  REVIEW_FILES,
+  renderedLine,
+  reviewControl,
+  status,
+  t,
+  target,
+} from './support/reviewHunkDiff';
 import type { ControlSnapshot } from './support/types';
 
 // The review window: three panes for one branch, and the review agent.
 
-const t = (id: string) => `[data-testid="${id}"]`;
-const target = adeFixture<{
-  gitRepoId: string;
-  codeRepoId: string;
-  branchId: string;
-  worktree: string;
-}>('review-target');
 const agent = adeFixture<{ session: { terminalId: string } }>('review-agent');
-
-const change = (path: string) => ({
-  kind: 'modified',
-  path,
-  similarity: 0,
-});
-const status = (kind: 'none' | 'full', changedSinceReview: boolean) => ({
-  kind,
-  changedSinceReview,
-});
-
-const REVIEW_FILES = {
-  branchTip: 'a'.repeat(40),
-  mergeBase: 'b'.repeat(40),
-  files: [
-    { change: change('src/pending.ts'), review: status('none', false) },
-    { change: change('src/done.ts'), review: status('full', false) },
-    { change: change('src/moved.ts'), review: status('full', true) },
-  ],
-};
-
-const GIT = {
-  repoId: target.gitRepoId,
-  extraResults: {
-    'review.resolveBase': {
-      branch: 'feat/billing-dashboard',
-      base: 'main',
-      reason: 'override',
-      range: { kind: 'ready', commitCount: 3 },
-      candidates: [],
-    },
-    'review.files': REVIEW_FILES,
-    'review.session.load': null,
-    'repo.open': null,
-  },
-};
-
-function reviewControl(extra: readonly ControlSnapshot[] = []): ControlSnapshot[] {
-  const defaults: ControlSnapshot[] = [
-    { channel: IPC.adeTaskReviewWindowTarget, response: target },
-    { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-  ];
-  const overridden = new Set(extra.map((e) => e.channel));
-  return adeV2Control([...defaults.filter((d) => !overridden.has(d.channel)), ...extra]);
-}
 
 async function openReview(
   relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
@@ -174,64 +129,6 @@ reviewTest('a review diff opens side by side', async ({ relaunch }) => {
   expect(width).toBeGreaterThan(100);
 });
 
-async function openHunkDiff(
-  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
-): Promise<{ page: Page; modified: Locator }> {
-  const read = (side: 'left' | 'right') => contract('git-review-hunks', `git:file.read#${side}`);
-  const comment = {
-    id: 1,
-    path: 'src/pending.ts',
-    range: { start: 12, end: 12 },
-    body: 'Why this?',
-    anchor: 'exact',
-    anchorSha: 'a'.repeat(40),
-    createdAt: 1_790_036_500_000,
-    kind: 'change',
-    state: 'open',
-    reply: '',
-    repliedAt: null,
-    sentAt: null,
-  };
-  const { window: page } = await relaunch({
-    control: reviewControl([
-      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
-      {
-        channel: IPC.codeWorkspaceListRepos,
-        response: [
-          {
-            id: target.codeRepoId,
-            name: 'web-app',
-            root: '/tmp/web-app',
-            repoId: target.gitRepoId,
-            sortOrder: 1,
-            color: 'none',
-            createdAt: '2026-01-01T00:00:00.000Z',
-          },
-        ],
-      },
-    ]),
-    gitStream: {
-      ...GIT,
-      extraResults: {
-        ...GIT.extraResults,
-        'file.read': { __sequence: [read('left'), read('right')] },
-        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
-        'review.fileDiff': {
-          ...contract<object>('git-review-hunks', 'git:review.fileDiff#range'),
-          path: 'src/pending.ts',
-        },
-        'review.comment.list': { at: 'a'.repeat(40), comments: [comment] },
-      },
-    },
-  });
-  await page.locator(t('ade-review-window')).waitFor();
-  await page
-    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
-    .click();
-  const modified = page.locator(t('repo-diff-editor')).locator('.editor.modified');
-  return { page, modified };
-}
-
 reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
   const { page, modified } = await openHunkDiff(relaunch);
   const lines = modified.locator('.view-lines .view-line');
@@ -242,7 +139,7 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
   for (const n of [97, 98, 99, 101, 102, 103, 12]) {
     await expect(rendered(`line ${n}`)).toHaveCount(1);
   }
-  await expect(modified.locator('.kira-review-glyph-comment')).toHaveCount(1);
+  await expect(modified.locator('.kira-review-ln-comment')).toHaveCount(1);
   for (const n of [50, 150]) await expect(rendered(`line ${n}`)).toHaveCount(0);
   expect(await lines.count()).toBeLessThan(40);
   const placeholders = modified.locator('.diff-hidden-lines');
@@ -255,35 +152,85 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
   await expect.poll(() => lines.count()).toBeGreaterThan(before);
 });
 
-reviewTest('the hunk mark stays put when the add-comment mark shows', async ({ relaunch }) => {
+reviewTest(
+  'the review gutter has no glyph margin and a hunk row holds the mark',
+  async ({ relaunch }) => {
+    const { page, modified } = await openHunkDiff(relaunch);
+    const original = page.locator(t('repo-diff-editor')).locator('.editor.original');
+    await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
+    for (const pane of [original, modified]) {
+      const margin = pane.locator('.glyph-margin');
+      expect((await margin.count()) === 0 || (await boxOf(margin)).width === 0).toBe(true);
+    }
+    const mark = modified.getByTestId('review-hunk-mark');
+    await expect(mark).toHaveAttribute('data-state', 'actionable');
+    const markBox = await boxOf(mark);
+    const line99 = await boxOf(renderedLine(modified, 'line 99'));
+    const changed = await boxOf(renderedLine(modified, 'CHANGED 100'));
+    expect(markBox.y).toBeGreaterThan(line99.y);
+    expect(markBox.y + markBox.height).toBeLessThanOrEqual(changed.y + 2);
+    // The row is one line tall, and the left pane keeps its line 100 level with CHANGED 100.
+    expect(changed.y - line99.y).toBeGreaterThan(line99.height + 8);
+    expect((await boxOf(renderedLine(original, 'line 100'))).y).toBe(changed.y);
+
+    await mark.click();
+    await expect
+      .poll(async () => (await gitStreamParams(page, 'review.mark')).length)
+      .toBeGreaterThan(0);
+    expect((await gitStreamParams(page, 'review.mark'))[0]).toMatchObject({
+      path: 'src/pending.ts',
+      reviewed: true,
+    });
+  },
+);
+
+reviewTest('the hunk row stays above the deleted lines inline', async ({ relaunch }) => {
   const { page, modified } = await openHunkDiff(relaunch);
-  const mark = modified
-    .locator('.kira-review-glyph-actionable, .kira-review-glyph-reviewed')
-    .first();
-  const viewLines = modified.locator('.view-lines');
-  const add = modified.locator('.kira-review-glyph-add');
-  const box = async (l: Locator) => {
-    const b = await l.boundingBox();
-    if (!b) throw new Error('no box');
-    return b;
-  };
-  await expect(mark).toBeVisible({ timeout: 15_000 }); // Monaco's diff and decorations land late under suite load
-  await page.mouse.move(0, 0);
-  const markBefore = await box(mark);
-  const linesBefore = await box(viewLines);
+  await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
+  await page.locator(t('repo-diff-layout-inline')).click();
+  const mark = page.getByTestId('review-hunk-mark');
+  await expect(mark).toBeVisible();
+  const markBox = await boxOf(mark);
+  const deleted = await boxOf(page.locator('.view-lines.line-delete .view-line'));
+  expect(markBox.y + markBox.height).toBeLessThanOrEqual(deleted.y + 2);
+  expect(markBox.y).toBeGreaterThan((await boxOf(renderedLine(modified, 'line 99'))).y);
+});
 
-  await page.mouse.move(linesBefore.x + 40, markBefore.y + markBefore.height / 2);
-  await expect(add).toHaveCount(1);
-  expect((await box(add)).y).toBe(markBefore.y);
-  expect(await box(mark)).toEqual(markBefore);
-  expect((await box(viewLines)).x).toBe(linesBefore.x);
+reviewTest(
+  'the add mark replaces the hovered line number and opens the composer',
+  async ({ relaunch }) => {
+    const { page, modified } = await openHunkDiff(relaunch, { comments: [] });
+    const line = renderedLine(modified, 'CHANGED 100');
+    await expect(line).toHaveCount(1, { timeout: 15_000 });
+    const number = modified.locator('.line-numbers').filter({ hasText: /^100$/ });
+    const before = await boxOf(number);
+    const contentLeft = (await boxOf(modified.locator('.view-lines'))).x;
 
-  const commentMark = await box(modified.locator('.kira-review-glyph-comment'));
-  expect(commentMark.x).toBeLessThan(markBefore.x);
+    await line.hover();
+    const add = modified.locator('.kira-review-ln-add');
+    await expect(add).toHaveCount(1);
+    expect(await add.evaluate((el) => getComputedStyle(el).color)).toBe('rgba(0, 0, 0, 0)');
+    expect(await boxOf(add)).toEqual(before);
+    expect((await boxOf(modified.locator('.view-lines'))).x).toBe(contentLeft);
 
-  await page.mouse.move(0, 0);
-  await expect(add).toHaveCount(0);
-  expect(await box(mark)).toEqual(markBefore);
+    await add.click();
+    const thread = page.locator(t('review-thread'));
+    await expect(thread).toBeVisible();
+    await expect(thread.getByTestId('review-thread-input')).toBeFocused();
+    await page.mouse.move(0, 0);
+    await expect(modified.locator('.kira-review-ln-add')).toHaveCount(0);
+  },
+);
+
+reviewTest('a commented line number is tinted and opens its thread', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch);
+  await expect(modified.locator('.kira-review-ln-comment')).toHaveText('12', { timeout: 15_000 });
+  await modified.locator('.kira-review-ln-comment').click();
+  const thread = page.locator(t('review-thread'));
+  await expect(thread.getByTestId('review-thread-body')).toHaveText('Why this?');
+  await expect(thread.getByTestId('review-thread-kind-chip')).toHaveText('Change');
+  await thread.getByRole('button', { name: 'Close' }).click();
+  await expect(thread).toHaveCount(0);
 });
 
 async function openDiffWindow(
@@ -1021,12 +968,6 @@ const openCommentDialog = async (
   return page;
 };
 
-const boxOf = async (l: Locator) => {
-  const b = await l.boundingBox();
-  if (!b) throw new Error('no box');
-  return b;
-};
-
 reviewTest('the review dialog fits a small window', async ({ relaunch }) => {
   const viewport = { width: 560, height: 420 };
   const page = await openCommentDialog(relaunch, viewport);
@@ -1098,3 +1039,126 @@ reviewTest('the review dialog resizes from its edges', async ({ relaunch }) => {
   await expect(dialog).toBeVisible();
   await expect.poll(async () => (await boxOf(dialog)).width).toBeCloseTo(d0.width, -1);
 });
+
+// P413: the review thread over the hunk diff. Backend halves: reviewflow TestCommentEdit (edit).
+
+const longComment = (extra: object = {}) => ({
+  ...HUNK_COMMENT,
+  range: { start: 100, end: 100 },
+  body: Array.from({ length: 80 }, (_, i) => `body line ${i + 1}`).join('\n'),
+  ...extra,
+});
+
+const ADDED = {
+  comment: { ...HUNK_COMMENT, id: 2, range: { start: 100, end: 100 }, body: 'x' },
+};
+
+/** The gutter route: hover the line, click the add mark that replaces its number. */
+async function openComposeFromGutter(page: Page, modified: Locator) {
+  await renderedLine(modified, 'CHANGED 100').hover();
+  await modified.locator('.kira-review-ln-add').click();
+  const thread = page.locator(t('review-thread'));
+  await expect(thread).toBeVisible();
+  return thread;
+}
+
+reviewTest('a long thread stays inside the editor and scrolls by wheel', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch, {
+    comments: [longComment()],
+    line101: `LONGLINE ${'x'.repeat(400)}`,
+  });
+  await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
+  await modified.locator('.kira-review-ln-comment').click();
+  const thread = page.locator(t('review-thread'));
+  await expect(thread).toBeVisible();
+
+  const editor = await boxOf(modified);
+  const box = await boxOf(thread);
+  expect(box.x + box.width).toBeLessThanOrEqual(editor.x + editor.width + 1);
+  expect(box.y + box.height).toBeLessThanOrEqual(editor.y + editor.height + 1);
+  expect(box.height).toBeLessThanOrEqual(editor.height * 0.8 + 1);
+  await expect(thread.getByTestId('review-thread-state')).toBeVisible();
+
+  const probe = renderedLine(modified, 'line 99');
+  const probeBefore = (await boxOf(probe)).y;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect
+    .poll(async () => {
+      await page.mouse.wheel(0, 300);
+      return thread.evaluate((el) => el.scrollTop);
+    })
+    .toBeGreaterThan(0);
+  expect((await boxOf(probe)).y).toBe(probeBefore);
+});
+
+reviewTest(
+  'the compose form grows to a cap, then scrolls, and never overlaps',
+  async ({ relaunch }) => {
+    const { page, modified } = await openHunkDiff(relaunch, { comments: [] });
+    await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
+    const thread = await openComposeFromGutter(page, modified);
+    const input = thread.getByTestId('review-thread-input');
+    const below = renderedLine(modified, 'line 101');
+    const editor = await boxOf(modified);
+
+    const small = await boxOf(thread);
+    await input.fill(Array.from({ length: 40 }, (_, i) => `row ${i + 1}`).join('\n'));
+    await expect.poll(async () => (await boxOf(thread)).height).toBeGreaterThan(small.height);
+    const grown = await boxOf(thread);
+    expect(grown.height).toBeLessThanOrEqual(editor.height * 0.8 + 1);
+    expect(grown.y + grown.height).toBeLessThanOrEqual((await boxOf(below)).y + 1);
+    await expect.poll(() => thread.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  },
+);
+
+reviewTest('keystrokes in the composer stay in the composer', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch, {
+    comments: [],
+    extraResults: { 'review.comment.add': ADDED },
+  });
+  await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
+  const thread = await openComposeFromGutter(page, modified);
+  const input = thread.getByTestId('review-thread-input');
+  await expect(input).toBeFocused();
+
+  await input.click();
+  const kb = page.keyboard;
+  await kb.type('abc');
+  await kb.press('ArrowLeft');
+  await kb.press('Backspace');
+  await kb.press('Enter');
+  await kb.type('d');
+  await kb.press('Home');
+  await kb.type('x');
+  await expect(input).toHaveValue('a\nxdc');
+  await kb.press('ControlOrMeta+A');
+  await kb.type('z');
+  await expect(input).toHaveValue('z');
+
+  await kb.press('Escape');
+  await expect(thread).toHaveCount(0);
+
+  await openComposeFromGutter(page, modified);
+  await input.fill('typed');
+  await kb.press('Meta+Enter');
+  await expect
+    .poll(async () => (await gitStreamRequests(page)).includes('review.comment.add'))
+    .toBe(true);
+  expect((await gitStreamParams(page, 'review.comment.add'))[0]).toMatchObject({
+    path: 'src/pending.ts',
+    range: { start: 100, end: 100 },
+    body: 'typed',
+    kind: 'change',
+  });
+});
+
+reviewTest(
+  'the context menu adds a review comment from the keyboard route',
+  async ({ relaunch }) => {
+    const { page, modified } = await openHunkDiff(relaunch, { comments: [] });
+    await expect(renderedLine(modified, 'CHANGED 100')).toHaveCount(1, { timeout: 15_000 });
+    await renderedLine(modified, 'CHANGED 100').click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Add review comment' }).click();
+    await expect(page.locator(t('review-thread'))).toBeVisible();
+  },
+);
