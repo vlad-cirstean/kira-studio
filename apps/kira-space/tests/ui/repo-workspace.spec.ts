@@ -451,6 +451,13 @@ test('contract: a repo workspace: the status bar blame item follows the cursor, 
     await expect(blameStatus).toBeVisible();
     await expect(blameStatus).toContainText(BLAME_RESULT.author);
     await expect(blameStatus).toContainText(BLAME_RESULT.summary);
+    await blameStatus.hover();
+    await expect(page.locator('[data-testid="tooltip-details-title"]')).toHaveText(
+      BLAME_RESULT.summary,
+    );
+    await expect(
+      page.locator('[data-testid="tooltip-details-row"][data-label="Author"]'),
+    ).toContainText(BLAME_RESULT.author);
   }
 
   {
