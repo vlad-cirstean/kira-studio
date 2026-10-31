@@ -2,7 +2,7 @@
 
 Branch `chapter/v0.2.24`. First `P` is 423 (highest in v0.2.23 is P422). Draft: opens after v0.2.23 merges.
 
-Source: user request. Phases run top to bottom, two phases in parallel where file ownership allows (worktree per stream). More phases to be added before the review. Ends with two code review rounds, then close, then PR.
+Source: user request. Phases run top to bottom, two phases in parallel where file ownership allows (worktree per stream). Scope is closed: any further phases go to v0.2.25. Ends with two code review rounds, then close, then PR.
 
 | Phase | Title | Status |
 |---|---|---|
