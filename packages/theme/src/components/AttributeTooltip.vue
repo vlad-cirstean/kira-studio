@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Badge } from '@theme/components/ui/badge';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Separator } from '@theme/components/ui/separator';
 import {
   Tooltip,
@@ -148,22 +149,26 @@ useEventListener(containerRef, 'focusout', onFocusOut);
               :key="tag"
               variant="chip"
               data
-              class="h-auto border border-bg/30 text-kira-sm"
+              class="h-auto border border-border text-kira-sm"
               data-testid="tooltip-tag"
               >{{
                 tag
               }}</Badge
             >
           </div>
-          <p v-if="parts.body" class="text-kira-sm text-bg/75" data-testid="tooltip-body">
-            {{ parts.body }}
-          </p>
+          <FieldDescription v-if="parts.body" data-testid="tooltip-body">{{
+            parts.body
+          }}</FieldDescription>
           <template v-if="parts.note">
-            <Separator class="bg-bg/20" />
+            <Separator />
             <div class="flex flex-col gap-0.5" data-testid="tooltip-note">
-              <span class="text-kira-sm font-medium text-bg/60" data-testid="tooltip-note-label">{{
-                parts.note.label
-              }}</span>
+              <span
+                class="text-kira-sm font-medium text-muted-foreground"
+                data-testid="tooltip-note-label"
+                >{{
+                  parts.note.label
+                }}</span
+              >
               <p class="text-kira-sm wrap-anywhere" data-testid="tooltip-note-text">{{
                 parts.note.text
               }}</p>
