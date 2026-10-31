@@ -9,8 +9,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P436 | ADE session tab context menu: close and restart a Claude session | Todo |
 | P437 | ADE sessions dropdown redesign | Todo |
 | P438 | Rename Automations to Runs; icon-only module tabs | Todo |
-| P439 | Code review (2 rounds) | Todo |
-| P440 | Close chapter v0.2.25 | Todo |
+| P439 | Kubernetes module (read only) | Todo |
+| P440 | Code review (2 rounds) | Todo |
+| P441 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -30,10 +31,18 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Internal identifiers (mode key `automations`, `<app home>/automations/<id>` folders, DB columns, i18n namespace) stay unless the plan finds a safe, worthwhile rename; the plan decides and justifies each.
 - Check wording collisions with the existing "run" concept (step runs, script runs, Operations panel history) and resolve them in the copy.
 
-### P439 Code review (2 rounds)
+### P439 Kubernetes module (read only)
+
+- New read-only Kubernetes module. Host app: Kira Studio next to Docker (the plan confirms or changes this).
+- Pick a namespace, pick a resource kind, list resources, view describe and logs.
+- Every list, describe and logs view supports filtering.
+- UI design consistent with the app, taking its cues from the Studio (database) module.
+- Read only: no create, edit, delete, exec or port-forward.
+
+### P440 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P440 Close chapter v0.2.25
+### P441 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
