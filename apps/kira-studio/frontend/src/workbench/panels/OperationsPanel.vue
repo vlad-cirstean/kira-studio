@@ -113,10 +113,14 @@ function opSqlDialect(record: OpRecord) {
 async function onRerun(record: OpRecord): Promise<void> {
   if (!record.connectionId || !record.command || record.commandTruncated) return;
   const dialect = opSqlDialect(record);
-  const statements = splitSqlStatements(record.command, {
-    ...lexOptionsFor(dialect),
-    slashSlashComments: connectionFor(record)?.kind === 'mongodb',
-  }).map((s) => s.text);
+  // A Discover statement is one JSON request; splitting it on ';' would cut a query string.
+  const statements =
+    connectionFor(record)?.kind === 'kibana'
+      ? [record.command]
+      : splitSqlStatements(record.command, {
+          ...lexOptionsFor(dialect),
+          slashSlashComments: connectionFor(record)?.kind === 'mongodb',
+        }).map((s) => s.text);
   if (statements.length === 0) return;
   const tabId = tabsStore.openConsoleTab(record.connectionId, record.path ?? '');
   try {
@@ -131,7 +135,11 @@ async function onRerun(record: OpRecord): Promise<void> {
 function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
   if (isAutomationOp(record)) return auto.menuFor(record);
   const hasTab = record.tabId !== null && tabsStore.tabs.some((t) => t.id === record.tabId);
-  const canSql = !!record.connectionId && connectionsStore.states[record.connectionId]?.caps?.sql;
+  const canSql =
+    !!record.connectionId &&
+    connectionsStore.states[record.connectionId]?.caps?.sql &&
+    // Only execute() carries a Discover request; the other kibana op kinds log metadata calls.
+    (connectionFor(record)?.kind !== 'kibana' || record.kind === 'execute');
   const [copyCommand, copyError, cancel] = opLogMenuItems(record, () =>
     opsStore.cancelOp(record.id),
   );

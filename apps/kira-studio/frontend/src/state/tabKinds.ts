@@ -172,11 +172,17 @@ export const TAB_KINDS: TabKindRegistry<
   },
   console: {
     mode: STUDIO_TAB_KIND_MODE.console,
-    title: tabTitle,
-    icon: () => 'terminal',
+    title: (tab) =>
+      tab.kind === 'console' && tab.state.kibana
+        ? (tab.state.kibana.dataViewName ?? t('studio.kibana.tab.title'))
+        : tabTitle(tab),
+    icon: (tab) => (tab.kind === 'console' && tab.state.kibana ? 'search' : 'terminal'),
     railColor,
     defaultState: () => defaultConsoleTabState(),
-    duplicateState: (_tab: ConsoleTabRecord): ConsoleTabState => defaultConsoleTabState(),
+    duplicateState: (tab: ConsoleTabRecord): ConsoleTabState =>
+      tab.state.kibana
+        ? { ...defaultConsoleTabState(), text: tab.state.text, kibana: tab.state.kibana }
+        : defaultConsoleTabState(),
     dropResources: dropConsoleResultPagesForTab,
     menuExtras: revealInProjectPanel,
     parseState: parseStateWith(consoleTabStateSchema),
