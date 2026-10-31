@@ -36,6 +36,8 @@ const STATE: Record<string, { tone: Tone; label: MessageKey }> = {
 };
 const STEP_LABEL: Record<string, MessageKey> = {
   install: 'space.settings.cliTools.step.install.label',
+  extension: 'space.settings.cliTools.step.extension.label',
+  defaults: 'space.settings.cliTools.step.defaults.label',
   login: 'space.settings.cliTools.step.login.label',
   loginToken: 'space.settings.cliTools.step.loginToken.label',
   check: 'space.settings.cliTools.step.check.label',

@@ -68,3 +68,66 @@ test('contract: the docs button opens the CLI documentation', async ({ relaunch 
     'developer.atlassian.com',
   );
 });
+
+// Contract space-cli-tools, Azure card; backend half: appflow TestCliTools.
+const azure = (key: string) => tools(key) as { tools: { provider: string }[] };
+
+test('contract: the Azure card walks the az setup and reads each state', async ({ relaunch }) => {
+  const { page, handle } = await openPane(relaunch, [
+    { channel: IPC.cliTools, response: azure('azure-no-defaults') },
+  ]);
+  await expect(page.locator(t('cli-tool-status-azure'))).toHaveText('Not signed in');
+  await expect(page.locator(t('cli-tool-reason-azure'))).toContainText(
+    'set a default organization',
+  );
+  const steps = page.locator(t('cli-tool-steps-azure'));
+  await expect(steps).toContainText('Add the Azure DevOps extension');
+  await expect(steps).toContainText('az extension add --name azure-devops');
+  await expect(steps).toContainText('Set your default organization and project');
+  await expect(steps).toContainText('az devops configure --defaults');
+  await page.locator(t('cli-tool-docs-azure')).click();
+  await expect.poll(() => calls(handle, IPC.linkOpenExternal)).toHaveLength(1);
+  expect(JSON.stringify(calls(handle, IPC.linkOpenExternal)[0]?.args)).toContain(
+    'learn.microsoft.com',
+  );
+});
+
+test('contract: a missing extension reads Not installed', async ({ relaunch }) => {
+  const { page } = await openPane(relaunch, [
+    { channel: IPC.cliTools, response: azure('azure-no-extension') },
+  ]);
+  await expect(page.locator(t('cli-tool-status-azure'))).toHaveText('Not installed');
+  await expect(page.locator(t('cli-tool-reason-azure'))).toContainText('az extension add');
+});
+
+test('contract: a signed-in Azure card shows version, account and organization', async ({
+  relaunch,
+}) => {
+  const { page } = await openPane(relaunch, [
+    { channel: IPC.cliTools, response: azure('azure-ready') },
+  ]);
+  await expect(page.locator(t('cli-tool-status-azure'))).toHaveText('Ready');
+  const details = page.locator(t('cli-tool-details-azure'));
+  await expect(details).toContainText('2.91.0 (azure-devops 1.0.10)');
+  await expect(details).toContainText('me@acme.test');
+  await expect(details).toContainText('https://dev.azure.com/acme');
+});
+
+test('contract: copying the extension command', async ({ relaunch }) => {
+  const { page } = await openPane(relaunch, [
+    { channel: IPC.cliTools, response: azure('azure-ready') },
+  ]);
+  await page.evaluate(() => {
+    const w = window as unknown as { __clipboard: string[] };
+    w.__clipboard = [];
+    navigator.clipboard.writeText = async (text: string) => {
+      w.__clipboard.push(text);
+    };
+  });
+  await page.locator(t('cli-tool-copy-azure-extension')).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard[0]),
+    )
+    .toBe('az extension add --name azure-devops');
+});

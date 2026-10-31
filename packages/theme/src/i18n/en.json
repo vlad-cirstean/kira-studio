@@ -9805,6 +9805,12 @@
           "check": {
             "label": "Verify"
           },
+          "defaults": {
+            "label": "Set your default organization and project"
+          },
+          "extension": {
+            "label": "Add the Azure DevOps extension"
+          },
           "install": {
             "label": "Install"
           },

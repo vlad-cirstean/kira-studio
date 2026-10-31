@@ -32,6 +32,8 @@ export const PROPER_NOUNS: readonly string[] = [
   'Claude',
   'Git',
   'GitHub',
+  'Azure',
+  'DevOps',
   'Docker Desktop',
   'Docker',
   'Jira',
