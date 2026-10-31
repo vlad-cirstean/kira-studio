@@ -1,0 +1,51 @@
+{
+  "continuation_token": null,
+  "results": [
+    {
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+        {
+          "pullRequestId": 12,
+          "title": "PROJ-7 Add login",
+          "status": "active",
+          "isDraft": false,
+          "sourceRefName": "refs/heads/feature/login",
+          "targetRefName": "refs/heads/main",
+          "creationDate": "2024-05-03T10:00:00Z",
+          "lastMergeSourceCommit": { "commitId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+          "createdBy": { "uniqueName": "ann@example.com" },
+          "reviewers": [{ "vote": 10, "isRequired": true }],
+          "url": "https://dev.azure.com/acme/9f0f/_apis/git/repositories/1c1c/pullRequests/12"
+        }
+      ]
+    },
+    {
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+        {
+          "pullRequestId": 15,
+          "title": "Fork: tweak build",
+          "status": "active",
+          "isDraft": false,
+          "sourceRefName": "refs/heads/feature/login",
+          "targetRefName": "refs/heads/main",
+          "creationDate": "2024-05-04T09:00:00Z",
+          "lastMergeSourceCommit": { "commitId": "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0" },
+          "createdBy": { "uniqueName": "mallory@example.com" },
+          "reviewers": [],
+          "forkSource": { "repository": { "name": "api-fork", "project": { "name": "Sandbox" } } }
+        },
+        {
+          "pullRequestId": 12,
+          "title": "PROJ-7 Add login",
+          "status": "active",
+          "isDraft": false,
+          "sourceRefName": "refs/heads/feature/login",
+          "targetRefName": "refs/heads/main",
+          "creationDate": "2024-05-03T10:00:00Z",
+          "lastMergeSourceCommit": { "commitId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+          "createdBy": { "uniqueName": "ann@example.com" },
+          "reviewers": [{ "vote": 10, "isRequired": true }]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+[
+  { "status": "rejected", "type": "Build" },
+  { "status": "running", "type": "Status" },
+  { "status": "approved", "type": "Minimum number of reviewers" },
+  { "status": "notApplicable", "type": "Work item linking" }
+]

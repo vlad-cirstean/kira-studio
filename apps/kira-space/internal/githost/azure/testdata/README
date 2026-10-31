@@ -1,0 +1,13 @@
+Fixtures for the azure package. Sources:
+
+Captured with azure-cli 2.91.0 and azure-devops extension 1.0.10 (stderr text and `configure --list` format
+verbatim; version*.json trimmed to the keys the parser reads):
+  version.json, version_noext.json, configure_list.txt, configure_list_empty.txt,
+  stderr_logged_out.txt, stderr_account.txt
+
+Hand-written from the Azure DevOps REST shapes the extension's SDK models use. They AWAIT CONFIRMATION
+against a real organization; see docs/DEV_ENVIRONMENT.md "az fixtures (P423)" to refresh them:
+  pr_list.json, pr_show.json   output of the `--query` projections in client.go (prListQuery, prShowQuery)
+  policy_list.json             output of policyQuery
+  pr_query.json                `az devops invoke` pullRequestQuery result (raw REST plus continuation_token)
+  threads_post.json            `az devops invoke` pullRequestThreads POST result
