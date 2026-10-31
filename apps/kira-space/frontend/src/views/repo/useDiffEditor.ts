@@ -166,7 +166,7 @@ export interface DiffEditorParams {
    *  supplies both (a root commit's left is git's well-known empty-tree sha, never null). */
   left: string | null;
   right: string | null;
-  /** Only toggles glyphMargin (§7.3 gotcha 1) — the review object itself,
+  /** Only turns the glyph margin off (§7.3 gotcha 1) — the review object itself,
    *  and attaching its comment-thread layer, stay the caller's own concern. */
   review: boolean;
   /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
@@ -276,9 +276,9 @@ export function useDiffEditor(
         revealLineCount: 20,
       },
       // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
-      // for the review variant rather than depend on either being right in a future Monaco bump.
+      // (off: the review marks live in the line numbers and hunk rows) rather than depend on either being right in a future Monaco bump.
       // The plain diff passes nothing, unchanged from before this phase.
-      ...(review ? { glyphMargin: true } : {}),
+      ...(review ? { glyphMargin: false } : {}),
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       fontFamily: settingsStore.appearance.fontFamily,

@@ -10,11 +10,10 @@
  * this module places a decoration at `comment.range.start` and renders `anchor` as a label, the
  * same two lines of logic `reviewComments.ts:63-74` already uses.
  *
- * Two decoration lanes keep a hunk glyph and a comment glyph from colliding on the same line:
- * hunk state renders in `GlyphMarginLane.Right`, comment/add-comment glyphs in
- * `GlyphMarginLane.Left`. Monaco lays lanes out per line, so both persist (`persistLane`) and
- * `laneCollection` reserves Left up front: the margin is always two lanes wide and hovering a
- * line never shifts a glyph.
+ * The gutter has no glyph margin. The hovered line's number turns into the add mark and a commented
+ * line's number is tinted (`lineNumberClassName`); a click on either number opens the composer or
+ * the thread. Each hunk gets a one-line view zone above its first changed line whose margin node
+ * holds the reviewed mark. View zones are not model lines, so every line coordinate stays put.
  */
 
 import {
@@ -40,6 +39,7 @@ import { type App, createApp, shallowRef } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
 import ReviewBanner from './ReviewBanner.vue';
+import ReviewHunkMark from './ReviewHunkMark.vue';
 import ReviewThread from './ReviewThread.vue';
 
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
@@ -132,8 +132,20 @@ export function attachReviewDecorations(
 ): ReviewDecorationsHandle {
   const modifiedEditor: ModifiedEditor = diffEditor.getModifiedEditor();
   // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
-  // rather than depend on either being right in a future Monaco bump.
-  modifiedEditor.updateOptions({ glyphMargin: true });
+  // rather than depend on either being right in a future Monaco bump. A click on a line number
+  // adds or opens a comment, so it must not also select the line.
+  modifiedEditor.updateOptions({ glyphMargin: false, selectOnLineNumbers: false });
+  // Monaco forces a glyph margin onto the original pane side by side; switch it off again.
+  const originalEditor = diffEditor.getOriginalEditor();
+  const keepGlyphMarginOff = (): void => {
+    if (originalEditor.getOption(mod.editor.EditorOption.glyphMargin)) {
+      originalEditor.updateOptions({ glyphMargin: false });
+    }
+  };
+  keepGlyphMarginOff();
+  const glyphMarginDisposable = originalEditor.onDidChangeConfiguration((e) => {
+    if (e.hasChanged(mod.editor.EditorOption.glyphMargin)) keepGlyphMarginOff();
+  });
 
   let disposed = false;
   // Separate counters per resource -- loadDiff and loadComments used to share one loadSeq,
@@ -151,16 +163,11 @@ export function attachReviewDecorations(
   let lineCount = 0;
   let comments: readonly ReviewComment[] = [];
 
-  // Line number -> the hunk block/reviewed state at that line, rebuilt every paint() — what the
-  // click handler looks up instead of re-walking `hunks` on every gutter click.
-  let hunkByLine = new Map<number, { block: LineRange; reviewed: boolean }>();
   let commentByLine = new Map<number, ReviewComment>();
 
   const reviewedLineCollection = modifiedEditor.createDecorationsCollection([]);
-  const hunkCollection = modifiedEditor.createDecorationsCollection([]);
   const commentCollection = modifiedEditor.createDecorationsCollection([]);
   const addGlyphCollection = modifiedEditor.createDecorationsCollection([]);
-  const laneCollection = modifiedEditor.createDecorationsCollection([]);
 
   let hoverLine: number | null = null;
   let openThreadCommentId: number | null = null;
@@ -199,6 +206,8 @@ export function attachReviewDecorations(
     const zone: ViewZone = {
       afterLineNumber: afterLine,
       ordinal: 0,
+      // A thread on the last visible line before a collapsed region would otherwise count as hidden.
+      showInHiddenAreas: true,
       heightInPx: 120,
       domNode: document.createElement('div'),
       onDomNodeTop: (top) => {
@@ -287,12 +296,58 @@ export function attachReviewDecorations(
       {
         range: new mod.Range(hoverLine, 1, hoverLine, 1),
         options: {
-          glyphMarginClassName: 'codicon codicon-add kira-review-glyph kira-review-glyph-add',
-          glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
-          glyphMarginHoverMessage: { value: t('space.repo.reviewEditor.addComment.tooltip') },
+          lineNumberClassName: 'kira-review-ln kira-review-ln-add',
+          lineNumberHoverMessage: { value: t('space.repo.reviewEditor.addComment.tooltip') },
         },
       },
     ]);
+  }
+
+  // One-line view zone per hunk, above its first changed line; the margin node holds the mark.
+  let hunkRowKey = '';
+  let hunkZoneIds: string[] = [];
+  let hunkApps: App[] = [];
+
+  function clearHunkRows(): void {
+    const ids = hunkZoneIds;
+    hunkZoneIds = [];
+    for (const app of hunkApps) app.unmount();
+    hunkApps = [];
+    hunkRowKey = '';
+    if (ids.length === 0) return;
+    modifiedEditor.changeViewZones((accessor) => {
+      for (const id of ids) accessor.removeZone(id);
+    });
+  }
+
+  function paintHunkRows(rows: readonly { block: LineRange; reviewed: boolean }[]): void {
+    const key = rows.map((r) => `${r.block.start}:${r.reviewed ? 1 : 0}`).join(',');
+    if (key === hunkRowKey) return;
+    clearHunkRows();
+    hunkRowKey = key;
+    if (rows.length === 0) return;
+    modifiedEditor.changeViewZones((accessor) => {
+      for (const { block, reviewed } of rows) {
+        const marginDomNode = document.createElement('div');
+        const app = createApp(ReviewHunkMark, {
+          reviewed,
+          onToggle: () => void mark(block, !reviewed),
+        });
+        app.use(i18n);
+        app.mount(marginDomNode);
+        hunkApps.push(app);
+        hunkZoneIds.push(
+          accessor.addZone({
+            afterLineNumber: block.start - 1,
+            heightInLines: 1,
+            ordinal: 1,
+            domNode: document.createElement('div'),
+            marginDomNode,
+            suppressMouseDown: true,
+          }),
+        );
+      }
+    });
   }
 
   function paint(): void {
@@ -321,32 +376,14 @@ export function attachReviewDecorations(
           ),
     );
 
-    const nextHunkByLine = new Map<number, { block: LineRange; reviewed: boolean }>();
-    const hunkDecorations: DeltaDecoration[] = [];
+    const hunkRows: { block: LineRange; reviewed: boolean }[] = [];
     if (bodyKind === 'text') {
       for (const hunk of hunks) {
         const block = hunkChangeBlock(hunk);
-        if (!block) continue;
-        const reviewed = coverage(block, reviewedRanges) === 'full';
-        nextHunkByLine.set(block.start, { block, reviewed });
-        hunkDecorations.push({
-          range: new mod.Range(block.start, 1, block.start, 1),
-          options: {
-            glyphMarginClassName: reviewed
-              ? 'codicon codicon-pass-filled kira-review-glyph kira-review-glyph-reviewed'
-              : 'codicon codicon-circle-large-outline kira-review-glyph kira-review-glyph-actionable',
-            glyphMargin: { position: mod.editor.GlyphMarginLane.Right, persistLane: true },
-            glyphMarginHoverMessage: {
-              value: reviewed
-                ? t('common.markUnreviewed.tooltip')
-                : t('common.markReviewed.tooltip'),
-            },
-          },
-        });
+        if (block) hunkRows.push({ block, reviewed: coverage(block, reviewedRanges) === 'full' });
       }
     }
-    hunkByLine = nextHunkByLine;
-    hunkCollection.set(hunkDecorations);
+    paintHunkRows(hunkRows);
 
     const nextCommentByLine = new Map<number, ReviewComment>();
     for (const comment of comments) nextCommentByLine.set(comment.range.start, comment);
@@ -356,26 +393,13 @@ export function attachReviewDecorations(
         (c): DeltaDecoration => ({
           range: new mod.Range(c.range.start, 1, c.range.start, 1),
           options: {
-            glyphMarginClassName:
-              'codicon codicon-comment kira-review-glyph kira-review-glyph-comment',
-            glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
-            glyphMarginHoverMessage: commentHoverMessage(c),
+            lineNumberClassName: 'kira-review-ln kira-review-ln-comment',
+            lineNumberHoverMessage: commentHoverMessage(c),
           },
         }),
       ),
     );
     paintAddGlyph();
-    // Monaco drops a decoration with an empty glyph class, so the name must be non-empty.
-    laneCollection.set([
-      {
-        range: new mod.Range(1, 1, 1, 1),
-        options: {
-          glyphMarginClassName: 'kira-review-lane',
-          glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
-        },
-      },
-    ]);
-
     // A repaint can move or remove the line the open thread was anchored to (a mark/comment
     // mutation elsewhere, §7.6) — close it rather than leave it pointing at a stale line.
     if (openThreadCommentId !== null) {
@@ -671,18 +695,12 @@ export function attachReviewDecorations(
   }
 
   const mouseDownDisposable = modifiedEditor.onMouseDown((e) => {
-    if (e.target.type !== mod.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+    if (e.target.type !== mod.editor.MouseTargetType.GUTTER_LINE_NUMBERS) return;
     const line = e.target.position?.lineNumber;
     if (line === undefined) return;
-    const lane = e.target.detail.glyphMarginLane;
-    if (lane === mod.editor.GlyphMarginLane.Right) {
-      const hunk = hunkByLine.get(line);
-      if (hunk) void mark(hunk.block, !hunk.reviewed);
-    } else if (lane === mod.editor.GlyphMarginLane.Left) {
-      const comment = commentByLine.get(line);
-      if (comment) toggleThread(comment);
-      else if (hoverLine === line) openCompose(line);
-    }
+    const comment = commentByLine.get(line);
+    if (comment) toggleThread(comment);
+    else if (hoverLine === line) openCompose(line);
   });
 
   const mouseMoveDisposable = modifiedEditor.onMouseMove((e) => {
@@ -750,6 +768,7 @@ export function attachReviewDecorations(
     dispose(): void {
       disposed = true;
       diffUpdateDisposable.dispose();
+      glyphMarginDisposable.dispose();
       unsubscribeRepaint();
       closeZone();
       closeErrorZone();
@@ -760,10 +779,9 @@ export function attachReviewDecorations(
       markReviewedAction.dispose();
       markUnreviewedAction.dispose();
       reviewedLineCollection.clear();
-      hunkCollection.clear();
+      clearHunkRows();
       commentCollection.clear();
       addGlyphCollection.clear();
-      laneCollection.clear();
       // 7d (P68 review): this module is what leases deps.transport (gitTransportFor, called once
       // per mount by RepoDiffView.vue) — nothing else holds a reference to release it.
       deps.transport.dispose();
