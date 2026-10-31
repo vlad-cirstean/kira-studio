@@ -2,8 +2,9 @@
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { usePlanModel } from '../plan/usePlanModel';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeAllSessions from './AdeAllSessions.vue';
 import AdeNeedsRow from './AdeNeedsRow.vue';
 
@@ -11,7 +12,7 @@ import AdeNeedsRow from './AdeNeedsRow.vue';
 // All sessions toggle.
 const { model } = usePlanModel();
 const needs = computed(() => model.value?.needs ?? null);
-const showAll = ref(false);
+const ui = useAdeBoardUiStore();
 
 function taskOf(taskId: string): { title: string; color: string } {
   const card = model.value?.cardFor(taskId);
@@ -56,15 +57,15 @@ function taskOf(taskId: string): { title: string; color: string } {
             variant="dialog"
             size="kira-lg"
             data-testid="ade-needs-all"
-            @click="showAll = !showAll"
+            @click="ui.showAllSessions = !ui.showAllSessions"
           >
             {{
-              showAll ? t('space.ade.needsPage.hideAll.label') : t('space.ade.needsPage.showAll.label')
+              ui.showAllSessions ? t('space.ade.needsPage.hideAll.label') : t('space.ade.needsPage.showAll.label')
             }}
           </Button>
         </div>
       </template>
-      <AdeAllSessions v-if="showAll" />
+      <AdeAllSessions v-if="ui.showAllSessions" />
     </div>
   </div>
 </template>

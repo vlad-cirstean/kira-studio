@@ -29,6 +29,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const actionError = ref<Record<string, string>>({});
   /** Per repo: what the last fetch changed, shown on its chip until the next fetch. */
   const refreshSummary = ref<Record<string, string>>({});
+  /** The Needs page's All sessions list is open; the status bar's Show all sessions sets it. */
+  const showAllSessions = ref(false);
   const showAllItems = usePersistedState('kira.ade.showAllItems', false);
   const showHistory = usePersistedState('kira.ade.showHistory', false);
   const hiddenRepoIds = usePersistedState<string[]>('kira.ade.hiddenRepoIds', []);
@@ -87,6 +89,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     focusRebaseLog,
     actionError,
     refreshSummary,
+    showAllSessions,
     showAllItems,
     showHistory,
     hiddenRepoIds,
