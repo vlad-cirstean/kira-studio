@@ -87,7 +87,9 @@ async function moveShelf(): Promise<void> {
   }
 }
 
-const tone = computed(() => (props.card.parked ? 'grey' : props.card.status.tone));
+const chip = computed(() =>
+  props.card.parked ? { tone: 'grey' as const } : { color: props.card.status.color },
+);
 const label = computed(() =>
   props.card.parked ? t('space.ade.board.notMerging.label') : props.card.status.name,
 );
@@ -191,7 +193,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           :style="card.parked ? { borderColor: card.color } : { background: card.color }"
           data-testid="ade-panel-dot"
         />
-        <AdeChip :label="label" :tone="tone" />
+        <AdeChip :label="label" v-bind="chip" />
         <AdeChip
           v-if="card.blocked"
           :label="t('space.common.status.blocked.status')"

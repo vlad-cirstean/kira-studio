@@ -15,14 +15,17 @@ import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { useImportWorkflow, useNewWorkflow, useWorkflows } from '../queries';
+import { useBoard } from '../readQueries';
 import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { WorkflowEntry } from '../wire';
 import AdeWorkflowEditor from './AdeWorkflowEditor.vue';
+import AdeTaskStatuses from './statuses/AdeTaskStatuses.vue';
 
 // Workflows page (SPEC2 section 5.1): the list of workflow files beside the editor for the picked one.
 const { info } = useAgentInfo();
 const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
+const board = useBoard();
 const importWf = useImportWorkflow();
 const newWf = useNewWorkflow();
 
@@ -57,8 +60,17 @@ function stepList(e: WorkflowEntry): string {
   return e.workflow ? e.workflow.steps.map((s) => s.name).join(' › ') : '';
 }
 
+const statusNames = computed(() =>
+  (board.data.value?.statuses ?? []).map((s) => s.name).join(' › '),
+);
+const showStatuses = computed(() => wfUi.pane === 'statuses');
+const selectedFile = computed(() =>
+  showStatuses.value ? null : (current.value?.fileName ?? null),
+);
+
 async function pick(fileName: string): Promise<void> {
-  if (fileName !== current.value?.fileName && !(await wfUi.leave())) return;
+  if (fileName !== selectedFile.value && !(await wfUi.leave())) return;
+  wfUi.pane = 'workflow';
   wfUi.workflowFile = fileName;
 }
 
@@ -68,6 +80,7 @@ async function runImport(): Promise<void> {
   listError.value = '';
   try {
     const entry = await importWf.mutateAsync({ path });
+    wfUi.pane = 'workflow';
     wfUi.workflowFile = entry.fileName;
     wfUi.workflowMode = 'yaml';
     importPath.value = '';
@@ -82,6 +95,7 @@ async function createNew(): Promise<void> {
   listError.value = '';
   try {
     const entry = await newWf.mutateAsync({ name: t('space.ade.workflows.page.new.label') });
+    wfUi.pane = 'workflow';
     wfUi.workflowFile = entry.fileName;
     wfUi.workflowMode = 'graph';
   } catch (err) {
@@ -146,10 +160,27 @@ async function createNew(): Promise<void> {
           {{ t('space.ade.workflows.page.empty.emptyHint', { dir }) }}
         </InlineState>
         <button
+          type="button"
+          :class="rowClass(showStatuses)"
+          data-testid="ade-wf-statuses-row"
+          @click="wfUi.openStatuses()"
+        >
+          <span class="min-w-0 truncate text-kira-lg font-medium">{{
+            t('space.ade.workflows.page.statuses.label')
+          }}</span>
+          <span
+            class="max-w-full truncate text-kira-sm text-muted-foreground"
+            data-testid="ade-wf-statuses-names"
+            >{{
+              statusNames
+            }}</span
+          >
+        </button>
+        <button
           v-for="e in entries"
           :key="e.fileName"
           type="button"
-          :class="rowClass(current?.fileName === e.fileName)"
+          :class="rowClass(selectedFile === e.fileName)"
           data-testid="ade-wf-row"
           :data-file="e.fileName"
           @click="pick(e.fileName)"
@@ -190,10 +221,13 @@ async function createNew(): Promise<void> {
     </div>
     <div :class="cn(paneFrame, 'flex flex-1 flex-col')">
       <PanelHeader>{{
-        current?.workflow?.name ?? current?.fileName ?? t('space.common.workflow.label')
+        showStatuses
+          ? t('space.ade.workflows.page.statuses.label')
+          : (current?.workflow?.name ?? current?.fileName ?? t('space.common.workflow.label'))
       }}</PanelHeader>
       <div class="min-h-0 flex-1 overflow-auto p-4">
-        <AdeWorkflowEditor v-if="current" :key="current.fileName" :entry="current" />
+        <AdeTaskStatuses v-if="showStatuses" />
+        <AdeWorkflowEditor v-else-if="current" :key="current.fileName" :entry="current" />
       </div>
     </div>
   </div>

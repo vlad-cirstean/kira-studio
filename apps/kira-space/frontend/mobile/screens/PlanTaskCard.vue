@@ -36,7 +36,7 @@ const stopFirst = computed(() => props.card.moves.live);
       <span class="flex min-w-0 flex-1 flex-col gap-1">
         <span class="text-kira-md">{{ card.title }}</span>
         <span class="flex flex-wrap items-center gap-1.5 text-kira-sm">
-          <AdeChip :label="card.status.name" :tone="card.status.tone" />
+          <AdeChip :label="card.status.name" :color="card.status.color" />
           <AdeChip
             v-if="card.blocked"
             :label="t('space.common.status.blocked.status')"

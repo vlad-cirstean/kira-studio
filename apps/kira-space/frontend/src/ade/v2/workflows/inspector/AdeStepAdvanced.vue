@@ -6,10 +6,10 @@ import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
-import { useSettingsStore } from '../../../../state/settings';
 import { formatTools, parseTools } from '../../board/workflowForm';
 import { useBoard } from '../../queries';
 import { useAdeWorkflowDraftStore } from '../../state/adeWorkflowDraft';
+import { useAdeWorkflowsUiStore } from '../../state/adeWorkflowsUi';
 import type { WorkflowStep } from '../../wire';
 import AdeStepSandbox from './AdeStepSandbox.vue';
 
@@ -18,20 +18,30 @@ const emit = defineEmits<{ patch: [p: Partial<WorkflowStep>] }>();
 const draft = useAdeWorkflowDraftStore();
 const board = useBoard();
 const statuses = computed(() => board.data.value?.statuses ?? []);
-const settings = useSettingsStore();
-const missing = computed(
-  () => statuses.value.length > 0 && !statuses.value.some((s) => s.id === props.step.status),
-);
-// A step whose status left the set applies the first status of its kind's default category.
-const missingLabel = computed(() => {
-  const fallback = statuses.value.find(
-    (s) => s.category === (props.step.kind === 'review' ? 'review' : 'active'),
-  );
-  return t('space.ade.workflows.stepInspector.statusMissing.label', {
-    id: props.step.status,
-    fallback: fallback?.name ?? '',
-  });
+const wfUi = useAdeWorkflowsUiStore();
+// A step with no status uses the default of its kind; a deleted status falls back to it too.
+const defaultName = computed(() => {
+  const d = board.data.value?.statusDefaults;
+  const id = props.step.kind === 'review' ? d?.review : d?.step;
+  return statuses.value.find((s) => s.id === id)?.name ?? '';
 });
+const defaultLabel = computed(() =>
+  defaultName.value
+    ? t('space.ade.workflows.stepInspector.statusDefault.label', { status: defaultName.value })
+    : t('space.ade.workflows.stepInspector.statusDefaultKeep.label'),
+);
+const missing = computed(
+  () =>
+    props.step.status !== '' &&
+    statuses.value.length > 0 &&
+    !statuses.value.some((s) => s.id === props.step.status),
+);
+const missingLabel = computed(() =>
+  t('space.ade.workflows.stepInspector.statusMissing.label', {
+    id: props.step.status,
+    status: defaultName.value || t('space.ade.workflows.stepInspector.statusDefaultKeep.label'),
+  }),
+);
 const id = (k: string): string => `ade-wf-step-${k}-${props.step.id}`;
 
 const toolsText = ref(formatTools(props.step.allowedTools));
@@ -89,6 +99,7 @@ function onTools(v: string | number): void {
       data-testid="ade-wf-step-status"
       @update:model-value="(v) => emit('patch', { status: String(v) as WorkflowStep['status'] })"
     >
+      <option value="">{{ defaultLabel }}</option>
       <option v-if="missing" :value="step.status">{{ missingLabel }}</option>
       <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
     </NativeSelect>
@@ -96,7 +107,7 @@ function onTools(v: string | number): void {
       variant="link"
       size="kira"
       data-testid="ade-step-edit-statuses"
-      @click="settings.openSettingsAt('Task statuses')"
+      @click="wfUi.openStatuses()"
       >{{
         t('space.ade.workflows.stepInspector.editStatuses.label')
       }}</Button

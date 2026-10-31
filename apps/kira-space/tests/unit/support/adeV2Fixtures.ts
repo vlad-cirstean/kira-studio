@@ -6,6 +6,7 @@ import type {
   Branch,
   Plan,
   Run,
+  StatusDefaults,
   Task,
   TaskStatusDef,
   WorkflowStep,
@@ -14,11 +15,18 @@ import type {
 // Builders for the pure-logic specs: every field defaulted, a spec overrides only what it asserts on.
 
 export const DEFAULT_STATUSES: TaskStatusDef[] = [
-  { id: 'todo', name: 'To do', tone: 'grey', category: 'todo' },
-  { id: 'in-progress', name: 'In progress', tone: 'amber', category: 'active' },
-  { id: 'in-review', name: 'In review', tone: 'blue', category: 'review' },
-  { id: 'done', name: 'Done', tone: 'green', category: 'done' },
+  { id: 'todo', name: 'To do', color: 'grey' },
+  { id: 'in-progress', name: 'In progress', color: 'amber' },
+  { id: 'in-review', name: 'In review', color: 'blue' },
+  { id: 'done', name: 'Done', color: 'green' },
 ];
+
+export const DEFAULT_STATUS_DEFAULTS: StatusDefaults = {
+  new: 'todo',
+  step: 'in-progress',
+  review: 'in-review',
+  finished: 'done',
+};
 
 export function mkBranch(over: Partial<Branch> & Pick<Branch, 'id' | 'taskId'>): Branch {
   return {
@@ -76,6 +84,7 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     createdAt: 0,
     statusId: 'todo',
     statusBy: 'auto',
+    statusStep: '',
     handoverIn: null,
     handoverDrafts: [],
     branchRequestId: '',

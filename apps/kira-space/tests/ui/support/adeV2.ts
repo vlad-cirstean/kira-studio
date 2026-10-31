@@ -159,7 +159,10 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskRemoveArtifact },
     {
       channel: IPC.adeTaskSaveStatuses,
-      response: { statuses: adeFixture<{ statuses: unknown[] }>('board').statuses },
+      response: (() => {
+        const b = adeFixture<{ statuses: unknown[]; statusDefaults: unknown }>('board');
+        return { statuses: b.statuses, defaults: b.statusDefaults };
+      })(),
     },
     { channel: IPC.adeTaskRetrySetup },
     { channel: IPC.adeTaskReadLog, response: adeFixture('log-page') },

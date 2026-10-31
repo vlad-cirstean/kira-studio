@@ -196,7 +196,15 @@ func TestTaskStatuses(t *testing.T) {
 	toTodo := cur()
 	toTodo.Statuses = append(toTodo.Statuses[:1], toTodo.Statuses[2:]...)
 	toTodo.Reassign = map[string]string{"in-progress": "todo"}
-	app.Contract(t, "ade-task-statuses", "args:AdeTaskService.SaveStatuses#delete", toTodo)
+	// The editor moves the defaults that name the removed status itself; the server also does it when
+	// they arrive unmoved (toTodo below).
+	sent := adewire.SaveStatusesArgs{
+		Statuses: []adewire.TaskStatusDef{renamed.Statuses[0], renamed.Statuses[2], renamed.Statuses[3]},
+		Defaults: renamed.Defaults,
+		Reassign: toTodo.Reassign,
+	}
+	sent.Defaults.Step = "todo"
+	app.Contract(t, "ade-task-statuses", "args:AdeTaskService.SaveStatuses#delete", sent)
 	deleted := mustSave(toTodo)
 	if len(deleted.Statuses) != 3 || deleted.Defaults.Step != "todo" {
 		t.Fatalf("deleted = %+v", deleted)

@@ -130,6 +130,7 @@
       "createdAt": 1789808400000,
       "statusId": "in-review",
       "statusBy": "auto",
+      "statusStep": "release",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -243,6 +244,7 @@
       "createdAt": 1789722000000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "plan",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -545,6 +547,7 @@
       "createdAt": 1789635600000,
       "statusId": "in-review",
       "statusBy": "auto",
+      "statusStep": "review",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -763,6 +766,7 @@
       "createdAt": 1789549200000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "plan",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -918,6 +922,7 @@
       "createdAt": 1789462800000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "plan",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -986,6 +991,7 @@
       "createdAt": 1789376400000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "repro",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1054,6 +1060,7 @@
       "createdAt": 1789290000000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "update",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1188,6 +1195,7 @@
       "createdAt": 1789203600000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "plan",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1216,6 +1224,7 @@
       "createdAt": 1789117200000,
       "statusId": "in-progress",
       "statusBy": "auto",
+      "statusStep": "spec",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1244,6 +1253,7 @@
       "createdAt": 1789030800000,
       "statusId": "todo",
       "statusBy": "auto",
+      "statusStep": "",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1269,6 +1279,7 @@
       "createdAt": 1788944400000,
       "statusId": "in-review",
       "statusBy": "auto",
+      "statusStep": "",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1294,6 +1305,7 @@
       "createdAt": 1788858000000,
       "statusId": "in-review",
       "statusBy": "auto",
+      "statusStep": "",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1319,6 +1331,7 @@
       "createdAt": 1788771600000,
       "statusId": "todo",
       "statusBy": "auto",
+      "statusStep": "",
       "handoverIn": null,
       "branchRequestId": "",
       "handoverDrafts": []
@@ -1328,28 +1341,30 @@
     {
       "id": "todo",
       "name": "To do",
-      "tone": "grey",
-      "category": "todo"
+      "color": "grey"
     },
     {
       "id": "in-progress",
       "name": "In progress",
-      "tone": "amber",
-      "category": "active"
+      "color": "amber"
     },
     {
       "id": "in-review",
       "name": "In review",
-      "tone": "blue",
-      "category": "review"
+      "color": "blue"
     },
     {
       "id": "done",
       "name": "Done",
-      "tone": "green",
-      "category": "done"
+      "color": "green"
     }
   ],
+  "statusDefaults": {
+    "new": "todo",
+    "step": "in-progress",
+    "review": "in-review",
+    "finished": "done"
+  },
   "branches": [
     {
       "id": "b_cart",

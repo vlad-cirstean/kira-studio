@@ -391,6 +391,8 @@ export interface Task {
   statusId: TaskStatus;
   /** Who set the status last: a step change ('auto') or the user. */
   statusBy: 'auto' | 'user';
+  /** The workflow step whose position set the status; '' before the task starts. */
+  statusStep: string;
   /** The newest handed handover: what the last stage move left for this stage. */
   handoverIn: Handover | null;
   /** Open drafts sessions wrote; they become handed on the next stage move. */
@@ -460,12 +462,36 @@ export interface StepDoneArgs {
   taskId: string;
   notes?: string | null;
 }
-/** One status of the user's set. `category` decides which status automation picks. */
+/** The 16 status colours (`--color-status-*`). */
+export type StatusColor =
+  | 'grey'
+  | 'brown'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'yellow'
+  | 'lime'
+  | 'green'
+  | 'teal'
+  | 'cyan'
+  | 'sky'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'purple'
+  | 'pink';
+/** One status of the user's set: a label. Kira reads no meaning into its name, colour or order. */
 export interface TaskStatusDef {
   id: TaskStatus;
   name: string;
-  tone: 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
-  category: 'todo' | 'active' | 'review' | 'done';
+  color: StatusColor;
+}
+/** The status of each automatic change; '' keeps the current status. `new` is required: it is the status of a new task and of a task back at its first step with nothing run. `step` applies when a step with no status of its own starts, `review` when a review step with none starts, `finished` when the workflow finishes. */
+export interface StatusDefaults {
+  new: TaskStatus;
+  step: TaskStatus | '';
+  review: TaskStatus | '';
+  finished: TaskStatus | '';
 }
 export interface Plan {
   day: Record<string, string> /* taskId -> ISO date; absent = Later */;
@@ -490,6 +516,7 @@ export interface RepoState {
 export interface Board {
   tasks: Task[];
   statuses: TaskStatusDef[];
+  statusDefaults: StatusDefaults;
   branches: Branch[];
   plan: Plan;
   pairs: Pair[];
@@ -804,13 +831,15 @@ export interface TaskPatch {
   kind: 'task' | 'parked' | null;
   statusId: TaskStatus | null;
 }
-/** `id` '' = a new status. `reassign` maps a removed id to the id its tasks move to; without an entry they go to the first kept status of its category. */
+/** `id` '' = a new status. `reassign` maps every removed id to the id its tasks move to; a `defaults` field naming a removed status moves there too. */
 export interface SaveStatusesArgs {
   statuses: TaskStatusDef[];
+  defaults: StatusDefaults;
   reassign: Record<string, string>;
 }
 export interface SaveStatusesResult {
   statuses: TaskStatusDef[];
+  defaults: StatusDefaults;
 }
 export interface UpdateTaskArgs {
   taskId: string;

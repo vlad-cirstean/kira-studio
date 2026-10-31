@@ -204,6 +204,7 @@ function withSavedStatuses(board: Board, args: SaveStatusesArgs): Board {
       ...s,
       id: s.id || board.statuses.find((o) => o.name === s.name)?.id || s.name,
     })),
+    statusDefaults: args.defaults,
   };
 }
 

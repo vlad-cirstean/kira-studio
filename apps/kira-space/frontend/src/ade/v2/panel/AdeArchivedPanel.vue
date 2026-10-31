@@ -122,7 +122,7 @@ async function onRestore(): Promise<void> {
             <AdeChip
               v-if="status(a)"
               :label="status(a)!.name"
-              :tone="status(a)!.tone"
+              :color="status(a)!.color"
               data-testid="ade-archived-status"
             />
             <AdeTip :text="titleOf(a)">

@@ -8,7 +8,13 @@ import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
 import { useAgentSessionsStore } from '../../state';
 import { withTuiActivity } from '../activity';
-import { type BranchTag, branchTag, type TaskAction, taskCell } from '../board/actions';
+import {
+  type BranchTag,
+  branchTag,
+  type TaskAction,
+  type TaskCell,
+  taskCell,
+} from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
 import {
@@ -88,7 +94,7 @@ export interface CardModel {
   status: TaskStatusDef;
   /** A stuck or failed run or setup, shown beside the status. */
   blocked: boolean;
-  tag: { label: string; tone: BranchTag['tone']; tip: string; since?: number } | null;
+  tag: TaskCell['tag'] | null;
   /** Task step action; which kinds render is `useTaskAction`'s call. */
   action: TaskAction | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */

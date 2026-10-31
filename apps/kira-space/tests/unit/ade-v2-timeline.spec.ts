@@ -6,7 +6,13 @@ import {
   type TimelineInput,
 } from '../../frontend/src/ade/v2/board/timeline';
 import type { Board } from '../../frontend/src/ade/v2/wire';
-import { DEFAULT_STATUSES, mkBranch, mkPlan, mkTask } from './support/adeV2Fixtures';
+import {
+  DEFAULT_STATUS_DEFAULTS,
+  DEFAULT_STATUSES,
+  mkBranch,
+  mkPlan,
+  mkTask,
+} from './support/adeV2Fixtures';
 
 // 2026-09-22 is a Tuesday: offsets 4 and 5 are Sat/Sun, 6 is Mon.
 const TODAY = '2026-09-22';
@@ -52,6 +58,7 @@ function board(specs: TaskSpec[], extra: Partial<Board> = {}): Board {
     plan: mkPlan({ day, order: specs.map((s) => s.id) }),
     pairs: [],
     statuses: DEFAULT_STATUSES,
+    statusDefaults: DEFAULT_STATUS_DEFAULTS,
     history: [],
     repos: [],
     worktreeBasePath: '',

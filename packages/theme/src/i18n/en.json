@@ -2132,6 +2132,9 @@
       "blue": {
         "label": "Blue"
       },
+      "brown": {
+        "label": "Brown"
+      },
       "cyan": {
         "label": "Cyan"
       },
@@ -2141,14 +2144,38 @@
       "grey": {
         "label": "Grey"
       },
+      "indigo": {
+        "label": "Indigo"
+      },
+      "lime": {
+        "label": "Lime"
+      },
       "magenta": {
         "label": "Magenta"
+      },
+      "orange": {
+        "label": "Orange"
+      },
+      "pink": {
+        "label": "Pink"
       },
       "purple": {
         "label": "Purple"
       },
       "red": {
         "label": "Red"
+      },
+      "sky": {
+        "label": "Sky"
+      },
+      "teal": {
+        "label": "Teal"
+      },
+      "violet": {
+        "label": "Violet"
+      },
+      "yellow": {
+        "label": "Yellow"
       }
     },
     "command": {
@@ -8425,29 +8452,48 @@
         "add": {
           "label": "Add status"
         },
-        "category": {
-          "active": {
-            "label": "In progress"
+        "defaults": {
+          "description": "A workflow step can set its own status. These apply when it does not.",
+          "finished": {
+            "hint": "Keep current status leaves the task as it is.",
+            "label": "When the workflow finishes"
           },
-          "description": "Each status counts as one of four kinds of progress. Every kind needs at least one status.",
-          "label": "Counts as",
+          "keep": {
+            "label": "Keep current status"
+          },
+          "new": {
+            "hint": "Also used when a task goes back to its first step before anything ran.",
+            "label": "New tasks start in"
+          },
           "review": {
-            "label": "In review"
+            "hint": "Review steps and new review tasks.",
+            "label": "When a review starts"
           },
-          "todo": {
-            "label": "To do"
-          }
+          "step": {
+            "hint": "Unless the step picks its own status in the workflow.",
+            "label": "When a step starts"
+          },
+          "title": "Automatic changes"
         },
         "delete": {
           "tooltip": "Delete status"
         },
         "deleteDialog": {
-          "body": "{count} tasks are in {status}. Move them to another status first.",
-          "title": "Delete status and move its tasks"
+          "body": "Choose the status its tasks move to, archived tasks included.",
+          "defaults": {
+            "body": "Automatic changes using it: {slots}. They move to the same status."
+          },
+          "steps": {
+            "body": "{count} workflow step names it and uses its default instead. | {count} workflow steps name it and use their default instead."
+          },
+          "tasks": {
+            "body": "{count} task has it. | {count} tasks have it."
+          },
+          "title": "Delete {status}"
         },
-        "description": "Statuses a task moves through. Workflow steps set one automatically; you can move a task by hand at any time.",
-        "lastOfCategory": {
-          "tooltip": "Each category needs one status"
+        "description": "Statuses are labels for where a task stands. Kira reads nothing into a name, colour or order. It changes a task’s status only at the moments set below, and you can always move a task by hand. Editing a status never changes the tasks that have it.",
+        "lastOne": {
+          "tooltip": "Keep at least one status"
         },
         "newName": {
           "label": "New status"
@@ -8780,6 +8826,9 @@
           "new": {
             "label": "New workflow"
           },
+          "statuses": {
+            "label": "Task statuses"
+          },
           "usedBy": {
             "label": "Used by {count} task | Used by {count} tasks"
           }
@@ -8949,8 +8998,14 @@
           "status": {
             "label": "Task status while in this step"
           },
+          "statusDefault": {
+            "label": "Default ({status})"
+          },
+          "statusDefaultKeep": {
+            "label": "Default (keep current status)"
+          },
           "statusMissing": {
-            "label": "{id} (missing, uses {fallback})"
+            "label": "{id} is deleted; uses the default ({status})"
           },
           "tools": {
             "example": "Bash(git *), Edit",
@@ -9666,9 +9721,6 @@
         },
         "mobileAccess": {
           "label": "Mobile access"
-        },
-        "taskStatuses": {
-          "label": "Task statuses"
         }
       }
     },

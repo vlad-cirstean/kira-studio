@@ -68,9 +68,7 @@ const handoverSnippet = computed(() => {
 });
 
 // ---- status
-const why = computed(() =>
-  statusWhy(task.value, props.card.status, props.card.blocked, props.card.progress),
-);
+const why = computed(() => statusWhy(task.value, props.card.blocked, props.card.progress));
 
 // ---- links
 const jira = computed(() => task.value.jira);

@@ -88,10 +88,10 @@
   },
   "args:AdeTaskService.SaveStatuses#delete": {
     "defaults": {
-      "finished": "",
+      "finished": "done",
       "new": "todo",
-      "review": "done",
-      "step": "in-progress"
+      "review": "in-review",
+      "step": "todo"
     },
     "reassign": {
       "in-progress": "todo"

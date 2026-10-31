@@ -17,7 +17,6 @@ import FileTypesPane from './settings/FileTypesPane.vue';
 import GitPane from './settings/GitPane.vue';
 import MemoryPane from './settings/MemoryPane.vue';
 import MobileAccessPane from './settings/MobileAccessPane.vue';
-import TaskStatusesPane from './settings/TaskStatusesPane.vue';
 
 // Kira Studio's own workbench/SettingsDialog.vue — only the sections still relevant to a repo-only
 // workbench (state/settings.ts's own `sections`).
@@ -39,7 +38,6 @@ const sectionLabels = computed<Record<Section, string>>(() => ({
   'File types': t('space.settings.nav.fileTypes.label'),
   'Mobile access': t('space.settings.nav.mobileAccess.label'),
   Agent: agentInfo.value.productLabel,
-  'Task statuses': t('space.settings.nav.taskStatuses.label'),
   Memory: t('common.module.memory.label'),
   Prompts: t('llmPrompts.nav.label'),
   Advanced: t('common.advanced.label'),
@@ -114,13 +112,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <AgentPane
         :active="s.activeSection === 'Agent'"
-        :draft="s.draft"
-        :is-at-default="s.isAtDefault"
-        :reset-leaf="s.resetLeaf"
-        :register-field-error="s.registerFieldError"
-      />
-      <TaskStatusesPane
-        :active="s.activeSection === 'Task statuses'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

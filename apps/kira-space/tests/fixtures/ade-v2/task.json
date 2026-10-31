@@ -22,6 +22,7 @@
   "createdAt": 1789030800000,
   "statusId": "todo",
   "statusBy": "auto",
+  "statusStep": "",
   "handoverIn": null,
   "branchRequestId": "",
   "handoverDrafts": []

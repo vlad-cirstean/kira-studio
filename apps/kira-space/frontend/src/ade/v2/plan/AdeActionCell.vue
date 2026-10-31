@@ -6,12 +6,20 @@ import { computed } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { type BranchAction, type Tone, tagLabel } from '../board/actions';
+import type { StatusColor } from '../wire';
 import AdeBranchTip from './AdeBranchTip.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
 // One cell of the left action column: the derived tag and, for a branch, its action buttons.
 const props = defineProps<{
-  tag: { label: string; tone: Tone; tip: string; tipParts?: readonly TextPart[]; since?: number };
+  tag: {
+    label: string;
+    tone?: Tone;
+    color?: StatusColor;
+    tip: string;
+    tipParts?: readonly TextPart[];
+    since?: number;
+  };
   tall?: boolean;
   actions?: readonly BranchAction[];
   row?: BranchRowModel;
@@ -55,6 +63,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
       <AdeChip
         :label="label"
         :tone="tag.tone"
+        :color="tag.color"
         class="max-w-30 shrink truncate"
         data-testid="ade-tag"
       />
@@ -63,6 +72,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
       <AdeChip
         :label="label"
         :tone="tag.tone"
+        :color="tag.color"
         class="max-w-30 shrink truncate"
         data-testid="ade-tag"
       />

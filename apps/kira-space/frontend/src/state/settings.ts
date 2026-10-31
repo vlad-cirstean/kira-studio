@@ -13,7 +13,6 @@ export const sections = [
   'File types',
   'Mobile access',
   'Agent',
-  'Task statuses',
   'Memory',
   'Prompts',
   'Advanced',
