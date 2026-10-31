@@ -4,7 +4,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import { type AutomationOp, isAutomationOp } from '@workbench/automations/runs/runOps';
 import { triggerLabel, useAutomationOps } from '@workbench/automations/runs/useAutomationOps';
-import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import { formatDuration } from '@workbench/behaviour/format';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, type OpLogDetailLine, opLogMenuItems } from '@workbench/lib/opLog';
@@ -85,17 +84,13 @@ function detailsText(record: SpaceOpRecord): string {
 
 function menuFor(record: Row): MenuItem[] {
   if (isAutomationOp(record)) return auto.menuFor(record);
-  return [
-    ...opLogMenuItems(record, () => void opsStore.cancelOp(record.id), canCancel(record)),
-    {
-      type: 'item',
-      id: 'copy-details',
-      label: t('space.operations.copyDetails.label'),
-      icon: 'copy',
-      run: () =>
-        void copyAndAnnounce(detailsText(record), t('space.operations.copiedDetails.announce')),
-    },
-  ];
+  return opLogMenuItems(
+    record,
+    () => void opsStore.cancelOp(record.id),
+    canCancel(record),
+    undefined,
+    detailsText(record),
+  );
 }
 </script>
 

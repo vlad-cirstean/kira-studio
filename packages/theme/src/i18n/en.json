@@ -9339,12 +9339,6 @@
       "clearHint": {
         "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
-      "copiedDetails": {
-        "announce": "Copied details"
-      },
-      "copyDetails": {
-        "label": "Copy details"
-      },
       "module": {
         "label": "Module"
       },
@@ -14516,8 +14510,14 @@
       "copiedCommand": {
         "announce": "Copied command"
       },
+      "copiedDetails": {
+        "announce": "Copied details"
+      },
       "copiedError": {
         "announce": "Copied error"
+      },
+      "copyDetails": {
+        "label": "Copy details"
       },
       "copyError": {
         "label": "Copy error"
