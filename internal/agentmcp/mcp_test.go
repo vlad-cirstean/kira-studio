@@ -372,3 +372,39 @@ func TestReleaseCancelsBlockedCall(t *testing.T) {
 		t.Fatal("blocked call outlived its release")
 	}
 }
+
+// OnToolCall sees every tools/call with its grant's run and task, and the finish verdict.
+func TestOnToolCallReportsEveryCall(t *testing.T) {
+	type seen struct {
+		call  ToolCall
+		isErr bool
+	}
+	var mu sync.Mutex
+	var got []seen
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(string, Finish) {},
+		OnToolCall: func(ctx context.Context, c ToolCall) (context.Context, func(bool, string, error)) {
+			return ctx, func(isErr bool, _ string, _ error) {
+				mu.Lock()
+				got = append(got, seen{c, isErr})
+				mu.Unlock()
+			}
+		}})
+	t.Cleanup(func() { _ = srv.Close() })
+	cfg, release, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-1", TaskID: "task-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	sess, err := connect(t, cfg, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": "done", "summary": "s"}}); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 || got[0].call.Tool != "finish_step" || got[0].call.RunID != "run-1" || got[0].call.TaskID != "task-1" || got[0].isErr {
+		t.Fatalf("calls = %+v", got)
+	}
+}

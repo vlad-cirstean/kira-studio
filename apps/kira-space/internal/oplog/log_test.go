@@ -116,3 +116,29 @@ func TestConcurrentOpsEmitRunningFirstFinalLast(t *testing.T) {
 		}
 	}
 }
+
+func TestBackgroundFailureDedupe(t *testing.T) {
+	l := New()
+	fail := func(kind, root, msg string) {
+		op := l.Start(WithOrigin(context.Background(), Origin{Module: ModuleGit, Background: true}), Meta{Kind: kind, RepoRoot: root})
+		op.Finish(StatusError, msg)
+	}
+	fail("status", "/r", "fatal: x\nmore")
+	fail("status", "/r", "fatal: x\nother tail")
+	fail("status", "/other", "fatal: x")
+	fail("fetch", "/r", "fatal: x")
+	fail("status", "/r", "fatal: different")
+	recs := l.Recent(100)
+	if len(recs) != 4 {
+		t.Fatalf("rows = %d, want 4", len(recs))
+	}
+	var folded int
+	for _, r := range recs {
+		if r.Kind == "status" && r.RepoRoot == "/r" && r.Error != nil && *r.Error == "fatal: x\nmore" {
+			folded = r.Repeat
+		}
+	}
+	if folded != 2 {
+		t.Fatalf("repeat = %d, want 2", folded)
+	}
+}

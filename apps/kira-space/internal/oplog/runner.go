@@ -38,11 +38,15 @@ func (r *RecordingRunner) Start(ctx context.Context, gitPath string, spec gitcli
 		return &recordedProcess{Process: p, ctx: ctx, spec: spec, finish: step.End}, nil
 	}
 	o, _ := OriginFrom(ctx)
+	repoName := ""
+	if spec.Dir != "" {
+		repoName = filepath.Base(spec.Dir)
+	}
 	op := r.Log.Start(ctx, Meta{
 		Category:   CategoryGit,
 		Kind:       spawnKind(spec.Args),
 		RepoRoot:   spec.Dir,
-		RepoName:   filepath.Base(spec.Dir),
+		RepoName:   repoName,
 		Background: o.Background || spec.ReadOnly,
 	})
 	cmd := renderCommand(argv)
