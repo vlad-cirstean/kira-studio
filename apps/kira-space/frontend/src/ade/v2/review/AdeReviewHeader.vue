@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import Identifier from '@workbench/components/Identifier.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { computed } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -12,6 +15,7 @@ import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import type { ReviewWindowTarget } from '../wire';
 import AdeReviewActions from './AdeReviewActions.vue';
 import { useReviewContext } from './useReviewContext';
+import { useReviewHead } from './useReviewHead';
 import { useReviewWorking } from './useReviewWorking';
 
 const props = defineProps<{ target: ReviewWindowTarget }>();
@@ -26,6 +30,14 @@ const dirtyCount = computed(() => working.data.value?.files.length ?? 0);
 const hint = computed(() =>
   t('space.ade.review.header.uncommitted.hint', { count: dirtyCount.value }),
 );
+const { head } = useReviewHead(() => props.target);
+const headHint = computed(() => {
+  const h = head.value;
+  if (!h) return '';
+  return h.state === 'stale'
+    ? t('space.ade.review.actions.headDiffers.hint', { short: h.short })
+    : t('space.ade.review.header.headCurrent.hint', { short: h.short });
+});
 </script>
 
 <template>
@@ -59,6 +71,35 @@ const hint = computed(() =>
           </Badge>
         </TooltipTrigger>
         <TooltipContent>{{ hint }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="head">
+        <TooltipTrigger as-child>
+          <Badge
+            :variant="head.state === 'stale' ? 'warn' : 'default'"
+            tabindex="0"
+            class="wails-no-drag shrink-0"
+            :aria-label="headHint"
+            :data-state="head.state"
+            data-testid="ade-review-head"
+          >
+            <template v-if="head.state === 'stale'">{{ t('common.stale.status') }}</template>
+            <template v-else>
+              <CodiconIcon name="check" :size="12" />
+              {{ t('space.ade.review.header.headCurrent.label', { short: head.short }) }}
+            </template>
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div class="flex flex-col gap-1">
+            <span>{{ headHint }}</span>
+            <span v-if="head.state === 'stale'" class="flex items-center gap-1.5 text-kira-sm">
+              <Identifier :value="head.local" :short="shortSha" />
+              <CodiconIcon name="arrow-right" :size="12" />
+              <Identifier :value="head.host" :short="shortSha" />
+            </span>
+            <Identifier v-else :value="head.host" :short="shortSha" />
+          </div>
+        </TooltipContent>
       </Tooltip>
     </div>
     <div class="wails-no-drag flex shrink-0 items-center gap-1">

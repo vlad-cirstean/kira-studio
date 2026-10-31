@@ -8236,6 +8236,10 @@
           "base": {
             "label": "Base {base}"
           },
+          "headCurrent": {
+            "hint": "Your local branch is at the {short} head.",
+            "label": "At {short} head"
+          },
           "uncommitted": {
             "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review.",
             "label": "{count} uncommitted | {count} uncommitted"
