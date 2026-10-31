@@ -19,7 +19,7 @@ Source: user request. Phases run top to bottom. Ends with one code review round,
 | P414 | Status bar: running ADE agents, interface font, tooltips | Done |
 | P415 Part 1 | Operations panel: shared git primitives, all git ops, session and in-app MCP ops | Done |
 | P415 Part 2 | Operations panel: memory MCP tool ops (out-of-process) | Done |
-| P416 | Move automation runs into Operations panel | Todo |
+| P416 | Move automation runs into Operations panel | Done |
 | P417 | Jira via acli behind an issue-tracker abstraction, CLI setup in Settings | Done |
 | P418 | Review window: uncommitted changes, committed vs uncommitted split, agent panel off by default | Todo |
 | P419 | Git module: editable files (read only by default, Edit button, save button or shortcut) | Todo |
@@ -140,6 +140,8 @@ The memory MCP server (`kira-space memory-mcp`) runs as a separate process start
 ### P416 Move automation runs into Operations panel
 
 Historical runs, success or failed, live in the Operations panel. Automation panel keeps only running ones. Persist errors; keep copy.
+
+**Result.** Finished automation runs list in the Operations panel of both apps; the Automations panel keeps only running and waiting runs. Runs stay in `script_runs` and project to rows `run:<id>` via `automationOp` and `useAutomationOps`, never `op_log` rows. Panel filters via shared `opLogMatches`; Clear hides rows via `clearedAt`; Cancel maps to Stop or Decline; menu adds Copy for agent, Open run, Resume, Run again. Failed terminal or headless runs persist `outcome.outputTail` (last 40 sanitized lines, 8 KiB) via `termtext.Tail` on the session tap or headless log sink; Copy for agent falls back to it. `internal/termtext` is the single ANSI stripper (moved from gitprepare). Empty state links to Operations via `showOperations`. Waiting rows show "Waiting" in the command cell (status column too narrow). `repos/oplog.go` `scanOp` shared with foreign ingest. Fixed on the way: `BoundService.Open` gocognit, stale Studio data-grid visual snapshot. Tests: Go flows both apps with contracts, UI scenario `automationsOps` both apps, unit 1968, Space UI 861, Studio UI 655, mobile 83, visual 24 and 13, lint, `lint:go`, smart-script and hook `claude` rows pass. Space `ade-v2-dialogs` tooltip hover flaked once under load, 30/30 alone.
 
 ### P417 Jira via acli behind an issue-tracker abstraction, CLI setup in Settings
 
