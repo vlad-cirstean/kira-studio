@@ -11,8 +11,8 @@ export const useAdeReviewWindowStore = defineStore('adeReviewWindow', () => {
   /** The right pane's tab the user picked; null until then (the pane then picks by the review step). */
   const rightTab = ref<'workflow' | 'ask' | null>(null);
 
-  // Per device, like the pane widths: review windows are not restored, so per-window state would be lost.
-  const agentPanelVisible = usePersistedState('kira.ade.review.agentPanel', true);
+  // Off until the user opens it. Per device, like the pane widths: review windows are not restored.
+  const agentPanelVisible = usePersistedState('kira.ade.review.agentPanel', false);
   function toggleAgentPanel(): void {
     agentPanelVisible.value = !agentPanelVisible.value;
   }
