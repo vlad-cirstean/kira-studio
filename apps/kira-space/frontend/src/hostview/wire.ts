@@ -141,7 +141,7 @@ export interface HostViewChangeRequest {
   status: HostStatus;
 }
 
-export interface IssuePerson {
+interface IssuePerson {
   id: string;
   name: string;
 }
