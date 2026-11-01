@@ -59,30 +59,45 @@ func NewHotkeyBinding(sc GlobalShortcuts, wayland func() bool) *HotkeyBinding {
 }
 
 // Apply makes accel the one registered chord (or none when disabled) and returns the new state.
+// A new chord registers before the old one is released, so a failed change keeps the old chord.
 func (b *HotkeyBinding) Apply(enabled bool, accel string, cb func()) HotkeyState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.current != "" {
-		if err := b.sc.Unregister(b.current); err != nil {
-			slog.Debug("unregister global shortcut", "scope", "capture", "err", err)
-		}
-		b.current = ""
-	}
 	if !enabled {
+		b.release()
 		b.state = HotkeyState{State: HotkeyOff, Accelerator: accel}
 		return b.state
 	}
-	if err := b.sc.Register(accel, cb); err != nil {
-		b.state = HotkeyState{State: HotkeyFailed, Accelerator: accel, Reason: err.Error()}
-		return b.state
+	if accel != b.current {
+		prev := b.current
+		if err := b.sc.Register(accel, cb); err != nil {
+			b.state = HotkeyState{State: HotkeyFailed, Accelerator: accel, Reason: err.Error()}
+			return b.state
+		}
+		b.current = accel
+		if prev != "" {
+			b.unregister(prev)
+		}
 	}
-	b.current = accel
 	st := HotkeyActive
 	if b.wayland() {
 		st = HotkeyRequested
 	}
 	b.state = HotkeyState{State: st, Accelerator: accel}
 	return b.state
+}
+
+func (b *HotkeyBinding) release() {
+	if b.current != "" {
+		b.unregister(b.current)
+		b.current = ""
+	}
+}
+
+func (b *HotkeyBinding) unregister(accel string) {
+	if err := b.sc.Unregister(accel); err != nil {
+		slog.Debug("unregister global shortcut", "scope", "capture", "err", err)
+	}
 }
 
 // ReportError records an asynchronous registration failure from the app ErrorHandler.
