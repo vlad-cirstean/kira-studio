@@ -3,7 +3,6 @@ package docker
 import (
 	"crypto/sha256"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/connhelper"
+	"github.com/docker/go-connections/tlsconfig"
 	"github.com/moby/moby/client"
 )
 
@@ -56,11 +56,19 @@ type resolveEnv struct {
 	Getenv func(string) string
 	Home   string
 	Stat   func(string) (os.FileInfo, error)
+	// Current is the docker CLI's current context; a seam for tests.
+	Current currentContexter
+}
+
+// currentContexter names the docker CLI's current context ("" when unknown) and forgets a cached answer.
+type currentContexter interface {
+	name() string
+	forget()
 }
 
 func osResolveEnv() resolveEnv {
 	home, _ := os.UserHomeDir()
-	return resolveEnv{Getenv: os.Getenv, Home: home, Stat: os.Stat}
+	return resolveEnv{Getenv: os.Getenv, Home: home, Stat: os.Stat, Current: &cliContext{home: home}}
 }
 
 func (e resolveEnv) exists(path string) bool {
@@ -114,17 +122,10 @@ func (e resolveEnv) currentContextName() string {
 	if c := e.Getenv("DOCKER_CONTEXT"); c != "" {
 		return c
 	}
-	raw, err := os.ReadFile(filepath.Join(e.configDir(), "config.json"))
-	if err != nil {
+	if e.Current == nil {
 		return ""
 	}
-	var cfg struct {
-		CurrentContext string `json:"currentContext"`
-	}
-	if json.Unmarshal(raw, &cfg) != nil {
-		return ""
-	}
-	return cfg.CurrentContext
+	return e.Current.name()
 }
 
 // tlsFiles are the three PEM paths of one TLS material directory.
@@ -154,25 +155,16 @@ func envTLS(e resolveEnv) tlsFiles {
 	return tlsFiles{ca: filepath.Join(dir, "ca.pem"), cert: filepath.Join(dir, "cert.pem"), key: filepath.Join(dir, "key.pem")}
 }
 
+// buildTLS passes PEM paths only; go-connections opens the files (CLI credentials rule).
 func buildTLS(t tlsFiles, skipVerify bool) (*tls.Config, error) {
-	cfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: skipVerify} //nolint:gosec // user-chosen via context SkipTLSVerify / unset DOCKER_TLS_VERIFY
-	if t.ca != "" {
-		pem, err := os.ReadFile(t.ca)
-		if err != nil {
-			return nil, fmt.Errorf("read TLS CA: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("TLS CA %s holds no certificate", t.ca)
-		}
-		cfg.RootCAs = pool
-	}
-	if t.cert != "" || t.key != "" {
-		pair, err := tls.LoadX509KeyPair(t.cert, t.key)
-		if err != nil {
-			return nil, fmt.Errorf("load TLS client certificate: %w", err)
-		}
-		cfg.Certificates = []tls.Certificate{pair}
+	cfg, err := tlsconfig.Client(tlsconfig.Options{
+		CAFile: t.ca, CertFile: t.cert, KeyFile: t.key,
+		InsecureSkipVerify: skipVerify, //nolint:gosec // user-chosen via context SkipTLSVerify / unset DOCKER_TLS_VERIFY
+		ExclusiveRootPools: true,
+		MinVersion:         tls.VersionTLS12,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("docker TLS material: %w", err)
 	}
 	return cfg, nil
 }
@@ -238,7 +230,7 @@ func fromEnvHost(e resolveEnv) (Endpoint, []client.Opt, error) {
 }
 
 // resolveEndpoint follows the docker CLI order: UI-selected context, DOCKER_HOST, DOCKER_CONTEXT
-// or config currentContext, the default socket, then well-known per-tool sockets.
+// or the CLI's current context, the default socket, then well-known per-tool sockets.
 func resolveEndpoint(e resolveEnv, selected string) (Endpoint, []client.Opt, error) {
 	if selected != "" && selected != defaultContext {
 		return fromContext(e, selected, sourceSelected)
