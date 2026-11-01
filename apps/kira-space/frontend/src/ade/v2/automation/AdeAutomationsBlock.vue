@@ -42,7 +42,7 @@ function openRun(run: ScriptRun): void {
     class="flex max-h-48 flex-col gap-1 overflow-y-auto"
     data-testid="ade-automations"
   >
-    <SectionHeading :label="t('space.ade.scriptRuns.label')" />
+    <SectionHeading :label="t('common.scriptRuns.label')" />
     <div
       v-for="run in rows"
       :key="run.id"

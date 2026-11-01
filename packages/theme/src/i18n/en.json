@@ -2830,6 +2830,9 @@
     "script": {
       "label": "Script"
     },
+    "scriptRuns": {
+      "label": "Script runs"
+    },
     "searching": {
       "loading": "Searching…"
     },
@@ -8886,9 +8889,6 @@
         "write": {
           "label": "Write worktree"
         }
-      },
-      "scriptRuns": {
-        "label": "Script runs"
       },
       "sessionList": {
         "empty": {
@@ -15355,8 +15355,7 @@
       "runs": {
         "open": {
           "hint": "Click to show the runs list."
-        },
-        "tooltip": "Script runs"
+        }
       }
     },
     "tabStrip": {
