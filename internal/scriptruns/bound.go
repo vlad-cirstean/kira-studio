@@ -144,21 +144,9 @@ func (b *Bound) ReadLog(args ReadLogArgs) (LogPage, error) {
 	return ipcerr.InternalResult(b.Svc.Runs.ReadLog(args.ID, args.AfterSeq))
 }
 
-// McpServers lists the MCP servers of the user's agent config.
+// McpServers lists the MCP servers the agent's CLI reports.
 func (b *Bound) McpServers() ([]harness.UserServer, error) {
-	return ipcerr.InternalResult(b.Svc.McpServers())
-}
-
-type McpToolsArgs struct {
-	Server string `json:"server"`
-}
-
-// McpTools lists the tools of one of those servers.
-func (b *Bound) McpTools(args McpToolsArgs) ([]harness.UserTool, error) {
-	if args.Server == "" {
-		return nil, ipcerr.Required("server")
-	}
-	return ipcerr.InternalResult(b.Svc.McpTools(context.Background(), args.Server))
+	return ipcerr.InternalResult(b.Svc.McpServers(context.Background()))
 }
 
 // NextFiresArgs asks for the next fire instants of a cron expression.

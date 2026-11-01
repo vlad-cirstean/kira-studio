@@ -796,14 +796,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	if l.smart != nil {
 		spec = l.smart.spec(agent, spec, space)
 		if names := l.smart.mcpNames(); len(names) > 0 {
-			path, relUser, err := agent.WriteUserMCPConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
-			if err != nil {
-				release()
-				fail(err)
-				return
-			}
-			defer relUser()
-			spec.MCPConfigs = append(spec.MCPConfigs, path)
+			spec.UserMCP, spec.GrantMCP = names, []string{agentmcp.ServerName}
 		}
 	}
 	spec = b.applySandbox(spec, sbx, l)

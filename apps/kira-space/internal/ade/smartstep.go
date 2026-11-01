@@ -93,7 +93,7 @@ func (s *smartStep) mcpNames() []string {
 	return names
 }
 
-// spec is the process spec of a smart step run; the caller adds the MCP config paths.
+// spec is the process spec of a smart step run; the caller adds the MCP config and user servers.
 func (s *smartStep) spec(agent harness.Provider, base harness.HeadlessSpec, space bool) harness.HeadlessSpec {
 	extra := harness.ToolNames(agent, agentmcp.FinishStep, agentmcp.RunOutcome)
 	if space {

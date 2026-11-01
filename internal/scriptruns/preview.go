@@ -259,7 +259,7 @@ func (s *Service) smartBlocker(agent harness.Provider, mcp []string) string {
 	if len(mcp) == 0 {
 		return ""
 	}
-	have, err := agent.UserMCPServers(s.getenv)
+	have, err := agent.UserMCPServers(context.Background(), s.Home)
 	if err != nil {
 		return err.Error()
 	}

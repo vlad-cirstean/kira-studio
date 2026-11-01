@@ -44,7 +44,7 @@ type Service struct {
 	EmitLog func(LogPush)
 	// Agent resolves the provider of a new run.
 	Agent harness.Selector
-	// Getenv reads the user's environment for their Claude config; nil means os.Getenv.
+	// Getenv reads the user's environment to resolve their login shell; nil means os.Getenv.
 	Getenv func(string) string
 	// SmartTimeout, when positive, replaces every smart run's own timeout (a flow test).
 	SmartTimeout time.Duration
