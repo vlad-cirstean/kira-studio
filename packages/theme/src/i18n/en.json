@@ -8605,6 +8605,9 @@
           "label": "Write worktree"
         }
       },
+      "scriptRuns": {
+        "label": "Script runs"
+      },
       "sessionList": {
         "empty": {
           "empty": "Nothing running"

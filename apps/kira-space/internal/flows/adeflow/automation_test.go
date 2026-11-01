@@ -12,6 +12,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
@@ -296,7 +298,7 @@ func TestAutomationRun(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RebasePreview: %v", err)
 		}
-		if len(rp.Blockers) == 0 || !strings.Contains(rp.Blockers[0].Text, "automation audit is running in feat/api-login") {
+		if len(rp.Blockers) == 0 || !strings.Contains(rp.Blockers[0].Text, "script run audit is running in feat/api-login") {
 			t.Fatalf("rebase blockers = %+v, want the automation", rp.Blockers)
 		}
 		if _, err := f.app.W.AdeTask.StartBranch(ctx, adewire.StartBranchArgs{BranchID: f.apiBr.ID}); err == nil {
@@ -308,7 +310,7 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatalf("Approve: %v", err)
 		}
 		held, ok := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
-		if !ok || held.State != "pending" || held.Note != "waiting for automation audit" {
+		if !ok || held.State != "pending" || held.Note != "waiting for script run audit" {
 			t.Fatalf("step run while a script works = %+v, want pending behind the automation", held)
 		}
 		f.app.Contract(t, "ade-automation", "AdeTaskService.Run#waiting", held, flowharness.Mask("createdAt", "startedAt", "finishedAt", "sessionId"))
@@ -348,6 +350,36 @@ func TestAutomationRun(t *testing.T) {
 		}
 		if r, _ := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID); r.State != "pending" {
 			t.Fatalf("step run = %+v, want pending", r)
+		}
+		release(t, f.gateTwo)
+		release(t, f.gateOne)
+		f.app.Restart()
+		if _, err := f.app.W.AdeTask.Board(ctx); err != nil {
+			t.Fatal(err)
+		}
+		testx.WaitUntil(t, waitFor, func() bool {
+			r, ok := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
+			return ok && r.State != "pending"
+		})
+	})
+
+	t.Run("a run held by an older version survives a restart", func(t *testing.T) {
+		f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false)
+		rec := f.script(t, smartFields("audit", "Audit {branch}"))
+		args := scriptruns.RunArgs{ScriptID: rec.ID, TaskID: f.task, BranchID: f.apiBr.ID}
+		f.start(t, args)
+		waitCall(t, f.app, "api", 2)
+		step := adewire.StepArgs{TaskID: f.task, StepID: "two"}
+		if err := f.app.W.AdeTask.Approve(ctx, step); err != nil {
+			t.Fatal(err)
+		}
+		r, _ := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
+		if r.State != "pending" {
+			t.Fatalf("step run = %+v, want pending", r)
+		}
+		old := "waiting for automation audit"
+		if _, err := (&repos.AdeTaskRepo{DB: f.app.DB()}).UpdateRun(r.ID, model.AdeRunPatch{Note: &old}); err != nil {
+			t.Fatal(err)
 		}
 		release(t, f.gateTwo)
 		release(t, f.gateOne)

@@ -6,7 +6,7 @@
     "finishedAt": null,
     "id": "<id:2>",
     "loops": 0,
-    "note": "waiting for automation audit",
+    "note": "waiting for script run audit",
     "outcome": null,
     "purpose": "",
     "resumable": false,

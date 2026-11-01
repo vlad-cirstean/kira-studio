@@ -21,7 +21,10 @@ var _ scriptruns.ADE = (*TaskBoard)(nil)
 
 // noteWaitingAutomation holds a pending step run behind a smart script working in its worktree; the
 // script's name follows.
-const noteWaitingAutomation = "waiting for automation "
+const noteWaitingAutomation = "waiting for script run "
+
+// noteWaitingAutomationOld is the pre-rename note; a run held by an older version still releases.
+const noteWaitingAutomationOld = "waiting for automation "
 
 // claimOn is the name of the automation holding the branch's worktree, "" when none.
 func (b *TaskBoard) claimOn(branchID string) string {
@@ -159,7 +162,7 @@ func (b *TaskBoard) busyLocked(sb model.AdeTaskBranch) (string, error) {
 		return "a rebase is running on " + sb.Name, nil
 	}
 	if name := b.claimOn(sb.ID); name != "" {
-		return fmt.Sprintf("automation %s is running in this worktree", name), nil
+		return fmt.Sprintf("script run %s is running in this worktree", name), nil
 	}
 	return "", nil
 }
@@ -236,7 +239,7 @@ func (b *TaskBoard) launchAutomationHeld() {
 	released := map[string]bool{}
 	for _, runs := range byTask {
 		for _, r := range runs {
-			if r.State != model.AdeRunPending || !strings.HasPrefix(r.Note, noteWaitingAutomation) || released[r.BranchID] {
+			if r.State != model.AdeRunPending || !(strings.HasPrefix(r.Note, noteWaitingAutomation) || strings.HasPrefix(r.Note, noteWaitingAutomationOld)) || released[r.BranchID] {
 				continue
 			}
 			released[r.BranchID] = true

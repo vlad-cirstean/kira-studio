@@ -88,7 +88,7 @@ func TestScheduleADE(t *testing.T) {
 			t.Fatal(err)
 		}
 		held, ok := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
-		if !ok || held.State != "pending" || held.Note != "waiting for automation audit" {
+		if !ok || held.State != "pending" || held.Note != "waiting for script run audit" {
 			t.Fatalf("step run = %+v, want pending behind the automation", held)
 		}
 		release(t, f.gateOne)
@@ -138,7 +138,7 @@ func TestScheduleADE(t *testing.T) {
 			t.Fatal(err)
 		}
 		held, ok := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
-		if !ok || held.State != "pending" || held.Note != "waiting for automation slow" {
+		if !ok || held.State != "pending" || held.Note != "waiting for script run slow" {
 			t.Fatalf("step run = %+v, want pending behind the script", held)
 		}
 		if err := f.app.W.ScriptRuns.Stop(scriptruns.IDArgs{ID: run.ID}); err != nil {

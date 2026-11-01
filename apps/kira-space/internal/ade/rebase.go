@@ -338,7 +338,7 @@ func (b *TaskBoard) rebaseBlockers(ctx context.Context, p *rebasePlan, entry *gi
 		} else if r, err := b.deps.Tasks.RunningRebaseOn(sb.ID); err == nil && r != nil {
 			p.block(sb.ID, "running", "a rebase is already running on %s", sb.Name)
 		} else if name := b.claimOn(sb.ID); name != "" {
-			p.block(sb.ID, "running", "automation %s is running in %s", name, sb.Name)
+			p.block(sb.ID, "running", "script run %s is running in %s", name, sb.Name)
 		}
 		if s, ok := setups[sb.ID]; ok && s.State != model.AdeSetupReady {
 			p.block(sb.ID, "setup", "the worktree of %s is still being prepared", sb.Name)
