@@ -183,39 +183,16 @@ func checkPie(in chartIn) (any, error) {
 
 func checkCartesian(in chartIn) (any, error) {
 	typ := *in.Type
-	switch {
-	case in.Slices != nil:
-		return nil, invalid("data.slices is only valid for type pie; use data.series")
-	case in.Unit != nil:
-		return nil, invalid("data.unit is only valid for type pie; use data.y.unit")
-	case in.Stacked != nil && *in.Stacked && typ != chartBar && typ != chartArea:
-		return nil, invalid("data.stacked is only valid for type bar and area")
-	case in.Horizontal != nil && *in.Horizontal && typ != chartBar:
-		return nil, invalid("data.horizontal is only valid for type bar")
+	if err := checkCartesianFlags(in, typ); err != nil {
+		return nil, err
 	}
 	out := chartCartesian{Type: typ}
 	out.Stacked = in.Stacked != nil && *in.Stacked
 	out.Horizontal = in.Horizontal != nil && *in.Horizontal
-	if in.X == nil || in.X.Type == nil {
-		return nil, invalid("data.x.type is required: one of category, time, value")
-	}
-	axis := *in.X.Type
-	if axis != axisCategory && axis != axisTime && axis != axisValue {
-		return nil, invalid("data.x.type must be one of category, time, value")
-	}
-	if err := checkLabel("data.x.name", in.X.Name, maxAxisNameRunes); err != nil {
+	if err := checkAxes(in, &out); err != nil {
 		return nil, err
 	}
-	out.X = chartAxis{Type: axis, Name: in.X.Name}
-	if in.Y != nil {
-		if err := checkLabel("data.y.name", in.Y.Name, maxAxisNameRunes); err != nil {
-			return nil, err
-		}
-		if err := checkLabel("data.y.unit", in.Y.Unit, maxUnitRunes); err != nil {
-			return nil, err
-		}
-		out.Y = chartY{Name: in.Y.Name, Unit: in.Y.Unit}
-	}
+	axis := out.X.Type
 	if in.Series == nil || len(*in.Series) < 1 || len(*in.Series) > maxChartSeries {
 		return nil, invalid("data.series must hold 1-%d series", maxChartSeries)
 	}
@@ -229,18 +206,8 @@ func checkCartesian(in chartIn) (any, error) {
 	total := 0
 	out.Series = make([]chartOutSeries, 0, len(*in.Series))
 	for si, s := range *in.Series {
-		if s.Name == nil {
-			return nil, invalid("data.series[%d].name is required", si)
-		}
-		if err := checkSeriesName("data.series", si, *s.Name); err != nil {
+		if err := checkSeriesHead(si, s, names); err != nil {
 			return nil, err
-		}
-		if names[*s.Name] {
-			return nil, invalid("data.series[%d].name %q is a duplicate", si, *s.Name)
-		}
-		names[*s.Name] = true
-		if len(s.Points) < 1 {
-			return nil, invalid("data.series[%d].points must hold at least 1 point", si)
 		}
 		total += len(s.Points)
 		if total > pointCap {
@@ -251,24 +218,7 @@ func checkCartesian(in chartIn) (any, error) {
 			return nil, err
 		}
 		if sorted {
-			idx := make([]int, len(pts))
-			for i := range idx {
-				idx[i] = i
-			}
-			slices.SortStableFunc(idx, func(a, b int) int {
-				switch {
-				case keys[a] < keys[b]:
-					return -1
-				case keys[a] > keys[b]:
-					return 1
-				}
-				return 0
-			})
-			ordered := make([]chartPoint, len(pts))
-			for i, j := range idx {
-				ordered[i] = pts[j]
-			}
-			pts = ordered
+			pts = sortByKey(pts, keys)
 		}
 		out.Series = append(out.Series, chartOutSeries{Name: *s.Name, Points: pts})
 	}
@@ -276,6 +226,86 @@ func checkCartesian(in chartIn) (any, error) {
 		return nil, invalid("data.series use %d distinct categories; the limit is %d", len(categories), maxCategories)
 	}
 	return out, nil
+}
+
+// checkCartesianFlags rejects pie-only fields and flags invalid for typ.
+func checkCartesianFlags(in chartIn, typ string) error {
+	switch {
+	case in.Slices != nil:
+		return invalid("data.slices is only valid for type pie; use data.series")
+	case in.Unit != nil:
+		return invalid("data.unit is only valid for type pie; use data.y.unit")
+	case in.Stacked != nil && *in.Stacked && typ != chartBar && typ != chartArea:
+		return invalid("data.stacked is only valid for type bar and area")
+	case in.Horizontal != nil && *in.Horizontal && typ != chartBar:
+		return invalid("data.horizontal is only valid for type bar")
+	}
+	return nil
+}
+
+// checkAxes validates the x and y axis and stores them in out.
+func checkAxes(in chartIn, out *chartCartesian) error {
+	if in.X == nil || in.X.Type == nil {
+		return invalid("data.x.type is required: one of category, time, value")
+	}
+	axis := *in.X.Type
+	if axis != axisCategory && axis != axisTime && axis != axisValue {
+		return invalid("data.x.type must be one of category, time, value")
+	}
+	if err := checkLabel("data.x.name", in.X.Name, maxAxisNameRunes); err != nil {
+		return err
+	}
+	out.X = chartAxis{Type: axis, Name: in.X.Name}
+	if in.Y != nil {
+		if err := checkLabel("data.y.name", in.Y.Name, maxAxisNameRunes); err != nil {
+			return err
+		}
+		if err := checkLabel("data.y.unit", in.Y.Unit, maxUnitRunes); err != nil {
+			return err
+		}
+		out.Y = chartY{Name: in.Y.Name, Unit: in.Y.Unit}
+	}
+	return nil
+}
+
+// checkSeriesHead validates one series' name and point presence, recording the name in names.
+func checkSeriesHead(si int, s chartSeries, names map[string]bool) error {
+	if s.Name == nil {
+		return invalid("data.series[%d].name is required", si)
+	}
+	if err := checkSeriesName("data.series", si, *s.Name); err != nil {
+		return err
+	}
+	if names[*s.Name] {
+		return invalid("data.series[%d].name %q is a duplicate", si, *s.Name)
+	}
+	names[*s.Name] = true
+	if len(s.Points) < 1 {
+		return invalid("data.series[%d].points must hold at least 1 point", si)
+	}
+	return nil
+}
+
+// sortByKey returns pts stably ordered by keys.
+func sortByKey(pts []chartPoint, keys []float64) []chartPoint {
+	idx := make([]int, len(pts))
+	for i := range idx {
+		idx[i] = i
+	}
+	slices.SortStableFunc(idx, func(a, b int) int {
+		switch {
+		case keys[a] < keys[b]:
+			return -1
+		case keys[a] > keys[b]:
+			return 1
+		}
+		return 0
+	})
+	ordered := make([]chartPoint, len(pts))
+	for i, j := range idx {
+		ordered[i] = pts[j]
+	}
+	return ordered
 }
 
 // parsePoints validates one series; keys carries each point's numeric x for sorting.

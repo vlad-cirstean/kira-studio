@@ -157,85 +157,19 @@ func lex(src string) ([]token, error) {
 		case c == ':':
 			simple(tColon, 1)
 		case c == '<' || c == '>':
-			kind := tLt
-			if c == '>' {
-				kind = tGt
-			}
-			if i+1 < len(rs) && rs[i+1] == '=' {
-				if c == '<' {
-					kind = tLte
-				} else {
-					kind = tGte
-				}
-				simple(kind, 2)
-			} else {
-				simple(kind, 1)
-			}
+			simple(cmpKind(rs, i))
 		case c == '"':
-			j := i + 1
-			var b strings.Builder
-			closed := false
-			for j < len(rs) {
-				if rs[j] == '\\' && j+1 < len(rs) && (rs[j+1] == '"' || rs[j+1] == '\\') {
-					b.WriteRune(rs[j+1])
-					j += 2
-					continue
-				}
-				if rs[j] == '"' {
-					closed = true
-					break
-				}
-				b.WriteRune(rs[j])
-				j++
-			}
+			text, j, closed := lexQuoted(rs, i)
 			if !closed {
 				return nil, &SyntaxError{Pos: len(rs) + 1, Expected: []string{"“\"”"}, Found: "end of input"}
 			}
 			toks = append(toks, token{
 				kind: tQuoted, pos: pos, space: space, raw: string(rs[i : j+1]),
-				val: value{parts: []part{{text: b.String()}}, quoted: true},
+				val: value{parts: []part{{text: text}}, quoted: true},
 			})
 			i = j + 1
 		default:
-			j := i
-			var parts []part
-			var cur strings.Builder
-			flush := func() {
-				if cur.Len() > 0 {
-					parts = append(parts, part{text: cur.String()})
-					cur.Reset()
-				}
-			}
-			escaped := false
-			for j < len(rs) && !unicode.IsSpace(rs[j]) && !isSpecial(rs[j]) {
-				ch := rs[j]
-				switch {
-				case ch == '*':
-					flush()
-					parts = append(parts, part{star: true})
-					j++
-				case ch == '\\' && j+1 < len(rs):
-					escaped = true
-					next := rs[j+1]
-					if kw := escapedKeyword(rs[j+1:]); kw != "" {
-						cur.WriteString(kw)
-						j += 1 + len(kw)
-					} else if isSpecial(next) || next == '*' || next == '\\' {
-						cur.WriteRune(next)
-						j += 2
-					} else if next == 't' || next == 'n' || next == 'r' {
-						cur.WriteRune(map[rune]rune{'t': '\t', 'n': '\n', 'r': '\r'}[next])
-						j += 2
-					} else {
-						cur.WriteRune('\\')
-						j++
-					}
-				default:
-					cur.WriteRune(ch)
-					j++
-				}
-			}
-			flush()
+			parts, j, escaped := lexWord(rs, i)
 			raw := string(rs[i:j])
 			tok := token{kind: tWord, pos: pos, space: space, raw: raw, val: value{parts: parts}}
 			if !escaped {
@@ -247,6 +181,94 @@ func lex(src string) ([]token, error) {
 			i = j
 		}
 	}
+}
+
+// cmpKind returns the comparison token kind at rs[i] and its length.
+func cmpKind(rs []rune, i int) (tokKind, int) {
+	lt := rs[i] == '<'
+	if i+1 < len(rs) && rs[i+1] == '=' {
+		if lt {
+			return tLte, 2
+		}
+		return tGte, 2
+	}
+	if lt {
+		return tLt, 1
+	}
+	return tGt, 1
+}
+
+// lexQuoted scans the quoted string opening at rs[i]. It returns the unescaped text, the index of the closing quote, and whether one was found.
+func lexQuoted(rs []rune, i int) (string, int, bool) {
+	j := i + 1
+	var b strings.Builder
+	for j < len(rs) {
+		if rs[j] == '\\' && j+1 < len(rs) && (rs[j+1] == '"' || rs[j+1] == '\\') {
+			b.WriteRune(rs[j+1])
+			j += 2
+			continue
+		}
+		if rs[j] == '"' {
+			return b.String(), j, true
+		}
+		b.WriteRune(rs[j])
+		j++
+	}
+	return b.String(), j, false
+}
+
+// lexWord scans the unquoted word starting at rs[i]. It returns its parts, the end index, and whether any escape appeared.
+func lexWord(rs []rune, i int) ([]part, int, bool) {
+	j := i
+	var parts []part
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			parts = append(parts, part{text: cur.String()})
+			cur.Reset()
+		}
+	}
+	escaped := false
+	for j < len(rs) && !unicode.IsSpace(rs[j]) && !isSpecial(rs[j]) {
+		ch := rs[j]
+		switch {
+		case ch == '*':
+			flush()
+			parts = append(parts, part{star: true})
+			j++
+		case ch == '\\' && j+1 < len(rs):
+			escaped = true
+			j += lexEscape(rs[j+1:], &cur)
+		default:
+			cur.WriteRune(ch)
+			j++
+		}
+	}
+	flush()
+	return parts, j, escaped
+}
+
+// lexEscape resolves the escape whose backslash precedes rest, writes it to cur, and returns the runes consumed including the backslash.
+func lexEscape(rest []rune, cur *strings.Builder) int {
+	next := rest[0]
+	switch {
+	case escapedKeyword(rest) != "":
+		kw := escapedKeyword(rest)
+		cur.WriteString(kw)
+		return 1 + len(kw)
+	case isSpecial(next) || next == '*' || next == '\\':
+		cur.WriteRune(next)
+	case next == 't':
+		cur.WriteByte('\t')
+	case next == 'n':
+		cur.WriteByte('\n')
+	case next == 'r':
+		cur.WriteByte('\r')
+	default:
+		cur.WriteByte('\\')
+		return 1
+	}
+	return 2
 }
 
 // escapedKeyword returns the keyword (in its original case) when rs starts with and/or/not.
