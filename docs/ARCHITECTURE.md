@@ -2348,6 +2348,9 @@ and `docs/HISTORY.md (v2.0)`.
 - A taken-over run can still call finish_step from the TUI (R14). Take over confirms when the run is live and passes stopIfRunning.
 - Sessions are window-scoped like every PTY: closing the window stops the session record, which stays resumable.
 - FocusSession raises the window that holds a session, via kira:adetask:openSession.
+- CloseSession (P436) ends a running session and keeps its history. Interactive: Tracker.Stop then CloseTerminal, so the row is stopped at once and resumable by Take over. Headless: StopRun.
+- RestartSession of a headless step run stops it and queues the next attempt resuming the same conversation (note "restarted by you"). Rebase and review runs refuse; their panels own retry.
+- The session tab menu offers Restart and Close without a confirm.
 - The agent-hooks Stop event ends a dialog turn; the renderer's turnWatch then calls RecordMerge (merge dialog) or ArchiveTask (send-then-archive), and that pending state lives in the renderer.
 
 ### Agent sandbox (P287)
