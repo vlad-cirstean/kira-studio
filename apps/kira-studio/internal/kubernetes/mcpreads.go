@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -60,14 +61,22 @@ func (s *Service) ReadLogs(ctx context.Context, args LogsReadArgs) (LogsReadResu
 		return LogsReadResult{}, mapErr(err)
 	}
 	defer body.Close()
-	raw, err := io.ReadAll(body)
+	raw, err := io.ReadAll(io.LimitReader(body, int64(mcpLogBytes)+1))
 	if err != nil {
 		return LogsReadResult{}, mapErr(err)
+	}
+	truncated := len(raw) > mcpLogBytes
+	if truncated {
+		// A server ignoring LimitBytes sent more; cut to the last whole line.
+		raw = raw[:mcpLogBytes]
+		if i := bytes.LastIndexByte(raw, '\n'); i >= 0 {
+			raw = raw[:i+1]
+		}
 	}
 	framer := newLineFramer(args.Timestamps)
 	lines := append(framer.write(raw), framer.flush()...)
 	if lines == nil {
 		lines = []LogLine{}
 	}
-	return LogsReadResult{Lines: lines, Truncated: len(raw) >= mcpLogBytes}, nil
+	return LogsReadResult{Lines: lines, Truncated: truncated || len(raw) >= mcpLogBytes}, nil
 }
