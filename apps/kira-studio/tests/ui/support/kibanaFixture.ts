@@ -1,6 +1,7 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { KibanaDataView, KibanaHistogram, KibanaSuggestions } from '@shared/domain/kibana';
 import { DATA_OP } from '@shared/protocol/dataOps';
+import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
 import { contract } from './contract';
 import { connectionSummary } from './engineFixture';
@@ -30,6 +31,8 @@ export const levelSuggestions = contract<KibanaSuggestions>(
   'kibana-discover',
   'KibanaService.Suggest#level',
 );
+
+const columnNames = contract<string[]>('kibana-discover', 'Execute#columns');
 
 export const logsNode = (() => {
   const node = tree.nodes.find((n) => n.name === LOGS_VIEW);
@@ -100,5 +103,45 @@ export function executeHits(statement: string, count: number, path = logsNode.pa
     op: DATA_OP.execute,
     payload: { connectionId: CONNECTION_ID, path, statements: [statement] },
     response: { kind: 'execute', pages: [hitsPage(count)] },
+  };
+}
+
+/** The execute() snapshot of a column-selected statement: a tabular page of the contract's columns. */
+export function executeColumns(statement: string, count: number): PortSnapshot {
+  const columns: ColumnDescriptor[] = columnNames.map((name) => ({
+    name,
+    dataType: name === 'status' ? 'number' : name === '@timestamp' ? 'date' : 'string',
+    typeClass: name === 'status' ? 'number' : name === '@timestamp' ? 'temporal' : 'text',
+    nullable: true,
+    isPrimaryKey: false,
+    generated: false,
+  }));
+  const rows = Array.from({ length: count }, (_, i) => [
+    `2026-01-01T00:${String(i % 60).padStart(2, '0')}:00.000Z`,
+    'error',
+    String(500 + (i % 4)),
+  ]);
+  return {
+    op: DATA_OP.execute,
+    payload: { connectionId: CONNECTION_ID, path: logsNode.path, statements: [statement] },
+    response: {
+      kind: 'execute',
+      pages: [
+        {
+          kind: 'tabular',
+          columns,
+          rows,
+          position: {
+            offset: 0,
+            pageSize: count,
+            hasMore: false,
+            nextToken: null,
+            prevToken: null,
+            strategy: 'offset',
+          },
+          truncatedCells: 0,
+        },
+      ],
+    },
   };
 }

@@ -3,7 +3,14 @@ import { DATA_OP } from '@shared/protocol/dataOps';
 import { browserTimeZone, resolveTime } from '../../frontend/src/views/console/kibana/time';
 import { expect, test } from './fixtures';
 import { typeInto } from './support/editor';
-import { executeHits, histogram, kibanaControl, logsNode, logsView } from './support/kibanaFixture';
+import {
+  executeColumns,
+  executeHits,
+  histogram,
+  kibanaControl,
+  logsNode,
+  logsView,
+} from './support/kibanaFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // UI half of the kibana-discover scenario; the Go half is dbflow TestKibanaDiscoverJourney.
@@ -12,7 +19,7 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 const NOW = new Date('2026-01-15T12:00:00.000Z');
 
 function statement(patch: Partial<KibanaDiscoverRequest> = {}): string {
-  const request: KibanaDiscoverRequest = {
+  const { columns, ...request }: KibanaDiscoverRequest = {
     dataView: logsView.id,
     query: '',
     language: 'kuery',
@@ -23,7 +30,7 @@ function statement(patch: Partial<KibanaDiscoverRequest> = {}): string {
     timeZone: browserTimeZone(),
     ...patch,
   };
-  return JSON.stringify(request);
+  return JSON.stringify(columns ? { ...request, columns } : request);
 }
 
 const EXISTS_STATUS = {
@@ -90,4 +97,36 @@ test('Discover runs the typed query, suggests fields and applies a sidebar filte
     statement({ query: 'level:error' }),
     statement({ query: 'level:error', filters: [EXISTS_STATUS] }),
   ]);
+});
+
+test('Discover shows the selected columns as a table', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: kibanaControl(),
+    stream: [
+      executeHits(statement(), 200),
+      executeColumns(statement({ columns: ['level'] }), 50),
+      executeColumns(statement({ columns: ['level', 'status'] }), 50),
+    ],
+  });
+  await page.clock.install({ time: NOW });
+  await page.clock.setFixedTime(NOW);
+
+  const connRow = connectionRow(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await (await findRow(page, logsNode.path)).dblclick();
+  await expect(page.locator('[data-testid="kibana-results"]')).toBeVisible({ timeout: 15_000 });
+
+  await page.click('[data-testid="kibana-field-column-level"]');
+  await page.click('[data-testid="kibana-field-column-status"]');
+  await expect(page.locator('[data-testid="kibana-field-column-status"]')).toHaveAccessibleName(
+    /Remove/,
+  );
+  const results = page.locator('[data-testid="kibana-results"]');
+  await expect(results.getByText('2026-01-01T00:03:00.000Z')).toBeVisible({ timeout: 15_000 });
+  await expect(results.getByText('503').first()).toBeVisible();
 });

@@ -32,6 +32,11 @@
     "since": 0,
     "status": "connected"
   },
+  "Execute#columns": [
+    "@timestamp",
+    "level",
+    "status"
+  ],
   "Execute#syntaxError": "KQL syntax error at position 7: expected a value, “(”, “{”, found end of input",
   "KibanaService.DataView#logs": {
     "fields": [

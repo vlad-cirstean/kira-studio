@@ -115,6 +115,22 @@ func TestKibanaDiscoverJourney(t *testing.T) {
 		t.Fatalf("filtered page = %#v, want fewer than %d documents", narrowed[0], doc.RowCount)
 	}
 
+	withColumns := base
+	withColumns.Columns = []string{"level", "status"}
+	tabular := execute(t, app, conn.ID, discoverRequest(t, withColumns))
+	tp, ok := tabular[0].(page.TabularPage)
+	if !ok || tp.RowCount != doc.RowCount || len(tp.Columns) != 3 {
+		t.Fatalf("columns page = %#v, want %d rows of @timestamp, level, status", tabular[0], doc.RowCount)
+	}
+	colNames := make([]string, len(tp.Columns))
+	for i, c := range tp.Columns {
+		colNames[i] = c.Name
+	}
+	if !slices.Equal(colNames, []string{"@timestamp", "level", "status"}) {
+		t.Fatalf("columns = %v, want @timestamp, level, status", colNames)
+	}
+	app.Contract(t, "kibana-discover", "Execute#columns", colNames)
+
 	hist, err := app.W.Kibana.Histogram(ctx, model.KibanaHistogramRequest{
 		ConnectionID: conn.ID, OpID: "kb-hist", TabID: "tab", Request: base, Interval: "auto",
 	})
