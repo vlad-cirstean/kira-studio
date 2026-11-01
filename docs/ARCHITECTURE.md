@@ -2006,6 +2006,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - ADE storage: ade_tasks.host_url. Migration 0044 renames github_url, ade_gh_synced and pr_number. Migration 0050 (P369) drops ade_viewed_sync. Migration 0051 (P379) adds ade_task_statuses with 4 seeds and ade_tasks.status_id, status_by, status_step, backfilled from the entry step. Migration 0055 (P405) adds ade_task_plan.backlog. Migration 0056 (P405) folds ade_backlog rows into repo-less tasks on the Backlog shelf and drops the table. Migration 0059 (P411) drops ade_task_statuses.category, renames tone to color (16 colours) and adds ade_task_status_defaults, seeded from the first status of each old category.
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
 - BranchLinks (P383) is an optional role: ParseBranchLink (pull, tree, issue links on a claimed host; no host call), ChangeRequestHead (fresh head, author) and ChangeRequestRef (refs/pull/<n>/head on GitHub). ADE ResolveHostLink is read only; AddHostLink re-resolves, fetches one refspec (fork or closed PR: the change-request ref into <owner>/<head>; same-repo open PR: the head into its tracking ref) and attaches through the AddExistingBranch path, so kind follows the tip-author rule. Repo match walks every remote, origin first. Issue links are refused.
+- ChangeRequestDetails (P427) is an optional role: ParseChangeRequestLink (a change request link on a claimed host; no host call) and ChangeRequestDetail (one request's description, conversation, reviewers and checks). It has its own link parser because `fakehost.Forge` lacks BranchLinks and adding it there would change `BranchLinkLabels()`.
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
 
 #### Azure Repos (P423)
@@ -2018,6 +2019,18 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Reviews: the body posts as a new thread through `az devops invoke` (git, pullRequestThreads, API 7.1) from a 0600 temp file, then `set-vote` (approve to approve, requestChanges to wait-for-author, comment to no vote). `ForCommit` uses the pullRequestQuery resource.
 - Azure serves no PR head ref. `ChangeRequestRef` is `refs/pull/<n>/merge`, so ADE fetches the merge ref.
 - Differs from the GitHub op log: `az` calls are not in the op log. Flows use the in-process `flowharness/fakeaz`, not the binary.
+
+#### Pull request view (P427)
+
+- Window: `HostViewService` (bridge) opens one window per change request. Key `hostview-<uuid>` (`HostWindowKeyPrefix`). Ephemeral: never restored, row dropped on close, never the last window. `main.go` purges `hostview-` rows at boot, before `Windows.List()`. `OnWindowClosing` forgets the key in `HostViewTargets`.
+- Calls: `Open(url)` resolves the link against the registry, stores the canonical URL as the target and focuses an existing window for the same request (`opened` false). `WindowTarget(windowKey)` answers the window's target, `null` for any other window. `ChangeRequest(url)` reads the detail and answers kind `ok`, `unavailable` (reason in `status`) or `gone`. A host failure is data, not an IPC error. A non-change-request link is refused as bad request.
+- Breaker: per repo (`provider|host|owner|name`). A rate limited read arms it until `ResetAt`, else 15 minutes; reads in that window answer `unavailable` without a host call.
+- GitHub: one GraphQL query through `gh api graphql`. Azure: three concurrent `az` reads: `repos pr show`, `repos pr policy list` and `az devops invoke` GET `pullRequestThreads` (newest 200 threads). Every read carries a `--query` projection, since `toolexec` caps stdout at 1 MiB.
+- Caps (`githost.DetailMax*`): 100 conversation comments, 50 reviews, 50 code threads, 30 comments per thread, 100 checks, 50 labels, 50 reviewers and 50 assignees. The newest stay; truncation flags show a note.
+- Markdown: `frontend/src/hostview/markdown.ts` (markdown-it). Raw HTML never renders: comments and tags drop and a block's text shows escaped. Images render as links. Only http, https, mailto and `#` links pass; a click opens http(s) in the OS browser through `openExternal`.
+- Frontend: `main.ts` asks for the host view target before the review target; a window with one skips workspace boot, like a review window. `App.vue` renders `HostViewWindow`. Refresh and Retry refetch; nothing refetches on focus.
+- `HostViewTarget.Kind` is `changeRequest`. A later view (Jira issue, P428) adds its own kind to the same window.
+- Entry points: the ADE branch panel's PR row and the task tab's host link row offer "View". `OpenHostViewChangeRequest` is a package function for a later opener.
 
 ## Agent harness (P316)
 
@@ -3231,6 +3244,12 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Azure serves no PR head ref (P423).** ADE fetches `refs/pull/<n>/merge` for fork and closed PRs. It is a merge preview and disappears once the PR closes.
 - **`az` calls are not in the op log (P423).** Like `gh`. Needs a host category in `oplog`.
 - **`ade.changeRequestRepo` has no Azure URL form (P423).** Title-search hits on Azure show no repo label.
+- **PR view caps its content (P427).** Comments, threads and checks past the caps show the newest, with a note. Open the request on the host for the rest.
+- **The PR view has no live update (P427).** It refreshes on demand only.
+- **Azure PR detail fixtures are hand-written (P427).** No org was reachable. Confirm `pr_detail.json`, `policy_detail.json` and `threads_get.json` against a real org.
+- **Images in PR descriptions render as links (P427).** Never inline.
+- **Azure `@<GUID>` mentions show raw (P427).** No identity lookup.
+- **Azure threads beyond the newest 200 are not read (P427).**
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
