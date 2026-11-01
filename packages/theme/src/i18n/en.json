@@ -39,7 +39,7 @@
           "title": "Edit smart script"
         },
         "homeNotice": {
-          "description": "Runs in your home folder {home}, the old default. New scripts use the Kira automations folder."
+          "description": "Runs in your home folder {home}, the old default. New scripts use the Kira scripts folder."
         },
         "nameExample": {
           "example": "Build"
@@ -63,7 +63,7 @@
           "label": "Run in the task’s worktree when started from ADE"
         },
         "useKira": {
-          "label": "Use automations folder"
+          "label": "Use Kira scripts folder"
         }
       }
     },
@@ -75,7 +75,7 @@
         "label": "Home folder"
       },
       "kira": {
-        "label": "Kira automations folder"
+        "label": "Kira scripts folder"
       }
     },
     "error": {
@@ -289,7 +289,7 @@
     },
     "runs": {
       "none": {
-        "emptyHint": "No automation is running. Finished runs are in the operations panel."
+        "emptyHint": "No script is running. Finished runs are in the operations panel."
       },
       "showHistory": {
         "label": "Show history"
@@ -968,13 +968,13 @@
       "automation": {
         "body": "Open Kira Space to see the run.",
         "done": {
-          "title": "Automation done · {name}"
+          "title": "Script run done · {name}"
         },
         "failed": {
-          "title": "Automation failed · {name}"
+          "title": "Script run failed · {name}"
         },
         "needsYou": {
-          "title": "Automation needs you · {name}"
+          "title": "Script run needs you · {name}"
         }
       },
       "rebase": {
@@ -7301,7 +7301,7 @@
           "label": "{name} · needs you"
         },
         "none": {
-          "empty": "No automations yet"
+          "empty": "No scripts yet"
         }
       },
       "baseMarker": {
@@ -7628,7 +7628,7 @@
             "label": "Review code"
           },
           "runAutomation": {
-            "label": "Run automation"
+            "label": "Run a script"
           },
           "showSessions": {
             "label": "Show sessions"
@@ -7731,7 +7731,7 @@
         },
         "source": {
           "automation": {
-            "label": "Automation"
+            "label": "Script run"
           },
           "run": {
             "label": "Run · {step}"
@@ -9650,7 +9650,7 @@
         "label": "Background {count}"
       },
       "clearHint": {
-        "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
+        "hint": "Clears this window’s list only. History is kept 30 days. Script runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "empty": {
         "hint": "Git commands, agent sessions and MCP calls from every module show here."
@@ -13226,7 +13226,7 @@
     },
     "operations": {
       "clear": {
-        "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
+        "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Script runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "commandTruncated": {
         "status": "Command truncated at 64 kibibytes, can’t be re-run"
@@ -15029,7 +15029,7 @@
         "open": {
           "hint": "Click to show the runs list."
         },
-        "tooltip": "Automation runs"
+        "tooltip": "Script runs"
       }
     },
     "tabStrip": {

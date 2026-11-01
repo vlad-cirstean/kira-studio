@@ -112,11 +112,11 @@ export function registerRunsScenarios(env: Env, options: Options): void {
     });
   }
 
-  test('the module is named Automations', async ({ relaunch }) => {
+  test('the module is named Runs', async ({ relaunch }) => {
     const { window: page } = await relaunch({ control: [] });
-    await expect(modeTab(page)).toHaveText(/Automations/);
+    await expect(modeTab(page)).toHaveAccessibleName('Runs');
     await modeTab(page).click();
-    await expect(page.locator('[data-testid="automations-panel"]')).toContainText('Automations');
+    await expect(page.locator('[data-testid="automations-panel"]')).toContainText('Runs');
     await expect(page.locator('[data-testid="automations-panel"]')).toContainText('No scripts');
     await expect(page.locator('[data-testid="automations-add"]')).toBeVisible();
     await expect(page.locator('[data-testid="automations-start"]')).toContainText(
@@ -228,7 +228,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
     expect(control.log().some((e) => e.channel === IPC.terminalOpen)).toBe(false);
   });
 
-  test('contract: a legacy home script offers the automations folder', async ({ relaunch }) => {
+  test('contract: a legacy home script offers the Kira scripts folder', async ({ relaunch }) => {
     const dir = contract<{ path: string }>('script-folders', 'ScriptRunsService.ResolveDir#legacy');
     const legacy = { ...SCRIPT, dirMode: 'home' };
     const { window: page } = await relaunch({

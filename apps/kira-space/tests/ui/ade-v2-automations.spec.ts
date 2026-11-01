@@ -200,7 +200,7 @@ test('a task chip shows a running automation and a failed one until its run is o
   const runs = page.locator(t('status-runs'));
   await expect(runs).toHaveText('1 running');
   await runs.hover();
-  await expect(page.locator(t('tooltip-details-title'))).toHaveText('Automation runs');
+  await expect(page.locator(t('tooltip-details-title'))).toHaveText('Script runs');
   await expect(page.locator(`${t('tooltip-details-row')}[data-label="Running"]`)).toHaveText(
     /Running\s*1/,
   );
@@ -237,9 +237,7 @@ test('the task panel lists the task automations and stops a running one', async 
   expect(calls(control, IPC.scriptRunsStop)[0]?.args).toEqual({ id: 'run-1' });
 });
 
-test('the Automations entry asks for the task and the run dialog lists tasks', async ({
-  relaunch,
-}) => {
+test('the Runs entry asks for the task and the run dialog lists tasks', async ({ relaunch }) => {
   const { window: page } = await openPlan(
     relaunch,
     withBase({

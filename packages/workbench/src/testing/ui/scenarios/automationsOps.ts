@@ -102,7 +102,7 @@ export function registerOpsScenarios(env: Env, options: Options): void {
     await openOps(page);
     const row = opRow(page, failed.id);
     await expect(row).toHaveAttribute('data-status', 'error');
-    await expect(row).toContainText('Automations');
+    await expect(row).toContainText('Runs');
     await expect(row).toContainText(failed.scriptName);
     await ops(page).locator('[data-testid="ops-tab-error"]').click();
     await expect(row).toBeVisible();
@@ -179,7 +179,7 @@ export function registerOpsScenarios(env: Env, options: Options): void {
       .toMatchObject({ id: 'run-w' });
   });
 
-  test('Clear hides automation runs; a run pushed after it shows', async ({ relaunch }) => {
+  test('Clear hides script runs; a run pushed after it shows', async ({ relaunch }) => {
     const { window: page } = await relaunch({
       control: [...BASE, { channel: IPC.scriptRunsList, response: [failed] }],
     });
@@ -197,7 +197,7 @@ export function registerOpsScenarios(env: Env, options: Options): void {
     await expect(opRow(page, failed.id)).toHaveCount(0);
   });
 
-  test('Open run on a smart run opens its tab in Automations', async ({ relaunch }) => {
+  test('Open run on a smart run opens its tab in Runs', async ({ relaunch }) => {
     const { window: page } = await relaunch({
       control: [...BASE, { channel: IPC.scriptRunsList, response: [smart('run-s', 'done')] }],
     });
@@ -218,7 +218,7 @@ export function registerOpsScenarios(env: Env, options: Options): void {
       .toBe(1);
   });
 
-  test('the Automations panel lists only running and waiting runs', async ({ relaunch }) => {
+  test('the Runs panel lists only running and waiting runs', async ({ relaunch }) => {
     const { window: page } = await relaunch({
       control: [
         ...BASE,
