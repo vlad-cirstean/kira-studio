@@ -51,7 +51,7 @@ interface HostStatus {
 
 export type ReviewerState = 'approved' | 'changesRequested' | 'rejected' | 'commented' | 'pending';
 export type CheckState = 'success' | 'failure' | 'error' | 'pending' | 'skipped' | 'neutral';
-type ThreadKind = 'comment' | 'review' | 'code';
+export type ThreadKind = 'comment' | 'review' | 'code';
 
 interface Person {
   login: string;
@@ -85,6 +85,8 @@ interface Comment {
   createdAt: number;
   updatedAt?: number;
   url?: string;
+  /** Client only: an optimistic comment the host has not confirmed. */
+  pending?: boolean;
 }
 
 export interface Thread {
@@ -139,6 +141,33 @@ export interface HostViewChangeRequest {
   kind: HostViewResultKind;
   detail?: ChangeRequestDetail;
   status: HostStatus;
+  compose?: HostViewCompose;
+}
+
+/** What the window's composer may do (HostViewCompose in hostviewcompose.go). */
+export interface HostViewCompose {
+  maxBodyBytes: number;
+  replyKinds: ThreadKind[];
+  attachments: boolean;
+  attachmentsReason?: string;
+  maxAttachments: number;
+  maxAttachmentBytes: number;
+  maxAttachmentTotalBytes: number;
+  allowedExtensions: string[];
+}
+
+export interface HostViewStaged {
+  id: string;
+  name: string;
+  size: number;
+  contentType: string;
+  image: boolean;
+}
+
+export interface HostViewPosted {
+  kind: HostViewResultKind;
+  status?: HostStatus;
+  reason?: string;
 }
 
 interface IssuePerson {
@@ -153,6 +182,8 @@ export interface IssueComment {
   createdAt: number;
   updatedAt?: number;
   url?: string;
+  /** Client only: an optimistic comment the host has not confirmed. */
+  pending?: boolean;
 }
 
 export interface IssueChangeRequest {
@@ -194,4 +225,5 @@ export interface HostViewIssue {
   kind: HostViewResultKind;
   detail?: IssueDetail;
   reason?: string;
+  compose?: HostViewCompose;
 }

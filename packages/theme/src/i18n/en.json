@@ -9432,6 +9432,47 @@
           "hint": "Some checks are not shown."
         }
       },
+      "compose": {
+        "attach": {
+          "label": "Attach files"
+        },
+        "attachments": {
+          "aria": "Attached files"
+        },
+        "body": {
+          "placeholder": "Write a comment"
+        },
+        "drop": {
+          "label": "Drop files to attach"
+        },
+        "heading": {
+          "title": "Add a comment"
+        },
+        "mayHavePosted": {
+          "hint": "The host may have posted this comment. Refresh to check before posting again."
+        },
+        "mode": {
+          "aria": "Write or preview"
+        },
+        "preview": {
+          "empty": "Nothing to preview"
+        },
+        "staging": {
+          "status": "Adding {done} of {total}"
+        },
+        "tooLarge": {
+          "error": "{name} is over {max}."
+        },
+        "tooMany": {
+          "error": "Attach at most {max} files."
+        },
+        "total": {
+          "error": "Files can total at most {max}."
+        },
+        "type": {
+          "error": "{name} has a type that can’t be attached."
+        }
+      },
       "conversation": {
         "commentsTruncated": {
           "hint": "Older comments in this thread are not shown."

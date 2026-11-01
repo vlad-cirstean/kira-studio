@@ -31,6 +31,8 @@ defineProps<{
       v-for="comment in comments"
       :key="comment.id"
       class="rounded-kira-md border border-border px-3 py-2"
+      :class="comment.pending && 'text-muted-foreground'"
+      :data-pending="comment.pending || undefined"
       data-testid="issue-comment"
     >
       <div class="m-0 mb-1 text-kira-sm text-muted-foreground">

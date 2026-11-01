@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
@@ -10,10 +11,24 @@ import {
 import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
+import { ref } from 'vue';
+import CommentComposer from './CommentComposer.vue';
 import MarkdownBody from './MarkdownBody.vue';
-import type { ReviewerState, Thread } from './wire';
+import type { HostViewCompose, ReviewerState, Thread } from './wire';
 
-defineProps<{ threads: Thread[]; truncated: boolean }>();
+// `compose` set means the window can post: each thread of a reply kind offers Reply.
+const props = defineProps<{
+  threads: Thread[];
+  truncated: boolean;
+  compose?: HostViewCompose;
+  queryKey?: readonly unknown[];
+  provider?: string;
+}>();
+
+const replying = ref<string | null>(null);
+function canReply(thread: Thread): boolean {
+  return !!props.compose?.replyKinds.includes(thread.kind) && !thread.id.startsWith('pending-');
+}
 
 function reviewLabel(state: ReviewerState | undefined): string {
   switch (state) {
@@ -87,6 +102,8 @@ function reviewLabel(state: ReviewerState | undefined): string {
           v-for="comment in thread.comments"
           :key="comment.id"
           class="border-b border-border px-3 py-2 last:border-b-0"
+          :class="comment.pending && 'text-muted-foreground'"
+          :data-pending="comment.pending || undefined"
           data-testid="host-view-comment"
         >
           <div class="m-0 mb-1 text-kira-sm text-muted-foreground">
@@ -96,6 +113,28 @@ function reviewLabel(state: ReviewerState | undefined): string {
             · {{ formatRelative(comment.createdAt) }}
           </div>
           <MarkdownBody :source="comment.body" />
+        </div>
+        <div v-if="canReply(thread)" class="border-t border-border px-3 py-2">
+          <Button
+            v-if="replying !== thread.id"
+            variant="toolbar"
+            size="kira"
+            data-testid="host-view-thread-reply"
+            @click="replying = thread.id"
+          >
+            {{ t('space.common.reply.label') }}
+          </Button>
+          <CommentComposer
+            v-else-if="compose && queryKey"
+            compact
+            kind="changeRequest"
+            :compose="compose"
+            :query-key="queryKey"
+            :provider="provider ?? ''"
+            :reply-to="thread.id"
+            @posted="replying = null"
+            @cancel="replying = null"
+          />
         </div>
       </CollapsibleContent>
     </Collapsible>

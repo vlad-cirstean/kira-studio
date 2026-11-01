@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { useElementSize } from '@vueuse/core';
@@ -9,11 +10,12 @@ import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, useTemplateRef } from 'vue';
 import { gapText } from '../ade/v2/artifacts/gapText';
 import { control } from '../bridge/control';
+import CommentComposer from './CommentComposer.vue';
 import HostViewFrame from './HostViewFrame.vue';
 import IssueComments from './IssueComments.vue';
 import IssueSidebar from './IssueSidebar.vue';
 import MarkdownBody from './MarkdownBody.vue';
-import { useIssueDetail } from './queries';
+import { issueKey, useIssueDetail } from './queries';
 import type { IssueTarget } from './wire';
 
 // One issue: description and comments (left), fields and pull requests (right), stacked when narrow.
@@ -21,8 +23,11 @@ import type { IssueTarget } from './wire';
 const WIDE_PX = 900;
 const props = defineProps<{ target: IssueTarget }>();
 const { copy } = useCopy();
-const query = useIssueDetail(() => props.target.url || props.target.key);
+const refText = computed(() => props.target.url || props.target.key);
+const query = useIssueDetail(refText);
+const queryKey = computed(() => issueKey(refText.value));
 const result = computed(() => query.data.value);
+const compose = computed(() => result.value?.compose);
 const detail = computed(() => (result.value?.kind === 'ok' ? result.value.detail : undefined));
 const failure = computed(() => {
   if (query.isError.value) return String(query.error.value ?? '');
@@ -108,6 +113,15 @@ function copyLink(): void {
           :omitted="!!detail.commentsOmitted"
           :label="label"
         />
+        <section v-if="compose" class="mt-4 flex flex-col gap-2" data-testid="issue-compose">
+          <SectionHeading :label="t('space.hostView.compose.heading.title')" />
+          <CommentComposer
+            kind="issue"
+            :compose="compose"
+            :query-key="queryKey"
+            :provider="target.provider"
+          />
+        </section>
       </main>
       <IssueSidebar :detail="detail" :provider="target.provider" :stacked="stacked" />
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
@@ -7,11 +8,12 @@ import { formatRelative } from '@workbench/behaviour/format';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
+import CommentComposer from './CommentComposer.vue';
 import HostViewConversation from './HostViewConversation.vue';
 import HostViewFrame from './HostViewFrame.vue';
 import HostViewSidebar from './HostViewSidebar.vue';
 import MarkdownBody from './MarkdownBody.vue';
-import { useChangeRequestDetail } from './queries';
+import { changeRequestKey, useChangeRequestDetail } from './queries';
 import type { ChangeRequestTarget } from './wire';
 
 // One change request: description and conversation (left), state and people (right). Refresh is the
@@ -21,6 +23,8 @@ const target = computed(() => props.target);
 const { copy } = useCopy();
 const query = useChangeRequestDetail(() => target.value.url);
 const result = computed(() => query.data.value);
+const compose = computed(() => result.value?.compose);
+const queryKey = computed(() => changeRequestKey(target.value.url));
 const detail = computed(() => (result.value?.kind === 'ok' ? result.value.detail : undefined));
 const failure = computed(() => {
   if (query.isError.value) return String(query.error.value ?? '');
@@ -103,7 +107,22 @@ function copyLink(): void {
           }}</span>
         </div>
         <MarkdownBody :source="detail.body" />
-        <HostViewConversation :threads="detail.threads" :truncated="!!detail.threadsTruncated" />
+        <HostViewConversation
+          :threads="detail.threads"
+          :truncated="!!detail.threadsTruncated"
+          :compose="compose"
+          :query-key="queryKey"
+          :provider="target.provider"
+        />
+        <section v-if="compose" class="mt-4 flex flex-col gap-2" data-testid="host-view-compose">
+          <SectionHeading :label="t('space.hostView.compose.heading.title')" />
+          <CommentComposer
+            kind="changeRequest"
+            :compose="compose"
+            :query-key="queryKey"
+            :provider="target.provider"
+          />
+        </section>
       </main>
       <HostViewSidebar :detail="detail" />
     </div>
