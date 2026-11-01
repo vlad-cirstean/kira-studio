@@ -13,7 +13,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P440 | Kubernetes MCP tools with per-cluster approval | Todo |
 | P441 | Dependency update, incl. Wails | Todo |
 | P442 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
-| P443 | Remove claude MCP header reads | Todo |
+| P443 | Remove CLI credential reads: claude MCP headers and docker TLS/config | Todo |
 | P444 | Code review (2 rounds) | Todo |
 | P445 | Close chapter v0.2.25 | Todo |
 
@@ -69,11 +69,14 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Before and after suite times recorded in the plan. No loss of coverage: each removed or merged spec is named with the spec that still covers it.
 - Standing rule already in `CLAUDE.md`: one full run per phase, targeted reruns after.
 
-### P443 Remove claude MCP header reads
+### P443 Remove CLI credential reads: claude MCP headers and docker TLS/config
 
-- Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. One known violation remains, tracked in Known open items.
+- Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. Two known violations remain, tracked in Known open items.
 - `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers (incl. `Authorization`) in `listTools` and copies them into the run's `--mcp-config` file. Replace with a path that never reads or forwards those headers (let `claude` load its own config); the plan decides.
-- Extend guard G5 to the claude harness once clean.
+- `internal/docker/endpoint.go`: `buildTLS` reads the client private key (`tls.LoadX509KeyPair`) and CA itself, and the whole `~/.docker/config.json` (can hold `auths`) for `currentContext`.
+  - TLS fix option: replace the `buildTLS` body with `github.com/docker/go-connections/tlsconfig.Client(Options{CAFile, CertFile, KeyFile, InsecureSkipVerify, ExclusiveRootPools: true, MinVersion: TLS12})` so the library opens the PEMs (already linked; indirect becomes direct in go.mod; re-check `endpoint_test` TLS cases).
+  - Config fix: replace the `currentContext` read with `docker context show` (`DOCKER_CONTEXT` first; fall back to default or probed sockets if the CLI is missing). The phase decides.
+- Extend guard G5 to the claude harness and `internal/docker` once clean: no `LoadX509KeyPair`, no `config.json` read.
 
 ### P444 Code review (2 rounds)
 
