@@ -94,6 +94,8 @@ func scan(t *testing.T, root, rel string) []finding {
 	}
 	inAdapters := strings.HasSuffix(filepath.ToSlash(filepath.Dir(rel)), "internal/adapters")
 	inHTTPClient := strings.HasSuffix(filepath.ToSlash(filepath.Dir(rel)), "internal/httpclient")
+	dir := filepath.ToSlash(filepath.Dir(rel))
+	inHostAdapters := strings.HasPrefix(dir, "apps/kira-space/internal/githost") || strings.HasPrefix(dir, "apps/kira-space/internal/issuetracker")
 	isCodes := filepath.ToSlash(rel) == "internal/ipcerr/codes.go"
 	var out []finding
 	add := func(rule string, pos token.Pos, msg string) {
@@ -120,12 +122,71 @@ func scan(t *testing.T, root, rel string) []finding {
 			if x.Kind == token.STRING && isErrorCodeLiteral(x.Value) && !declared[x.Pos()] {
 				add("G2", x.Pos(), "error code literal "+x.Value+"; use the ipcerr constant")
 			}
+			if x.Kind == token.STRING && inHostAdapters {
+				if v, err := strconv.Unquote(x.Value); err == nil {
+					if why := credentialLiteral(v); why != "" {
+						add("G5", x.Pos(), why+g5Rule)
+					}
+				}
+			}
+		case *ast.CompositeLit:
+			if inHostAdapters && hasAuthToken(x) {
+				add("G5", x.Pos(), "gh auth token argv"+g5Rule)
+			}
 		case *ast.CallExpr:
 			checkCall(x, inAdapters, inHTTPClient, add)
+			if inHostAdapters {
+				if why := credentialCall(x); why != "" {
+					add("G5", x.Pos(), why+g5Rule)
+				}
+			}
 		}
 		return true
 	})
 	return out
+}
+
+const g5Rule = "; Kira never touches a driven CLI's credentials (docs/ARCHITECTURE.md, \"CLI credentials: never touched\")"
+
+// credentialLiteral names why a string literal in a host adapter touches a CLI credential, or "".
+func credentialLiteral(v string) string {
+	for _, bad := range []string{"get-access-token", "--show-token", "hosts.yml", ".config/gh", ".azure/", "azureProfile",
+		"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "AZURE_DEVOPS_EXT_PAT", "JIRA_API_TOKEN", "net/http"} {
+		if strings.Contains(v, bad) {
+			return "literal " + strconv.Quote(bad)
+		}
+	}
+	if v == "Authorization" || strings.HasPrefix(v, "Bearer ") {
+		return "auth header literal"
+	}
+	return ""
+}
+
+// hasAuthToken reports adjacent "auth", "token" elements, the `gh auth token` argv.
+func hasAuthToken(c *ast.CompositeLit) bool {
+	for i := 0; i+1 < len(c.Elts); i++ {
+		a, ok1 := c.Elts[i].(*ast.BasicLit)
+		b, ok2 := c.Elts[i+1].(*ast.BasicLit)
+		if ok1 && ok2 && a.Value == `"auth"` && b.Value == `"token"` {
+			return true
+		}
+	}
+	return false
+}
+
+// credentialCall flags env and home-dir reads; os.Environ passthrough stays allowed.
+func credentialCall(x *ast.CallExpr) string {
+	sel, ok := x.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "os" {
+		switch sel.Sel.Name {
+		case "Getenv", "LookupEnv", "UserHomeDir", "UserConfigDir":
+			return "os." + sel.Sel.Name
+		}
+	}
+	return ""
 }
 
 func isErrorCodeLiteral(v string) bool {
