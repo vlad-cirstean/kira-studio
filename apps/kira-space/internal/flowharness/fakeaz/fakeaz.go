@@ -102,6 +102,10 @@ type Az struct {
 	repos      map[string]*repoState
 	votes      map[int][]string
 	threads    map[int][]string
+	replies    map[int][]Reply
+	uploads    map[int][]Upload
+	noToken    bool
+	uploadCode int
 	calls      []string
 	violations []string
 }
@@ -111,6 +115,7 @@ func New() *Az {
 	return &Az{
 		installed: true, extension: true, loggedIn: true, account: "me@acme.test",
 		repos: map[string]*repoState{}, votes: map[int][]string{}, threads: map[int][]string{},
+		replies: map[int][]Reply{}, uploads: map[int][]Upload{},
 	}
 }
 
@@ -127,6 +132,12 @@ func (a *Az) SetLoggedIn(v bool) { a.set(func() { a.loggedIn = v }) }
 func (a *Az) SetDefaults(orgURL, project string) {
 	a.set(func() { a.defOrg, a.defProject = orgURL, project })
 }
+
+// SetTokenUnavailable makes `az account get-access-token` fail as a PAT-only sign-in does.
+func (a *Az) SetTokenUnavailable(v bool) { a.set(func() { a.noToken = v }) }
+
+// SetUploadStatus forces the next attachment upload's HTTP status (413, 401, 429); 0 clears it.
+func (a *Az) SetUploadStatus(code int) { a.set(func() { a.uploadCode = code }) }
 
 // SetFailure makes every organization-scoped call after sign-in fail with stderr; "" clears it.
 func (a *Az) SetFailure(stderr string) { a.set(func() { a.failure = stderr }) }
@@ -184,6 +195,13 @@ func (a *Az) Threads(id int) []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return slices.Clone(a.threads[id])
+}
+
+// Replies returns the comments posted into existing threads of pull request id, in order.
+func (a *Az) Replies(id int) []Reply {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.replies[id])
 }
 
 // Calls returns every recorded call, in order: "version", "defaults", "project-list", "account",
@@ -248,6 +266,8 @@ func (a *Az) Run(ctx context.Context, _ string, args []string) ([]byte, error) {
 			ext = `{"azure-devops":"1.0.10"}`
 		}
 		return []byte(`{"azure-cli":"2.91.0","azure-cli-core":"2.91.0","extensions":` + ext + `}`), nil
+	case len(args) > 1 && args[0] == "account" && args[1] == "get-access-token":
+		return a.accessToken(args)
 	case args[0] == "account":
 		a.calls = append(a.calls, "account")
 		if !a.loggedIn {
@@ -593,6 +613,8 @@ func (a *Az) invoke(args []string) ([]byte, error) {
 	case "pullrequestquery":
 		a.calls = append(a.calls, "invoke:pullRequestQuery:"+key)
 		return a.pullRequestQuery(key, body)
+	case "pullrequestthreadcomments":
+		return a.threadReply(key, rp, body)
 	case "pullrequestthreads":
 		id, _ := strconv.Atoi(rp["pullRequestId"])
 		a.calls = append(a.calls, "invoke:pullRequestThreads:"+key)
@@ -611,6 +633,35 @@ func (a *Az) invoke(args []string) ([]byte, error) {
 		return []byte(`{"id":1,"status":"active","continuation_token":null}`), nil
 	}
 	return nil, a.unsupported(args)
+}
+
+// Reply is one comment posted into an existing thread.
+type Reply struct {
+	ThreadID, ParentCommentID int
+	Content                   string
+}
+
+func (a *Az) threadReply(key string, rp map[string]string, body []byte) ([]byte, error) {
+	id, _ := strconv.Atoi(rp["pullRequestId"])
+	thread, err := strconv.Atoi(rp["threadId"])
+	if err != nil {
+		a.violations = append(a.violations, "pullRequestThreadComments without threadId")
+		return nil, fail("ERROR: fakeaz: missing threadId")
+	}
+	a.calls = append(a.calls, "invoke:pullRequestThreadComments:"+key+":"+rp["threadId"])
+	var c struct {
+		Content         string `json:"content"`
+		ParentCommentID int    `json:"parentCommentId"`
+		CommentType     int    `json:"commentType"`
+	}
+	if json.Unmarshal(body, &c) != nil || c.Content == "" {
+		return nil, fail("ERROR: fakeaz: bad comment body")
+	}
+	if _, _, ok := a.find(id); !ok {
+		return nil, fail(prMissing)
+	}
+	a.replies[id] = append(a.replies[id], Reply{ThreadID: thread, ParentCommentID: c.ParentCommentID, Content: c.Content})
+	return []byte(`{"id":2}`), nil
 }
 
 // invokeGet answers the threads read. A GET sends no body and must project with azure.ThreadsQuery,

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -23,6 +24,7 @@ type Acli struct {
 	issues    map[string]string
 	details   map[string]string
 	comments  map[string]string
+	posted    map[string][]PostedComment
 	tooLarge  map[string]bool
 	gate      chan struct{}
 	calls     []string
@@ -30,7 +32,7 @@ type Acli struct {
 
 // New returns an installed, logged-in acli for site with no issues.
 func New(site string) *Acli {
-	return &Acli{installed: true, loggedIn: true, site: site, issues: map[string]string{}, details: map[string]string{}, comments: map[string]string{}, tooLarge: map[string]bool{}}
+	return &Acli{installed: true, loggedIn: true, site: site, issues: map[string]string{}, details: map[string]string{}, comments: map[string]string{}, tooLarge: map[string]bool{}, posted: map[string][]PostedComment{}}
 }
 
 // SetInstalled makes the binary present or absent.
@@ -113,6 +115,8 @@ func (a *Acli) Run(ctx context.Context, _ string, args []string) ([]byte, error)
 			return nil, &toolexec.ExecError{ExitCode: 1, Stderr: "no Jira account is logged in"}
 		}
 		return []byte(fmt.Sprintf("Authenticated\n  Site: %s\n  Email: me@acme.test\n", site)), nil
+	case len(args) == 8 && slices.Equal(args[:4], []string{"jira", "workitem", "comment", "create"}) && args[4] == "--key" && args[6] == "--body-file":
+		return a.commentCreate(ctx, args[5], args[7], loggedIn, gate)
 	case len(args) >= 4 && slices.Equal(args[:3], []string{"jira", "workitem", "view"}):
 		return a.view(ctx, args, gate)
 	case len(args) == 11 && slices.Equal(args[:4], []string{"jira", "workitem", "comment", "list"}) && args[4] == "--key" &&
@@ -131,6 +135,39 @@ func (a *Acli) Run(ctx context.Context, _ string, args []string) ([]byte, error)
 		return []byte(raw), nil
 	}
 	return nil, &toolexec.ExecError{ExitCode: 2, Stderr: "fakeacli: unsupported: " + strings.Join(args, " ")}
+}
+
+// PostedComment is one `comment create`: the body file's content and the path acli was given.
+type PostedComment struct{ Body, Path string }
+
+// Posted returns the comments created on KEY, in order.
+func (a *Acli) Posted(key string) []PostedComment {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.posted[key])
+}
+
+func (a *Acli) commentCreate(ctx context.Context, key, path string, loggedIn bool, gate chan struct{}) ([]byte, error) {
+	a.record("comment-create:" + key)
+	if err := wait(ctx, gate); err != nil {
+		return nil, err
+	}
+	if !loggedIn {
+		return nil, &toolexec.ExecError{ExitCode: 1, Stderr: "no Jira account is logged in"}
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, &toolexec.ExecError{ExitCode: 1, Stderr: "Error: cannot read body file"}
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	_, inIssues := a.issues[key]
+	_, inDetails := a.details[key]
+	if !inIssues && !inDetails {
+		return nil, notFound()
+	}
+	a.posted[key] = append(a.posted[key], PostedComment{Body: string(body), Path: path})
+	return []byte("Comment added\n"), nil
 }
 
 func (a *Acli) view(ctx context.Context, args []string, gate chan struct{}) ([]byte, error) {
