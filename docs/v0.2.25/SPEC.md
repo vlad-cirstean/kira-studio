@@ -46,7 +46,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 ### P440 Kubernetes MCP tools with per-cluster approval
 
 - Expose the P439 read operations (list namespaces, kinds, resources; describe; logs) through the Kira Studio DB MCP server, so the AI can request read data.
-- Per-cluster setting decides whether each AI request shows an approve dialog first or runs without asking. Default: ask.
+- A cluster works like a DB connection in the MCP server: per-cluster, per-operation permission (off, ask, allow) for each read operation, plus a free-text description shown to the AI in the list output. Default: ask.
+- Off hides the operation's use for that cluster; ask shows an approve dialog per AI request; allow runs without asking.
+- Mirror the DB connection `permissions` and `description` model (`dbmcp` `connectionPermissions`, connection `Description`); the plan decides the exact operation groups and UI placement.
 - Read only, same as P439: no write, exec or port-forward tools.
 - Reuse the existing DB MCP approval flow and P415 op-log origin stamping where they fit; the plan decides.
 
