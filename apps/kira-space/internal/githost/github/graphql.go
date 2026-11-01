@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -48,13 +49,23 @@ func graphqlArgv(host, query string, vars []GraphQLVar) []string {
 // forbidden Status carrying the first message; errors[] beside data are returned for the caller to
 // map per alias.
 func (c *Client) graphql(ctx context.Context, repo Repo, query string, vars []GraphQLVar, out any) (Status, []graphqlError) {
+	return c.graphqlWithin(ctx, repo, query, vars, out, graphqlTimeout, false)
+}
+
+// graphqlWithin is graphql with an explicit timeout. A write that times out may still have landed,
+// so its reason says so.
+func (c *Client) graphqlWithin(ctx context.Context, repo Repo, query string, vars []GraphQLVar, out any, timeout time.Duration, write bool) (Status, []graphqlError) {
 	authStatus := c.discovery.Status(ctx, repo.Host)
 	if !authStatus.OK() {
 		return authStatus, nil
 	}
-	res, runErr := c.runner.Run(ctx, authStatus.Path, Spec{Args: graphqlArgv(repo.Host, query, vars), Timeout: graphqlTimeout})
+	res, runErr := c.runner.Run(ctx, authStatus.Path, Spec{Args: graphqlArgv(repo.Host, query, vars), Timeout: timeout})
 	if runErr != nil || ctx.Err() != nil {
-		return classify(repo.Host, res, runErr, ctx.Err()), nil
+		st := classify(repo.Host, res, runErr, ctx.Err())
+		if write && ctx.Err() == nil && errors.Is(runErr, context.DeadlineExceeded) {
+			st.Reason = writeTimeoutReason
+		}
+		return st, nil
 	}
 	var env graphqlEnvelope
 	decoded := json.Unmarshal(res.Stdout, &env) == nil

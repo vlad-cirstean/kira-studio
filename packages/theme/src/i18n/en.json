@@ -1286,6 +1286,11 @@
         }
       },
       "gitHost": {
+        "comment": {
+          "attachmentsUnsupported": {
+            "body": "{label} has no API for comment attachments. Add files on {label}."
+          }
+        },
         "notChangeRequestUrl": {
           "body": "That isn’t a {changeRequests} link."
         },

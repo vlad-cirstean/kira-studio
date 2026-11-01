@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/clisetup"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
@@ -15,18 +16,24 @@ type Options struct {
 	Locator Locator
 	Runner  Runner
 	Clock   Clock
+	// HTTP is the attachment upload transport; nil takes http.DefaultTransport.
+	HTTP http.RoundTripper
 }
 
 // Provider adapts Client to the githost roles.
-type Provider struct{ client *Client }
+type Provider struct {
+	client   *Client
+	uploader *uploader
+}
 
 var (
-	_ githost.Provider             = (*Provider)(nil)
-	_ githost.ChangeRequestSync    = (*Provider)(nil)
-	_ githost.ChangeRequestReviews = (*Provider)(nil)
-	_ githost.BranchLinks          = (*Provider)(nil)
-	_ githost.ChangeRequestSearch  = (*Provider)(nil)
-	_ githost.CLISetup             = (*Provider)(nil)
+	_ githost.Provider              = (*Provider)(nil)
+	_ githost.ChangeRequestSync     = (*Provider)(nil)
+	_ githost.ChangeRequestReviews  = (*Provider)(nil)
+	_ githost.BranchLinks           = (*Provider)(nil)
+	_ githost.ChangeRequestSearch   = (*Provider)(nil)
+	_ githost.ChangeRequestComments = (*Provider)(nil)
+	_ githost.CLISetup              = (*Provider)(nil)
 )
 
 // New builds the Azure Repos provider over the `az` CLI.
@@ -40,7 +47,7 @@ func New(o Options) *Provider {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Provider{client: NewClient(NewDiscovery(o.Locator, o.Runner, o.Clock), o.Runner)}
+	return &Provider{client: NewClient(NewDiscovery(o.Locator, o.Runner, o.Clock), o.Runner), uploader: newUploader(o.HTTP)}
 }
 
 func (p *Provider) ID() string { return ProviderID }
