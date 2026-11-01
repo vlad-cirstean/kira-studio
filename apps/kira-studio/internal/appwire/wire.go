@@ -152,7 +152,8 @@ func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, kee
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
 	dbMcpApprovals.Prompts = promptRouter
-	dbMcpSvc := bridge.NewDbMcpService(deps, installer, dbMcpApprovals, proofSvc)
+	kubeSvc := &bridge.KubernetesService{BoundService: kubernetes.NewBoundService(deps.Repos.KubeClusters, deps.Events, opts.KubernetesExtra...)}
+	dbMcpSvc := bridge.NewDbMcpService(deps, installer, dbMcpApprovals, proofSvc, kubernetes.ServiceOf(kubeSvc.BoundService))
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
 	// P87 §3/§4: one keep-awake assertion for the whole app, driven by the titlebar toggle. The
@@ -187,7 +188,6 @@ func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, kee
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs, Agent: agents}}
 	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts, deps.Repos.DockerRestore)...)}
 	docker.StartRestoreBound(dockerSvc.BoundService)
-	kubeSvc := &bridge.KubernetesService{BoundService: kubernetes.NewBoundService(deps.Repos.KubeClusters, deps.Events, opts.KubernetesExtra...)}
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 

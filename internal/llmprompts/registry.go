@@ -1287,7 +1287,7 @@ var DbmcpInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.dbmcpInstructions.title",
 	PurposeKey: "llmPrompts.entry.dbmcpInstructions.description",
 	UsedByKey:  "llmPrompts.entry.dbmcpInstructions.usedBy.body",
-	Default:    "Read and query the databases configured in this Kira Studio app. Only connections the user exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned. Levels differ per engine; do not assume a database or schema level exists. `run_query` and `explain_query` need the database's `path` on engines with several databases. `describe_schema` returns every relation's columns in one call, cheaper than one `describe_table` per table. `run_query` runs one statement through the app's SQL console path, under the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Run `explain_query` before an expensive-looking query. `run_query` plans it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it.",
+	Default:    "Read and query the databases configured in this Kira Studio app. Only connections the user exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned. Levels differ per engine; do not assume a database or schema level exists. `run_query` and `explain_query` need the database's `path` on engines with several databases. `describe_schema` returns every relation's columns in one call, cheaper than one `describe_table` per table. `run_query` runs one statement through the app's SQL console path, under the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Run `explain_query` before an expensive-looking query. `run_query` plans it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it. Kubernetes tools (`kube_*`) are read only; start with `kube_list_clusters` and read each cluster's `permissions` and `description` first. A prompt permission waits up to two minutes for the user.",
 }, NoVars{})
 
 // DbmcpToolListConnections describes the list_connections tool.
@@ -1411,3 +1411,68 @@ var DbmcpToolProofListSessions = define(Entry{
 	ID: "dbmcp.tool.proof_list_sessions", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_list_sessions",
 	Default: "List closed proof sessions, newest first, with step count and whether an edit waits for review. Use it to find the name proof_edit_session needs. The app keeps the newest 30.",
 }, NoVars{})
+
+// DbmcpToolKubeListClusters describes the kube_list_clusters tool.
+var DbmcpToolKubeListClusters = define(Entry{
+	ID: "dbmcp.tool.kube_list_clusters", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "kube_list_clusters",
+	Default: "List the Kubernetes clusters (kubeconfig contexts) exposed to MCP, with each one's description and per-operation permissions (deny, allow or prompt).",
+}, NoVars{})
+
+// DbmcpToolKubeListNamespaces describes the kube_list_namespaces tool.
+var DbmcpToolKubeListNamespaces = define(Entry{
+	ID: "dbmcp.tool.kube_list_namespaces", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "kube_list_namespaces",
+	Default: "List one cluster's namespaces. restricted is true when the cluster denied the list; fallback is then the context's own namespace.",
+}, NoVars{})
+
+var _ = arg(DbmcpToolKubeListNamespaces.id, "clusterId", studioApp, NextCall, `Cluster id from kube_list_clusters.`, NoVars{})
+
+// DbmcpToolKubeListKinds describes the kube_list_kinds tool.
+var DbmcpToolKubeListKinds = define(Entry{
+	ID: "dbmcp.tool.kube_list_kinds", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "kube_list_kinds",
+	Default: "List the resource kinds a cluster serves. Pass a kind's key to kube_list_resources and kube_describe. partial is true when some API groups failed discovery.",
+}, NoVars{})
+
+var _ = arg(DbmcpToolKubeListKinds.id, "clusterId", studioApp, NextCall, `Cluster id from kube_list_clusters.`, NoVars{})
+
+// DbmcpToolKubeListResources describes the kube_list_resources tool.
+var DbmcpToolKubeListResources = define(Entry{
+	ID: "dbmcp.tool.kube_list_resources", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "kube_list_resources",
+	Default: "List one kind's objects as kubectl get columns. Namespace empty lists all namespaces. Capped at maxRows; truncated says so.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolKubeListResources.id, "clusterId", studioApp, NextCall, `Cluster id from kube_list_clusters.`, NoVars{})
+	_ = arg(DbmcpToolKubeListResources.id, "kind", studioApp, NextCall, `Kind key from kube_list_kinds, such as v1/pods or apps/v1/deployments.`, NoVars{})
+	_ = arg(DbmcpToolKubeListResources.id, "namespace", studioApp, NextCall, `Namespace to list. Omit for all namespaces.`, NoVars{})
+	_ = arg(DbmcpToolKubeListResources.id, "labelSelector", studioApp, NextCall, `Label selector, such as app=web,tier!=db. Omit for none.`, NoVars{})
+	_ = arg(DbmcpToolKubeListResources.id, "maxRows", studioApp, NextCall, `Rows to return, 1-{{.Max}}. Default {{.Default}}.`, LimitVars{Default: 200, Max: 2000})
+)
+
+// DbmcpToolKubeDescribe describes the kube_describe tool.
+var DbmcpToolKubeDescribe = define(Entry{
+	ID: "dbmcp.tool.kube_describe", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "kube_describe",
+	Default: "Describe one object: metadata, owners, conditions, events and YAML manifest. Secret values are replaced by their byte counts.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolKubeDescribe.id, "clusterId", studioApp, NextCall, `Cluster id from kube_list_clusters.`, NoVars{})
+	_ = arg(DbmcpToolKubeDescribe.id, "kind", studioApp, NextCall, `Kind key from kube_list_kinds, such as v1/pods.`, NoVars{})
+	_ = arg(DbmcpToolKubeDescribe.id, "name", studioApp, NextCall, `Object name.`, NoVars{})
+	_ = arg(DbmcpToolKubeDescribe.id, "namespace", studioApp, NextCall, `Object namespace. Omit for a cluster-scoped kind.`, NoVars{})
+)
+
+// DbmcpToolKubePodLogs describes the kube_pod_logs tool.
+var DbmcpToolKubePodLogs = define(Entry{
+	ID: "dbmcp.tool.kube_pod_logs", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "kube_pod_logs",
+	Default: "Read the last lines of one pod container's log, up to 256 KiB. No follow.",
+}, NoVars{})
+
+var (
+	_ = arg(DbmcpToolKubePodLogs.id, "clusterId", studioApp, NextCall, `Cluster id from kube_list_clusters.`, NoVars{})
+	_ = arg(DbmcpToolKubePodLogs.id, "namespace", studioApp, NextCall, `Pod namespace.`, NoVars{})
+	_ = arg(DbmcpToolKubePodLogs.id, "pod", studioApp, NextCall, `Pod name, from kube_list_resources on v1/pods.`, NoVars{})
+	_ = arg(DbmcpToolKubePodLogs.id, "container", studioApp, NextCall, `Container name. Omit when the pod has one.`, NoVars{})
+	_ = arg(DbmcpToolKubePodLogs.id, "previous", studioApp, NextCall, `Read the previous container instance's log. Default false.`, NoVars{})
+	_ = arg(DbmcpToolKubePodLogs.id, "timestamps", studioApp, NextCall, `Prefix each line with its timestamp. Default false.`, NoVars{})
+	_ = arg(DbmcpToolKubePodLogs.id, "tail", studioApp, NextCall, `Lines from the end, 1-{{.Max}}. Default {{.Default}}.`, LimitVars{Default: 200, Max: 5000})
+)

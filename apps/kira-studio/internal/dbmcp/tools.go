@@ -473,25 +473,30 @@ func (s *Server) awaitApproval(ctx context.Context, args runQueryArgs, summary m
 			return res, out, err, true
 		}
 		return nil, nil, nil, false
-	case ApprovalDenied:
-		res, out, err = errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
-		return res, out, err, true
-	case ApprovalTimedOut:
-		res, out, err = errResult(fmt.Sprintf("query against %q got no answer within 2 minutes", summary.Name))
-		return res, out, err, true
-	case ApprovalAbandoned:
-		res, out, err = errResult(fmt.Sprintf("the database MCP server stopped before the query against %q was answered", summary.Name))
-		return res, out, err, true
-	case ApprovalQueueFull:
-		res, out, err = errResult(queueFullMessage)
-		return res, out, err, true
 	default:
-		res, out, err = errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
+		res, out, err = approvalOutcomeError(outcome, fmt.Sprintf("query against %q", summary.Name))
 		return res, out, err, true
 	}
 }
 
 const queueFullMessage = "too many queries are already waiting for approval; retry after the user answers them"
+
+// approvalOutcomeError words every outcome of a request that must not run; subject names what was
+// asked about ("query against "x"").
+func approvalOutcomeError(outcome ApprovalOutcome, subject string) (*mcp.CallToolResult, any, error) {
+	switch outcome {
+	case ApprovalDenied:
+		return errResult(subject + " was denied by the user")
+	case ApprovalTimedOut:
+		return errResult(subject + " got no answer within 2 minutes")
+	case ApprovalAbandoned:
+		return errResult("the database MCP server stopped before the " + subject + " was answered")
+	case ApprovalQueueFull:
+		return errResult(queueFullMessage)
+	default:
+		return errResult(subject + " was not approved")
+	}
+}
 
 // --- explain_query (§4) ---
 
@@ -579,16 +584,8 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 			}
 			summary = resummary
 			// fall through to Execute below.
-		case ApprovalDenied:
-			return errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
-		case ApprovalTimedOut:
-			return errResult(fmt.Sprintf("query against %q got no answer within 2 minutes", summary.Name))
-		case ApprovalAbandoned:
-			return errResult(fmt.Sprintf("the database MCP server stopped before the query against %q was answered", summary.Name))
-		case ApprovalQueueFull:
-			return errResult(queueFullMessage)
 		default:
-			return errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
+			return approvalOutcomeError(outcome, fmt.Sprintf("query against %q", summary.Name))
 		}
 	case "deny":
 		// Already handled above (m.read == "deny", before connecting) — unreachable in practice,
