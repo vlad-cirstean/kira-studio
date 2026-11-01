@@ -98,7 +98,8 @@ type listEntry struct {
 
 // UserMCPServers asks `claude mcp list` from dir for the MCP servers claude loads there. Kira never
 // opens claude's config files or runs `claude mcp get`, which prints stored headers and env. Claude
-// health-checks every server on each call, so the result is cached per dir for a short while.
+// health-checks every server on each call, so the result is cached per dir for a short while; a failed
+// listing falls back to the last good one for that dir.
 func (p *Provider) UserMCPServers(ctx context.Context, dir string) ([]harness.UserServer, error) {
 	c := &p.mcpList
 	c.mu.Lock()
@@ -110,6 +111,13 @@ func (p *Provider) UserMCPServers(ctx context.Context, dir string) ([]harness.Us
 	v, err, _ := c.flight.Do(dir, func() (any, error) {
 		servers, err := p.runMCPList(ctx, dir)
 		if err != nil {
+			// A slow or hung server must not block runs: reuse the last good list.
+			c.mu.Lock()
+			stale, ok := c.entries[dir]
+			c.mu.Unlock()
+			if ok {
+				return stale.servers, nil
+			}
 			return nil, err
 		}
 		c.mu.Lock()
