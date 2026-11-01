@@ -1,6 +1,9 @@
 package issuetracker
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Registry holds the registered providers in registration order. A nil Registry is empty.
 type Registry struct {
@@ -60,4 +63,17 @@ func (r *Registry) Infos() []Info {
 		out = append(out, Info{ID: p.ID(), Terms: p.Terms(), Setup: p.Setup()})
 	}
 	return out
+}
+
+// IssueViewLabels names what the issue view opens, e.g. "Jira work item key or link". It joins the
+// providers that implement IssueDetails with " or ".
+func (r *Registry) IssueViewLabels() string {
+	var parts []string
+	for _, p := range r.All() {
+		if _, ok := p.(IssueDetails); ok {
+			t := p.Terms()
+			parts = append(parts, t.Label+" "+strings.ToLower(t.Issue)+" key or link")
+		}
+	}
+	return strings.Join(parts, " or ")
 }
