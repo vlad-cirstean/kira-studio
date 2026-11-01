@@ -34,6 +34,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   hostViewOpen: 'HostViewService.Open',
   hostViewWindowTarget: 'HostViewService.WindowTarget',
   hostViewChangeRequest: 'HostViewService.ChangeRequest',
+  hostViewIssue: 'HostViewService.Issue',
   linkOpenExternal: 'LinkService.OpenExternal',
   settingsGetAll: 'SettingsService.GetAll',
   settingsSet: 'SettingsService.Set',

@@ -81,3 +81,48 @@ export function hostViewControl(
 export function calls(control: ControlMockHandle, channel: string) {
   return control.log().filter((e) => e.channel === channel);
 }
+
+export interface IssueWire {
+  kind: string;
+  detail?: Record<string, unknown>;
+  reason?: string;
+}
+
+type IssueTarget = {
+  kind: string;
+  url: string;
+  provider: string;
+  tracker: Record<string, string>;
+  key: string;
+};
+
+// issue-view.json is written by issueview_test.go.
+export const issueTarget = contract<IssueTarget>(
+  'issue-view',
+  'HostViewService.WindowTarget#issue',
+);
+export const issueOk = contract<IssueWire>('issue-view', 'HostViewService.Issue#ok');
+export const issueFallback = contract<IssueWire>(
+  'issue-view',
+  'HostViewService.Issue#commentsFallback',
+);
+export const issueOmitted = contract<IssueWire>(
+  'issue-view',
+  'HostViewService.Issue#commentsOmitted',
+);
+export const issueGone = contract<IssueWire>('issue-view', 'HostViewService.Issue#gone');
+export const issueUnauthenticated = contract<IssueWire>(
+  'issue-view',
+  'HostViewService.Issue#unauthenticated',
+);
+
+export function issueControl(
+  result: IssueWire,
+  extra: readonly ControlSnapshot[] = [],
+): ControlSnapshot[] {
+  return [
+    { channel: IPC.hostViewWindowTarget, response: issueTarget },
+    { channel: IPC.hostViewIssue, response: result },
+    ...extra,
+  ];
+}

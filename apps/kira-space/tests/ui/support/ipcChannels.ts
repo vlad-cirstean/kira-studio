@@ -10,6 +10,7 @@ export const IPC = {
   hostViewOpen: 'kira:hostview:open',
   hostViewWindowTarget: 'kira:hostview:windowTarget',
   hostViewChangeRequest: 'kira:hostview:changeRequest',
+  hostViewIssue: 'kira:hostview:issue',
   linkOpenExternal: 'kira:link:openExternal',
 
   settingsGetAll: 'kira:settings:getAll',
