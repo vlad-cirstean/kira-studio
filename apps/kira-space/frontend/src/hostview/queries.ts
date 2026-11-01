@@ -4,7 +4,7 @@ import { toValue } from 'vue';
 import { control } from '../bridge/control';
 
 export const hostViewTargetKey = (windowKey: string) => ['hostview', 'target', windowKey] as const;
-export const changeRequestKey = (url: string) => ['hostview', 'changeRequest', url] as const;
+const changeRequestKey = (url: string) => ['hostview', 'changeRequest', url] as const;
 
 /**
  * One change request's detail. A host failure arrives as data (kind unavailable or gone), not as a

@@ -1,7 +1,7 @@
 // Wire types of HostViewService (apps/kira-space/internal/bridge/hostview.go) and the githost
 // detail contract (internal/githost/detail.go).
 
-export interface HostInfo {
+interface HostInfo {
   id: string;
   label: string;
   changeRequest: string;
@@ -25,7 +25,7 @@ export interface HostViewOpen {
   opened: boolean;
 }
 
-export interface HostStatus {
+interface HostStatus {
   kind: string;
   reason?: string;
   host?: string;
@@ -35,19 +35,19 @@ export interface HostStatus {
 
 export type ReviewerState = 'approved' | 'changesRequested' | 'rejected' | 'commented' | 'pending';
 export type CheckState = 'success' | 'failure' | 'error' | 'pending' | 'skipped' | 'neutral';
-export type ThreadKind = 'comment' | 'review' | 'code';
+type ThreadKind = 'comment' | 'review' | 'code';
 
-export interface Person {
+interface Person {
   login: string;
   name?: string;
 }
 
-export interface Label {
+interface Label {
   name: string;
   color?: string;
 }
 
-export interface Reviewer {
+interface Reviewer {
   person: Person;
   team?: boolean;
   state: ReviewerState;
@@ -62,7 +62,7 @@ export interface Check {
   required?: boolean;
 }
 
-export interface Comment {
+interface Comment {
   id: string;
   author: Person;
   body: string;
@@ -83,14 +83,14 @@ export interface Thread {
   commentsTruncated?: boolean;
 }
 
-export interface DiffStats {
+interface DiffStats {
   commits: number;
   files: number;
   additions: number;
   deletions: number;
 }
 
-export type ChangeRequestState = 'open' | 'draft' | 'merged' | 'closed';
+type ChangeRequestState = 'open' | 'draft' | 'merged' | 'closed';
 
 export interface ChangeRequestDetail {
   number: number;
@@ -117,7 +117,7 @@ export interface ChangeRequestDetail {
   mergeable?: 'mergeable' | 'conflicting';
 }
 
-export type HostViewResultKind = 'ok' | 'unavailable' | 'gone';
+type HostViewResultKind = 'ok' | 'unavailable' | 'gone';
 
 export interface HostViewChangeRequest {
   kind: HostViewResultKind;
