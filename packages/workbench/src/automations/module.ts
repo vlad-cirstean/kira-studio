@@ -4,6 +4,9 @@ import type {
   ScriptRunLogChunk,
   ScriptRunLogPage,
   ScriptRunPreview,
+  ScriptRunRestoreChoice,
+  ScriptRunRestoreResult,
+  ScriptRunRestoreState,
   ScriptRunStarted,
 } from '@shared/domain/scriptRuns';
 import type {
@@ -58,6 +61,12 @@ export interface ScriptRunsSeam {
   resume(id: string): Promise<ScriptRunStarted>;
   /** The terminal command that continues a smart run's conversation. */
   resumeCommand(runId: string): Promise<string>;
+  /** The runs the last quit or crash ended, each planned against its script as it is now. */
+  restoreState(): Promise<ScriptRunRestoreState>;
+  /** Starts the confirmed runs; one outcome each, a failed run stays on the list. */
+  restore(items: ScriptRunRestoreChoice[]): Promise<ScriptRunRestoreResult>;
+  /** Forgets the list. */
+  restoreDismiss(): Promise<void>;
   readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
   onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
   /** Next fire instants (unix ms) of a cron in a timezone; rejects with the Go validation text. */

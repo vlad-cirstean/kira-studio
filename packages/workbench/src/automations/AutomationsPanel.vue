@@ -29,6 +29,7 @@ import {
   type ScriptMenuActions,
   scriptMenu,
 } from './panelMenus';
+import RunsRestoreBanner from './restore/RunsRestoreBanner.vue';
 import { useRunScript } from './runScript';
 import RunsSection from './runs/RunsSection.vue';
 import { useLiveRunByScript } from './runs/runsQueries';
@@ -437,6 +438,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
           />
         </template>
       </PanelHeader>
+      <RunsRestoreBanner />
       <PanelBar v-if="!empty && showSearch">
         <SearchField v-model="search" data-testid="tree-search" />
       </PanelBar>

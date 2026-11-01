@@ -162,6 +162,24 @@
         "label": "Parameters"
       }
     },
+    "restore": {
+      "banner": {
+        "body": "{count} script was running when {app} closed. | {count} scripts were running when {app} closed.",
+        "review": {
+          "label": "Review scripts"
+        }
+      },
+      "dialog": {
+        "description": "These were running when {app} closed. Nothing starts until you confirm.",
+        "title": "Restart scripts"
+      },
+      "params": {
+        "label": "{count} param | {count} params"
+      },
+      "resume": {
+        "label": "Continues its conversation"
+      }
+    },
     "run": {
       "again": {
         "label": "Run again"
