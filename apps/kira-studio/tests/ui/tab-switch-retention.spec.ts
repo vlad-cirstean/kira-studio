@@ -98,7 +98,7 @@ function discoverStatement(): string {
   return JSON.stringify(columns ? { ...request, columns } : request);
 }
 
-test('Discover keeps its field search and re-reads no data view or histogram after six minutes away', async ({
+test('Discover keeps its field search and re-reads no data view or histogram after four minutes away', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({
@@ -113,7 +113,8 @@ test('Discover keeps its field search and re-reads no data view or histogram aft
 
   const search = page.locator('[data-testid="kibana-field-search"]');
   await search.fill('mess');
-  // The data view picker's list (kibanaDataViews) stays on a one-minute staleTime on purpose: Kibana
+  // The data view definition has no gcTime override (P434 R1-F3): the default 5 min bounds it, so the
+  // away time stays under that. The data view picker's list (kibanaDataViews) stays on a one-minute staleTime on purpose: Kibana
   // owns it and others add views. The view's own definition and the histogram are Kira's to keep.
   const kibanaReads = () =>
     control
@@ -122,7 +123,7 @@ test('Discover keeps its field search and re-reads no data view or histogram aft
   const before = kibanaReads();
 
   await modeTab(page, 'api').click();
-  await page.clock.fastForward(6 * 60_000);
+  await page.clock.fastForward(4 * 60_000);
   await modeTab(page, 'studio').click();
 
   await expect(page.locator('[data-testid="kibana-results"]')).toBeVisible();
