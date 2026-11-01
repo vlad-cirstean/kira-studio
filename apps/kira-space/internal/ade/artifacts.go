@@ -261,16 +261,21 @@ func (b *TaskBoard) repoNicks() (map[string]string, error) {
 	return nick, nil
 }
 
-// repoArtifacts is one repo's share: the task's change requests (live from the host, else the archive
-// snapshot), its branches and, for a live task, the deployments git facts report. rows are the task's
-// rows in the repo; liveRows every live row of the repo, the input the board gives repoFacts.
-func (b *TaskBoard) repoArtifacts(ctx context.Context, sc ArtifactScope, repoID, nick string, rows, liveRows []model.AdeTaskBranch, setups map[string]model.AdeWorktreeSetup) ([]adewire.Artifact, []adewire.ArtifactGap) {
+func namedBranches(rows []model.AdeTaskBranch) []model.AdeTaskBranch {
 	var named []model.AdeTaskBranch
 	for _, r := range rows {
 		if r.Name != "" {
 			named = append(named, r)
 		}
 	}
+	return named
+}
+
+// repoArtifacts is one repo's share: the task's change requests (live from the host, else the archive
+// snapshot), its branches and, for a live task, the deployments git facts report. rows are the task's
+// rows in the repo; liveRows every live row of the repo, the input the board gives repoFacts.
+func (b *TaskBoard) repoArtifacts(ctx context.Context, sc ArtifactScope, repoID, nick string, rows, liveRows []model.AdeTaskBranch, setups map[string]model.AdeWorktreeSetup) ([]adewire.Artifact, []adewire.ArtifactGap) {
+	named := namedBranches(rows)
 	if len(named) == 0 {
 		return nil, nil
 	}

@@ -282,35 +282,10 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			}
 		}
 	} else {
-		existing, err := t.deps.Store.Get(args.Resume)
-		if err != nil {
-			return PrepareResult{}, fmt.Errorf("ade: prepare: resume lookup: %w", err)
-		}
-		if existing == nil {
-			return PrepareResult{}, ErrSessionNotFound
-		}
-		if existing.TaskID != args.TaskID {
-			return PrepareResult{}, ErrSessionWrongTask
-		}
-		if existing.State != model.AdeSessionStateStopped {
-			return PrepareResult{}, ErrSessionRunning
-		}
-		recordID = existing.ID
-		agentSessionID = existing.AgentSessionID
-		if agent, err = t.deps.Agent.For(existing.Provider); err != nil {
+		var err error
+		if recordID, agentSessionID, cwd, agent, err = t.resumeTarget(args); err != nil {
 			return PrepareResult{}, err
 		}
-		// Resume always uses the recorded cwd, never args.Cwd — a session must not appear to resume
-		// somewhere it never ran. A missing directory is an error.
-		if info, err := os.Stat(existing.Cwd); err != nil {
-			if !os.IsNotExist(err) {
-				return PrepareResult{}, fmt.Errorf("ade: prepare: stat resume cwd: %w", err)
-			}
-			return PrepareResult{}, fmt.Errorf("%w: %s no longer exists", ErrInvalidInput, existing.Cwd)
-		} else if !info.IsDir() {
-			return PrepareResult{}, ErrResumeCwdNotDir
-		}
-		cwd = existing.Cwd
 	}
 
 	if _, err := agent.Locate(context.Background(), t.deps.AgentBin); err != nil {
@@ -352,6 +327,40 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	time.AfterFunc(t.deps.PendingTTL, func() { t.expirePending(terminalID) })
 
 	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: agentSessionID, Command: command, Cwd: cwd}, nil
+}
+
+// resumeTarget validates a resume request and returns the recorded session, cwd and provider.
+func (t *Tracker) resumeTarget(args PrepareArgs) (recordID, agentSessionID, cwd string, agent harness.Provider, err error) {
+	existing, err := t.deps.Store.Get(args.Resume)
+	if err != nil {
+		return "", "", "", nil, fmt.Errorf("ade: prepare: resume lookup: %w", err)
+	}
+	if existing == nil {
+		return "", "", "", nil, ErrSessionNotFound
+	}
+	if existing.TaskID != args.TaskID {
+		return "", "", "", nil, ErrSessionWrongTask
+	}
+	if existing.State != model.AdeSessionStateStopped {
+		return "", "", "", nil, ErrSessionRunning
+	}
+	recordID = existing.ID
+	agentSessionID = existing.AgentSessionID
+	if agent, err = t.deps.Agent.For(existing.Provider); err != nil {
+		return "", "", "", nil, err
+	}
+	// Resume always uses the recorded cwd, never args.Cwd — a session must not appear to resume
+	// somewhere it never ran. A missing directory is an error.
+	if info, err := os.Stat(existing.Cwd); err != nil {
+		if !os.IsNotExist(err) {
+			return "", "", "", nil, fmt.Errorf("ade: prepare: stat resume cwd: %w", err)
+		}
+		return "", "", "", nil, fmt.Errorf("%w: %s no longer exists", ErrInvalidInput, existing.Cwd)
+	} else if !info.IsDir() {
+		return "", "", "", nil, ErrResumeCwdNotDir
+	}
+	cwd = existing.Cwd
+	return recordID, agentSessionID, cwd, agent, nil
 }
 
 // expirePending releases an intent that never composed within PendingTTL, so an abandoned launch's

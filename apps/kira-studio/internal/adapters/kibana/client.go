@@ -99,6 +99,12 @@ func resolveTarget(cfg model.ResolvedConnectionConfig) (target, error) {
 		return t, adapters.T(adapters.CodeConnect, "backend.studio.adapter.hostMissing.body", nil, nil)
 	}
 	t.host = *host
+	t.fill(port, space, username, password)
+	return t, nil
+}
+
+// fill sets the optional parts, leaving the defaults where unset.
+func (t *target) fill(port *int, space, username, password *string) {
 	if port != nil {
 		t.port = *port
 	}
@@ -111,7 +117,6 @@ func resolveTarget(cfg model.ResolvedConnectionConfig) (target, error) {
 	if password != nil {
 		t.password = *password
 	}
-	return t, nil
 }
 
 // authorization: a username means Basic; a password alone is an encoded API key, as Kibana shows it.
