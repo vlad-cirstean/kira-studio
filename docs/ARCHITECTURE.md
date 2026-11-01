@@ -2911,6 +2911,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Logs stream per window and per stream id through a coalescer (16 ms, 500 lines). A line is capped at 64 KiB; the UI keeps the newest 20 000 lines. Follow with Tail all asks the server for 20 000 lines, because a byte limit would end the follow stream. Streams end on LogsClose, window close, service shutdown and quit.
 - Frontend: apps/kira-studio/frontend/src/kubernetes/ (app-local, no second consumer). Mode `kubernetes` has no tab strip. Server state is on TanStack Query under ['kubernetes', clusterId, ...]; lists refetch every 10 s while the document is visible. UI state is one Pinia store; the last cluster, kind and namespace per cluster persist in localStorage (kira.kubernetes.selection).
 - Flow tests run against `flowharness.KubeFake`, an in-process HTTPS API server (client-go sends no credentials over plain HTTP). It serves discovery, Table lists, objects, events, logs and an exec-plugin cluster. No real cluster is used anywhere.
+- P440: `Service.SetMcp` stores per-cluster MCP modes and description (migration 0051, above Studio's reserved 0050). `ListCapped` and `ReadLogs` (one non-follow request, 256 KiB cap) feed the MCP tools. See "Kubernetes tools (P440)" under Database MCP server.
 
 ## Database MCP server (v1.7)
 
@@ -2933,6 +2934,15 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - list_children replaces the fixed-name list_databases/list_schemas pair named in the M1 row of docs/HISTORY.md (v1.7), because the adapter metadata primitive is one lazy level (Adapter.Children) and levels differ per kind, so one tool returning the node's own kind carries more information.
 - list_children, describe_table and describe_schema are gated on read-mode deny, not only run_query.
 - list_connections is deliberately not gated by read-mode deny, because its job is to show a caller a connection's configured permissions before it tries any of them.
+
+### Kubernetes tools (P440)
+
+- Six more tools register when `Config.Kube` and `Config.Ops` are set: kube_list_clusters, kube_list_namespaces, kube_list_kinds, kube_list_resources, kube_describe, kube_pod_logs. All read-only.
+- Each cluster has four modes, `deny|prompt|allow`, default prompt: discover (namespaces, kinds), list, describe, logs. Stored on `kube_clusters` (migration 0051).
+- No exposure switch. A cluster with all four modes deny is hidden and answers `no cluster %q exposed to MCP`.
+- Prompt mode uses the shared ApprovalBroker (`KindDbMcp`) with `ApprovalRequest.Cluster`. The dialog shows a kubectl-equivalent statement. It is display and op command only, never run. The cluster is re-resolved after approval.
+- Calls log as op kind `kubernetes` (connectionless), source MCP.
+- Settings: cluster tree menu "MCP access" and Settings, Database MCP pane list.
 
 ### Permissions and statement classification (M2)
 
