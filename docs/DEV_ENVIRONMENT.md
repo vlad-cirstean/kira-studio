@@ -684,7 +684,7 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   {KIRA_MEMORY_HOME: <tmp>}}`. `printf '' | <binary> memory-mcp` exits 0. The macOS app-bundle binary
   is unchecked (Known open items).
 - Semantic search (P210): the ONNX Runtime library is not in the repo. `sh scripts/fetch-onnxruntime.sh
-  linux-x64` downloads the pinned 1.29.1 build (checksum-verified, idempotent) to
+  linux-x64` downloads the pinned 1.31.1 build (checksum-verified, idempotent) to
   `apps/kira-space/build/onnxruntime/linux-x64/` (gitignored) and prints the library path; set
   `KIRA_ORT_LIB` to it for any process that should embed (the server-tag app, `memory-mcp`). Without it
   the status is `unavailable` and search stays keyword-only. Hugging Face is reachable through the agent

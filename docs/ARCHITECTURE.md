@@ -160,7 +160,7 @@ whatever sandbox a session happens to be in),
 - The MCP server uses Streamable HTTP rather than stdio because it is one long-running process serving many concurrent clients and tool calls, not a process spawned per client; the SDK's auth.RequireBearerToken middleware gates every request.
 - mcp.AddTool[In, Out] derives each MCP tool's input schema from a Go struct's tags, so every tool's schema has exactly one source. A tool argument the handler needs carries no `omitempty` (schema-required). A string or array that must be non-empty also goes through `llmprompts.RequireNonEmpty`. go-sdk rejects either before the handler runs.
 - The repo-map MCP server was removed in v1.9 P97.
-- Local embeddings (P210, Kira Space memory) use ONNX Runtime 1.29.1 via yalue/onnxruntime_go v1.36.0, gomlx/go-huggingface v0.4.13 (hftokenizer + hub downloader), and model Snowflake arctic-embed-s int8 (Apache-2.0).
+- Local embeddings (P210, Kira Space memory) use ONNX Runtime 1.31.1 via yalue/onnxruntime_go v1.38.0, gomlx/go-huggingface v0.4.20 (hftokenizer + hub downloader), and model Snowflake arctic-embed-s int8 (Apache-2.0).
 - Embedding inference cgo-dlopens a bundled libonnxruntime and runs in a memory-embed worker subprocess; vectors are stored as BLOBs in memory.db and search is done in Go.
 - Declined for embeddings: hugot pure-Go backend (458 MB loaded, 1.05 GB peak, 40x slower) and its ORT backend (drags GoMLX and go-xla into go.mod for one pipeline).
 - Declined for embeddings: sqlite-vec (native extension modernc.org/sqlite cannot load; its KNN is brute force anyway), llama.cpp (second native toolchain), EmbeddingGemma (Gemma terms), jina v3 (non-commercial).
@@ -2689,13 +2689,13 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - memory_embeddings (migration 2) holds one L2-normalised little-endian float32 vector per memory version, superseded ones too; one model at a time, rows carry the model id and search filters on it. Writing a vector never bumps memory_revision.
 - The embedding model is Snowflake arctic-embed-s int8 ONNX (Apache-2.0, 33M params, 384 dims, CLS pooling, query prefix, pinned HF revision e596f50, id arctic-embed-s-int8-e596f50), embedding only the fact text.
 - Model files (model.onnx 34 MB, tokenizer.json) download only on an explicit click in Settings > Memory to $KIRA_MEMORY_HOME/models/<id>/ with pinned SHA-256 (embed.Install, manifest written last), shared by the app and every memory-mcp process. MCP never downloads.
-- The embedding runtime (internal/memory/embed, a leaf package) uses ONNX Runtime 1.29.1 via yalue/onnxruntime_go (cgo, dlopen) and WordPiece via gomlx/go-huggingface hftokenizer.
+- The embedding runtime (internal/memory/embed, a leaf package) uses ONNX Runtime 1.31.1 via yalue/onnxruntime_go (cgo, dlopen) and WordPiece via gomlx/go-huggingface hftokenizer.
 - Embedding runs in a worker subprocess (<Kira Space executable> memory-embed --model-dir …, via appwire.RunArgvShim), spawned lazily by whichever process needs vectors, speaking NDJSON on stdin/stdout in batches of at most 32 (embed.Client).
 - The embed worker exits when its stdin closes: after 5 min idle (so the OS reclaims the model, which in-process Session.Destroy does not) and whenever the parent dies. A crash or cancelled request kills only the worker. A failed spawn is refused for 60 s (Reset clears it).
 - Worker lifecycle lives in internal/memory/workerproc; model download, SHA-256 check and manifest live in internal/memory/modelstore (embed uses both).
 - Builds with CGO_ENABLED=0 compile an embedding stub whose status is unavailable.
-- The ONNX runtime library is taken from $KIRA_ORT_LIB, else Kira Space.app/Contents/Frameworks/libonnxruntime.1.29.1.dylib, bundled arm64-only by darwin:package (scripts/fetch-onnxruntime.sh, checksum-pinned); native code is never downloaded at runtime.
-- ORT 1.29.1 has no x86_64 macOS build, so the x86_64 slice of a universal bundle reports embeddings unavailable; keyword search is unaffected.
+- The ONNX runtime library is taken from $KIRA_ORT_LIB, else Kira Space.app/Contents/Frameworks/libonnxruntime.1.31.1.dylib, bundled arm64-only by darwin:package (scripts/fetch-onnxruntime.sh, checksum-pinned); native code is never downloaded at runtime.
+- ORT 1.31.1 has no x86_64 macOS build, so the x86_64 slice of a universal bundle reports embeddings unavailable; keyword search is unaffected.
 - Search candidate pools are clamp(4 x limit, 100, 400) from each source, unioned by seq. Limit defaults to 40, max 200 (Space panel search uses 200).
 - Keyword score is bm25 (columns fact 10, keywords 6, reason 3) divided by the pool best: 0.7 x bnorm + 0.3 x term coverage, coverage restoring order under the OR query. Semantic score is cosine mapped linearly between embed.Spec.QueryFloor and QueryCeil.
 - Fusion with both sources is rel = 0.45 kw + 0.45 sem + 0.10 min(kw, sem); with no semantic, rel = kw. RRF was dropped because it kept rank only.

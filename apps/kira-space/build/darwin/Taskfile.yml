@@ -158,16 +158,16 @@ tasks:
           exit 1
         fi
       # P210: the ONNX Runtime dylib memory embeddings load from Contents/Frameworks (embed.RuntimeLib),
-      # copied BEFORE codesign:adhoc so the ad-hoc signature covers it (N2's --deep --strict verify). It ships arm64 only (ORT 1.29.1
+      # copied BEFORE codesign:adhoc so the ad-hoc signature covers it (N2's --deep --strict verify). It ships arm64 only (ORT 1.31.1
       # has no x86_64 macOS build), so a universal bundle's x86_64 slice reports embeddings unavailable.
       - |
         ORT="build/onnxruntime/osx-arm64"
-        if [ ! -f "$ORT/libonnxruntime.1.29.1.dylib" ]; then
-          echo "create:app:bundle: $ORT/libonnxruntime.1.29.1.dylib not found — package/package:universal must depend on fetch:onnxruntime" >&2
+        if [ ! -f "$ORT/libonnxruntime.1.31.1.dylib" ]; then
+          echo "create:app:bundle: $ORT/libonnxruntime.1.31.1.dylib not found — package/package:universal must depend on fetch:onnxruntime" >&2
           exit 1
         fi
         mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Frameworks"
-        cp "$ORT/libonnxruntime.1.29.1.dylib" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Frameworks/"
+        cp "$ORT/libonnxruntime.1.31.1.dylib" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Frameworks/"
         cp "$ORT/LICENSE" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/onnxruntime-LICENSE.txt"
         cp "$ORT/ThirdPartyNotices.txt" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/onnxruntime-ThirdPartyNotices.txt"
       - task: codesign:adhoc
@@ -193,7 +193,7 @@ tasks:
       # P210: conditional, not a dependency — run `sh ../../scripts/fetch-onnxruntime.sh` once to try
       # local embeddings from a dev build.
       - |
-        ORT="build/onnxruntime/osx-arm64/libonnxruntime.1.29.1.dylib"
+        ORT="build/onnxruntime/osx-arm64/libonnxruntime.1.31.1.dylib"
         if [ -f "$ORT" ]; then
           mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Frameworks"
           cp "$ORT" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Frameworks/"
