@@ -16,7 +16,7 @@ const esc = format.encodeHTML;
 export const TOOLTIP_CLASS = 'kira-proof-chart-tooltip';
 
 // Above this many points a line or area drops its symbols (and with them point selection).
-const SYMBOL_LIMIT = 2000;
+const SYMBOL_LIMIT = 1000;
 const SYMBOLS_SELECTED = 10;
 const TIME_SHORT_SPAN_MS = 48 * 3_600_000;
 

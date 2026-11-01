@@ -17,7 +17,7 @@ const (
 	maxChartSeries     = 20
 	maxCategories      = 1000
 	maxPathPoints      = 20_000
-	maxMarkPoints      = 2_000
+	maxMarkPoints      = 1_000
 	maxSlices          = 50
 	maxSeriesNameRunes = 120
 	maxCategoryBytes   = 256

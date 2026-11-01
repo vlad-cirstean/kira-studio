@@ -62,7 +62,7 @@ func TestCheckChart(t *testing.T) {
 		{name: "duplicate category", in: `{"type":"bar","x":{"type":"category"},"series":[{"name":"s","points":[["a",1],["a",2]]}]}`, wantErr: "duplicate in its series"},
 		{name: "same category across series", in: `{"type":"bar","x":{"type":"category"},"series":[{"name":"s","points":[["a",1]]},{"name":"t","points":[["a",2]]}]}`, want: `[["a",1]]`},
 		{name: "1001 categories", in: `{"type":"bar","x":{"type":"category"},"series":[{"name":"s","points":` + catPoints(1001) + `}]}`, wantErr: "1000"},
-		{name: "2001 bar points", in: `{"type":"bar","x":{"type":"value"},"series":[{"name":"s","points":` + timePoints(2001) + `}]}`, wantErr: "2000"},
+		{name: "1001 bar points", in: `{"type":"bar","x":{"type":"value"},"series":[{"name":"s","points":` + timePoints(1001) + `}]}`, wantErr: "1000"},
 		{name: "2001 line points", in: `{"type":"line","x":{"type":"value"},"series":[{"name":"s","points":` + timePoints(2001) + `}]}`, want: `[[1000,0]`},
 		{name: "20001 line points", in: `{"type":"line","x":{"type":"value"},"series":[{"name":"s","points":` + timePoints(20001) + `}]}`, wantErr: "20000"},
 		{name: "21 series", in: `{"type":"bar","x":{"type":"category"},"series":` + series(21) + `}`, wantErr: "1-20"},
