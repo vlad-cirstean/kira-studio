@@ -130,7 +130,7 @@ func (d *Dialogs) OpenMultipleFiles(title, filterName, filterPattern string) ([]
 }
 
 // OpenDirectory is P25 D13: the same OpenFile panel, switched to directory-picking mode —
-// CanChooseDirectories(bool)/CanChooseFiles(bool) already exist on Wails v3 beta.16's
+// CanChooseDirectories(bool)/CanChooseFiles(bool) already exist on Wails v3's
 // OpenFileDialogStruct, so a folder picker is one more method on this seam, not a new mechanism.
 func (d *Dialogs) OpenDirectory(title string) (string, error) {
 	t, err := d.attached()

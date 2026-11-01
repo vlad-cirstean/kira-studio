@@ -26,7 +26,7 @@ whatever sandbox a session happens to be in),
 
 ## Stack
 
-- The desktop shell is Wails v3 (v3.0.0-beta.28) in Go, targeting macOS 26+ on arm64 only.
+- The desktop shell is Wails v3 (v3.1.0) in Go, targeting macOS 26+ on arm64 only.
 - The window uses a custom MacTitleBar (AppearsTransparent, HideTitle, FullSizeContent, no toolbar) over a full-size-content window, not the OS-drawn bar, drawn by the shared packages/workbench/src/components/TitleBar.vue.
 - On macOS 26 AppKit picks window chrome by the executable's linked-SDK field. The SDK is the building machine's Xcode; CI and release run on `macos-26`, so dev and release both link SDK 26.
 - Each app's own frontend/src/workbench/TitleBar.vue supplies its title-bar buttons and mode tabs through the shared TitleBar shell's default slot.
@@ -3108,7 +3108,7 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 |---|---|
 | `contextIsolation` / `sandbox` / `nodeIntegration: false` | **No subject, strictly better.** There is no Node in the webview to isolate it from, and no `contextBridge`/`window.kira` surface at all — the renderer reaches Go only through generated bindings and the `engine` stream. |
 | DevTools in a packaged build | **Ports, by a different mechanism.** It is a Go build tag rather than a runtime option: `-tags production`, already set by `apps/kira-studio/build/darwin/Taskfile.yml`. |
-| Every Chromium permission except the clipboard | **Set; on macOS and Linux only camera and microphone are enforced.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed). Wails v3.0.0-beta.28's `permissions_darwin.go` consults it for `getUserMedia` only (`resolveMediaCapturePermission`: a denied microphone or camera is refused instead of prompting); geolocation, notifications and clipboard are not consulted there (beta.16 had no darwin code at all; `permissions_linux.go` likewise covers media capture only). On macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
+| Every Chromium permission except the clipboard | **Set; on macOS and Linux only camera and microphone are enforced.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed). Wails v3.1.0's `permissions_darwin.go` consults it for `getUserMedia` only (`resolveMediaCapturePermission`: a denied microphone or camera is refused instead of prompting); geolocation, notifications and clipboard are not consulted there (`permissions_linux.go` likewise covers media capture only). On macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
 | `window.open` deny | **Partial.** `MacWebviewPreferences.JavaScriptCanOpenWindowsAutomatically` is false, which denies JS-initiated windows; there is no per-request handler (no `WKUIDelegate createWebViewWithConfiguration:`). Still zero `window.open`, zero `target="_blank"` and zero `<a href>` in `apps/kira-studio/frontend/src`/`packages/shared`, and file pickers remain native dialogs via `FilesService`, not popups. |
 | Navigation lock to the base URL | **No analogue — a real loss, already known.** There is no navigation-policy delegate on darwin at all (`webview_window_darwin.m` has no `decidePolicy`). This is weaker than the Electron `will-frame-navigate` guard plus fuses it replaces, and is recorded as a loss rather than mitigated. |
 | `webviewTag: false` | **No subject.** |
@@ -3147,10 +3147,10 @@ previous hardcoded literal broke GitHub Enterprise Server entirely, since the va
 was not really an allowlist for a GHES host).
 
 **Whether the `WKWebView` itself is configurable beyond this table — checked, and closed, at P22
-(D5).** `MacWebviewPreferences` (`webview_window_options.go:773-796`) is Wails v3.0.0-beta.28's
+(D5).** `MacWebviewPreferences` (`webview_window_options.go:773-796`) is Wails v3.1.0's
 entire macOS webview surface — ten fields, unchanged since beta.15 — and none is a compositing or
 tiling knob; the `WKWebViewConfiguration` is built and `autorelease`d inside one cgo block
-(`webview_window_darwin.go:138-195`) with no hook of any kind between "config allocated" and
+(`webview_window_darwin.go:139-197`) with no hook of any kind between "config allocated" and
 "webview created" (the whole options file has exactly one func-typed field, `KeyBindings`).
 `WindowsOptions` carries `EnabledFeatures`/`DisabledFeatures`/`AdditionalBrowserArgs` for WebView2;
 `MacOptions` has only `ActivationPolicy` and terminate-on-last-window-closed — macOS is the one

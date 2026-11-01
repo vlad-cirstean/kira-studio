@@ -339,7 +339,8 @@ historical prose.
   code whose whole purpose is to work on a path nobody exercises interactively, prefer a pure-Go
   implementation this container can build and test — `internal/startupfail` chose an argv-only
   `osascript` spawn over a cgo `NSAlert` shim for exactly this reason, and it's checkable in CI as
-  a result.
+  a result. Wails 3.1's build guard rejects `CGO_ENABLED=0` on darwin without `-tags purego` (or
+  `server`): add `-tags purego` to the vet/build line above.
 - **Regenerate bindings via `wails3 task common:generate:bindings`** (or `scripts/setup.sh`, which
   calls it) — never a hand-typed `wails3 generate bindings` flag list, which has already drifted
   from the task's real flags once. `scripts/setup.sh` now calls the task **unconditionally on every
