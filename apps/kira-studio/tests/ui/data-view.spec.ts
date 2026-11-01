@@ -28,7 +28,7 @@ import {
   NULLS_PATH,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { findRow } from './support/tree';
+import { findRow, settleFrames } from './support/tree';
 
 // Ported from tests/e2e/data-view.spec.ts (P57 D16), against a real captured app.big_rows
 // (1,000,000 rows, id/hash=md5(id) — packages/db-fixtures/fixtures/0001_seed.sql) and app.nulls_and_unicode,
@@ -1013,7 +1013,7 @@ async function scrollGridToBottom(page: Page): Promise<void> {
   await grid.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
 }
 
 async function firstGutterNumber(page: Page): Promise<string> {
@@ -1173,6 +1173,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   const countsBeforeRefresh = await readOpsCount(stream, DATA_OP.count);
   await page.click('[data-testid="toolbar-refresh"]');
+  // Refresh invalidates the count asynchronously; no DOM signal marks it done before the count click.
   await page.waitForTimeout(200);
   await countButton.click();
   await expect.poll(() => readOpsCount(stream, DATA_OP.count)).toBe(countsBeforeRefresh + 1);

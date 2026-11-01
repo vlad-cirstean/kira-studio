@@ -697,6 +697,7 @@ test('autocomplete — Mongo console degrades to methods/operators when the data
 
   await mongoConsole.locator('.view-lines').click();
   await page.keyboard.type('db.');
+  // Absence of a popup: no event to await.
   await page.waitForTimeout(300);
   await expect(tooltip).toHaveCount(0);
 
@@ -806,6 +807,7 @@ test('autocomplete — Redis console completes command names on the first token 
 
   // Second token: no completion at all — this is a key name, not a command.
   await page.keyboard.type(' somek');
+  // Absence of a popup: no event to await.
   await page.waitForTimeout(300);
   await expect(tooltip).toHaveCount(0);
 

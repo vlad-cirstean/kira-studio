@@ -30,7 +30,7 @@ import {
   DB_PATH,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, expandRow, findRow, openRowMenu, settleFrames } from './support/tree';
 
 // Ported from tests/e2e/cell-editor.spec.ts (P57 D16), against real captures of app.formats,
 // app.wide_table, app.nulls_and_unicode and app.nested_json (scripts/capture-postgres-tree.ts's
@@ -193,7 +193,7 @@ async function scrollColumnIntoView(
     await grid.evaluate((el) => {
       el.scrollLeft = 0;
     });
-    await page.waitForTimeout(50);
+    await settleFrames(page);
     for (let i = 0; i < 80; i++) {
       if ((await target.count()) > 0) break;
       const atEnd = await grid.evaluate(
@@ -203,16 +203,16 @@ async function scrollColumnIntoView(
       await grid.evaluate((el) => {
         el.scrollLeft += Math.max(200, el.clientWidth);
       });
-      await page.waitForTimeout(100);
+      await settleFrames(page);
     }
     if ((await target.count()) === 0) {
       await grid.evaluate((el) => {
         el.scrollLeft = el.scrollWidth;
       });
-      await page.waitForTimeout(150);
+      await settleFrames(page);
     }
   }
-  await page.waitForTimeout(150);
+  await settleFrames(page);
 }
 
 // P60a §9.1/OQ-3: Monaco virtualises lines — this reads the encoded pane's own MonacoHost through

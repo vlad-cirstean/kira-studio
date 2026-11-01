@@ -699,6 +699,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     el.scrollTop = t;
   }, subRowBaseline);
   await page.mouse.move(0, 0);
+  // Scroll and hover re-render have no observable end; the mutation count below needs a quiet DOM.
   await page.waitForTimeout(500);
   const subRowMutations = await viewport.evaluate(async (el) => {
     let count = 0;

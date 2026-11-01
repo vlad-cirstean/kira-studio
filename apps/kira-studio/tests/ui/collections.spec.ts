@@ -543,6 +543,7 @@ test('environments reorder by dragging the grip; refused while filtered (P140)',
   await page.fill('[data-testid="environments-filter"]', 'pr');
   await expect(rows).toHaveCount(2);
   await dragGrip('env-preview', 'env-prod');
+  // Absence of a reorder call: no later event on that channel to use as a barrier.
   await page.waitForTimeout(300);
   expect(reorderCalls()).toHaveLength(1);
   expect(await rowIds()).toEqual(['env-prod', 'env-preview']);

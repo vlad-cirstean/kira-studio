@@ -165,13 +165,13 @@ test('Alt+Arrow moves within the set; the first script of a collection never mov
 
   await row(page, 't1').focus();
   await page.keyboard.press('Alt+ArrowUp');
-  await page.waitForTimeout(100);
-  expect(calls(control, IPC.customScriptsReorderCollections)).toHaveLength(0);
-  expect(calls(control, IPC.customScriptsReorder)).toHaveLength(0);
-  expect(await groupIds(page)).toEqual(['col-x', 'col-y']);
 
+  // The Alt+ArrowDown call is the barrier: exactly one reorder call proves the Alt+ArrowUp above
+  // sent none.
   await page.keyboard.press('Alt+ArrowDown');
   await expect.poll(() => calls(control, IPC.customScriptsReorder)).toHaveLength(1);
+  expect(calls(control, IPC.customScriptsReorderCollections)).toHaveLength(0);
+  expect(await groupIds(page)).toEqual(['col-x', 'col-y']);
   await expect(row(page, 't1')).toBeFocused();
 
   await header(page, 'col-x').focus();

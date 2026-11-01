@@ -680,9 +680,11 @@ test('saved queries popover — type-ahead jumps by first letter and prefix, Ent
   await page.keyboard.press('b');
   await expect(entries.nth(2)).toBeFocused();
   // After the buffer resets, a two-letter prefix picks the matching row.
+  // Behavior under test: the type-ahead buffer resets after a real-time idle window.
   await page.waitForTimeout(600);
   await page.keyboard.type('be');
   await expect(entries.nth(3)).toBeFocused();
+  // Behavior under test: the type-ahead buffer resets after a real-time idle window.
   await page.waitForTimeout(600);
   await page.keyboard.press('a');
   await expect(entries.nth(0)).toBeFocused();

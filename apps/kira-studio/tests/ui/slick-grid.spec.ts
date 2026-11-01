@@ -25,7 +25,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { expandRow, findRow, openRowMenu } from './support/tree';
+import { expandRow, findRow, openRowMenu, settleFrames } from './support/tree';
 
 // Eight sandbox-provable exit criteria. SlickGrid is the only engine
 // `relaunch()` ever boots (the `window.__kiraGridEngine` flag this file used to force before boot,
@@ -376,7 +376,7 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   await rightViewport(page).evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
   function dataRow(p: import('@playwright/test').Page, row: number) {
     return p.locator(
       `[data-testid="data-grid"] .grid-canvas-top.grid-canvas-right .slick-row[data-row="${row}"] .slick-cell`,
@@ -432,6 +432,7 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
     await rightViewport(page).evaluate((el) => {
       el.scrollTop += 400;
     });
+    // Scroll cadence is the input under test: real-time gaps between wheel steps.
     await page.waitForTimeout(30);
   }
   const afterScrollRows = await decodeCacheRows();
@@ -480,11 +481,13 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
     await rightViewport(page).evaluate((el) => {
       el.scrollTop = 0;
     });
+    // Rest gap before the next fling; the sampler's at-rest threshold is real time.
     await page.waitForTimeout(50);
     for (let frame = 0; frame < 20; frame++) {
       await rightViewport(page).evaluate((el, delta) => {
         el.scrollTop += delta;
       }, pxPerFrame);
+      // One scroll step per frame: the cadence is the input under test.
       await page.waitForTimeout(16);
     }
     const cellCount = await page.locator('[data-testid="data-grid"] .slick-cell').count();
@@ -584,6 +587,7 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
+  // Rest gap before arming the trace; the sampler's at-rest threshold is real time.
   await page.waitForTimeout(50);
   await page.evaluate(() => window.__kiraScrollTrace?.start());
   await wheelFling(page, viewport);
@@ -614,6 +618,7 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
+  // Rest gap before arming the trace; the sampler's at-rest threshold is real time.
   await page.waitForTimeout(50);
   await page.evaluate(() => {
     window.__kiraGridTuning ??= {};
@@ -621,6 +626,7 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
   });
   await page.evaluate(() => window.__kiraScrollTrace?.start());
   await wheelFling(page, viewport);
+  // Trailing quiescent frames, so a chase still converging gets to run and clear.
   await page.waitForTimeout(300);
   const zeroResult = await page.evaluate(() => window.__kiraScrollTrace?.stop());
   await page.evaluate(() => {
@@ -714,7 +720,7 @@ test('P22 postscript — a scroll event anywhere in the document after grid tear
     el.scrollTop = 500;
     el.scrollLeft = 300;
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
 
   await page.locator('[data-testid="tab"].is-active [data-testid="tab-close"]').click();
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
@@ -729,7 +735,7 @@ test('P22 postscript — a scroll event anywhere in the document after grid tear
       .querySelector('[data-testid="tree"]')
       ?.dispatchEvent(new Event('scroll', { bubbles: true }));
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
 
   expect(pageErrors).toEqual([]);
 });
@@ -862,6 +868,7 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   await page.evaluate(() => window.__kiraScrollTrace?.start());
   for (let burst = 0; burst < 3; burst++) await flingFromRest(page, viewport);
   for (let burst = 0; burst < 3; burst++) await jumpFromRest(page, viewport);
+  // Trailing quiescent frames, so a chase still converging gets to run and clear.
   await page.waitForTimeout(300);
   const fixed = await page.evaluate(() => window.__kiraScrollTrace?.stop());
   expect(fixed).not.toBeNull();
@@ -891,6 +898,7 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   });
   await page.evaluate(() => window.__kiraScrollTrace?.start());
   for (let burst = 0; burst < 3; burst++) await jumpFromRest(page, viewport);
+  // Trailing quiescent frames, so a chase still converging gets to run and clear.
   await page.waitForTimeout(300);
   const preFix = await page.evaluate(() => window.__kiraScrollTrace?.stop());
   await page.evaluate(() => {
@@ -909,6 +917,7 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
+  // Rest gap before arming the trace; the sampler's at-rest threshold is real time.
   await page.waitForTimeout(50);
   await page.evaluate(() => {
     window.__kiraGridTuning ??= {};
@@ -916,6 +925,7 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   });
   await page.evaluate(() => window.__kiraScrollTrace?.start());
   await wheelFling(page, viewport);
+  // Trailing quiescent frames, so a chase still converging gets to run and clear.
   await page.waitForTimeout(300);
   const msGateOnly = await page.evaluate(() => window.__kiraScrollTrace?.stop());
   await page.evaluate(() => {
@@ -1269,9 +1279,11 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
     await viewport.evaluate((el) => {
       el.scrollTop = 0;
     });
+    // Rest gap before arming the trace; the sampler's at-rest threshold is real time.
     await page.waitForTimeout(50);
     await page.evaluate(() => window.__kiraScrollTrace?.start());
     await wheelFling(page, viewport);
+    // Trailing quiescent frames, so a chase still converging gets to run and clear.
     await page.waitForTimeout(300);
     const result = await page.evaluate(() => window.__kiraScrollTrace?.stop());
     expect(result).not.toBeNull();
@@ -1319,7 +1331,7 @@ test('P22b D17 — a staged insert row scrolls into view, and a discard does not
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
   await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(0);
 
   await page.click('[data-testid="toolbar-add-row"]');
@@ -1337,7 +1349,7 @@ test('P22b D17 — a staged insert row scrolls into view, and a discard does not
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
   await page.click('[data-testid="toolbar-discard-changes"]');
   await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(0);
   await expect(viewport.evaluate((el) => el.scrollTop)).resolves.toBe(0);
@@ -1370,7 +1382,7 @@ test('P182 — the gutter moves with the rows in the same task as a scrollTop wr
     el.scrollTop = 0;
     el.scrollLeft = 300;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   const pinned = await viewport.evaluate((el) => {
     const gutter = el.querySelector('[data-testid="grid-gutter-cell"]');
     if (!gutter) throw new Error('no gutter cell');
@@ -1420,7 +1432,6 @@ test('P182 — a gutter click or right-click while scrolled right selects the ro
   await viewport.evaluate((el) => {
     el.scrollLeft = 300;
   });
-  await page.waitForTimeout(100);
   await expect(page.locator('[data-testid="grid-header-cell"][data-column="col5"]')).toBeVisible();
 
   await gutterCell(page, 3).click();
