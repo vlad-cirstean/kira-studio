@@ -154,6 +154,7 @@ test('a quick blur and focus sends one sync request', async ({ relaunch }) => {
   await expect
     .poll(async () => (await gitStreamParams(page, 'branch.syncChangeRequests')).length)
     .toBe(1);
+  // Absence of a second sync: spans the throttle window of real time.
   await page.waitForTimeout(1500);
   const calls = (await gitStreamParams(page, 'branch.syncChangeRequests')) as {
     focused?: boolean;

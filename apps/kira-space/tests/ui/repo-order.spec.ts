@@ -95,10 +95,8 @@ test('Alt+ArrowUp on a repo row moves it; on a worktree row it moves nothing', a
   await expect(worktree).toBeVisible();
   await worktree.focus();
   await page.keyboard.press('Alt+ArrowUp');
-  await page.waitForTimeout(100);
-  expect(calls(control, IPC.codeWorkspaceReorderRepos)).toHaveLength(0);
-  expect(await orderOf(page)).toEqual([A.id, B.id]);
 
+  // The call below is the barrier: exactly one call proves the worktree Alt+ArrowUp sent none.
   await repoRowById(page, B.id).focus();
   await page.keyboard.press('Alt+ArrowUp');
   await expect.poll(() => orderOf(page)).toEqual([B.id, A.id]);
@@ -115,6 +113,7 @@ test('an active search pauses drag and Alt+Arrow', async ({ relaunch }) => {
   await dragAbove(page, B.id, A.id);
   await repoRowById(page, B.id).focus();
   await page.keyboard.press('Alt+ArrowUp');
+  // Absence of a call: nothing to await, no later event on the same channel.
   await page.waitForTimeout(100);
   expect(calls(control, IPC.codeWorkspaceReorderRepos)).toHaveLength(0);
   expect(await orderOf(page)).toEqual([A.id, B.id]);

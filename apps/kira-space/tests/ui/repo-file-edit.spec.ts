@@ -191,6 +191,7 @@ test('no suggestions appear while editing', async ({ relaunch }) => {
   await startEditing(page);
   await page.keyboard.type('pack');
   await page.keyboard.press('Control+Space');
+  // Absence of a suggest popup: no event to await.
   await page.waitForTimeout(300);
   await expect(page.locator('.suggest-widget.visible')).toHaveCount(0);
 });

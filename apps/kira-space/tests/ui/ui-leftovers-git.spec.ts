@@ -124,11 +124,11 @@ test('graph keys: Ctrl+R does nothing, F5 refreshes', async ({ relaunch }) => {
   const before = await refreshes();
 
   await page.keyboard.press('Control+r');
-  await page.waitForTimeout(200);
-  expect(await refreshes()).toBe(before);
 
+  // F5 is the barrier: exactly one refresh proves Ctrl+R sent none.
   await page.keyboard.press('F5');
-  await expect.poll(refreshes).toBe(before + 1);
+  await expect.poll(refreshes).toBeGreaterThan(before);
+  expect(await refreshes()).toBe(before + 1);
 });
 
 const BLOCKED = {
