@@ -185,8 +185,66 @@ func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.
 	return b.prepareWithGrant(ctx, tr, tc, pa, kind, runID, rec.StepID)
 }
 
-// RestartSession closes a running interactive session and resumes its conversation, as Take over
-// does for a stopped one. Stop runs before the close so the exit's Reconcile finds nothing to do.
+// closeTUILocked stops and closes a running interactive session. Stop runs before the close so
+// the exit's Reconcile finds nothing to do. taskMu is held by the caller.
+func (b *TaskBoard) closeTUILocked(tr *Tracker, rec *model.AdeSession) error {
+	if b.deps.CloseTerminal == nil {
+		return invalid("interactive sessions are not available")
+	}
+	terminalID, ok := tr.TerminalOf(rec.ID)
+	if !ok {
+		return invalid("the session is not running")
+	}
+	if err := tr.Stop(rec.ID); err != nil {
+		if errors.Is(err, ErrSessionNotRunning) {
+			return invalid("the session is not running")
+		}
+		return err
+	}
+	// Blocks until the process exits, so a resumed claude never shares the conversation file.
+	if err := b.deps.CloseTerminal(terminalID); err != nil {
+		return fmt.Errorf("ade: close terminal: %w", err)
+	}
+	return nil
+}
+
+// CloseSession ends a running session and keeps its history: an interactive one stops at once
+// and resumes by Take over, a background one stops its run.
+func (b *TaskBoard) CloseSession(ctx context.Context, args adewire.CloseSessionArgs) error {
+	rec, err := b.deps.Sessions.Get(args.SessionID)
+	if err != nil {
+		return err
+	}
+	if rec == nil || rec.TaskID == "" {
+		return invalid("session %s is not a task session", args.SessionID)
+	}
+	if rec.State != model.AdeSessionStateRunning {
+		return invalid("the session is not running")
+	}
+	if rec.Mode != model.AdeSessionModeTUI {
+		if rec.RunID == "" {
+			return invalid("the session is not running")
+		}
+		return b.StopRun(ctx, rec.RunID)
+	}
+	tr, err := b.tracker()
+	if err != nil {
+		return err
+	}
+	mu := b.taskMu(rec.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	if rec, err = b.deps.Sessions.Get(args.SessionID); err != nil {
+		return err
+	}
+	if rec == nil || rec.State != model.AdeSessionStateRunning {
+		return invalid("the session is not running")
+	}
+	return b.closeTUILocked(tr, rec)
+}
+
+// RestartSession closes a running session and continues its conversation: an interactive one
+// resumes as Take over does for a stopped one, a background step run queues its next attempt.
 func (b *TaskBoard) RestartSession(ctx context.Context, args adewire.RestartSessionArgs) (adewire.Launch, error) {
 	tr, err := b.tracker()
 	if err != nil {
@@ -198,6 +256,10 @@ func (b *TaskBoard) RestartSession(ctx context.Context, args adewire.RestartSess
 	}
 	if rec == nil || rec.TaskID == "" {
 		return adewire.Launch{}, invalid("session %s is not a task session", args.SessionID)
+	}
+	// StopRun must not run under the task lock.
+	if rec.Mode != model.AdeSessionModeTUI {
+		return b.restartHeadless(ctx, rec)
 	}
 	// Held across Stop, close and resume: a concurrent Take over would otherwise resume the
 	// conversation while the old process still writes it.
@@ -211,27 +273,13 @@ func (b *TaskBoard) RestartSession(ctx context.Context, args adewire.RestartSess
 		return adewire.Launch{}, invalid("session %s is not a task session", args.SessionID)
 	}
 	if rec.Mode != model.AdeSessionModeTUI {
-		return adewire.Launch{}, invalid("only an interactive session restarts")
+		return adewire.Launch{}, invalid("the session is not running")
 	}
 	if rec.State != model.AdeSessionStateRunning {
 		return adewire.Launch{}, invalid("the session is not running")
 	}
-	if b.deps.CloseTerminal == nil {
-		return adewire.Launch{}, invalid("interactive sessions are not available")
-	}
-	terminalID, ok := tr.TerminalOf(rec.ID)
-	if !ok {
-		return adewire.Launch{}, invalid("the session is not running")
-	}
-	if err := tr.Stop(rec.ID); err != nil {
-		if errors.Is(err, ErrSessionNotRunning) {
-			return adewire.Launch{}, invalid("the session is not running")
-		}
+	if err := b.closeTUILocked(tr, rec); err != nil {
 		return adewire.Launch{}, err
-	}
-	// Blocks until the process exits, so the resumed claude never shares the conversation file.
-	if err := b.deps.CloseTerminal(terminalID); err != nil {
-		return adewire.Launch{}, fmt.Errorf("ade: restart: close terminal: %w", err)
 	}
 	if rec, err = b.deps.Sessions.Get(rec.ID); err != nil {
 		return adewire.Launch{}, err

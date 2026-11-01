@@ -10,6 +10,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -179,10 +180,10 @@ func TestRestartSession(t *testing.T) {
 	app := flowharness.New(t, flowharness.WithTrackerGrace(time.Minute))
 	// Call 1 is the headless run; calls 2 and 3 are the interactive session and its restart, held open.
 	claude(app, map[string][]fakeagent.Action{"*": {
-		{Name: "done"}, {WaitFile: flag("first")}, {WaitFile: flag("second")},
+		{Name: "done"}, {WaitFile: flag("first")}, {WaitFile: flag("second")}, {WaitFile: flag("bg")}, {WaitFile: flag("bg2")},
 	}})
 	t.Cleanup(func() {
-		for _, n := range []string{"first", "second"} {
+		for _, n := range []string{"first", "second", "bg", "bg2"} {
 			_ = os.WriteFile(flag(n), nil, 0o644)
 		}
 	})
@@ -227,11 +228,120 @@ func TestRestartSession(t *testing.T) {
 		flowharness.Mask("terminalId", "sessionId", "command"))
 
 	if _, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: headless}); err == nil {
-		t.Fatal("RestartSession of a headless session succeeded")
+		t.Fatal("RestartSession of a finished headless session succeeded")
 	}
 	if _, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: "missing"}); err == nil {
 		t.Fatal("RestartSession of an unknown session succeeded")
 	}
+
+	// A running background run: stopped, then its next attempt resumes the same conversation.
+	task2 := createTask(t, app, "Add search", "flow", rec.ID)
+	row := branchOf(t, board(t, app), task2.ID, rec.ID)
+	if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task2.ID, BranchNames: map[string]string{row.ID: "feat/api-search"}}); err != nil {
+		t.Fatal(err)
+	}
+	bg := waitRun(t, app, task2.ID, "one", "running")
+	bgOld := waitSession(t, app, bg.SessionID, "running")
+	testx.WaitUntil(t, waitFor, func() bool { return sessionByID(t, app, bg.SessionID).AgentSessionID != "" })
+	bgOld = sessionByID(t, app, bgOld.ID)
+	bgRestart, err := app.W.AdeTask.RestartSession(ctx, adewire.RestartSessionArgs{SessionID: bgOld.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bgRestart.SessionID == "" || bgRestart.SessionID == bgOld.ID || bgRestart.TerminalID != "" || bgRestart.Command != "" {
+		t.Fatalf("headless restart launch = %+v, want a new session and no terminal", bgRestart)
+	}
+	if got := sessionByID(t, app, bgOld.ID).State; got != "stopped" {
+		t.Fatalf("old headless session state = %q, want stopped", got)
+	}
+	next := waitRun(t, app, task2.ID, "one", "running")
+	if next.Attempt != bg.Attempt+1 || next.SessionID != bgRestart.SessionID {
+		t.Fatalf("restarted run = %+v, want attempt %d on session %s", next, bg.Attempt+1, bgRestart.SessionID)
+	}
+	if got := waitSession(t, app, bgRestart.SessionID, "running"); got.Resumes != bgOld.AgentSessionID {
+		t.Fatalf("restarted session resumes %q, want %q", got.Resumes, bgOld.AgentSessionID)
+	}
+	var prev adewire.Run
+	for _, r := range taskOf(t, board(t, app), task2.ID).Runs {
+		if r.Attempt == bg.Attempt {
+			prev = r
+		}
+	}
+	if prev.State != "stuck" {
+		t.Fatalf("previous attempt state = %q, want stuck", prev.State)
+	}
+	app.Contract(t, "ade-session-restart-headless", "AdeTaskService.RestartSession", bgRestart,
+		flowharness.Mask("sessionId", "cwd"))
+}
+
+func TestCloseSession(t *testing.T) {
+	dir := t.TempDir()
+	flag := func(n string) string { return filepath.Join(dir, n) }
+	// A minute-long grace proves the close bypasses Reconcile's wait.
+	app := flowharness.New(t, flowharness.WithTrackerGrace(time.Minute))
+	// Call 1 is the headless run, call 2 the interactive session, call 3 its resume; all held open.
+	claude(app, map[string][]fakeagent.Action{"*": {
+		{WaitFile: flag("run")}, {WaitFile: flag("tui")}, {WaitFile: flag("again")},
+	}})
+	t.Cleanup(func() {
+		for _, n := range []string{"run", "tui", "again"} {
+			_ = os.WriteFile(flag(n), nil, 0o644)
+		}
+	})
+	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
+	rec := importRepo(t, app, repo.Dir)
+	saveWorkflow(t, app, "flow", flowYAML("flow", agentStep("one", "")))
+	app.WindowMgr.OpenWindow(shell.WindowRecord{Key: sessionWindow})
+
+	task := createTask(t, app, "Fix login", "flow", rec.ID)
+	row := branchOf(t, board(t, app), task.ID, rec.ID)
+	if _, err := app.W.AdeTask.StartRun(ctx, adewire.StartRunArgs{TaskID: task.ID, BranchNames: map[string]string{row.ID: "feat/api-login"}}); err != nil {
+		t.Fatal(err)
+	}
+	run := waitRun(t, app, task.ID, "one", "running")
+	waitSession(t, app, run.SessionID, "running")
+	if err := app.W.AdeTask.CloseSession(ctx, adewire.CloseSessionArgs{SessionID: run.SessionID}); err != nil {
+		t.Fatal(err)
+	}
+	waitRun(t, app, task.ID, "one", "stuck")
+	if got := sessionByID(t, app, run.SessionID).State; got != "stopped" {
+		t.Fatalf("closed headless session state = %q, want stopped", got)
+	}
+
+	task2 := createTask(t, app, "Add search", "flow", rec.ID)
+	row2 := branchOf(t, board(t, app), task2.ID, rec.ID)
+	br, err := app.W.AdeTask.SetTaskBranch(ctx, adewire.SetTaskBranchArgs{BranchID: row2.ID, Name: "feat/api-search"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	launch, err := app.W.AdeTask.StartAdHoc(ctx, adewire.BranchArgs{BranchID: br.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	openLaunch(t, app, launch)
+	waitSession(t, app, launch.SessionID, "running")
+	if err := app.W.AdeTask.CloseSession(ctx, adewire.CloseSessionArgs{SessionID: launch.SessionID}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sessionByID(t, app, launch.SessionID).State; got != "stopped" {
+		t.Fatalf("closed session state = %q, want stopped at once", got)
+	}
+	testx.WaitUntil(t, waitFor, func() bool {
+		r, ok := findOp(opsNow(t, app), oplog.CategorySession, "stop")
+		return ok && r.Trigger == oplog.TriggerUser && r.Status == oplog.StatusOK
+	})
+	if err := app.W.AdeTask.CloseSession(ctx, adewire.CloseSessionArgs{SessionID: launch.SessionID}); err == nil {
+		t.Fatal("CloseSession of a stopped session succeeded")
+	}
+	if err := app.W.AdeTask.CloseSession(ctx, adewire.CloseSessionArgs{SessionID: "missing"}); err == nil {
+		t.Fatal("CloseSession of an unknown session succeeded")
+	}
+	again, err := app.W.AdeTask.TakeOver(ctx, adewire.TakeOverArgs{SessionID: launch.SessionID})
+	if err != nil {
+		t.Fatalf("TakeOver of a closed session: %v", err)
+	}
+	openLaunch(t, app, again)
+	waitSession(t, app, launch.SessionID, "running")
 }
 
 // P414 status bar agents. Contract ade-sessions-running: tests/ui/status-agents.spec.ts reads this
