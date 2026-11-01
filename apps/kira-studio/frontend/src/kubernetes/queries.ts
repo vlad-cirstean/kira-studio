@@ -7,6 +7,8 @@ import { kubeControl } from './control';
 import type { KubeClusters, KubeMcpSettings, KubeStatus } from './wire';
 
 const LIST_POLL = TIMING.pollFast * 2;
+const LIST_POLL_LARGE = TIMING.pollSlow / 2;
+const LARGE_LIST_ROWS = 1000;
 
 const kubeKeys = {
   clusters: ['kubernetes', 'clusters'] as const,
@@ -101,7 +103,13 @@ export function useResourceList(args: {
         toValue(args.namespace),
         toValue(args.labelSelector),
       ),
-    refetchInterval: () => (visibility.value === 'visible' ? LIST_POLL : false),
+    refetchInterval: (query) => {
+      if (visibility.value !== 'visible') return false;
+      const data = query.state.data;
+      return data && (data.truncated || data.rows.length > LARGE_LIST_ROWS)
+        ? LIST_POLL_LARGE
+        : LIST_POLL;
+    },
     enabled: computed(() => toValue(args.clusterId) !== '' && toValue(args.enabled)),
   });
 }
