@@ -9478,6 +9478,9 @@
           "none": {
             "empty": "No reporter"
           }
+        },
+        "view": {
+          "tooltip": "View issue"
         }
       },
       "labels": {

@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Skeleton } from '@theme/components/ui/skeleton';
 import { t } from '@theme/i18n';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed } from 'vue';
 import { control } from '../../../bridge/control';
+import { useOpenHostView } from '../../../hostview/queries';
 import AdeChip from '../AdeChip.vue';
 import { gapText } from '../artifacts/gapText';
 import { artifactStatusLabel, artifactStatusTone } from '../artifacts/status';
@@ -39,6 +41,14 @@ const gap = computed<ArtifactGap | null>(() => {
   return missing > 0 ? { source, repo: '', reason: 'changeRequestsMissing', count: missing } : null;
 });
 
+const openView = useOpenHostView();
+
+function viewIssue(): void {
+  // link is `<key> <url>`; the view takes the link when there is one, else the key.
+  const [key = '', url = ''] = props.link.trim().split(/\s+/);
+  fireAndForget(openView.mutateAsync(url || key), 'ade.taskIssue');
+}
+
 function open(e: MouseEvent, url: string): void {
   e.preventDefault();
   fireAndForget(control.openExternal(url), 'ade.taskIssue');
@@ -64,6 +74,15 @@ function open(e: MouseEvent, url: string): void {
             :label="issue.status"
             :tone="CATEGORY_TONE[issue.statusCategory] ?? 'grey'"
             data-testid="ade-task-issue-status"
+          />
+          <TooltipIconButton
+            v-if="!issue.reason"
+            icon="eye"
+            :label="t('space.hostView.issue.view.tooltip')"
+            :icon-size="16"
+            class="shrink-0"
+            data-testid="ade-task-issue-view"
+            @click="viewIssue"
           />
         </div>
         <template v-if="!issue.reason">

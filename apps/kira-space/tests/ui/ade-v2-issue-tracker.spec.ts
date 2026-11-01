@@ -42,6 +42,20 @@ test('contract: the Task tab shows the issue title, status and pull requests', a
   expect(calls(control, IPC.adeTaskIssue)[0]?.args).toEqual({ taskId: 'T_alerts' });
 });
 
+test('contract: View issue opens the issue view for the task link', async ({ relaunch }) => {
+  const fx = issue('IssueTrackerService.TaskIssue');
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskIssue, response: fx },
+    { channel: IPC.hostViewOpen, response: { key: 'hostview-x', opened: true } },
+  ]);
+  await openTask(page, 'T_alerts');
+  await page.locator(t('ade-task-issue-view')).click();
+  await expect.poll(() => calls(control, IPC.hostViewOpen)).toHaveLength(1);
+  expect(calls(control, IPC.hostViewOpen)[0]?.args).toEqual({
+    url: 'https://acme.atlassian.net/browse/PAY-130',
+  });
+});
+
 test('contract: Jira counting more pull requests than found reads as a gap', async ({
   relaunch,
 }) => {
