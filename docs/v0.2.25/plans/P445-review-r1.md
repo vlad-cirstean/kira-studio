@@ -160,3 +160,17 @@ Severity count: High 0, Medium 3, Low 6.
 - P442 gocognit splits are behaviour-preserving; ONNX Runtime version strings updated everywhere.
 - `ui_target_of`: unknown paths fall back to both apps; `packages/*` selects both; full-run triggers
   select both.
+
+## Result
+
+All nine fixed. Fast checks per commit (hooks) green. Targeted reruns: Go flows (kubeflow, dbmcpflow, studio+space termflow, adeflow), UI specs `kubernetes-module`, `kubernetes-mcp`, `automations-restore` (19 pass). Real claude: `bun run test:claude:studio -run TestSmartScriptRun` pass (0.0024 USD); new `--settings` keys accepted.
+
+- F1 fixed (`2adbda9ec`). `smartBlocker` lists from run folder (nearest existing ancestor, since kira/worktree folders may not exist at preview). `userMCPSettings` adds `enableAllProjectMcpServers:false`, `enabledMcpjsonServers:[]`. Rule in ARCHITECTURE. Picker keeps home list.
+- F2 fixed (`78abd6713`). zod schema.
+- F3 fixed (`85e07768c`). Generation counter in `open()`, bumped on unmount. No dedicated test; existing reopen UI spec passes.
+- F4 fixed (`039f157a8`). `smartStep.checkMCP` before `Register`; `ErrServerGone` fails the step. Flow test added in `adeflow/automation_test.go`.
+- F5 fixed (`7e96bb103`). Dialog uses item `command`/`scriptName`/`color`; restore item `color` now `paletteColorSchema`.
+- F6 fixed (`0b719462d`). `LimitReader`, trim to last newline, `Truncated` on overflow.
+- F7 fixed (`a500979fe`). Kubeconfig parse cached by path/size/mtime; `Service.Cluster(id)` replaces `Clusters()` in `resolveCluster` (no SQLite writes per call).
+- F8 fixed (`f4946b4d7`). Poll 30 s when result truncated or over 1000 rows.
+- F9 fixed in part (`4c1f78486`). Last good list reused when listing fails. Not done: threading the caller context through `Preview`/`plan` (about 10 callers, none hold a context) and a longer presence TTL. Cold cache with no prior list still waits up to 30 s once.
