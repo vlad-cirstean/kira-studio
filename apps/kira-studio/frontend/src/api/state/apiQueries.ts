@@ -27,7 +27,7 @@ import type { ApiDataChange } from '@shared/protocol/events';
 import type { QueryKey } from '@tanstack/vue-query';
 import { useQuery } from '@tanstack/vue-query';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
-import { queryClient } from '@workbench/state/queryClient';
+import { KEEP_WHILE_OPEN, queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { toValue } from 'vue';
 import { control } from '../../bridge/control';
@@ -56,6 +56,7 @@ export interface ApiCollectionsTree {
 export function apiCollectionsTreeQueryOptions() {
   return {
     queryKey: apiCollectionsTreeKey,
+    gcTime: KEEP_WHILE_OPEN,
     queryFn: async (): Promise<ApiCollectionsTree> => {
       const { collections, items } = await control.collectionsList();
       return { collections, items: items as CollectionItemSummary[] };
@@ -75,6 +76,7 @@ function nullOnNotFound(err: unknown): null {
 function apiSavedRequestQueryOptions(itemId: string) {
   return {
     queryKey: apiSavedRequestKey(itemId),
+    gcTime: KEEP_WHILE_OPEN,
     queryFn: async (): Promise<HttpSavedRequest | null> => {
       try {
         return httpSavedRequestSchema.parse(await control.collectionsGetRequest(itemId));
@@ -89,6 +91,7 @@ function apiSavedRequestQueryOptions(itemId: string) {
 function apiSavedGrpcRequestQueryOptions(itemId: string) {
   return {
     queryKey: apiSavedGrpcRequestKey(itemId),
+    gcTime: KEEP_WHILE_OPEN,
     queryFn: async (): Promise<GrpcSavedRequest | null> => {
       try {
         return grpcSavedRequestSchema.parse(await control.collectionsGetGrpcRequest(itemId));
@@ -102,6 +105,7 @@ function apiSavedGrpcRequestQueryOptions(itemId: string) {
 export function apiEnvironmentsQueryOptions() {
   return {
     queryKey: apiEnvironmentsKey,
+    gcTime: KEEP_WHILE_OPEN,
     queryFn: (): Promise<ApiEnvironment[]> => control.variablesListEnvironments(),
   };
 }
@@ -109,6 +113,7 @@ export function apiEnvironmentsQueryOptions() {
 function apiVariablesQueryOptions(scope: VariableScope, ownerId: string) {
   return {
     queryKey: apiVariablesKey(scope, ownerId),
+    gcTime: KEEP_WHILE_OPEN,
     queryFn: (): Promise<ApiVariable[]> => control.variablesList(scope, ownerId),
   };
 }
@@ -184,6 +189,15 @@ export function reconcileTree(): void {
   for (const query of queryClient.getQueryCache().findAll({ queryKey: ['apiSavedGrpcRequest'] })) {
     const itemId = query.queryKey[1] as string;
     if (!itemIds.has(itemId)) queryClient.setQueryData(query.queryKey, null);
+  }
+  // Item-scope history lists (`[domain, itemId, '']`) live until their item goes.
+  for (const domain of ['httpHistory', 'grpcHistory']) {
+    for (const query of queryClient.getQueryCache().findAll({ queryKey: [domain] })) {
+      const itemId = query.queryKey[1] as string;
+      if (itemId !== '' && !itemIds.has(itemId)) {
+        queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
+      }
+    }
   }
   for (const query of queryClient
     .getQueryCache()

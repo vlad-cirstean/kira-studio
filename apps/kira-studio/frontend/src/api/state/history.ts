@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/vue-query';
 import { errorText } from '@workbench/bridge/codedError';
-import { queryClient } from '@workbench/state/queryClient';
+import { KEEP_WHILE_OPEN, queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, type MaybeRefOrGetter, reactive, toValue, watch } from 'vue';
 import { refreshApiQuery } from './apiQueries';
@@ -60,6 +60,8 @@ export function createHistoryQueries<
     return {
       queryKey: listKey(itemId, tabId),
       queryFn: () => opts.list(itemId, tabId),
+      // Tab-scope lists go at tab close below, item-scope lists with their item (reconcileTree).
+      gcTime: KEEP_WHILE_OPEN,
     };
   }
   function snapshotKey(id: string) {
@@ -89,7 +91,7 @@ export function createHistoryQueries<
     return ui[tabId];
   }
 
-  // `tab:` scope lists die with the tab; item-scope lists are left to gcTime.
+  // `tab:` scope lists die with the tab.
   registerTabRuntimeCleanup((tabId) => {
     const viewingId = ui[tabId]?.viewingId;
     delete ui[tabId];

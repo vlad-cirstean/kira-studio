@@ -224,6 +224,7 @@ test('heap: api grpc and http request', async ({ relaunch }) => {
   const app = await relaunch({
     control: [
       { channel: IPC.tabsList, response: [grpcTab({ target: 'demo.example.com:443' })] },
+      { channel: IPC.grpcHistoryList, args: { itemId: '', tabId: 'tab-grpc-1' }, response: [] },
       {
         channel: IPC.grpcDescribe,
         response: { services: [], mode: 'reflection', warnings: [] },

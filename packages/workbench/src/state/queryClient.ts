@@ -11,6 +11,11 @@ import { QueryClient } from '@tanstack/vue-query';
 //   so a failure is a real backend error, not a transient one worth repeating; window focus changes
 //   nothing.
 // - remote (`remote: true`, the phone UI over HTTP): one retry, and a refocus or reconnect refetches.
+// `gcTime` for a key with bounded cardinality: a singleton, an app-wide list, or a key removed when
+// its owner (tab, item, collection) closes or goes away. Every use names its removal. Input-keyed
+// keys (completions, previews, search) keep the 5 min default: under this they grow without bound.
+export const KEEP_WHILE_OPEN = Number.POSITIVE_INFINITY;
+
 export function createQueryClient({ remote }: { remote: boolean }): QueryClient {
   return new QueryClient({
     defaultOptions: {
