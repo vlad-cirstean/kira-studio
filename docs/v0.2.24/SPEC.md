@@ -10,9 +10,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P424 | Kibana: Discover-grade query editor with autocomplete | Done |
 | P425 | Kibana: save and update queries | Done |
 | P426 | Validation proof MCP tool: visualisation support | Done |
-| P427 | Pull request view for GitHub and Azure Repos | Todo |
-| P428 | Jira issue viewer | Todo |
-| P429 | PR and issue comments: post, attachments, drag and drop | Todo |
+| P427 | Pull request view for GitHub and Azure Repos | Done |
+| P428 | Jira issue viewer | Done |
+| P429 | PR and issue comments: post, attachments, drag and drop | Done |
 | P430 | Clipboard capture hotkey: link or text into Kira Space | Todo |
 | P431 | Stage settings injection in the workflow editor (auto compact limit) | Done |
 | P432 | Operations panel overhaul: looks and interactions | Done |
@@ -55,16 +55,22 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - One PR, not lists or boards.
 - Description, comments (read), checks status, plus the other most common details, kept simple.
 
+**Result:** One-PR view for GitHub and Azure Repos in a Space host-view window: description, comments (read), checks, common details. Provider-neutral `HostViewService`; Markdown rendered with escaping.
+
 ### P428 Jira issue viewer
 
 - One issue, not lists or boards.
 - Title, description, common details (assignee etc.), comments (read).
 - Builds on the v0.2.23 P417 issue-tracker abstraction.
 
+**Result:** Jira issue viewer in the same host-view frame: fields, sidebar, comments. Hand-rolled ADF-to-Markdown converter (candidate libraries lacked escaping and link-scheme filtering).
+
 ### P429 PR and issue comments: post, attachments, drag and drop
 
 - Post comments in the PR view and the issue view.
 - Comments can carry attachments; drag and drop supported.
+
+**Result:** Post comments and replies on PRs and issues with a Markdown composer, VueUse `useDropZone` drag and drop. Attachments: Azure only, over HTTPS with an `az` access token (needs `az login`, not PAT-only). GitHub and Jira comments carry no attachments (no API; no Jira credential held). Narrows the spec line on attachments; follow-up needs a stored Atlassian token (v0.2.25). Live acli post, live Azure upload and macOS drag and drop unverified (Known open items).
 
 ### P430 Clipboard capture hotkey: link or text into Kira Space
 
