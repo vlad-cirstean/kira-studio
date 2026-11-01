@@ -273,3 +273,42 @@ step 9.
   workbench tab plumbing; rebase mechanically, ownership boundary otherwise disjoint.
 - Before numbers come from pre-B/C tree; after numbers from same tree, so comparison stays valid.
   Integrated-tree numbers belong to the follow-up re-sweep.
+
+## Result
+
+Done. Commits `4b79adc8f` to `c7c3ae7ec` on `chapter/v0.2.24-stream-d`, one per step 1-10.
+Before/after numbers: `P433-measurements.md`.
+
+Landed:
+- Heap probe (`heap` project in both apps, `packages/workbench/src/testing/ui/heapProbe.ts`).
+- F1 `KEEP_WHILE_OPEN` plus gRPC schema/history, API history, cookies, apiQueries (S2).
+- F2 Discover data view and histogram kept (S3). F3 keyvalue page kept (S1). F4 mask rules kept (S4).
+- F5 console cursor and Discover sidebar state kept.
+- F4 Go events `savedQueriesChanged` and `filterHistoryChanged`; saved-query menus drop `staleTime: 0`.
+  Flow test in `dbflow/sqlite_test.go`, UI spec `saved-queries-sync.spec.ts`.
+- F7 Monaco view state kept across remount (Space).
+- F6 stat-gated file and diff reads (`ifStat`, `ifHeadOid`, kind `unchanged`); Go test in
+  `repoflow/workspace_test.go`, UI spec `repo-file-gate.spec.ts`.
+- Retention specs `tab-switch-retention.spec.ts` (4 tests). F8 docs in `ARCHITECTURE.md`,
+  `DEV_ENVIRONMENT.md`, S8 header comment in `page/store.ts`.
+
+Tests: Studio UI 680 passed (one load timeout, passed on lone rerun). Space UI 882 passed. Go
+tests for both apps passed. Pre-commit hooks passed on every commit.
+
+Deviations:
+- P3 (Space local-file refetch) skipped. No OpenedFiles watcher exists, so a skipped read is unsafe;
+  retaining text only adds memory.
+- Plan premises corrected: gRPC schema keyed by source, not tab; cookies keyed by typed URL;
+  StreamFilterHistoryMenu has no IPC; nothing to change there.
+- Tree saved-filters stay on right-click fetch. Double invalidation on saved-query writes accepted.
+- Space gate cuts payload, not call count.
+- Stream-history `useQuery` conversion not done.
+
+Open items:
+- Studio Discover leaks about 4 MB per mount round, +33 MB after close-all. Not query-related.
+  Hypothesis, unverified: per-mount registration in `kqlLanguage.ts`. In `ARCHITECTURE.md` Known open items.
+- Space repo file/diff still grows about 0.7 MB per round, +2.8 MB per open/close cycle.
+- Stat gate can miss a same-size edit inside timestamp granularity.
+- Kibana data view picker list (60 s) and other `staleTime: 0` external reads stay as named exceptions.
+- Studio before numbers predate the `grpcHistoryList` mock snapshot.
+- Re-sweep needed after Streams B and C land: hostview, settings, capture, OperationsPanel, OpLog.
