@@ -89,12 +89,17 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 	} else {
 		d.Windows.Add(rec.Key, rec.Order, win, detach)
 	}
+	wireLifecycle(d, win, rec.Key, ephemeral)
+}
+
+// wireLifecycle attaches the close-flush and WindowClosing teardown every managed window shares.
+func wireLifecycle(d WindowOpenerDeps, win *application.WebviewWindow, key string, ephemeral bool) {
 	// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
 	// window's own close-flush wait completes (closeflush.go's own doc comment) — this window is
 	// still counted (RemoveAndCount, below, is what removes it, and only once a real Close()
 	// actually goes through), so `== 1` means "I am the only one left".
-	AttachCloseFlush(win, rec.Key, d.CloseFlush, func() bool {
-		hide, _ := closeDecision(ephemeral, d.Windows.OthersReal(rec.Key))
+	AttachCloseFlush(win, key, d.CloseFlush, func() bool {
+		hide, _ := closeDecision(ephemeral, d.Windows.OthersReal(key))
 		return hide
 	})
 	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
@@ -102,16 +107,16 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 		// removed from the pending set here rather than being waited out for the full timeout
 		// — a no-op when no quit is in flight, since Quitter.Flushed ignores a key it isn't
 		// currently waiting on.
-		d.Quitter.Flushed(rec.Key)
+		d.Quitter.Flushed(key)
 		// P83 §4's teardown table: a terminal never outlives the window that opened it, even when
 		// the renderer never gets to ack.
-		d.Terminal.CloseWindow(rec.Key)
+		d.Terminal.CloseWindow(key)
 		for _, fn := range d.OnWindowClosing {
-			fn(rec.Key)
+			fn(key)
 		}
-		if d.Windows.RowDecision(rec.Key) {
-			if err := d.Repo.Delete(rec.Key); err != nil {
-				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
+		if d.Windows.RowDecision(key) {
+			if err := d.Repo.Delete(key); err != nil {
+				slog.Warn("delete window row", "scope", "window", "key", key, "err", err)
 			}
 		}
 	})
