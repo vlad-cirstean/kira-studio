@@ -32,6 +32,9 @@ func SetMCPListTTL(d time.Duration) (restore func()) {
 	return func() { mcpListTTL = prev }
 }
 
+// mcpListArgs is the argv after claude: the only way Kira learns the user's servers.
+var mcpListArgs = []string{"mcp", "list"}
+
 // errMCPList is the only error a failed listing surfaces; claude's output never reaches it.
 var errMCPList = errors.New("could not list your Claude MCP servers")
 
@@ -130,7 +133,7 @@ func (p *Provider) runMCPList(ctx context.Context, dir string) ([]harness.UserSe
 	ctx, cancel := context.WithTimeout(ctx, mcpListTimeout)
 	defer cancel()
 	shell, login := loginshell.ResolveShell(os.Getenv, loginshell.IsExecutableFile)
-	argv := loginshell.BuildArgv(shell, login, "exec claude mcp list")
+	argv := loginshell.BuildArgv(shell, login, "exec claude "+strings.Join(mcpListArgs, " "))
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = p.ScrubEnv(os.Environ())
