@@ -245,3 +245,132 @@ func TestKibanaSearch(t *testing.T) {
 		}
 	})
 }
+
+func TestKibanaColumns(t *testing.T) {
+	f := testsupport.StartKibana(t)
+	cfg := f.Config
+	a := connected(t, cfg)
+
+	table := func(t *testing.T, r model.KibanaDiscoverRequest, cap page.ResultCap) page.TabularPage {
+		t.Helper()
+		if r.DataView == "" {
+			r.DataView = testsupport.KibanaLogsView
+		}
+		if r.TimeRange == nil {
+			r.TimeRange = window()
+		}
+		pages, err := a.Execute(context.Background(), model.ConsoleRequest{Path: rootPath(cfg), Statements: []string{statement(t, r)}, Cap: cap}, opCtx("execute"))
+		if err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		tp, ok := pages[0].(page.TabularPage)
+		if !ok {
+			t.Fatalf("page is %T, want a table", pages[0])
+		}
+		return tp
+	}
+	names := func(p page.TabularPage) []string {
+		out := make([]string, len(p.Columns))
+		for i, c := range p.Columns {
+			out[i] = c.Name
+		}
+		return out
+	}
+	cell := func(t *testing.T, p page.TabularPage, col string, row int) *string {
+		t.Helper()
+		for i, c := range p.Columns {
+			if c.Name == col {
+				return testsupport.CellAt(t, p, i, row)
+			}
+		}
+		t.Fatalf("no column %s in %v", col, names(p))
+		return nil
+	}
+	req := func(cols ...string) model.KibanaDiscoverRequest {
+		return model.KibanaDiscoverRequest{Size: 5, Query: "status:503", Columns: cols}
+	}
+
+	t.Run("time field comes first", func(t *testing.T) {
+		p := table(t, req("level", "status"), page.ResultCap{})
+		if got := strings.Join(names(p), ","); got != "@timestamp,level,status" {
+			t.Errorf("columns = %s", got)
+		}
+		if p.RowCount != 5 || !p.Position.Truncated {
+			t.Errorf("rows = %d truncated = %v", p.RowCount, p.Position.Truncated)
+		}
+	})
+
+	t.Run("an explicit time column keeps its place", func(t *testing.T) {
+		p := table(t, req("level", "@timestamp"), page.ResultCap{})
+		if got := strings.Join(names(p), ","); got != "level,@timestamp" {
+			t.Errorf("columns = %s", got)
+		}
+	})
+
+	t.Run("type classes", func(t *testing.T) {
+		p := table(t, req("level", "status", "ok"), page.ResultCap{})
+		want := map[string]page.TypeClass{"@timestamp": page.TypeClassTemporal, "level": page.TypeClassText, "status": page.TypeClassNumber, "ok": page.TypeClassBoolean}
+		for _, c := range p.Columns {
+			if want[c.Name] != c.TypeClass {
+				t.Errorf("%s class = %s, want %s", c.Name, c.TypeClass, want[c.Name])
+			}
+		}
+		if v := cell(t, p, "status", 0); v == nil || *v != "503" {
+			t.Errorf("status = %v", v)
+		}
+	})
+
+	t.Run("runtime, multi-field and nested values", func(t *testing.T) {
+		p := table(t, req("status_class", "message.keyword", "user.name"), page.ResultCap{})
+		if v := cell(t, p, "status_class", 0); v == nil || *v != "error" {
+			t.Errorf("status_class = %v", v)
+		}
+		if v := cell(t, p, "message.keyword", 0); v == nil || !strings.HasPrefix(*v, "request ") {
+			t.Errorf("message.keyword = %v", v)
+		}
+		if v := cell(t, p, "user.name", 0); v == nil || (*v != "alice" && *v != "bob" && *v != "carol") {
+			t.Errorf("user.name = %v", v)
+		}
+	})
+
+	t.Run("several values render as a JSON array", func(t *testing.T) {
+		r := model.KibanaDiscoverRequest{Size: 5, Query: "tags:a and tags:b", Columns: []string{"tags"}}
+		p := table(t, r, page.ResultCap{})
+		if v := cell(t, p, "tags", 0); v == nil || *v != `["a","b"]` {
+			t.Errorf("tags = %v", v)
+		}
+	})
+
+	t.Run("a missing value is NULL", func(t *testing.T) {
+		r := model.KibanaDiscoverRequest{DataView: testsupport.KibanaNoTimeView, Size: 5, Columns: []string{"name", "count"}}
+		p := table(t, r, page.ResultCap{})
+		if got := strings.Join(names(p), ","); got != "name,count" {
+			t.Errorf("columns = %s", got)
+		}
+		r.Columns = []string{"name"}
+		r.Filters = []model.KibanaFilter{{Field: "name", Operator: "is", Values: []string{"item-3"}}}
+		if p = table(t, r, page.ResultCap{}); p.RowCount != 1 {
+			t.Errorf("rows = %d", p.RowCount)
+		}
+	})
+
+	t.Run("rejects unknown and duplicate columns", func(t *testing.T) {
+		for _, cols := range [][]string{{"nope"}, {"level", "level"}} {
+			_, err := run(a, cfg, statement(t, model.KibanaDiscoverRequest{DataView: testsupport.KibanaLogsView, Columns: cols}))
+			wantCode(t, err, adapters.CodeQuery)
+		}
+	})
+
+	t.Run("the byte cap stops early", func(t *testing.T) {
+		p := table(t, model.KibanaDiscoverRequest{Size: 100, Columns: []string{"message"}}, page.ResultCap{Bytes: 200})
+		if p.RowCount >= 100 || p.RowCount == 0 || !p.Position.Truncated {
+			t.Errorf("rows = %d truncated = %v", p.RowCount, p.Position.Truncated)
+		}
+	})
+
+	t.Run("no columns keeps the document page", func(t *testing.T) {
+		if p := hits(t, a, cfg, model.KibanaDiscoverRequest{Size: 3}); p.RowCount != 3 {
+			t.Errorf("rows = %d", p.RowCount)
+		}
+	})
+}

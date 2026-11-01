@@ -71,6 +71,7 @@ export const kibanaDiscoverRequestSchema = /*#__PURE__*/ z
     sort: z.array(kibanaSortSchema),
     size: z.number().int().min(0),
     timeZone: z.string(),
+    columns: z.array(z.string()).optional(),
   })
   .strict();
 export type KibanaDiscoverRequest = z.infer<typeof kibanaDiscoverRequestSchema>;
@@ -114,6 +115,13 @@ export const kibanaTimeSelectionSchema = /*#__PURE__*/ z.discriminatedUnion('mod
 export type KibanaTimeSelection = z.infer<typeof kibanaTimeSelectionSchema>;
 
 export const KIBANA_SAMPLE_SIZES = [100, 500, 1000, 5000, 10000] as const;
+export const kibanaSampleSizeSchema = /*#__PURE__*/ z.union([
+  z.literal(100),
+  z.literal(500),
+  z.literal(1000),
+  z.literal(5000),
+  z.literal(10000),
+]);
 
 /** Per-tab Discover state. The query text lives in the console tab's own `text`. */
 export const kibanaConsoleStateSchema = /*#__PURE__*/ z.object({
@@ -124,9 +132,8 @@ export const kibanaConsoleStateSchema = /*#__PURE__*/ z.object({
   time: kibanaTimeSelectionSchema.default({ mode: 'preset', preset: 'last15m' }),
   filters: z.array(kibanaFilterSchema).default([]),
   sort: z.array(kibanaSortSchema).default([]),
-  sampleSize: z
-    .union([z.literal(100), z.literal(500), z.literal(1000), z.literal(5000), z.literal(10000)])
-    .default(500),
+  columns: z.array(z.string()).default([]),
+  sampleSize: kibanaSampleSizeSchema.default(500),
   interval: kibanaIntervalSchema.default('auto'),
 });
 export type KibanaConsoleState = z.infer<typeof kibanaConsoleStateSchema>;

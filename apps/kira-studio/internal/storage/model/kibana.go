@@ -54,6 +54,8 @@ type KibanaDiscoverRequest struct {
 	Sort      []KibanaSort     `json:"sort"`
 	Size      int              `json:"size"`
 	TimeZone  string           `json:"timeZone"` // IANA; "" = UTC
+	// Columns selects fields: the page is a table of the time field plus these. Empty = documents.
+	Columns []string `json:"columns,omitempty"`
 }
 
 // KibanaHistogramRequest asks for a hit-count date histogram of Request (Size and Sort ignored).

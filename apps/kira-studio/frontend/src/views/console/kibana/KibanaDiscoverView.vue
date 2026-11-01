@@ -87,6 +87,11 @@ function onExists(name: string): void {
   ];
 }
 
+function onToggleColumn(name: string): void {
+  d.toggleColumn(name);
+  void onRun();
+}
+
 function onHistogramRange(from: string, to: string): void {
   d.patch({ time: { mode: 'absolute', from, to } });
   void onRun();
@@ -215,9 +220,11 @@ onUnmounted(() => {
       >
         <FieldSidebar
           :fields="d.fields.value"
+          :columns="d.state.value.columns"
           :loading="d.dataViewQuery.isFetching.value"
           @insert="onInsertField"
           @exists="onExists"
+          @toggle-column="onToggleColumn"
         />
       </aside>
       <ResizeHandle

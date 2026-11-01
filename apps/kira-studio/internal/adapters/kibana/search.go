@@ -320,6 +320,13 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		return nil, err
 	}
 	body["size"] = size + 1
+	var cols []model.KibanaField
+	if len(dr.Columns) > 0 {
+		if cols, err = tableColumns(dv, dr.Columns); err != nil {
+			return nil, err
+		}
+		columnsBody(body, cols)
+	}
 	res, err := h.search(ctx, dv.Title, body)
 	if err != nil {
 		return nil, err
@@ -328,6 +335,14 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	truncated := len(hits) > size
 	if truncated {
 		hits = hits[:size]
+	}
+	if cols != nil {
+		builder, capped, err := columnPage(cols, hits, limit)
+		if err != nil {
+			return nil, err
+		}
+		op.SetRows(builder.RowCount())
+		return []page.Page{builder.Finish(page.CappedPosition(builder.RowCount(), truncated || capped))}, nil
 	}
 	builder, capped, err := pushHits(hits, runtimeNames(dv), limit)
 	if err != nil {

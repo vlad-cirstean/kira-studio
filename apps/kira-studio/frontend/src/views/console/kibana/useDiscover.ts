@@ -64,7 +64,14 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
       sort: s.sort,
       size: s.sampleSize,
       timeZone,
+      ...(s.columns.length > 0 ? { columns: s.columns } : {}),
     };
+  }
+
+  // Completion and suggestions send size-0 requests that never render a table.
+  function searchRequest(query: string): KibanaDiscoverRequest {
+    const { columns: _columns, ...rest } = buildRequest(query);
+    return rest;
   }
 
   // The request of the latest run: hits and histogram both send exactly it, so they never disagree.
@@ -119,6 +126,7 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
         : state.value.time,
       filters: req.filters,
       sort: req.sort,
+      columns: req.columns ?? [],
       sampleSize: SAMPLE_SIZES.find((s) => s === req.size) ?? state.value.sampleSize,
     });
     lastRequest.value = req;
@@ -140,11 +148,16 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     { immediate: true },
   );
 
+  function toggleColumn(name: string): void {
+    const cols = state.value.columns;
+    patch({ columns: cols.includes(name) ? cols.filter((c) => c !== name) : [...cols, name] });
+  }
+
   // A new data view drops sort and filters on fields it lacks, then reruns once its fields arrive.
   let rerunOnLoad = false;
   function selectDataView(view: { id: string; name: string }): void {
     if (view.id === state.value.dataViewId) return;
-    patch({ dataViewId: view.id, dataViewName: view.name, sort: [] });
+    patch({ dataViewId: view.id, dataViewName: view.name, sort: [], columns: [] });
     rerunOnLoad = true;
   }
   watch(dataView, (view) => {
@@ -152,8 +165,13 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     const names = new Set(view.fields.map((f) => f.name));
     const filters = state.value.filters.filter((f) => names.has(f.field));
     const sort = state.value.sort.filter((s) => names.has(s.field));
-    if (filters.length !== state.value.filters.length || sort.length !== state.value.sort.length) {
-      patch({ filters, sort });
+    const columns = state.value.columns.filter((c) => names.has(c));
+    if (
+      filters.length !== state.value.filters.length ||
+      sort.length !== state.value.sort.length ||
+      columns.length !== state.value.columns.length
+    ) {
+      patch({ filters, sort, columns });
     }
     if (rerunOnLoad) {
       rerunOnLoad = false;
@@ -165,7 +183,7 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     connectionId: () => connectionId.value,
     dataView: () => dataView.value,
     language: () => state.value.language,
-    request: (query) => ({ ...buildRequest(query), size: 0 }),
+    request: (query) => ({ ...searchRequest(query), size: 0 }),
     scopeKey: () => JSON.stringify([state.value.time, state.value.filters]),
   });
 
@@ -174,7 +192,7 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
       connectionId: connectionId.value,
       opId: crypto.randomUUID(),
       tabId: tab.value.id,
-      request: { ...buildRequest(''), size: SUGGEST_LIMIT },
+      request: { ...searchRequest(''), size: SUGGEST_LIMIT },
       field,
       prefix: '',
     });
@@ -197,6 +215,7 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     runtime,
     histogramQuery,
     selectDataView,
+    toggleColumn,
     completion,
     suggestValues,
   };

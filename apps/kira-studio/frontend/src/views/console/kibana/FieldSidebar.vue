@@ -11,8 +11,16 @@ import { matchesQuery } from '@workbench/behaviour/match';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
 import { computed, ref, watch } from 'vue';
 
-const props = defineProps<{ fields: readonly KibanaField[]; loading: boolean }>();
-const emit = defineEmits<{ insert: [field: string]; exists: [field: string] }>();
+const props = defineProps<{
+  fields: readonly KibanaField[];
+  columns: readonly string[];
+  loading: boolean;
+}>();
+const emit = defineEmits<{
+  insert: [field: string];
+  exists: [field: string];
+  toggleColumn: [field: string];
+}>();
 
 const STEP = 200;
 const ICONS: Record<string, string> = {
@@ -28,7 +36,11 @@ const search = ref('');
 const matches = computed(() => {
   return props.fields.filter((f) => matchesQuery(f.name, search.value));
 });
-const { visible, hiddenCount, showMore, reset } = useCappedList(() => matches.value, STEP);
+const selected = computed(() =>
+  props.columns.flatMap((c) => matches.value.filter((f) => f.name === c)),
+);
+const available = computed(() => matches.value.filter((f) => !props.columns.includes(f.name)));
+const { visible, hiddenCount, showMore, reset } = useCappedList(() => available.value, STEP);
 watch(search, reset);
 </script>
 
@@ -43,38 +55,67 @@ watch(search, reset);
       />
     </div>
     <ul class="min-h-0 flex-1 overflow-y-auto">
-      <li
-        v-for="f in visible"
-        :key="f.name"
-        :class="[rowVariants({ layout: 'tree' }), 'group pl-2']"
-        data-testid="kibana-field-row"
+      <template
+        v-for="section in [
+          { id: 'selected', rows: selected, heading: t('studio.kibana.fields.selected.label') },
+          { id: 'available', rows: visible, heading: t('studio.kibana.fields.available.label') },
+        ]"
+        :key="section.id"
       >
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="flex h-control min-w-0 flex-1 items-center gap-1.5 text-left text-kira-md"
-              :data-testid="`kibana-field-${f.name}`"
-              @click="emit('insert', f.name)"
-            >
-              <CodiconIcon
-                :name="ICONS[f.type] ?? 'symbol-field'"
-                :size="12"
-                class="shrink-0 text-muted-foreground"
-              />
-              <span class="truncate font-data">{{ f.name }}</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ f.type }}</TooltipContent>
-        </Tooltip>
-        <TooltipIconButton
-          icon="add"
-          class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-          :label="t('studio.kibana.fields.exists.tooltip', { field: f.name })"
-          :data-testid="`kibana-field-exists-${f.name}`"
-          @click="emit('exists', f.name)"
-        />
-      </li>
+        <li
+          v-if="section.rows.length > 0 && (section.id === 'selected' || selected.length > 0)"
+          class="px-2 pt-1 text-kira-sm font-medium text-muted-foreground"
+          :data-testid="`kibana-${section.id}-fields`"
+        >
+          {{ section.heading }}
+        </li>
+        <li
+          v-for="f in section.rows"
+          :key="`${section.id}-${f.name}`"
+          :class="[rowVariants({ layout: 'tree' }), 'group pl-2']"
+          data-testid="kibana-field-row"
+        >
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="flex h-control min-w-0 flex-1 items-center gap-1.5 text-left text-kira-md"
+                :data-testid="`kibana-field-${f.name}`"
+                @click="emit('insert', f.name)"
+              >
+                <CodiconIcon
+                  :name="ICONS[f.type] ?? 'symbol-field'"
+                  :size="12"
+                  class="shrink-0 text-muted-foreground"
+                />
+                <span class="truncate font-data">{{ f.name }}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ f.type }}</TooltipContent>
+          </Tooltip>
+          <TooltipIconButton
+            :icon="section.id === 'selected' ? 'close' : 'add'"
+            class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            :label="
+              t(
+                section.id === 'selected'
+                  ? 'studio.kibana.fields.column.remove.tooltip'
+                  : 'studio.kibana.fields.column.add.tooltip',
+                { field: f.name },
+              )
+            "
+            :data-testid="`kibana-field-column-${f.name}`"
+            @click="emit('toggleColumn', f.name)"
+          />
+          <TooltipIconButton
+            icon="filter"
+            class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            :label="t('studio.kibana.fields.exists.tooltip', { field: f.name })"
+            :data-testid="`kibana-field-exists-${f.name}`"
+            @click="emit('exists', f.name)"
+          />
+        </li>
+      </template>
       <li
         v-if="!loading && matches.length === 0"
         class="px-2 py-1 text-kira-sm text-muted-foreground"

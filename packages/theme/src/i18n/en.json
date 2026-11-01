@@ -1547,6 +1547,9 @@
         "kibanaBadRequest": {
           "body": "Invalid Discover request: {detail}."
         },
+        "kibanaDuplicateColumn": {
+          "body": "Column {field} is listed twice."
+        },
         "kibanaFilterOperator": {
           "body": "Filter operator {operator} is not supported."
         },
@@ -1576,6 +1579,9 @@
         },
         "kibanaTextSort": {
           "body": "Text sort is not supported. Sort by a field and direction."
+        },
+        "kibanaUnknownColumn": {
+          "body": "Column {field} is not in this data view."
         },
         "kibanaUnknownField": {
           "body": "Field {field} is not in this data view."
@@ -12533,6 +12539,17 @@
         }
       },
       "fields": {
+        "available": {
+          "label": "Available fields"
+        },
+        "column": {
+          "add": {
+            "tooltip": "Add {field} as a column"
+          },
+          "remove": {
+            "tooltip": "Remove {field} column"
+          }
+        },
         "exists": {
           "tooltip": "Filter on {field} existing"
         },
@@ -12544,6 +12561,9 @@
         },
         "search": {
           "placeholder": "Search fields"
+        },
+        "selected": {
+          "label": "Selected fields"
         }
       },
       "filter": {
