@@ -14,13 +14,21 @@ function modeTab(page: Page, mode: 'git' | 'automations' | 'ade') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
-test('the title bar lists Agents, Automations, Memory, then Git', async ({ relaunch }) => {
+test('the title bar lists Agents, Runs, Memory, then Git', async ({ relaunch }) => {
   const { window: page } = await relaunch();
   const modes = await page
     .locator('[data-testid="mode-tab"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-mode')));
   expect(modes).toEqual(['ade', 'automations', 'memory', 'git']);
   await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  const tabs = page.locator('[data-testid="mode-tab"]');
+  const names = ['Agents', 'Runs', 'Memory', 'Git'];
+  for (const [i, name] of names.entries()) {
+    await expect(tabs.nth(i)).toHaveAccessibleName(name);
+    expect((await tabs.nth(i).innerText()).trim()).toBe('');
+  }
+  await modeTab(page, 'ade').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText('Agents');
 });
 
 test('a window boots into whatever mode windowsEnsure answers with, with no Git panel mounted alongside it', async ({

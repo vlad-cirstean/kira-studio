@@ -65,7 +65,7 @@ async function openTerminalModule(page: import('@playwright/test').Page): Promis
 test('the module exists and opens', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
 
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
+  await expect(modeTab(page, 'automations')).toBeVisible();
   await openTerminalModule(page);
 
   await expect(page.locator('[data-testid="automations-panel"]')).toBeVisible();
