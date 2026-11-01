@@ -2221,6 +2221,12 @@
       "select": {
         "label": "Select"
       },
+      "selectAll": {
+        "label": "Select all"
+      },
+      "selectNone": {
+        "label": "Select none"
+      },
       "send": {
         "label": "Send"
       },
@@ -6357,9 +6363,6 @@
       },
       "run": {
         "label": "Run distill"
-      },
-      "selectAll": {
-        "label": "Select all"
       },
       "selection": {
         "label": "Distill selection"
@@ -14957,6 +14960,20 @@
         "label": "Script runs: {count}"
       },
       "title": "Quit {app}?"
+    },
+    "restore": {
+      "dismiss": {
+        "label": "Don’t restore"
+      },
+      "selection": {
+        "status": "{selected} of {total} selected"
+      },
+      "submit": {
+        "label": "Restore {count}"
+      },
+      "unavailable": {
+        "title": "Not restored ({count})"
+      }
     },
     "search": {
       "matchCase": {
