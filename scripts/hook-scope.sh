@@ -64,3 +64,32 @@ nested_go_mods() {
     [ "$_m" = "." ] || echo "$_m"
   done | sort -u
 }
+
+# ui_target_of <file>: prints studio, space, both or none, the UI suites (Playwright `ui`) one
+# path can affect. First match wins. UI specs run a built bundle against mocks, so Go code never
+# reaches them; contract JSON and bindings sit under the app dir and select that app.
+ui_target_of() {
+  case "$1" in
+    go.mod|go.sum|*/go.mod|*/go.sum|.golangci.yml|*/.golangci.yml) echo none; return ;;
+  esac
+  if printf '%s\n' "$1" | grep -Eq "$FULL_RE"; then echo both; return; fi
+  case "$1" in
+    packages/*) echo both ;;
+    *.go|internal/*|apps/*/internal/*|apps/*/tests/claude/*|docs/*|site/*|*.md) echo none ;;
+    apps/kira-studio/*) echo studio ;;
+    apps/kira-space/*) echo space ;;
+    *) echo both ;;
+  esac
+}
+
+# ui_targets <file list>: prints `studio`, `space`, both (one per line) or nothing.
+ui_targets() {
+  printf '%s\n' "$1" | while IFS= read -r _f; do
+    [ -n "$_f" ] || continue
+    case "$(ui_target_of "$_f")" in
+      studio) echo studio ;;
+      space) echo space ;;
+      both) echo studio; echo space ;;
+    esac
+  done | sort -u
+}
