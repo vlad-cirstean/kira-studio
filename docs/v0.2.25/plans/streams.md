@@ -1,6 +1,6 @@
 # v0.2.25 stream split
 
-Split plan for `docs/v0.2.25/SPEC.md` rows P436-P444. Base: `6ba267359` (`chapter/v0.2.25` tip, same commit as
+Split plan for `docs/v0.2.25/SPEC.md` rows P436-P445. Base: `6ba267359` (`chapter/v0.2.25` tip, same commit as
 `chapter/v0.2.24` tip). Discovery ran through `codegraph_explore` (ADE `AdeSessionStrip`, `useSessionMenu`,
 `AdeSessionsTab`, `AdeStoppedMenu`/`AdeStoppedList`, `AdeSessionActions`, `AdeAllSessions`, `useRestartSession`,
 `AdeSessionsRepo`, `adewire.Session`; both apps' `workbench/modes.ts`, `automationsModule.ts`, `WorkbenchShell.vue`,
@@ -9,14 +9,14 @@ shared `ModeSwitcher.vue`, `WorkbenchTitleBar.vue`, `TitleBar.vue`, `createModeS
 `bridge/dbmcp.go`, `bridge/docker.go`; Space `oplog.Origin`/`WithOrigin`, `mcpRecorder`, `recordSessionEnd`), then
 Read/Grep for i18n catalog, migrations, window-mode lists, package manifests, root configs, tests and docs.
 
-Numbering note: the request named P442 as review and P443 as close. `SPEC.md` is authoritative: P442 is the slow
-test audit, P443 the review, P444 the close. No renumber or reorder is needed for this split, so `SPEC.md` is
+Numbering note: the request named P443 as review and P444 as close. `SPEC.md` is authoritative: P443 is the slow
+test audit, P444 the review, P445 the close. No renumber or reorder is needed for this split, so `SPEC.md` is
 untouched. Its intro says "two phases in parallel"; the user's later ask for 3 streams overrides it.
 
 User asked for 3 parallel streams (overrides the 2-stream cap). Verdict: a clean 3-way split holds for P436-P440,
-with one named docs hand-off (README and site card, see "Serial hand-off"). P441 and P442 cannot run in parallel
-with anything: both sweep the whole tree. They run after all three streams land, on the chapter branch, then P443
-and P444.
+with one named docs hand-off (README and site card, see "Serial hand-off"). P442 and P443 cannot run in parallel
+with anything: both sweep the whole tree. They run after all three streams land, on the chapter branch, then P444
+and P445.
 
 This file is the split only. Each phase still gets its own Opus plan under `plans/`, written in its stream's worktree
 against that worktree's then-current tree.
@@ -98,9 +98,9 @@ against that worktree's then-current tree.
   per-cluster setting keys on P439's cluster identity.
 - P438 needs nothing in this chapter.
 - P439 needs nothing outside Stream C: a new mode entry renders through whatever `ModeSwitcher` draws.
-- P441 needs every earlier phase landed: it bumps manifests and fixes API breaks across all code the streams add.
-- P442 needs P441: it measures suite times on the final dependency set and edits specs every stream touched.
-- P443 needs P436-P442; P444 needs P443.
+- P442 needs every earlier phase landed: it bumps manifests and fixes API breaks across all code the streams add.
+- P443 needs P442: it measures suite times on the final dependency set and edits specs every stream touched.
+- P444 needs P436-P443; P445 needs P444.
 
 No other edge. Stream A touches no mode, Automations or Studio file. Stream B touches no ADE session file, no bridge,
 no Go service, no migration. Stream C touches no Space file.
@@ -112,13 +112,13 @@ no Go service, no migration. Stream C touches no Space file.
 | A | P436, P437 | Kira Space ADE sessions |
 | B | P438 | Shared mode strip (both apps), Automations to Runs copy |
 | C | P439, P440 | Kira Studio Kubernetes module and its MCP tools |
-| tail | P441, P442, then P443, P444 | whole tree, chapter branch, after A, B, C land |
+| tail | P442, P443, then P444, P445 | whole tree, chapter branch, after A, B, C land |
 
 Each order is the `SPEC.md` table order, so the "top to bottom" rule holds inside every stream and across the tail.
 
 ### Cross-stream dependency
 
-None in code among A, B, C. Every edge above stays inside one stream. P441 and P442 depend on all three and touch
+None in code among A, B, C. Every edge above stays inside one stream. P442 and P443 depend on all three and touch
 files every stream owns, so they leave the parallel phase entirely.
 
 ### Serial hand-off (docs only)
@@ -213,7 +213,7 @@ Consequences named so no stream drifts across:
   `workbench.statusBar.*`, new `workbench.modeSwitcher.*`. C: new `studio.kubernetes.*` or top-level `kubernetes.*`
   (mirrors `docker.*`), `studio.dbMcp.*`, new `common.product.kubernetes.*`, `backend.studio.kubernetes*`. A run-word
   collision B finds inside A's subtrees is reported to the orchestrator, which routes it to A while A runs, or to
-  P443 after. Keys are disjoint, so a rebase conflict here is textual adjacency only: resolve as the union of both
+  P444 after. Keys are disjoint, so a rebase conflict here is textual adjacency only: resolve as the union of both
   sides, then `bun scripts/copy/check-catalog.ts --unused` and `bun run typecheck` must pass. This is the one named
   exception to "a conflict means the boundary was wrong".
 - `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`: A and C edit only their listed sections. B's edit is a word
@@ -273,15 +273,15 @@ Consequences named so no stream drifts across:
 - Risks: approval request shape (SQL fields vs cluster fields); log volume through MCP (caps); prompt text.
 - Tests: `dbmcpflow` flow test + UI spec of the dialog; claude test row for dbmcp (`bun run test:claude:studio`).
 
-### P441 Dependency update, incl. Wails (tail)
+### P442 Dependency update, incl. Wails (tail)
 
 Alone on `chapter/v0.2.25` after A, B, C land. It changes `go.mod`, `go.sum`, every `package.json`, `bun.lock`, tool
 versions and Wails bindings, then fixes breaks anywhere; nothing else can run beside it. Workflow files go through
 `docs/pending-workflows/` per `docs/DEV_ENVIRONMENT.md`.
 
-### P442 Slow test audit (tail)
+### P443 Slow test audit (tail)
 
-After P441, alone. It edits specs and configs every stream touched and needs the final dependency set for its
+After P442, alone. It edits specs and configs every stream touched and needs the final dependency set for its
 before/after numbers.
 
 ## Landing procedure
@@ -302,8 +302,8 @@ before/after numbers.
 6. After each landing the orchestrator updates `SPEC.md` rows of that stream (Done + Result copied from the plan files)
    in its own commit, then pushes `chapter/v0.2.25`.
 7. After all three land: `git worktree remove` each, `git branch -d chapter/v0.2.25-stream-{a,b,c}`, push.
-8. Tail on `/home/user/kira-studio`: P441, then P442, then P443 two review rounds over the diff since `main`, then
-   P444 close.
+8. Tail on `/home/user/kira-studio`: P442, then P443, then P444 two review rounds over the diff since `main`, then
+   P445 close.
 9. A worktree survives a container restart: resume a stopped stream from its last commit and its plan files.
 
 ## Decisions this split fixes
@@ -312,21 +312,33 @@ before/after numbers.
    app).
 2. P438 keeps the internal mode key `automations` while streams run; a rename needs the user's call and runs after C.
 3. P438's tab icon for Runs stays `run-all`; B does not edit Studio `modes.ts`.
-4. P441 and P442 run alone after all streams.
+4. P442 and P443 run alone after all streams.
 
-## Tail override (user request): P441 and P443 run in parallel
+## Tail override (user request): P442 and P444 run in parallel
 
-User: run code review and dependency update in parallel. Supersedes "P441 alone, then P442, then P443" above. Order
+User: run code review and dependency update in parallel. Supersedes "P442 alone, then P443, then P444" above. Order
 after A, B, C land on the chapter branch:
 
-- Stream D: P441. Own worktree. Owns every `go.mod`, `go.sum`, `package.json`, `bun.lock`, Wails bindings and
+- Stream D: P442. Own worktree. Owns every `go.mod`, `go.sum`, `package.json`, `bun.lock`, Wails bindings and
   generated output, build and tool-version config, plus code edits forced by an API break in a bumped dependency.
-- Stream E: P443 (2 review rounds; Opus review, findings file, Sonnet fixer, repeat). Own worktree. Owns all other
+- Stream E: P444 (2 review rounds; Opus review, findings file, Sonnet fixer, repeat). Own worktree. Owns all other
   source. Reviewer ignores dependency churn and lockfiles. A fixer never edits manifests, lockfiles, bindings or
   build config; a finding needing that goes to D as a note in its plan file.
 - Both start from the same base commit (chapter tip after A, B, C). Landing: rebase D, then E, onto the chapter
   branch. A real conflict outside forced API-break edits means the boundary was wrong.
-- P442 (slow test audit) runs after D and E land: needs the final dependency set and edits specs.
-- P444 closes after P442.
+- P443 (slow test audit) runs after D and E land: needs the final dependency set and edits specs.
+- P445 closes after P443.
 - Stream D's full-suite run covers pre-review code; E's fixers re-run the suites they touch. A final full run
-  happens in P442.
+  happens in P443.
+
+## New phase P441 (user request): restore dialog for Runs and Docker
+
+Added after the split. Earlier tail phases renumbered +1 (deps P442, audit P443, review P444, close P445); sections above
+already use the new numbers except where they predate this note.
+
+- Joins Stream B, after P438: depends on the Runs rename and edits `packages/workbench/src/automations/**`, which B owns.
+- Docker restore files in Kira Studio carve out of Stream C's ownership to B for P441 only. Stream C does not touch the
+  Docker module (it adds a new `kubernetes` mode); the P441 plan must verify this against current source and name the
+  exact Docker files before B starts the phase.
+- Shared dialog lives in `packages/workbench` (B's tree). If it needs a new i18n group, B owns it.
+- Stream B order: P438, then P441. Landing unchanged.

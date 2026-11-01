@@ -11,11 +11,12 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P438 | Rename Automations to Runs; icon-only module tabs | Todo |
 | P439 | Kubernetes module (read only) | Todo |
 | P440 | Kubernetes MCP tools with per-cluster approval | Todo |
-| P441 | Dependency update, incl. Wails | Todo |
-| P442 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
-| P443 | Remove CLI credential reads: claude MCP headers | Todo |
-| P444 | Code review (2 rounds) | Todo |
-| P445 | Close chapter v0.2.25 | Todo |
+| P441 | Restore previous Runs scripts and Docker containers after app close: shared dialog | Todo |
+| P442 | Dependency update, incl. Wails | Todo |
+| P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
+| P444 | Remove CLI credential reads: claude MCP headers | Todo |
+| P445 | Code review (2 rounds) | Todo |
+| P446 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -52,15 +53,23 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Read only, same as P439: no write, exec or port-forward tools.
 - Reuse the existing DB MCP approval flow and P415 op-log origin stamping where they fit; the plan decides.
 
-### P441 Dependency update, incl. Wails
+### P441 Restore previous Runs scripts and Docker containers after app close: shared dialog
+
+- After the app closes, on next start offer to reopen the scripts that were running in the Runs module, as the Docker module already does for containers.
+- Docker and Runs share one dialog component. It lists the previous items, all selected by default; the user deselects any not to restart, then confirms.
+- Redesign the dialog: current look is ugly. Tailwind and shadcn-vue primitives; consistent with the app.
+- Depends on P438 (Runs naming) and the existing Docker restore flow; the plan finds that flow, extracts the shared dialog, and decides how "was running" is recorded for scripts.
+- Docker restore files sit in Kira Studio, Runs code in `packages/workbench/src/automations`: the plan fixes file ownership across the streams.
+
+### P442 Dependency update, incl. Wails
 
 - Update Go modules, JS packages and tool versions across the monorepo to current releases.
 - Upgrade Wails to the latest release. Regenerate bindings; fix any API or build changes in both apps.
 - Check the license of every changed dependency against the open-source-only rule.
 - Run the full suites after the bump (Go, typecheck, lint, UI, visual). Re-record visual baselines only if the upgrade shifts rendering.
-- Scope for v0.2.25 is closed after P443: no further phases.
+- Scope for v0.2.25 is closed after P444: no further phases.
 
-### P442 Slow test audit and speed-up: UI suites wait 30+ min per phase
+### P443 Slow test audit and speed-up: UI suites wait 30+ min per phase
 
 - PR CI keeps running the full suite. Goal: cut the wait on each phase locally.
 - Measure first. Run each UI suite (Studio, Space) once on an idle host with `--reporter=json`. Write the slowest 30 specs per app, plus total time per Playwright project, to a file under `plans/`.
@@ -71,16 +80,16 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Before and after suite times recorded in the plan. No loss of coverage: each removed or merged spec is named with the spec that still covers it.
 - Standing rule already in `CLAUDE.md`: one full run per phase, targeted reruns after.
 
-### P443 Remove CLI credential reads: claude MCP headers
+### P444 Remove CLI credential reads: claude MCP headers
 
 - Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. One known violation remains, tracked in Known open items (docker half fixed in v0.2.24 P429 Part 2).
 - `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers (incl. `Authorization`) in `listTools` and copies them into the run's `--mcp-config` file. Replace with a path that never reads or forwards those headers (let `claude` load its own config); the plan decides.
 - Extend guard G5 to the claude harness once clean: no `.claude.json` header reads or forwarding.
 
-### P444 Code review (2 rounds)
+### P445 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P445 Close chapter v0.2.25
+### P446 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
