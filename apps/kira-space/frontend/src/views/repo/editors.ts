@@ -126,6 +126,14 @@ export function knownRead(tabId: string, currentVersionIds: readonly number[]): 
   return known.versionIds.every((v, i) => v === currentVersionIds[i]) ? known : null;
 }
 
+/** Detaches models before dispose: a widget disposed with cached models still attached stays
+ *  reachable from them (view model, sash and theme listeners). */
+function releaseWidget(entry: RepoEditorEntry): void {
+  entry.editor?.setModel(null);
+  entry.editor?.dispose();
+  entry.editor = null;
+}
+
 /** Called on Vue unmount (a tab switch away, not a close) — disposes the widget, keeps the uris so
  *  dropResources can still find the model(s) to dispose later if the tab is closed while
  *  unmounted. Works for either a repo-file or a repo-diff entry. */
@@ -133,8 +141,7 @@ export function unmountEditor(tabId: string): void {
   const entry = entries.get(tabId);
   if (!entry) return;
   entry.viewState = entry.editor?.saveViewState() ?? entry.viewState;
-  entry.editor?.dispose();
-  entry.editor = null;
+  releaseWidget(entry);
 }
 
 /** state/tabKinds.ts's own `dropResources(tabId)` hook — the tab is actually closing. Disposes
@@ -143,7 +150,7 @@ export function unmountEditor(tabId: string): void {
 export function dropRepoFileTab(tabId: string): void {
   const entry = entries.get(tabId);
   if (!entry) return;
-  entry.editor?.dispose();
+  releaseWidget(entry);
   for (const uri of releaseRefs(tabId, entry.uris)) disposeModel(uri);
   entries.delete(tabId);
 }
