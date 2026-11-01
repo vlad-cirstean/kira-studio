@@ -14,7 +14,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P441 | Restore previous Runs scripts and Docker containers after app close: shared dialog | Done |
 | P442 | Dependency update, incl. Wails | Done |
 | P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
-| P444 | Remove CLI credential reads: claude MCP headers | Todo |
+| P444 | Remove CLI credential reads: claude MCP headers | Done |
 | P445 | Code review (2 rounds) | Todo |
 | P446 | Close chapter v0.2.25 | Todo |
 
@@ -99,6 +99,8 @@ Result: Wails v3.1.0 (runtime lockstep), Go 1.27.3, golangci-lint v2.15 (four go
 - Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. One known violation remains, tracked in Known open items (docker half fixed in v0.2.24 P429 Part 2).
 - `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers (incl. `Authorization`) in `listTools` and copies them into the run's `--mcp-config` file. Replace with a path that never reads or forwards those headers (let `claude` load its own config); the plan decides.
 - Extend guard G5 to the claude harness once clean: no `.claude.json` header reads or forwarding.
+
+Result: Kira no longer reads `~/.claude.json` or forwards MCP headers. The picker lists servers from `claude mcp list` (name, transport, host or command name, health status); tool listing is gone and a ticked server grants all tools or named tools (`allTools`). A run that ticks a user server runs with `--setting-sources user` plus `--settings` (`disableAllHooks`, `allowedMcpServers`) and claude loads the server itself; no per-run copy on disk. `HeadlessSpec.UserMCP`/`GrantMCP` are provider-neutral. G5 now covers `internal/harness/claude` (five checks, `sandbox.go` exempt) and fails on the old `usermcp.go`. New Known open item: such a run loads the user's Claude settings. Flow tests (Studio and Space `termflow`, Space `adeflow`) sweep for sentinel credentials; real `claude` subtest passes (0.0011 USD). Studio `ui` 700 passed, 3 unrelated contract specs timed out under load and pass alone; Space `ui` 953 passed.
 
 ### P445 Code review (2 rounds)
 
