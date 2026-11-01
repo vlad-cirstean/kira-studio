@@ -14,7 +14,7 @@ import { useTabsStore } from '../../state/tabs';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { attachDistillSelection } from './distillSelection';
 import { knownRead, registerEditor, rememberRead, unmountEditor } from './editors';
-import { loadFileContent } from './fileContent';
+import { FULL_COMMIT_ID, loadFileContent } from './fileContent';
 import { loadMonaco, peekModel, repoFileUri, repoRevisionFileUri } from './monaco';
 import RepoFileEditBar from './RepoFileEditBar.vue';
 import { consumeReveal } from './reveal';
@@ -23,8 +23,6 @@ import { type InlineBlameAttachParams, useInlineBlame } from './useInlineBlame';
 import { useReadonlyFileViewer } from './useReadonlyFileViewer';
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
-// A full or abbreviated commit id; a branch or tag name can move, so it is never trusted as fixed.
-const COMMIT_ID = /^[0-9a-f]{7,64}$/i;
 const tabsStore = useTabsStore();
 const fileEdit = useFileEditStore();
 
@@ -100,7 +98,8 @@ async function resolveText(
   if (draft) return { text: draft.getValue() };
   fileEdit.end(props.tab.id);
   // A commit's content never changes: the model from the last mount is current.
-  if (cachedModel && rev !== null && COMMIT_ID.test(rev)) return { text: cachedModel.getValue() };
+  if (cachedModel && rev !== null && FULL_COMMIT_ID.test(rev))
+    return { text: cachedModel.getValue() };
   const known = cachedModel ? knownRead(props.tab.id, [cachedModel.getVersionId()]) : null;
   const result = await loadFileContent(
     repoId,

@@ -25,6 +25,7 @@ import { openRepoFileTab } from '../../state/repoTabs';
 import { useSettingsStore } from '../../state/settings';
 import { useDiffLayout } from './diffLayout';
 import { knownRead, registerDiffEditor, rememberRead, unmountEditor } from './editors';
+import { FULL_COMMIT_ID } from './fileContent';
 import { monacoLanguageFor } from './language';
 import {
   getOrCreateModel,
@@ -57,9 +58,6 @@ interface DiffSidesLoaded {
   diff: { head: DiffSide; worktree: DiffSide; contentHash?: string };
   gitRepoId: string | undefined;
 }
-
-// A full or abbreviated commit id; a branch or tag name can move, so it is never trusted as fixed.
-const COMMIT_ID = /^[0-9a-f]{7,64}$/i;
 
 type TextModel = import('monaco-editor').editor.ITextModel;
 
@@ -127,7 +125,12 @@ async function loadDiffSides(
     return { error: t('space.repo.view.repoNotOpen.error') };
   }
   // Both sides are commits, which never change: the models from the last mount are current.
-  if (prior && reviewBranch === undefined && COMMIT_ID.test(left) && COMMIT_ID.test(right)) {
+  if (
+    prior &&
+    reviewBranch === undefined &&
+    FULL_COMMIT_ID.test(left) &&
+    FULL_COMMIT_ID.test(right)
+  ) {
     return {
       diff: { head: sideFromModel(prior.head, {}), worktree: sideFromModel(prior.worktree, {}) },
       gitRepoId,

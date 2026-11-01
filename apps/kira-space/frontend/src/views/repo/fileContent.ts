@@ -9,6 +9,10 @@ import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 
+/** A full commit id: the backend pins a branch or tag to one, so a shorter hex spelling may be a
+ *  moving ref and never counts as fixed. */
+export const FULL_COMMIT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+
 export type FileContentResult =
   | { kind: 'found'; text: string; stat?: FileStat }
   | { kind: 'missing' | 'binary' | 'tooLarge' }

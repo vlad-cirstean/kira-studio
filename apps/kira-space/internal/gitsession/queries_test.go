@@ -196,6 +196,24 @@ func TestGoToTarget_HistoricalPathNotOnDiskButBlobExists(t *testing.T) {
 	}
 }
 
+// TestGoToTarget_HistoricalPinsBranchToCommit proves a branch name resolves to the full commit id,
+// so the caller never reuses a stale read for a ref that later moves.
+func TestGoToTarget_HistoricalPinsBranchToCommit(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir, rev := initGoToTargetRepo(t)
+	runGitQ(t, dir, "branch", "cafe123", rev)
+	e := newQueriesTestEntry(t, dir)
+
+	got, err := e.GoToTarget(context.Background(), "cafe123", "gone.txt")
+	if err != nil {
+		t.Fatalf("GoToTarget: %v", err)
+	}
+	if got.Kind != "historical" || got.Rev != rev {
+		t.Fatalf("got = %+v, want historical at %s", got, rev)
+	}
+}
+
 // TestGoToTarget_UnavailableNeitherOnDiskNorInRevision proves the third branch: a path that was
 // never tracked at rev and does not exist on disk either.
 func TestGoToTarget_UnavailableNeitherOnDiskNorInRevision(t *testing.T) {
