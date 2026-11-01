@@ -555,6 +555,18 @@ func TestAutomationStep(t *testing.T) {
 		})
 	})
 
+	t.Run("user mcp server removed fails the step", func(t *testing.T) {
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, lintStep("    params:\n      level: high\n"))
+		cfg := fmt.Sprintf(`{"mcpServers":{"other":{"command":%q}}}`, filepath.Join(f.app.BinDir, "fake-mcp"))
+		if err := os.WriteFile(filepath.Join(f.app.Home, ".claude.json"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		smart(f, "lint", "Lint {level}", level, func(s *scripts.Smart) { s.MCP = []scripts.MCPChoice{{Server: "fake", AllTools: true}} })
+		if r := runOnly(t, f, "feat/api-gone"); r.State != "failed" {
+			t.Fatalf("run = %+v, want failed", r)
+		}
+	})
+
 	t.Run("cannot start", func(t *testing.T) {
 		for _, c := range []struct {
 			name, extra, want string

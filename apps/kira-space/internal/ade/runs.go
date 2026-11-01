@@ -771,6 +771,12 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	defer b.endSandbox(run.ID, sbx)
+	if l.smart != nil {
+		if err := l.smart.checkMCP(ctx, l.agent, l.path); err != nil {
+			fail(err)
+			return
+		}
+	}
 	var grantSandbox *agentmcp.SandboxGrant
 	if sbx != nil {
 		grantSandbox = sbx.grant
