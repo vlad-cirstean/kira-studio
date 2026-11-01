@@ -3053,7 +3053,8 @@ Kira drives gh, az and acli but never touches their credentials. It runs the CLI
 - Setup steps are copy-only commands the user runs in their own terminal.
 - Consequence: comments carry no attachments (no driven CLI uploads one; Azure would need a bearer token).
 - Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/.
-- Known violations, outside G5 until fixed: `usermcp.go` and `docker/endpoint.go`. See Known open items; planned v0.2.25 P443.
+- Non-secret config reads are fine (docker `currentContext` from `~/.docker/config.json`) as long as Kira never reads, logs or sends a token; tokens live only in memory of the CLI's own library.
+- Known violation, outside G5 until fixed: `usermcp.go`. See Known open items; planned v0.2.25 P443.
 
 ## Renderer security surface
 
@@ -3307,7 +3308,6 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Comments carry no attachments (P429).** Kira never touches a CLI's credentials, and none of gh, az, acli uploads a comment attachment. Add files on the host.
 - **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input is not seen live; the Azure reply assumes the first comment id is 1.
 - **Kira reads and forwards Claude MCP server headers (CLI credentials rule violation).** `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers, including `Authorization`, when listing tools, and copies the raw entries into the run's 0600 `--mcp-config` file. Pending user decision; planned v0.2.25 P443.
-- **Kira reads the Docker CLI config (CLI credentials rule violation).** `internal/docker/endpoint.go` reads `~/.docker/config.json`. Only `currentContext` is used, but the file may hold `auths`. Pending user decision; planned v0.2.25 P443.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.

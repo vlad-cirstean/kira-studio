@@ -13,7 +13,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P440 | Kubernetes MCP tools with per-cluster approval | Todo |
 | P441 | Dependency update, incl. Wails | Todo |
 | P442 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
-| P443 | Remove CLI credential reads: claude MCP headers and docker config | Todo |
+| P443 | Remove claude MCP header reads | Todo |
 | P444 | Code review (2 rounds) | Todo |
 | P445 | Close chapter v0.2.25 | Todo |
 
@@ -69,12 +69,11 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Before and after suite times recorded in the plan. No loss of coverage: each removed or merged spec is named with the spec that still covers it.
 - Standing rule already in `CLAUDE.md`: one full run per phase, targeted reruns after.
 
-### P443 Remove CLI credential reads: claude MCP headers and docker config
+### P443 Remove claude MCP header reads
 
-- Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. Two known violations remain, tracked in Known open items.
+- Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. One known violation remains, tracked in Known open items.
 - `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers (incl. `Authorization`) in `listTools` and copies them into the run's `--mcp-config` file. Replace with a path that never reads or forwards those headers (let `claude` load its own config); the plan decides.
-- `internal/docker/endpoint.go` reads `~/.docker/config.json` for `currentContext`; the file can hold `auths`. Resolve the context through the `docker` CLI output instead.
-- Extend guard G5 to both packages once clean.
+- Extend guard G5 to the claude harness once clean.
 
 ### P444 Code review (2 rounds)
 
