@@ -818,6 +818,8 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ScriptLauncher.Begin records a running run when a script terminal opens; a blocked folder records a failed run with source start and refuses the open.
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
+- Recover also flags those runs `restore_pending` (migrations Space 0061, Studio 0050). `TakeRestore` hands them to an in-memory offer for the session, so a second restart does not repeat it. A user stop never flags. `RestoreState`, `Restore` and `RestoreDismiss` serve the offer; `Restore` re-checks the script hash per item (`E_CONFLICT` on drift) and resumes smart runs.
+- The Runs module shows a banner for the offer (`automations/restore/`); clicking it opens the shared restore dialog. No startup auto-open.
 - The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Runs list. The Runs panel (RunsSection.vue) lists only running and waiting runs; finished runs live in the Operations panel.
 - `runoutcome.Outcome.outputTail` holds the last 40 sanitized lines (8 KiB cap) of a failed terminal or headless script run. A `termtext.Tail` on the script session tap (`ScriptLauncher.Output`) feeds terminal runs; the headless log sink feeds the rest. It lives in `outcome_json`, so it survives tab close and restart. Copy for agent falls back to it once the terminal tab is gone.
 - `internal/termtext` is the one ANSI stripper and line sanitizer (gitprepare and scriptruns).
@@ -2890,6 +2892,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Storage: tables docker_restore_engines and docker_restore_containers (migration 0044). Snapshots not updated for 30 days are pruned at start. internal/docker sees only the RestoreStore interface.
 - Restore is click-only. A Compose project starts as one unit in depends_on order (service_healthy waits up to 60 s). Deleted containers are listed, never recreated. Boot-time restore is out of scope.
 - Channel kira:docker:restore; query key ['docker-restore'] sits outside ['docker']. The banner shows only inside the Docker module.
+- The restore dialog is the shared presentational `workbench/restore/RestoreDialog.vue` (P441); docker-ui and the Runs module each wrap it with their own data and calls.
 - Flow seams: docker.WithRestoreTiming, docker.WithBootProbe, flowharness.BootGen (simulates a daemon restart). A real dockerd restart runs only with KIRA_FLOW_DOCKER_RESTART=1.
 - UI styling: start uses text-ok and stop text-error module-wide; selected rows use neutral bg-select; left-panel section tabs are the git module's ToggleGroup.
 
