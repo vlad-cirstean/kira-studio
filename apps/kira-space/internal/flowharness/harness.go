@@ -71,6 +71,7 @@ type options struct {
 	embedSpec       *embed.Spec
 	provider        harness.Provider
 	crSync          gitsession.CRSyncConfig
+	wayland         bool
 }
 
 // Opt tweaks New.
@@ -100,6 +101,10 @@ func WithGitHost(p githost.Provider) Opt {
 // timer, no run on a refs change, a 1 ns min gap and checks interval, and a short backoff, so a
 // test drives each run through branch.syncChangeRequests.
 func WithChangeRequestSync(c gitsession.CRSyncConfig) Opt { return func(o *options) { o.crSync = c } }
+
+// WithWayland makes the capture hotkey binding report a Wayland session (the portal decides the
+// trigger), whatever the process environment says.
+func WithWayland() Opt { return func(o *options) { o.wayland = true } }
 
 // WithoutClaude leaves claude off PATH entirely, system installs included.
 func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
@@ -169,6 +174,9 @@ type App struct {
 	Dialogs   *Dialogs
 	WindowMgr *WindowManager
 	KeepAwake *KeepAwakeDriver
+	// Clipboard and Shortcuts fake the capture hotkey's two OS seams.
+	Clipboard *Clipboard
+	Shortcuts *Shortcuts
 
 	db       *storage.DB
 	repos    *repos.Repos
@@ -207,7 +215,7 @@ func New(t *testing.T, opts ...Opt) *App {
 		MemoryHome: filepath.Join(root, "memory"), Work: filepath.Join(root, "work"),
 		BinDir: filepath.Join(root, "bin"), FakeDir: filepath.Join(root, "fake"),
 		Events: newEvents(), Browser: &Browser{}, Dialogs: &Dialogs{}, WindowMgr: newWindowManager(),
-		KeepAwake: &KeepAwakeDriver{},
+		KeepAwake: &KeepAwakeDriver{}, Clipboard: &Clipboard{}, Shortcuts: newShortcuts(),
 	}
 	for _, d := range []string{a.Home, a.Work, a.BinDir, a.FakeDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -366,7 +374,10 @@ func (a *App) build() {
 			return n, nil
 		},
 	})
+	a.Shortcuts.reset()
 	a.W.BindShell(appwire.ShellHooks{
+		OpenPopup: a.WindowMgr.openPopup, Clipboard: a.Clipboard.Text, Shortcuts: a.Shortcuts,
+		Wayland:    func() bool { return a.opts.wayland },
 		OpenWindow: a.WindowMgr.OpenWindow, OpenNewWindow: a.WindowMgr.openNew, OpenNewWindowKeyed: a.WindowMgr.openKeyed,
 		CloseWindow: a.WindowMgr.CloseWindow, FocusWindow: a.WindowMgr.FocusWindow,
 		SetWindowTitle: a.WindowMgr.SetWindowTitle, AppFocused: a.WindowMgr.AppFocused,
