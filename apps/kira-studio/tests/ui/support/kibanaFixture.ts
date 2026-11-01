@@ -95,10 +95,10 @@ export function hitsPage(count: number) {
 }
 
 /** The execute() snapshot for one Discover statement; match is exact, so the spec builds it the way the view does. */
-export function executeHits(statement: string, count: number): PortSnapshot {
+export function executeHits(statement: string, count: number, path = logsNode.path): PortSnapshot {
   return {
     op: DATA_OP.execute,
-    payload: { connectionId: CONNECTION_ID, path: logsNode.path, statements: [statement] },
+    payload: { connectionId: CONNECTION_ID, path, statements: [statement] },
     response: { kind: 'execute', pages: [hitsPage(count)] },
   };
 }

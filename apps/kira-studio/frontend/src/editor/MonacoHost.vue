@@ -67,6 +67,8 @@ const props = defineProps<{
    *  pure lookup itself here. */
   hoverSource?: (doc: string, offset: number) => ConsoleHoverInfo | null;
   singleLine?: boolean;
+  /** The save chord emits `save`; Monaco consumes it before the view handler otherwise. */
+  saveCommand?: boolean;
   /** Wraps regardless of the appearance setting. */
   forceWrap?: boolean;
   rangeHighlights?: (doc: string) => readonly RangeHighlight[];
@@ -85,6 +87,7 @@ const emit = defineEmits<{
   ready: [];
   /** Enter in a `singleLine` host with no suggestion open. */
   submit: [];
+  save: [];
 }>();
 
 const settingsStore = useSettingsStore();
@@ -555,6 +558,9 @@ onMounted(async () => {
   decorations = editor.createDecorationsCollection();
   if (props.singleLine) {
     editor.addCommand(mod.KeyCode.Enter, () => emit('submit'), '!suggestWidgetVisible');
+  }
+  if (props.saveCommand) {
+    editor.addCommand(mod.KeyMod.CtrlCmd | mod.KeyCode.KeyS, () => emit('save'));
   }
   wrapDisposable = attachWrapOnType(editor, model);
   registerProviders(mod, languageId(mod));

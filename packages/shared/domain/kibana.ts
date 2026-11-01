@@ -123,6 +123,32 @@ export const kibanaSampleSizeSchema = /*#__PURE__*/ z.union([
   z.literal(10000),
 ]);
 
+/** A saved Discover query's body: the whole tab state. Mirrors Go's model.DiscoverBody. */
+export const kibanaDiscoverBodySchema = /*#__PURE__*/ z
+  .object({
+    query: z.string(),
+    dataViewId: z.string().min(1),
+    // Display only (list subtitle, tab title fallback); never compared for dirty.
+    dataViewName: z.string().nullable(),
+    language: kibanaLanguageSchema,
+    time: kibanaTimeSelectionSchema,
+    filters: z.array(kibanaFilterSchema),
+    columns: z.array(z.string()),
+    sort: z.array(kibanaSortSchema),
+    sampleSize: kibanaSampleSizeSchema,
+    interval: kibanaIntervalSchema,
+  })
+  .strict();
+export type KibanaDiscoverBody = z.infer<typeof kibanaDiscoverBodySchema>;
+
+/** The saved query a tab is linked to, with the body it last saved or loaded. */
+export const kibanaSavedLinkSchema = /*#__PURE__*/ z.object({
+  id: z.string(),
+  name: z.string(),
+  body: kibanaDiscoverBodySchema,
+});
+export type KibanaSavedLink = z.infer<typeof kibanaSavedLinkSchema>;
+
 /** Per-tab Discover state. The query text lives in the console tab's own `text`. */
 export const kibanaConsoleStateSchema = /*#__PURE__*/ z.object({
   dataViewId: z.string().nullable().default(null),
@@ -135,5 +161,6 @@ export const kibanaConsoleStateSchema = /*#__PURE__*/ z.object({
   columns: z.array(z.string()).default([]),
   sampleSize: kibanaSampleSizeSchema.default(500),
   interval: kibanaIntervalSchema.default('auto'),
+  saved: kibanaSavedLinkSchema.nullable().default(null),
 });
 export type KibanaConsoleState = z.infer<typeof kibanaConsoleStateSchema>;

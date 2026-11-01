@@ -1906,6 +1906,12 @@
         }
       },
       "query": {
+        "invalidBody": {
+          "body": "Saved query is invalid: {detail}."
+        },
+        "nameTaken": {
+          "body": "A saved query named “{name}” already exists on this connection."
+        },
         "notFound": {
           "body": "This saved query no longer exists."
         }
@@ -12706,6 +12712,43 @@
       },
       "sampleSize": {
         "label": "Sample size"
+      },
+      "saved": {
+        "delete": {
+          "body": "Delete “{name}”? Tabs linked to it keep their state as an unsaved query.",
+          "title": "Delete saved query"
+        },
+        "detach": {
+          "label": "Detach from saved query"
+        },
+        "dirty": {
+          "tooltip": "Unsaved changes to “{name}”"
+        },
+        "discard": {
+          "body": "This tab has unsaved changes. Opening a saved query replaces them.",
+          "title": "Discard changes"
+        },
+        "more": {
+          "aria": "More save options"
+        },
+        "nameTitle": {
+          "title": "Save query as"
+        },
+        "noView": {
+          "error": "Select a data view before saving."
+        },
+        "revert": {
+          "label": "Revert changes"
+        },
+        "save": {
+          "tooltip": "Save query"
+        },
+        "saveAs": {
+          "label": "Save as new…"
+        },
+        "saveCurrent": {
+          "label": "Save current query as…"
+        }
       },
       "sort": {
         "ascending": {

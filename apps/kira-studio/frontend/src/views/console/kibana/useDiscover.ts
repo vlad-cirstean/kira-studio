@@ -2,9 +2,11 @@ import {
   type KibanaConsoleState,
   type KibanaDataView,
   type KibanaDiscoverRequest,
+  type KibanaSavedLink,
   kibanaConsoleStateSchema,
   kibanaDiscoverRequestSchema,
 } from '@shared/domain/kibana';
+import type { SavedDiscoverQuery } from '@shared/domain/queries';
 import { useQuery } from '@tanstack/vue-query';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, type Ref, ref, watch } from 'vue';
@@ -12,6 +14,7 @@ import { control } from '../../../bridge/control';
 import type { ConsoleTabRecord } from '../../../state/tabDomain';
 import { setKibana, setText, useConsoleViewStore } from '../state';
 import { createKqlCompletion } from './kqlCompletion';
+import { discoverBody, discoverDirty, kibanaStateFromBody, savedLink } from './savedDiscover';
 import { browserTimeZone, resolveTime } from './time';
 
 export const dataViewQueryKey = (connectionId: string, id: string) =>
@@ -148,13 +151,35 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     { immediate: true },
   );
 
+  let rerunOnLoad = false;
+  const body = computed(() => discoverBody(tab.value.state.text, state.value));
+  const dirty = computed(() => discoverDirty(tab.value.state));
+
+  /**
+   * Restores a saved query exactly and links the tab to it. Returns whether the caller runs it
+   * now; a different data view runs once its fields (and time field) arrive.
+   */
+  function applySaved(entry: KibanaSavedLink): boolean {
+    const sameView = entry.body.dataViewId === state.value.dataViewId;
+    setText(tab.value.id, entry.body.query);
+    setKibana(tab.value.id, kibanaStateFromBody(entry.body, entry));
+    lastOwn = '';
+    rerunOnLoad = !sameView;
+    return sameView;
+  }
+  function link(entry: SavedDiscoverQuery): void {
+    patch({ saved: savedLink(entry) });
+  }
+  function unlink(): void {
+    patch({ saved: null });
+  }
+
   function toggleColumn(name: string): void {
     const cols = state.value.columns;
     patch({ columns: cols.includes(name) ? cols.filter((c) => c !== name) : [...cols, name] });
   }
 
   // A new data view drops sort and filters on fields it lacks, then reruns once its fields arrive.
-  let rerunOnLoad = false;
   function selectDataView(view: { id: string; name: string }): void {
     if (view.id === state.value.dataViewId) return;
     patch({ dataViewId: view.id, dataViewName: view.name, sort: [], columns: [] });
@@ -216,6 +241,11 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     histogramQuery,
     selectDataView,
     toggleColumn,
+    body,
+    dirty,
+    applySaved,
+    link,
+    unlink,
     completion,
     suggestValues,
   };

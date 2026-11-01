@@ -9,7 +9,8 @@ import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../../../state/connections';
 import type { ConsoleTabRecord } from '../../../state/tabDomain';
 import EngineIcon from '../../../theme/EngineIcon.vue';
@@ -19,6 +20,7 @@ import ConsoleResultGrid from '../ConsoleResultGrid.vue';
 import ConsoleResultStrip from '../ConsoleResultStrip.vue';
 import { setText, useConsoleViewStore } from '../state';
 import DataViewPicker from './DataViewPicker.vue';
+import DiscoverSavedControls from './DiscoverSavedControls.vue';
 import FieldSidebar from './FieldSidebar.vue';
 import FilterBar from './FilterBar.vue';
 import HitsHistogram from './HitsHistogram.vue';
@@ -155,6 +157,11 @@ const showHistogram = computed(
   () => !!d.timeField.value || (d.histogramQuery.data.value?.total ?? 0) > 0,
 );
 
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const savedControls = useTemplateRef<{ save: () => Promise<void> }>('savedControls');
+const savedError = ref<string | null>(null);
+useShortcut(rootEl, ['form.save'], () => void savedControls.value?.save());
+
 let off: Array<() => void> = [];
 onMounted(() => {
   off = [
@@ -168,7 +175,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col" data-testid="kibana-discover" :data-path="tab.path">
+  <div
+    ref="rootEl"
+    class="flex h-full min-h-0 flex-col"
+    data-testid="kibana-discover"
+    :data-path="tab.path"
+  >
     <ViewToolbar>
       <span v-if="railColor !== undefined" :class="colorMarkClass('dot', railColor)" />
       <span class="flex size-4 shrink-0 items-center justify-center">
@@ -180,6 +192,13 @@ onUnmounted(() => {
         :enabled="connected"
         :fallback-label="d.state.value.dataViewName"
         @select="d.selectDataView"
+      />
+      <DiscoverSavedControls
+        ref="savedControls"
+        :d="d"
+        :connection-id="tab.connectionId ?? ''"
+        @run="onRun"
+        @error="(m) => (savedError = m)"
       />
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
@@ -195,11 +214,15 @@ onUnmounted(() => {
       :starting="connect.pending.value"
       @run="onRun"
       @stop="d.stop"
+      @save="savedControls?.save()"
     >
       <TimePicker v-model="time" :disabled="!d.timeField.value" @refresh="onRun" />
     </QueryBar>
     <FilterBar v-model="filters" :fields="d.fields.value" :suggest="d.suggestValues" />
 
+    <Alert strip v-if="savedError" variant="error" data-testid="kibana-saved-error">
+      <AlertDescription>{{ savedError }}</AlertDescription>
+    </Alert>
     <Alert
       strip
       v-if="rt?.status === 'error' && rt.error"

@@ -23,7 +23,7 @@ const props = defineProps<{
   /** Reconnecting before the run. */
   starting: boolean;
 }>();
-const emit = defineEmits<{ run: []; stop: [] }>();
+const emit = defineEmits<{ run: []; stop: []; save: [] }>();
 const doc = defineModel<string>('doc', { required: true });
 const language = defineModel<KibanaLanguage>('language', { required: true });
 
@@ -78,6 +78,7 @@ defineExpose({ insertText: (text: string) => editorHost.value?.insertText(text) 
           v-model:doc="doc"
           language="plain"
           single-line
+          save-command
           autocomplete
           auto-close-brackets
           :monaco-language="grammar"
@@ -85,6 +86,7 @@ defineExpose({ insertText: (text: string) => editorHost.value?.insertText(text) 
           :completion-sources="completionSources"
           :async-completion-sources="asyncCompletionSources"
           @submit="onSubmit"
+          @save="emit('save')"
         />
       </div>
     </InputGroup>
