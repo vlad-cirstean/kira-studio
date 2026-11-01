@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -521,6 +522,37 @@ func TestAutomationStep(t *testing.T) {
 		if got := fakeFile(t, f.app, "api-1.env"); !strings.Contains(got, "KIRA_PARAM_LEVEL=high") || !strings.Contains(got, "KIRA_BRANCH=feat/api-lint") {
 			t.Errorf("env = %q", got)
 		}
+	})
+
+	t.Run("user mcp server", func(t *testing.T) {
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done", MCP: []fakeagent.MCPCall{{Server: "fake", Tool: "echo", Args: map[string]any{"text": "hi"}}}}}, lintStep("    params:\n      level: high\n"))
+		cfg := fmt.Sprintf(`{"mcpServers":{"fake":{"command":%q,"env":{"TOKEN":"SENTINEL-ENV"}}}}`, filepath.Join(f.app.BinDir, "fake-mcp"))
+		if err := os.WriteFile(filepath.Join(f.app.Home, ".claude.json"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		smart(f, "lint", "Lint {level}", level, func(s *scripts.Smart) { s.MCP = []scripts.MCPChoice{{Server: "fake", AllTools: true}} })
+		if r := runOnly(t, f, "feat/api-mcp"); r.State != "done" {
+			t.Fatalf("run = %+v", r)
+		}
+		args := fakeFile(t, f.app, "api-1.args")
+		if n := strings.Count(args, "--mcp-config"); n != 1 || strings.Contains(args, "--strict-mcp-config") || !strings.Contains(args, "--setting-sources\nuser") || !strings.Contains(args, "mcp__fake") {
+			t.Errorf("argv:\n%s", args)
+		}
+		if got, want := fakeFile(t, f.app, "api-1.settings"), `{"disableAllHooks":true,"allowedMcpServers":[{"serverName":"kira-ade"},{"serverName":"fake"}]}`; got != want {
+			t.Errorf("--settings = %s, want %s", got, want)
+		}
+		if _, err := os.Stat(filepath.Join(f.app.FakeDir, "mcp-echo-1.json")); err != nil {
+			t.Errorf("the echo call did not reach the user server: %v", err)
+		}
+		if strings.Contains(args, "SENTINEL") || strings.Contains(fakeFile(t, f.app, "api-1.mcp0"), "SENTINEL") {
+			t.Error("a user credential reached the run's argv or config")
+		}
+		_ = filepath.WalkDir(f.app.SpaceHome, func(path string, d fs.DirEntry, err error) error {
+			if err == nil && strings.HasSuffix(path, "-user.mcp.json") {
+				t.Errorf("user config copy left: %s", path)
+			}
+			return nil
+		})
 	})
 
 	t.Run("cannot start", func(t *testing.T) {

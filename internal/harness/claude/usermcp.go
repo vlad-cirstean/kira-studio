@@ -20,10 +20,17 @@ import (
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
-const (
-	mcpListTimeout = 30 * time.Second
-	mcpListTTL     = 30 * time.Second
-)
+const mcpListTimeout = 30 * time.Second
+
+var mcpListTTL = 30 * time.Second
+
+// SetMCPListTTL replaces how long a `claude mcp list` result is reused and returns the restore func
+// (a flow test passes 0 to see a config change at once).
+func SetMCPListTTL(d time.Duration) (restore func()) {
+	prev := mcpListTTL
+	mcpListTTL = d
+	return func() { mcpListTTL = prev }
+}
 
 // errMCPList is the only error a failed listing surfaces; claude's output never reaches it.
 var errMCPList = errors.New("could not list your Claude MCP servers")
