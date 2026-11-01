@@ -109,6 +109,8 @@ needs.
   already-namespaced image (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`,
   `localstack/localstack`) mirrors at the same path with no prefix. Confirmed for every image this
   repo uses. ClickHouse needs one further workaround on top — see the ClickHouse section below.
+- **Docker Hub `429 toomanyrequests`** fails Go and `e2e-real` tests that pull `confluentinc/cp-kafka`, kibana or postgres.
+  Not a code fault. Run `bun run test:images` (mirror pull) first, then rerun later if it persists.
 - **Bun's `testcontainers` integration hangs indefinitely in this sandbox** on images that pull and
   run fine under plain Node with the identical image (confirmed fine on real hardware — a Bun-here
   quirk, not a real bug). Postgres is a confirmed instance. Workaround, already applied in
@@ -590,10 +592,20 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
 
 - **Test speed on this box (P294).** 4 cores. Go: `bun run test:go:containers` (81s) and `bun run test:go:rest`
   (134s) split `go test ./...` for CI; leave `-count=1` off to reuse the test cache. `ade` (44s) never caches.
-  `--project=ui` costs about 10 min (546 tests); `--shard=N/4` costs about 2.5 min each (CI runs 4 shards). Re-run failures with
+  Playwright `ui` costs about 17 min per app on an idle host (P443): Studio 701 tests, 1044 s; Space 953 tests,
+  1038 s; 4 workers (`'100%'`), parallelism 3.9. 2 or 3 workers cost more wall (sweep: 3 workers up to +4%, 2 workers
+  +13-21%); more than 4 cannot be set from the CLI because each project's `workers` caps the pool. Per-test median
+  is 4.2 s against 1.5 s for the cheapest test, so boot is not the whole cost; fixed sleeps are under a minute
+  of it. `--shard=N/4` splits the same cores, so it saves nothing on one host (CI runs 4 shards on 4 machines).
+  `bun run test:ui:changed` runs only the app suites a change can affect (`ui_target_of` in `scripts/hook-scope.sh`:
+  `packages/**`, config, `scripts/` and unknown paths run both; Go, docs and `*.md` run none;
+  `--dry-run` prints the choice; one-app change saves about 17 min). Space `ui` runs in no CI job, so a local
+  run is its only gate. Re-run failures with
   `playwright test --last-failed`; `--only-changed=<ref>` selects spec and support files only, since app code is a
   built bundle. Hooks run no UI test: pre-commit lints and typechecks only the staged files (full run when config,
   a lockfile, `scripts/` or a shared package changed), pre-push builds, lints and tests only changed Go packages.
+  Timing report: `PLAYWRIGHT_JSON_OUTPUT_NAME=out.json playwright test ... --reporter=json`, then
+  `bun scripts/ui-timings.ts <label> out.json` (per-project table, slowest files and tests).
   `sh scripts/prepare-ui-tests.sh` also installs the chromium headless shell `ipc-frontend` needs.
 - **`nohup` makes SIGHUP ignored, and children inherit it.** The terminal package resets that for its shells (P294). Other code relying on a hang-up misbehaves in a `nohup` run.
 - **Run one heavy suite at a time.** The sandbox has 4 CPUs. Two Go suites, or a Go suite beside Playwright,
@@ -607,10 +619,11 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
   wait 60 s and retry. This covers `bun run lint:go`, `lint:claude` and the pre-push hook.
 - **`bun run lint:go` needs `bun run build:space-mobile` once per checkout** (`main.go` embeds
   `frontend/dist-mobile`; absent, typecheck of the Go module fails).
-- **`ui-timing` needs an idle machine** (load below ~1, nothing else running). `--project=ui-timing` also runs the
-  whole `ui` project first. Check no `playwright`, `chrome` or `webkit` process is left before it starts.
-  The WebKit sandbox is slow (measured 1.8x on JS and 2.9x on DOM work against Chromium on the same host), so a few p50/p95 budgets
-  fail even idle; the list is in `ARCHITECTURE.md` Known open items.
+- **`ui-timing` needs an idle machine** (load below ~1, nothing else running). It is out of `bun run test:ui:studio`
+  (P443); run `bun run test:ui:timing:studio` alone (4 tests, about 70 s; CI runs the same `--no-deps` command). Check
+  no `playwright`, `chrome` or `webkit` process is left before it starts. The WebKit sandbox is slow (measured 1.8x
+  on JS and 2.9x on DOM work against Chromium on the same host); the open budget failures, if any, are in
+  `ARCHITECTURE.md` Known open items.
 - **Docker flow tests need `dockerd` started by hand** (section above) and `KIRA_FLOW_DOCKER=require`, or
   they skip and report green.
 - **Check `df -h /` before a build.** Aim for 6 GB free. The Go build cache once reached 8 GB and filled the

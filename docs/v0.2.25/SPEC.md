@@ -13,7 +13,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P440 | Kubernetes MCP tools with per-cluster approval | Done |
 | P441 | Restore previous Runs scripts and Docker containers after app close: shared dialog | Done |
 | P442 | Dependency update, incl. Wails | Done |
-| P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
+| P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Done |
 | P444 | Remove CLI credential reads: claude MCP headers | Done |
 | P445 | Code review (2 rounds) | Todo |
 | P446 | Close chapter v0.2.25 | Todo |
@@ -93,6 +93,7 @@ Result: Wails v3.1.0 (runtime lockstep), Go 1.27.3, golangci-lint v2.15 (four go
 - Sharding (`--shard`) only if the host has spare cores.
 - Before and after suite times recorded in the plan. No loss of coverage: each removed or merged spec is named with the spec that still covers it.
 - Standing rule already in `CLAUDE.md`: one full run per phase, targeted reruns after.
+- Result: Done. Studio `ui` 701 tests 1009.7 s -> 1043.8 s, Space `ui` 953 tests 1160.0 s -> 1038.3 s (idle start, 4 workers; 6% run noise). Wall did not drop: top file is under 8% of the sum, boot not dominant, sleeps under a minute. Timings in `plans/P443-timings.md`. Workers: 4 stays. Sleeps 60 -> 33 (Studio), 14 -> 8 (Space), rest commented; barriers replace absence waits in `ade-v2-review`, `repo-order`, `script-order`, `ui-leftovers-git`. `dragTab` and Sortable drag shared in `packages/workbench/src/testing/ui/drag.ts`. No test removed or merged. `bun run test:ui:changed` selects app suites by path (one-app change saves about 17 min); `ui-timing` moved to `bun run test:ui:timing:studio` (passed idle: keystroke p50 39.0 and 36.0 ms; bound stays 50 ms; Known open item updated, stays open). Space `ui` runs in no CI job: patch in `docs/pending-changes/.github__workflows__pr.yml.patch` for the user to apply. `CLAUDE.md` rule change proposed in the plan Result, not applied.
 
 ### P444 Remove CLI credential reads: claude MCP headers
 

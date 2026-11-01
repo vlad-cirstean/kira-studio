@@ -47,7 +47,7 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 | Cell → editor | 17-22 ms | 23-32 ms | — | — | ≤ 50 ms (p95) | pass |
 | Tab switch (P139 Part 2) | 113-125 ms | 159-194 ms | — | — | ≤ 300 ms (p95, WebKit sandbox bound; product budget 50 ms, see below) | pass |
 | Cached tree expand | 17-20 ms | 24-53 ms | — | — | ≤ 50 ms (p95) | pass |
-| Console keystroke → completion popup (P18 addendum D26) | 32-36 ms | 38-49 ms | — | — | ≤ 50 ms (p50), max ≤ 200 ms | pass |
+| Console keystroke → completion popup (P18 addendum D26) | 32-36 ms (P139); 36-39 ms, p95 48-55 ms (P443, idle; 53-56 ms on some earlier runs, see ARCHITECTURE Known open items) | 38-49 ms | — | — | ≤ 50 ms (p50), max ≤ 200 ms | pass idle; open item |
 | Cell-editor populate latency (informational) | — | 41 ms | — | — | — | logged |
 | `perf.spec.ts` rAF scroll frame time | 16.7 ms | 17.6 ms | — | — | < 24 ms (secondary tripwire) | pass |
 | Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | — | — | ≤ 2500 ms | pass |
