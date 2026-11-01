@@ -1976,6 +1976,9 @@
         }
       },
       "kubernetes": {
+        "badMcpMode": {
+          "error": "Unknown MCP permission: {mode}"
+        },
         "badSelector": {
           "error": "Invalid label selector: {message}"
         },
@@ -1984,6 +1987,9 @@
         },
         "forbidden": {
           "error": "The cluster denied access: {message}"
+        },
+        "mcpDescriptionTooLong": {
+          "error": "The MCP description is longer than {max} characters."
         },
         "notFound": {
           "error": "Not found in the cluster: {message}"

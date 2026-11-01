@@ -29,14 +29,31 @@ type ConfigInfo struct {
 
 // Cluster is one kubeconfig context with its stable stored id.
 type Cluster struct {
-	ID        string `json:"id"`
-	Context   string `json:"context"`
-	Cluster   string `json:"cluster"`
-	Server    string `json:"server"`
-	User      string `json:"user"`
-	Namespace string `json:"namespace"`
-	Current   bool   `json:"current"`
-	Source    string `json:"source"`
+	ID        string      `json:"id"`
+	Context   string      `json:"context"`
+	Cluster   string      `json:"cluster"`
+	Server    string      `json:"server"`
+	User      string      `json:"user"`
+	Namespace string      `json:"namespace"`
+	Current   bool        `json:"current"`
+	Source    string      `json:"source"`
+	Mcp       McpSettings `json:"mcp"`
+}
+
+// McpSettings is a cluster's MCP exposure: a description for the AI and one mode per operation group
+// (deny, prompt or allow).
+type McpSettings struct {
+	Description string `json:"description"`
+	Discover    string `json:"discover"`
+	List        string `json:"list"`
+	Describe    string `json:"describe"`
+	Logs        string `json:"logs"`
+}
+
+// SetMcpArgs is SetMcp's argument.
+type SetMcpArgs struct {
+	ClusterID string      `json:"clusterId"`
+	Mcp       McpSettings `json:"mcp"`
 }
 
 // ClustersResult is Clusters' result.

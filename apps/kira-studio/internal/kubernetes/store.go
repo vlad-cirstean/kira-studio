@@ -9,6 +9,7 @@ type ClusterRecord struct {
 	Server     string
 	CreatedAt  time.Time
 	LastSeenAt time.Time
+	Mcp        McpSettings
 }
 
 // ClusterStore persists cluster identities. The Studio repos package implements it, so this
@@ -17,4 +18,6 @@ type ClusterStore interface {
 	// Ensure returns the row for (context, server), creating it on first sight and bumping last_seen_at.
 	Ensure(context, server string, now time.Time) (ClusterRecord, error)
 	Get(id string) (ClusterRecord, bool, error)
+	// SetMcp stores a cluster's MCP settings; false when no row has the id.
+	SetMcp(id string, m McpSettings) (bool, error)
 }

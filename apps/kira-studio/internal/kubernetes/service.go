@@ -6,9 +6,11 @@ import (
 	"errors"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -158,7 +160,7 @@ func (s *Service) Clusters(context.Context) (ClustersResult, error) {
 		}
 		res.Clusters = append(res.Clusters, Cluster{
 			ID: rec.ID, Context: name, Cluster: c.Cluster, Server: server, User: c.AuthInfo,
-			Namespace: c.Namespace, Current: name == ld.cfg.CurrentContext, Source: c.LocationOfOrigin,
+			Namespace: c.Namespace, Current: name == ld.cfg.CurrentContext, Source: c.LocationOfOrigin, Mcp: rec.Mcp,
 		})
 	}
 	sort.Slice(res.Clusters, func(i, j int) bool {
@@ -203,4 +205,32 @@ func unavailable(err error, fallback string) Status {
 		reason = fallback
 	}
 	return Status{State: StatusUnavailable, Reason: reason, Message: strings.TrimSpace(err.Error())}
+}
+
+const mcpDescriptionMax = 1000
+
+func validMcpMode(m string) bool { return m == "deny" || m == "prompt" || m == "allow" }
+
+// SetMcp validates and stores a cluster's MCP settings and returns what is stored.
+func (s *Service) SetMcp(_ context.Context, args SetMcpArgs) (McpSettings, error) {
+	if args.ClusterID == "" {
+		return McpSettings{}, ipcerr.Required("clusterId")
+	}
+	m := args.Mcp
+	for _, mode := range []string{m.Discover, m.List, m.Describe, m.Logs} {
+		if !validMcpMode(mode) {
+			return McpSettings{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.kubernetes.badMcpMode.error", map[string]string{"mode": mode})
+		}
+	}
+	if utf8.RuneCountInString(m.Description) > mcpDescriptionMax {
+		return McpSettings{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.kubernetes.mcpDescriptionTooLong.error", map[string]string{"max": strconv.Itoa(mcpDescriptionMax)})
+	}
+	ok, err := s.store.SetMcp(args.ClusterID, m)
+	if err != nil {
+		return McpSettings{}, ipcerr.Internal(err.Error())
+	}
+	if !ok {
+		return McpSettings{}, unknownCluster()
+	}
+	return m, nil
 }
