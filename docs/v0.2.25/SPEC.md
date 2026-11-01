@@ -12,7 +12,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P439 | Kubernetes module (read only) | Done |
 | P440 | Kubernetes MCP tools with per-cluster approval | Done |
 | P441 | Restore previous Runs scripts and Docker containers after app close: shared dialog | Done |
-| P442 | Dependency update, incl. Wails | Todo |
+| P442 | Dependency update, incl. Wails | Done |
 | P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
 | P444 | Remove CLI credential reads: claude MCP headers | Todo |
 | P445 | Code review (2 rounds) | Todo |
@@ -80,6 +80,8 @@ Result: Shared restore dialog (`packages/workbench/src/restore`) used by Docker 
 - Check the license of every changed dependency against the open-source-only rule.
 - Run the full suites after the bump (Go, typecheck, lint, UI, visual). Re-record visual baselines only if the upgrade shifts rendering.
 - Scope for v0.2.25 is closed after P444: no further phases.
+
+Result: Wails v3.1.0 (runtime lockstep), Go 1.27.3, golangci-lint v2.15 (four gocognit funcs split), Go modules, onnxruntime_go 1.38.0 with ORT 1.31.1, Biome 2.6, JS packages, @babel/parser 8, mutation tools, bun 1.4.4 and actions/cache v6.1.0 (workflow edits as `docs/pending-changes` patches). Deferred: TypeScript 7, backoff v5, go-git v6, flatbuffers 25.12, k8s 0.38, Docker test images. Studio `ui` 707 and Space `ui` 953 passed; 18 visual baselines re-recorded for Playwright 1.64; Go and e2e-real failures only Docker Hub 429 and a pre-existing dockerflow test. Mac packaging and Wails smoke test pending (user-run).
 
 ### P443 Slow test audit and speed-up: UI suites wait 30+ min per phase
 
