@@ -9,7 +9,7 @@ import StudioStart from './panels/StudioStart.vue';
 
 // P91 OQ-1: Terminal joins Studio/Api last, the plan's own stated default. Hoisted here from
 // the old TitleBar.vue at P128 §2.3: one file lists a module.
-export const MODE_ORDER: AppMode[] = ['studio', 'api', 'automations', 'docker'];
+export const MODE_ORDER: AppMode[] = ['studio', 'api', 'automations', 'docker', 'kubernetes'];
 
 // Mode content comes from a registry, mirroring the tab-kind registry. Api's own entries are both
 // EmptyState-based — this adds no HTTP functionality, only the seam. `Component` already covers
@@ -57,5 +57,15 @@ export const MODES: ModeRegistry<AppMode, PanelModeDef> = {
     tabStrip: false,
     panel: defineAsyncComponent(() => import('../docker/DockerPanel.vue')),
     start: defineAsyncComponent(() => import('../docker/DockerView.vue')),
+  },
+  // P439: lazy like Docker; no tabs of its own.
+  kubernetes: {
+    get label() {
+      return t('common.product.kubernetes.label');
+    },
+    icon: 'type-hierarchy',
+    tabStrip: false,
+    panel: defineAsyncComponent(() => import('../kubernetes/components/KubernetesPanel.vue')),
+    start: defineAsyncComponent(() => import('../kubernetes/components/KubernetesView.vue')),
   },
 };

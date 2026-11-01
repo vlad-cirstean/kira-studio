@@ -2789,6 +2789,9 @@
       },
       "kiraStudio": {
         "label": "Kira Studio"
+      },
+      "kubernetes": {
+        "label": "Kubernetes"
       }
     },
     "progressPercent": {
@@ -5639,6 +5642,197 @@
       },
       "switch": {
         "tooltip": "Switch to this worktree"
+      }
+    }
+  },
+  "kubernetes": {
+    "cluster": {
+      "copyContext": {
+        "label": "Copy context name"
+      },
+      "current": {
+        "label": "Current context"
+      },
+      "state": {
+        "error": {
+          "label": "Unavailable"
+        },
+        "ok": {
+          "label": "Connected"
+        },
+        "unknown": {
+          "label": "Not connected"
+        }
+      }
+    },
+    "config": {
+      "invalid": {
+        "body": "{message}. Fix the kubeconfig, then refresh.",
+        "title": "The kubeconfig can’t be read"
+      },
+      "missing": {
+        "body": "Looked in {paths}. Set {env} or create {path}.",
+        "title": "No kubeconfig found"
+      }
+    },
+    "describe": {
+      "copyManifest": {
+        "label": "Copy manifest"
+      },
+      "field": {
+        "apiVersion": {
+          "label": "API version"
+        },
+        "uid": {
+          "label": "UID"
+        }
+      },
+      "filter": {
+        "placeholder": "Filter details"
+      },
+      "noEvents": {
+        "empty": "No events"
+      },
+      "section": {
+        "annotations": {
+          "label": "Annotations"
+        },
+        "conditions": {
+          "label": "Conditions"
+        },
+        "events": {
+          "label": "Events"
+        },
+        "manifest": {
+          "label": "Manifest"
+        },
+        "owners": {
+          "label": "Owners"
+        }
+      }
+    },
+    "detail": {
+      "close": {
+        "label": "Close details"
+      },
+      "resize": {
+        "label": "Resize details"
+      },
+      "tab": {
+        "describe": {
+          "label": "Describe"
+        }
+      }
+    },
+    "kind": {
+      "category": {
+        "access": {
+          "label": "Access control"
+        },
+        "cluster": {
+          "label": "Cluster"
+        },
+        "config": {
+          "label": "Config"
+        },
+        "custom": {
+          "label": "Custom resources"
+        },
+        "storage": {
+          "label": "Storage"
+        },
+        "workloads": {
+          "label": "Workloads"
+        }
+      }
+    },
+    "list": {
+      "count": {
+        "status": "{count} row | {count} rows"
+      },
+      "empty": {
+        "empty": "No resources"
+      },
+      "emptyHint": {
+        "emptyHint": "Nothing of this kind in the chosen namespace."
+      },
+      "filter": {
+        "placeholder": "Filter rows"
+      },
+      "labelSelector": {
+        "label": "Filter rows by label",
+        "placeholder": "Label selector"
+      },
+      "truncated": {
+        "status": "Showing the first {count} rows"
+      }
+    },
+    "logs": {
+      "container": {
+        "label": "Container name"
+      },
+      "ended": {
+        "status": "Stream ended"
+      },
+      "filter": {
+        "placeholder": "Filter lines"
+      },
+      "initContainer": {
+        "option": "{name} (init)"
+      },
+      "matches": {
+        "status": "{shown} of {total} lines"
+      }
+    },
+    "namespace": {
+      "all": {
+        "option": "All namespaces"
+      },
+      "picker": {
+        "search": {
+          "placeholder": "Find a namespace"
+        }
+      },
+      "restricted": {
+        "hint": "Your account can’t list namespaces. Type a name to use it."
+      }
+    },
+    "panel": {
+      "none": {
+        "empty": "No contexts"
+      },
+      "noneHint": {
+        "emptyHint": "The kubeconfig lists no contexts."
+      }
+    },
+    "start": {
+      "body": "Expand a context in the sidebar and choose a resource kind.",
+      "title": "Browse a cluster"
+    },
+    "unavailable": {
+      "config": {
+        "hint": "This context is incomplete or invalid in the kubeconfig.",
+        "title": "Context can’t be used"
+      },
+      "forbidden": {
+        "hint": "Your account is not allowed to read this cluster.",
+        "title": "Access denied"
+      },
+      "plugin": {
+        "hint": "The kubeconfig credential plugin did not return a token. Run it in a terminal, then retry.",
+        "title": "Credential plugin failed"
+      },
+      "timeout": {
+        "hint": "The request timed out. Retry in a moment.",
+        "title": "The cluster did not answer"
+      },
+      "unauthorized": {
+        "hint": "The cluster refused the credentials. Sign in again, then retry.",
+        "title": "Sign-in rejected"
+      },
+      "unreachable": {
+        "hint": "Check the server address, your network connection and any proxy.",
+        "title": "Can’t reach the cluster"
       }
     }
   },

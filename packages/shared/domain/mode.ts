@@ -8,4 +8,4 @@
 // (packages/shared/domain/workspace.ts) collapsed back into this type outright (deleted, not just
 // trimmed): with no repo-prefixed workspace ever occurring here again, "which workspace" and
 // "which mode" are the same one-dimensional question.
-export type AppMode = 'studio' | 'api' | 'automations' | 'docker';
+export type AppMode = 'studio' | 'api' | 'automations' | 'docker' | 'kubernetes';
