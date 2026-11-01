@@ -17,7 +17,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P431 | Stage settings injection in the workflow editor (auto compact limit) | Done |
 | P432 | Operations panel overhaul: looks and interactions | Done |
 | P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Done |
-| P434 | Code review (2 rounds) | Todo |
+| P434 | Code review (2 rounds) | Done |
 | P435 | Close chapter v0.2.24 | Todo |
 
 ## Rows
@@ -110,6 +110,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 ### P434 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
+
+**Result:** Two review rounds. Round 1 found 8, round 2 found 4; all fixed.
 
 ### P435 Close chapter v0.2.24
 
