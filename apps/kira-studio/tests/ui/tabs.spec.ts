@@ -1,3 +1,4 @@
+import { dragTab } from '@workbench/testing/ui/drag';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
@@ -6,7 +7,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { dragTab, tabLocator } from './support/tabs';
+import { tabLocator } from './support/tabs';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/tabs.spec.ts. Its "session restore" section (roughly the back

@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { boxCenter, sortableHover } from '@workbench/testing/ui/drag';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { openHttpMode } from './support/apiMode';
@@ -382,14 +383,12 @@ test('reorder persists what was dragged', async ({ relaunch }) => {
   const grip = await variableRow(page, 'v3').locator('[data-testid="variable-grip"]').boundingBox();
   const target = await variableRow(page, 'v1').boundingBox();
   if (!grip || !target) throw new Error('variable row has no box');
-  // Sortable's fallback mode emulates dragover on a tick, so the pointer hovers before `up`.
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 10, { steps: 5 });
-  await page.mouse.move(target.x + target.width / 2, target.y + target.height * 0.25, {
-    steps: 15,
-  });
-  await page.waitForTimeout(300);
+  await sortableHover(
+    page,
+    boxCenter(grip),
+    { x: target.x + target.width / 2, y: target.y + target.height * 0.25 },
+    { start: { x: 0, y: -10 } },
+  );
   await page.mouse.up();
   const dragCalls = control.log().filter((e) => e.channel === IPC.variablesReorder);
   expect(dragCalls).toHaveLength(1);

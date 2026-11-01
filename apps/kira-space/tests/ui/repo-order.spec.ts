@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { boxCenter, sortableHover } from '@workbench/testing/ui/drag';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { installGitStreamMock } from './support/gitStreamMock';
@@ -52,11 +53,12 @@ async function dragAbove(page: Page, from: string, to: string): Promise<void> {
   const src = await repoRowById(page, from).boundingBox();
   const dst = await repoRowById(page, to).boundingBox();
   if (!src || !dst) throw new Error('repo row has no box');
-  await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 - 10, { steps: 5 });
-  await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, { steps: 15 });
-  await page.waitForTimeout(300);
+  await sortableHover(
+    page,
+    boxCenter(src),
+    { x: dst.x + dst.width / 2, y: dst.y + dst.height * 0.25 },
+    { start: { x: 0, y: -10 } },
+  );
   await page.mouse.up();
 }
 

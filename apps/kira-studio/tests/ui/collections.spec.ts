@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { CHANNEL } from '@shared/protocol/events';
+import { boxCenter, sortableHover } from '@workbench/testing/ui/drag';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { openHttpMode } from './support/apiMode';
@@ -524,15 +525,10 @@ test('environments reorder by dragging the grip; refused while filtered (P140)',
       .locator(`[data-testid="environment-row"][data-id="${to}"]`)
       .boundingBox();
     if (!src || !dst) throw new Error('environment row has no box');
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, {
-      steps: 5,
+    await sortableHover(page, boxCenter(src), {
+      x: dst.x + dst.width / 2,
+      y: dst.y + dst.height * 0.25,
     });
-    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, {
-      steps: 15,
-    });
-    await page.waitForTimeout(300);
     await page.mouse.up();
   };
 

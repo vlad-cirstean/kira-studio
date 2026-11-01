@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { sortableHover } from '@workbench/testing/ui/drag';
 import { expect, test } from './fixtures';
 import { openPlan } from './support/adeV2';
 import { contract } from './support/contract';
@@ -45,11 +46,7 @@ async function dragOnto(page: Page, from: string, onto: string, frac: number): P
   const dst = (await row(page, onto).boundingBox()) as Box;
   const home = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
   const end = { x: dst.x + dst.width / 2, y: dst.y + dst.height * frac };
-  await page.mouse.move(home.x, home.y);
-  await page.mouse.down();
-  await page.mouse.move(home.x, home.y + 10, { steps: 5 });
-  await page.mouse.move(end.x, end.y, { steps: 15 });
-  await page.waitForTimeout(300);
+  await sortableHover(page, home, end);
   await page.mouse.up();
 }
 
