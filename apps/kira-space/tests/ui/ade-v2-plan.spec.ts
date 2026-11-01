@@ -231,39 +231,12 @@ test('a repo without a remote reads no remote, never an error', async ({ relaunc
   await expect(note).not.toHaveClass(/text-tone-red/);
 });
 
-test('dragging a card to another day writes the plan once, with no dialog', async ({
-  relaunch,
-}) => {
-  const board = adeFixture<BoardFx>('board');
-  const { window: page, control } = await openPlan(relaunch);
-  await page.setViewportSize({ width: 1440, height: 2400 });
-  const from = await card(page, 'T_deps').boundingBox();
-  const to = await bandOf(page, 6).locator('[data-testid="ade-band-drop"]').boundingBox();
-  if (!from || !to) throw new Error('drag geometry missing');
-  await page.mouse.move(from.x + 40, from.y + 30);
-  await page.mouse.down();
-  await page.mouse.move(from.x + 60, from.y + 50, { steps: 4 });
-  await page.mouse.move(to.x + 200, to.y + to.height / 2, { steps: 12 });
-  await page.mouse.up();
-
-  const calls = () => control.log().filter((e) => e.channel === IPC.adeTaskSetPlan);
-  await expect.poll(() => calls().length).toBe(1);
-  expect(calls()[0]?.args).toEqual({
-    order: [...board.plan.order.filter((id) => id !== 'T_deps'), 'T_deps'],
-    days: { T_deps: '2026-09-28' },
-  });
-  await expect(page.locator('[data-testid="ade-confirm-dialog"]')).toHaveCount(0);
-});
-
-test('dragging a review card to another day pins it', async ({ relaunch }) => {
-  const board = adeFixture<BoardFx>('board');
-  const { window: page, control } = await openPlan(relaunch);
-  await page.setViewportSize({ width: 1440, height: 3200 });
-  await page.locator('[data-testid="ade-load-all"]').click();
-  await card(page, 'R_sara').scrollIntoViewIfNeeded();
-  const drop = bandOf(page, 6).locator('[data-testid="ade-band-drop"]');
+/** Drags a card onto a day band. Waits for the layout to settle first, else the band moves under the pointer. */
+async function dragCardToBand(page: Page, taskId: string, day: number): Promise<void> {
+  const drop = bandOf(page, day).locator('[data-testid="ade-band-drop"]');
+  await card(page, taskId).scrollIntoViewIfNeeded();
   const geometry = async () =>
-    JSON.stringify([await card(page, 'R_sara').boundingBox(), await drop.boundingBox()]);
+    JSON.stringify([await card(page, taskId).boundingBox(), await drop.boundingBox()]);
   let last = '';
   await expect
     .poll(async () => {
@@ -284,6 +257,31 @@ test('dragging a review card to another day pins it', async ({ relaunch }) => {
     () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
   );
   await page.mouse.up();
+}
+
+test('dragging a card to another day writes the plan once, with no dialog', async ({
+  relaunch,
+}) => {
+  const board = adeFixture<BoardFx>('board');
+  const { window: page, control } = await openPlan(relaunch);
+  await page.setViewportSize({ width: 1440, height: 2400 });
+  await dragCardToBand(page, 'T_deps', 6);
+
+  const calls = () => control.log().filter((e) => e.channel === IPC.adeTaskSetPlan);
+  await expect.poll(() => calls().length).toBe(1);
+  expect(calls()[0]?.args).toEqual({
+    order: [...board.plan.order.filter((id) => id !== 'T_deps'), 'T_deps'],
+    days: { T_deps: '2026-09-28' },
+  });
+  await expect(page.locator('[data-testid="ade-confirm-dialog"]')).toHaveCount(0);
+});
+
+test('dragging a review card to another day pins it', async ({ relaunch }) => {
+  const board = adeFixture<BoardFx>('board');
+  const { window: page, control } = await openPlan(relaunch);
+  await page.setViewportSize({ width: 1440, height: 3200 });
+  await page.locator('[data-testid="ade-load-all"]').click();
+  await dragCardToBand(page, 'R_sara', 6);
 
   const calls = () => control.log().filter((e) => e.channel === IPC.adeTaskSetPlan);
   await expect.poll(() => calls().length).toBe(1);
