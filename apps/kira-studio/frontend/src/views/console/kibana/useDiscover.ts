@@ -9,6 +9,8 @@ import {
 import type { SavedDiscoverQuery } from '@shared/domain/queries';
 import { useQuery } from '@tanstack/vue-query';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
+import { KEEP_WHILE_OPEN, queryClient } from '@workbench/state/queryClient';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, type Ref, ref, watch } from 'vue';
 import { control } from '../../../bridge/control';
 import type { ConsoleTabRecord } from '../../../state/tabDomain';
@@ -19,6 +21,13 @@ import { browserTimeZone, resolveTime } from './time';
 
 const dataViewQueryKey = (connectionId: string, id: string) =>
   ['kibana', 'dataView', connectionId, id] as const;
+
+const histogramKeyFor = (tabId: string) => ['kibana', 'histogram', tabId] as const;
+
+// A tab keeps only its latest run's histogram: each run drops the earlier ones, tab close drops all.
+registerTabRuntimeCleanup((tabId) =>
+  queryClient.removeQueries({ queryKey: histogramKeyFor(tabId) }),
+);
 
 const SAMPLE_SIZES = [100, 500, 1000, 5000, 10000] as const;
 const SUGGEST_LIMIT = 100;
@@ -50,6 +59,7 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
       control.kibanaDataView(connectionId.value, crypto.randomUUID(), state.value.dataViewId ?? ''),
     enabled: connected.value && !!connectionId.value && !!state.value.dataViewId,
     staleTime: 5 * 60_000,
+    gcTime: KEEP_WHILE_OPEN,
   }));
   const dataView = computed<KibanaDataView | null>(() => dataViewQuery.data.value ?? null);
   const fields = computed(() => dataView.value?.fields ?? []);
@@ -79,7 +89,6 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
 
   // The request of the latest run: hits and histogram both send exactly it, so they never disagree.
   const lastRequest = ref<KibanaDiscoverRequest | null>(null);
-  const runSeq = ref(0);
   let lastOwn = '';
   const runtime = computed(() => consoleViewStore.runtime[tab.value.id]);
   const running = computed(() => runtime.value?.status === 'running');
@@ -88,8 +97,8 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
   async function run(): Promise<void> {
     if (!canRun.value) return;
     const request = buildRequest();
+    queryClient.removeQueries({ queryKey: histogramKeyFor(tab.value.id) });
     lastRequest.value = request;
-    runSeq.value++;
     lastOwn = JSON.stringify(request);
     await consoleViewStore.run(tab.value.id, [lastOwn]);
   }
@@ -99,7 +108,11 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
   }
 
   const histogramQuery = useQuery(() => ({
-    queryKey: ['kibana', 'histogram', tab.value.id, runSeq.value, state.value.interval] as const,
+    queryKey: [
+      ...histogramKeyFor(tab.value.id),
+      JSON.stringify(lastRequest.value),
+      state.value.interval,
+    ] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) => {
       const opId = crypto.randomUUID();
       signal.addEventListener(
@@ -116,10 +129,11 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
       });
     },
     enabled: connected.value && lastRequest.value !== null,
-    gcTime: 30_000,
+    gcTime: KEEP_WHILE_OPEN,
   }));
 
-  function applyRequest(req: KibanaDiscoverRequest): void {
+  // `fresh` is a run started elsewhere; a remount re-applies the last run's request and keeps its histogram.
+  function applyRequest(req: KibanaDiscoverRequest, fresh: boolean): void {
     setText(tab.value.id, req.query);
     patch({
       dataViewId: req.dataView,
@@ -132,20 +146,23 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
       columns: req.columns ?? [],
       sampleSize: SAMPLE_SIZES.find((s) => s === req.size) ?? state.value.sampleSize,
     });
+    if (fresh) queryClient.removeQueries({ queryKey: histogramKeyFor(tab.value.id) });
     lastRequest.value = req;
-    runSeq.value++;
   }
 
   // A run started elsewhere (Operations re-run) hydrates the controls from its statement.
+  let hydrated = false;
   watch(
     () => runtime.value?.lastStatements,
     (statements) => {
+      const fresh = hydrated;
+      hydrated = true;
       const text = statements?.[0];
       if (!text || text === lastOwn) return;
       const parsed = kibanaDiscoverRequestSchema.safeParse(safeJson(text));
       if (parsed.success) {
         lastOwn = text;
-        applyRequest(parsed.data);
+        applyRequest(parsed.data, fresh);
       }
     },
     { immediate: true },
