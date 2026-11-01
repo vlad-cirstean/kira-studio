@@ -231,6 +231,15 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
 
+  kubernetesClusters: 'KubernetesService.Clusters',
+  kubernetesDescribe: 'KubernetesService.Describe',
+  kubernetesKinds: 'KubernetesService.Kinds',
+  kubernetesList: 'KubernetesService.List',
+  kubernetesLogsClose: 'KubernetesService.LogsClose',
+  kubernetesLogsOpen: 'KubernetesService.LogsOpen',
+  kubernetesNamespaces: 'KubernetesService.Namespaces',
+  kubernetesStatus: 'KubernetesService.Status',
+
   dockerContainerEditSpec: 'DockerService.ContainerEditSpec',
   dockerContainerSize: 'DockerService.ContainerSize',
   dockerContainers: 'DockerService.Containers',

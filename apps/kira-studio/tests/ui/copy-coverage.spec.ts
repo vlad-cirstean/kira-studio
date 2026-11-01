@@ -28,6 +28,7 @@ import {
 import { typeInto } from './support/editor';
 import { cellText, gridCell, gutterCell, headerCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
+import { openKind, openKubernetes, setupKubernetes } from './support/kubernetesFixture';
 import { emitWailsEvent } from './support/mockRuntime';
 import {
   DB_PATH as MONGO_DB_PATH,
@@ -426,4 +427,38 @@ test('collections panel menu', async ({ relaunch }) => {
     .click({ button: 'right' });
   await expect(loc(page, 'context-menu')).toBeVisible();
   await expectCatalogText(loc(page, 'context-menu'), { allow: fixtureNames });
+});
+
+// Cluster, kind and pod names, versions and table cells are data, not chrome.
+const KUBE_DATA = [
+  /kind-dev|bad-token|plugin-ctx|down|dev-user|web-\d|db-\d|db-creds|default|kube-system|apps|ReplicaSet|kubelet|v1\.\d+/,
+  /^(Deployment|Pod|Service|Secret|Event|Namespace|Node|Widget|Ready|Status|Restarts|Age|Name|Namespace|Running|Opaque|True|False|Normal|PodScheduled|Scheduled|Started|Pulled|app|web)$/,
+  /^\s*[\d/.,]+\s*(m|s|h|d)?\s*$/,
+  /container started|image pulled|assigned to node|\bUTC\b|\d{4}-\d{2}-\d{2}|apiVersion|metadata|creationTimestamp|uid/,
+];
+
+test('Kubernetes panel, list, describe and logs use catalog text', async ({ relaunch }) => {
+  const { page } = await setupKubernetes(relaunch);
+  await setPseudoLocale(page);
+  await openKubernetes(page);
+  await expectCatalogText(loc(page, 'kubernetes-panel'), { allow: KUBE_DATA });
+
+  await openKind(page, 'kind-dev', 'v1/pods');
+  const view = loc(page, 'kubernetes-view');
+  await expect(loc(page, 'kube-row').first()).toBeVisible();
+  await expectCatalogText(view, { allow: KUBE_DATA });
+
+  await loc(page, 'kube-row').first().click();
+  await expect(loc(page, 'kube-describe-section-events')).toBeVisible();
+  await expectCatalogText(loc(page, 'kube-detail'), { allow: KUBE_DATA });
+
+  await loc(page, 'kube-detail-tab-logs').click();
+  await expect(loc(page, 'kube-logs')).toBeVisible();
+  await expectCatalogText(loc(page, 'kube-logs'), {
+    allow: [...KUBE_DATA, /^app$|^init$|^sidecar$/],
+  });
+
+  await page.locator('[data-testid="kube-cluster-row"][data-context="bad-token"]').click();
+  await expect(loc(page, 'kube-unavailable')).toBeVisible();
+  await expectCatalogText(loc(page, 'kube-unavailable'), { allow: KUBE_DATA });
 });

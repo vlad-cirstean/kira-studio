@@ -5,6 +5,13 @@ import { expect, test } from './fixtures';
 import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { PG_CONN } from './support/copyScenarios';
 import { IPC } from './support/ipcChannels';
+import {
+  kubeError,
+  loc,
+  openKind,
+  openKubernetes,
+  setupKubernetes,
+} from './support/kubernetesFixture';
 import { emitWailsEvent } from './support/mockRuntime';
 import { openSettings } from './support/settings';
 import { connectionRow } from './support/tree';
@@ -299,4 +306,22 @@ test('renamed menu events still open their UI', async ({ relaunch }) => {
 
   await emitWailsEvent(page, IPC.openSettings, null);
   await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
+});
+
+test('Kubernetes: a list failure offers Retry; an empty kubeconfig is an EmptyState without a button', async ({
+  relaunch,
+}) => {
+  const failing = await setupKubernetes(relaunch, { List: () => kubeError('E_INTERNAL', 'boom') });
+  await openKubernetes(failing.page);
+  await openKind(failing.page, 'kind-dev', 'v1/pods');
+  await expect(loc(failing.page, 'query-error')).toBeVisible();
+  await expect(loc(failing.page, 'query-retry')).toBeVisible();
+
+  const empty = await setupKubernetes(relaunch, {
+    Clusters: () => ({ config: { state: 'ok', paths: [], message: '' }, clusters: [] }),
+  });
+  await openKubernetes(empty.page);
+  const none = loc(empty.page, 'kube-tree-empty');
+  await expect(none).toBeVisible();
+  await expect(none.locator('button')).toHaveCount(0);
 });

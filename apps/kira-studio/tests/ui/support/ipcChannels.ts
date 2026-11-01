@@ -186,6 +186,16 @@ export const IPC = {
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
 
+  // P439: the Kubernetes module's bound surface; log batches are events, no entry.
+  kubernetesClusters: 'kira:kubernetes:clusters',
+  kubernetesDescribe: 'kira:kubernetes:describe',
+  kubernetesKinds: 'kira:kubernetes:kinds',
+  kubernetesList: 'kira:kubernetes:list',
+  kubernetesLogsClose: 'kira:kubernetes:logsClose',
+  kubernetesLogsOpen: 'kira:kubernetes:logsOpen',
+  kubernetesNamespaces: 'kira:kubernetes:namespaces',
+  kubernetesStatus: 'kira:kubernetes:status',
+
   // P200: the Docker module's bound surface; pushes (changed/stats/logs/exec) are events, no entry.
   dockerContainerEditSpec: 'kira:docker:containerEditSpec',
   dockerContainerSize: 'kira:docker:containerSize',
