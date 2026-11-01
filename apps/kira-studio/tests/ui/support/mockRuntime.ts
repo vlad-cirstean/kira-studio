@@ -225,7 +225,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   scriptRunsStart: 'ScriptRunsService.Start',
   scriptRunsReadLog: 'ScriptRunsService.ReadLog',
   scriptRunsMcpServers: 'ScriptRunsService.McpServers',
-  scriptRunsMcpTools: 'ScriptRunsService.McpTools',
 
   linkOpenExternal: 'LinkService.OpenExternal',
   keepAwakeStatus: 'KeepAwakeService.Status',

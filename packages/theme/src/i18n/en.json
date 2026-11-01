@@ -485,11 +485,29 @@
       "mcp": {
         "label": "MCP tools"
       },
+      "mcpAllTools": {
+        "label": "All tools"
+      },
       "mcpHint": {
-        "hint": "Only servers from your user {agent} config are listed."
+        "hint": "Servers {agent} reports for your user config. A run that uses one loads your {agent} settings."
       },
       "mcpNone": {
         "emptyHint": "No MCP servers."
+      },
+      "mcpStatusConnected": {
+        "status": "Online"
+      },
+      "mcpStatusFailed": {
+        "status": "Unreachable"
+      },
+      "mcpStatusNeedsAuth": {
+        "status": "Needs sign-in"
+      },
+      "mcpStatusPending": {
+        "status": "Connecting"
+      },
+      "mcpStatusUnknown": {
+        "status": "Status unknown"
       },
       "model": {
         "label": "Model"

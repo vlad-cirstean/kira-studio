@@ -99,7 +99,6 @@ export const IPC = {
   scriptRunsStart: 'kira:scriptRuns:start',
   scriptRunsReadLog: 'kira:scriptRuns:readLog',
   scriptRunsMcpServers: 'kira:scriptRuns:mcpServers',
-  scriptRunsMcpTools: 'kira:scriptRuns:mcpTools',
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
   keepAwake: 'kira:keepAwake:changed',

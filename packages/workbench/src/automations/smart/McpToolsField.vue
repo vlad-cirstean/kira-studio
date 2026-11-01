@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SmartSettings } from '@shared/domain/scripts';
+import type { ScriptMcpServer, SmartSettings } from '@shared/domain/scripts';
 import { useQuery } from '@tanstack/vue-query';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -22,20 +22,28 @@ const servers = useQuery({
   staleTime: 0,
 });
 
-function chosen(server: string): string[] | null {
-  return smart.value.mcp.find((c) => c.server === server)?.tools ?? null;
+function chosen(server: string): string[] {
+  return smart.value.mcp.find((c) => c.server === server)?.tools ?? [];
+}
+
+function allTools(server: string): boolean {
+  return smart.value.mcp.find((c) => c.server === server)?.allTools ?? false;
 }
 
 function setServer(server: string, on: boolean): void {
   smart.value.mcp = on
-    ? withMcp(smart.value.mcp, server, [])
+    ? withMcp(smart.value.mcp, server, [], true)
     : smart.value.mcp.filter((c) => c.server !== server);
 }
 
+function setAllTools(server: string, on: boolean): void {
+  smart.value.mcp = withMcp(smart.value.mcp, server, chosen(server), on);
+}
+
 function setTool(server: string, tool: string, on: boolean): void {
-  const cur = chosen(server) ?? [];
+  const cur = chosen(server);
   const next = on ? [...cur.filter((x) => x !== tool), tool] : cur.filter((x) => x !== tool);
-  smart.value.mcp = withMcp(smart.value.mcp, server, next);
+  smart.value.mcp = withMcp(smart.value.mcp, server, next, false);
 }
 
 const typed = ref<Record<string, string>>({});
@@ -44,6 +52,21 @@ function addByName(server: string): void {
   if (name === '') return;
   setTool(server, name, true);
   typed.value = { ...typed.value, [server]: '' };
+}
+
+function statusText(status: ScriptMcpServer['status']): string {
+  switch (status) {
+    case 'connected':
+      return t('automations.smart.mcpStatusConnected.status');
+    case 'failed':
+      return t('automations.smart.mcpStatusFailed.status');
+    case 'needsAuth':
+      return t('automations.smart.mcpStatusNeedsAuth.status');
+    case 'pending':
+      return t('automations.smart.mcpStatusPending.status');
+    default:
+      return t('automations.smart.mcpStatusUnknown.status');
+  }
 }
 
 const enabled = computed(() => smart.value.mcp.map((c) => c.server));
@@ -84,12 +107,17 @@ const enabled = computed(() => smart.value.mcp.map((c) => c.server));
             <span class="truncate font-data text-kira-sm text-muted-foreground"
               >{{ s.transport }} {{ s.target }}</span
             >
+            <span class="text-kira-sm text-muted-foreground" data-testid="smart-mcp-status">{{
+              statusText(s.status)
+            }}</span>
           </div>
           <McpServerTools
             v-if="enabled.includes(s.name)"
             :server="s.name"
-            :chosen="chosen(s.name) ?? []"
+            :all-tools="allTools(s.name)"
+            :chosen="chosen(s.name)"
             :typed="typed[s.name] ?? ''"
+            @all-tools="(on) => setAllTools(s.name, on)"
             @tool="(tool, on) => setTool(s.name, tool, on)"
             @typed="(v) => (typed = { ...typed, [s.name]: v })"
             @add="addByName(s.name)"

@@ -96,7 +96,6 @@ import type {
   ScriptCollection,
   ScriptDir,
   ScriptMcpServer,
-  ScriptMcpTool,
   ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -587,8 +586,6 @@ const studioControl = {
     unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
-  scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
-    unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 };
 
 // One exported object, composed from the methods shared with Kira Space

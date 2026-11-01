@@ -297,7 +297,6 @@ export const IPC = {
   scriptRunsStart: 'kira:scriptRuns:start',
   scriptRunsReadLog: 'kira:scriptRuns:readLog',
   scriptRunsMcpServers: 'kira:scriptRuns:mcpServers',
-  scriptRunsMcpTools: 'kira:scriptRuns:mcpTools',
   // The titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape restated. Real wire channel string verbatim
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never

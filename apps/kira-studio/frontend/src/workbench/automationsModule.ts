@@ -75,7 +75,6 @@ export function createAutomationsModule(): AutomationsModuleContext {
         control.scriptRunsConfirmAccept(runId, hash, secrets),
       confirmDecline: (runId) => control.scriptRunsConfirmDecline(runId),
       mcpServers: () => control.scriptRunsMcpServers(),
-      mcpTools: (server) => control.scriptRunsMcpTools(server),
     },
     ade: false,
     showAutomations: () => modeStore.setMode('automations'),

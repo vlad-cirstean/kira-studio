@@ -12,7 +12,6 @@ type Env = ScenarioEnv<
   | 'scriptRunLog'
   | 'scriptRunsChanged'
   | 'scriptRunsMcpServers'
-  | 'scriptRunsMcpTools'
   | 'scriptRunsPreview'
   | 'scriptRunsReadLog'
   | 'scriptRunsResumeCommand'
@@ -171,14 +170,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
         { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
         {
           channel: IPC.scriptRunsMcpServers,
-          response: [{ name: 'fake', transport: 'stdio', target: 'fake-mcp' }],
-        },
-        {
-          channel: IPC.scriptRunsMcpTools,
-          response: [
-            { name: 'echo', description: 'Echo the text back.' },
-            { name: 'ping', description: 'Ping.' },
-          ],
+          response: [{ name: 'fake', transport: 'stdio', target: 'fake-mcp', status: 'connected' }],
         },
         { channel: IPC.customScriptsCreate, response: SMART },
       ],
@@ -211,16 +203,14 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     const sw = dialog.locator('[data-testid="smart-mcp-switch-fake"]');
     await expect(sw).toHaveAttribute('aria-checked', 'false');
     await expect(dialog.locator('[data-testid="smart-mcp-tools"]')).toHaveCount(0);
+    await expect(dialog.locator('[data-testid="smart-mcp-status"]')).toHaveText('Online');
     await sw.click();
-    await expect(dialog.locator('[data-testid="smart-mcp-tool-echo"]')).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
-    await expect(dialog.locator('[data-testid="smart-mcp-tool-ping"]')).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
-    await dialog.locator('[data-testid="smart-mcp-tool-echo"]').click();
+    const all = dialog.locator('[data-testid="smart-mcp-all"]');
+    await expect(all).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.locator('[data-testid="smart-allowed-line"]')).toContainText('mcp__fake');
+    await all.click();
+    await dialog.locator('[data-testid="smart-mcp-add-input"]').fill('echo');
+    await dialog.locator('[data-testid="smart-mcp-add"]').click();
     await expect(dialog.locator('[data-testid="smart-allowed-line"]')).toContainText(
       'mcp__fake__echo',
     );
@@ -253,7 +243,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
             maxBudgetUsd: 1,
             timeout: '15m',
             tools: ['Read', 'Grep', 'Glob'],
-            mcp: [{ server: 'fake', tools: ['echo'] }],
+            mcp: [{ server: 'fake', allTools: false, tools: ['echo'] }],
           },
         },
       });

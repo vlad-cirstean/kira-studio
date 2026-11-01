@@ -15,7 +15,6 @@ import type {
   ScriptCollection,
   ScriptDir,
   ScriptMcpServer,
-  ScriptMcpTool,
 } from '@shared/domain/scripts';
 import type { ScriptRunTabState } from '@shared/domain/tabs';
 import { type ComputedRef, computed, type InjectionKey, inject } from 'vue';
@@ -85,9 +84,8 @@ export interface ScriptRunsSeam {
     secrets: Record<string, string[]>,
   ): Promise<ScriptRunStarted>;
   confirmDecline(runId: string): Promise<void>;
-  /** Servers of the user's Claude config. */
+  /** MCP servers claude reports. */
   mcpServers(): Promise<ScriptMcpServer[]>;
-  mcpTools(server: string): Promise<ScriptMcpTool[]>;
 }
 
 export interface AutomationsModuleContext {

@@ -71,7 +71,6 @@ import type {
   ScriptCollection,
   ScriptDir,
   ScriptMcpServer,
-  ScriptMcpTool,
   ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import { CHANNEL } from '@shared/protocol/events';
@@ -200,8 +199,6 @@ const spaceControl = {
     unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
-  scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
-    unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 
   // P120: openExternal (LinkService) moved off createCoreControl.ts's now-deleted shared `link` binding —
   // Kira Studio never had a real use for it, so this app's own LinkService.OpenExternal call
