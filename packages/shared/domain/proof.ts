@@ -4,7 +4,7 @@ import { z } from 'zod';
 // shapes internal/proof/validate.go stores; Go validates first, the window parses again before
 // building a page from a payload.
 
-export const proofViewSchema = /*#__PURE__*/ z.enum(['table', 'document', 'keyvalue']);
+export const proofViewSchema = /*#__PURE__*/ z.enum(['table', 'document', 'keyvalue', 'chart']);
 export type ProofView = z.infer<typeof proofViewSchema>;
 
 export const proofLanguageSchema = /*#__PURE__*/ z.enum(['sql', 'json', 'shell', 'text']);
@@ -37,6 +37,44 @@ export const proofKeyValuePayloadSchema = /*#__PURE__*/ z.object({
 });
 export type ProofKeyValuePayload = z.infer<typeof proofKeyValuePayloadSchema>;
 
+// P426: a point is [x, y]; x is a category label, epoch milliseconds or a number by x.type, y is
+// null for a gap. Go normalises (time to epoch ms, line and area sorted by x).
+export const proofChartPointSchema = /*#__PURE__*/ z.tuple([
+  z.union([z.string(), z.number()]),
+  z.number().nullable(),
+]);
+
+export const proofCartesianChartSchema = /*#__PURE__*/ z.object({
+  type: z.enum(['bar', 'line', 'area', 'scatter']),
+  x: z.object({ type: z.enum(['category', 'time', 'value']), name: z.string() }),
+  y: z.object({ name: z.string(), unit: z.string() }),
+  stacked: z.boolean(),
+  horizontal: z.boolean(),
+  series: z.array(z.object({ name: z.string(), points: z.array(proofChartPointSchema) })),
+});
+export type ProofCartesianChart = z.infer<typeof proofCartesianChartSchema>;
+
+export const proofPieChartSchema = /*#__PURE__*/ z.object({
+  type: z.literal('pie'),
+  unit: z.string(),
+  slices: z.array(z.object({ name: z.string(), value: z.number() })),
+});
+export type ProofPieChart = z.infer<typeof proofPieChartSchema>;
+
+export const proofChartPayloadSchema = /*#__PURE__*/ z.union([
+  proofCartesianChartSchema,
+  proofPieChartSchema,
+]);
+export type ProofChartPayload = z.infer<typeof proofChartPayloadSchema>;
+
+// Legend entries hidden, the clicked point and the zoom window (percent of the axis).
+export const proofChartViewStateSchema = /*#__PURE__*/ z.object({
+  hidden: z.array(z.string()),
+  selected: z.object({ series: z.number().int(), index: z.number().int() }).nullable(),
+  zoom: z.object({ start: z.number(), end: z.number() }).nullable(),
+});
+export type ProofChartViewState = z.infer<typeof proofChartViewStateSchema>;
+
 // Mirrors views/shared/slick/selection.ts's Selection.
 export const proofSelectionSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('cell'), row: z.number().int(), col: z.number().int() }),
@@ -61,6 +99,8 @@ export const proofViewStateSchema = /*#__PURE__*/ z.object({
   selectedRow: z.number().int().nullable(),
   expanded: z.array(z.string()),
   columnWidths: z.record(z.string(), z.number()),
+  // Absent on every step stored before P426 and on non-chart steps.
+  chart: proofChartViewStateSchema.optional(),
 });
 export type ProofViewState = z.infer<typeof proofViewStateSchema>;
 

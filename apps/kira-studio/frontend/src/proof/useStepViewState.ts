@@ -1,4 +1,4 @@
-import type { ProofViewState } from '@shared/domain/proof';
+import type { ProofChartViewState, ProofViewState } from '@shared/domain/proof';
 import { useDebounceFn, useThrottleFn } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
@@ -21,6 +21,7 @@ function sameState(a: ProofViewState, b: ProofViewState): boolean {
     a.resultScrollLeft === b.resultScrollLeft &&
     a.selectedRow === b.selectedRow &&
     JSON.stringify(a.selection) === JSON.stringify(b.selection) &&
+    JSON.stringify(a.chart ?? null) === JSON.stringify(b.chart ?? null) &&
     a.expanded.length === b.expanded.length &&
     a.expanded.every((id, i) => id === b.expanded[i]) &&
     sameRecord(a.columnWidths, b.columnWidths)
@@ -89,5 +90,6 @@ export function useStepViewState(ids: StepIds) {
     loadFailed: query.isError,
     setResult: (state: ResultViewState) => update(state),
     setQueryScroll: (queryScrollTop: number) => update({ queryScrollTop }),
+    setChart: (chart: ProofChartViewState) => update({ chart }),
   };
 }

@@ -13567,6 +13567,11 @@
           "aria": "Revision to show"
         }
       },
+      "chart": {
+        "region": {
+          "aria": "Chart: {description}"
+        }
+      },
       "compare": {
         "added": {
           "emptyHint": "This step is new in the edit."

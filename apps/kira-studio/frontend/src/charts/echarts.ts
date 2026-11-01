@@ -1,7 +1,10 @@
-import { BarChart, LineChart, PieChart } from 'echarts/charts';
+import { BarChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
 import {
+  AriaComponent,
   BrushComponent,
+  DataZoomInsideComponent,
   GridComponent,
+  LegendComponent,
   ToolboxComponent,
   TooltipComponent,
 } from 'echarts/components';
@@ -13,7 +16,11 @@ use([
   BarChart,
   LineChart,
   PieChart,
+  ScatterChart,
+  AriaComponent,
+  DataZoomInsideComponent,
   GridComponent,
+  LegendComponent,
   TooltipComponent,
   BrushComponent,
   ToolboxComponent,

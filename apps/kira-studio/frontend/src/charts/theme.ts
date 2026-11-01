@@ -12,6 +12,8 @@ export interface ChartTheme {
   tooltipBorder: string;
   tooltipText: string;
   brush: string;
+  selected: string;
+  fontFamily: string;
   series: string[];
 }
 
@@ -33,6 +35,8 @@ export function chartTheme(): ChartTheme {
     tooltipBorder: token('--kira-border-strong'),
     tooltipText: token('--kira-fg'),
     brush: token('--kira-select'),
+    selected: token('--kira-fg'),
+    fontFamily: getComputedStyle(document.body).fontFamily,
     series: [
       token('--kira-conn-blue'),
       token('--kira-ok'),
@@ -40,6 +44,12 @@ export function chartTheme(): ChartTheme {
       token('--kira-error'),
       token('--kira-state-on'),
       token('--kira-var-resolved'),
+      token('--kira-conn-teal'),
+      token('--kira-conn-violet'),
+      token('--kira-conn-orange'),
+      token('--kira-conn-magenta'),
+      token('--kira-conn-olive'),
+      token('--kira-conn-cyan'),
     ],
   };
 }
