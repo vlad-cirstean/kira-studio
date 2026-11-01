@@ -186,7 +186,7 @@ func (f *KibanaFixture) buildConfigs() {
 }
 
 type kibanaHTTP struct {
-	base, user, pass, space string
+	base, user, pass string
 }
 
 func (c *kibanaHTTP) do(ctx context.Context, method, path string, body, out any) error {
@@ -273,6 +273,9 @@ func (f *KibanaFixture) seed(ctx context.Context) error {
 		return err
 	}
 
+	if err := kb.do(ctx, "POST", "/api/spaces/space", map[string]any{"id": KibanaSpace, "name": "Kira Space"}, nil); err != nil {
+		return err
+	}
 	views := []struct {
 		space string
 		view  map[string]any
@@ -283,14 +286,8 @@ func (f *KibanaFixture) seed(ctx context.Context) error {
 		{"", map[string]any{"id": KibanaNoTimeView, "title": "kira-notime", "name": "kira-notime"}},
 		// Kibana rejects two data views with one name, so the name-versus-title case is the one testable.
 		{"", map[string]any{"id": KibanaTitledView, "title": "kira-log*", "name": "Wildcard logs", "timeFieldName": "@timestamp"}},
+		{"/s/" + KibanaSpace, map[string]any{"id": KibanaSpaceView, "title": "kira-logs", "name": "space-logs", "timeFieldName": "@timestamp"}},
 	}
-	if err := kb.do(ctx, "POST", "/api/spaces/space", map[string]any{"id": KibanaSpace, "name": "Kira Space"}, nil); err != nil {
-		return err
-	}
-	views = append(views, struct {
-		space string
-		view  map[string]any
-	}{"/s/" + KibanaSpace, map[string]any{"id": KibanaSpaceView, "title": "kira-logs", "name": "space-logs", "timeFieldName": "@timestamp"}})
 	for _, v := range views {
 		if err := kb.do(ctx, "POST", v.space+"/api/data_views/data_view", map[string]any{"data_view": v.view, "override": true}, nil); err != nil {
 			return err

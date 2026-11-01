@@ -24,13 +24,12 @@ type StageValues map[string]string
 
 // Parse returns the canonical value of v, false when v is not valid for s.
 func (s StageSetting) Parse(v string) (string, bool) {
-	switch s.Kind {
-	case StageSettingInt:
-		n, err := strconv.Atoi(strings.TrimSpace(v))
-		if err != nil || n < s.Min || n > s.Max {
-			return "", false
-		}
-		return strconv.Itoa(n), true
+	if s.Kind != StageSettingInt {
+		return "", false
 	}
-	return "", false
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n < s.Min || n > s.Max {
+		return "", false
+	}
+	return strconv.Itoa(n), true
 }
