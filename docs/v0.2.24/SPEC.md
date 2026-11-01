@@ -13,7 +13,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P427 | Pull request view for GitHub and Azure Repos | Done |
 | P428 | Jira issue viewer | Done |
 | P429 | PR and issue comments: post, attachments, drag and drop | Done |
-| P430 | Clipboard capture hotkey: link or text into Kira Space | Todo |
+| P430 | Clipboard capture hotkey: link or text into Kira Space | Done |
 | P431 | Stage settings injection in the workflow editor (auto compact limit) | Done |
 | P432 | Operations panel overhaul: looks and interactions | Done |
 | P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Todo |
@@ -79,6 +79,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Global hotkey needs no Accessibility on macOS (`RegisterEventHotKey`); Wayland uses a portal or the desktop's shortcut settings.
 - No tray icon. The hotkey works while the app process runs (macOS keeps it running with no window). On Windows and Linux it works only while the app is running; no background mode.
 - Out of scope: tray icon, clipboard watcher (reads every copy), URL scheme, Share/Services menu, browser extension.
+
+**Result:** Global capture hotkey opens quick-capture popup; clipboard classified, action preselected (PR link, Jira key, else Later). Default chord `CmdOrCtrl+Shift+K`, user-customisable in Settings > Capture (`capture.enabled`, `capture.hotkey`), re-registered live with conflict status. Bridge types are TS interfaces, not zod. Windows/Linux work only while app runs.
 
 ### P431 Stage settings injection in the workflow editor (auto compact limit)
 
