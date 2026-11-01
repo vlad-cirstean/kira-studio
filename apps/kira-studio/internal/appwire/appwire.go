@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/kubernetes"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/proof"
@@ -63,6 +64,8 @@ type Options struct {
 	DockerHubAPI string
 	// DockerExtra appends docker options (flow-test seams for the restore tracker).
 	DockerExtra []docker.Option
+	// KubernetesExtra appends kubernetes options (flow-test seams: environment, list limits).
+	KubernetesExtra []kubernetes.Option
 	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
 	Providers *harness.Registry
 	// WindowFocus replaces the registry's focus state and raise (a flow-test seam); nil keeps the registry.
@@ -117,6 +120,7 @@ type Wired struct {
 	CustomScripts   *bridge.CustomScriptsService
 	ScriptRuns      *bridge.ScriptRunsService
 	Docker          *bridge.DockerService
+	Kubernetes      *bridge.KubernetesService
 	Link            *bridge.LinkService
 	Update          *bridge.UpdateService
 	Lifecycle       *bridge.LifecycleService
@@ -222,7 +226,7 @@ func Build(opts Options) (*Wired, error) {
 	}
 	embedded := wireEmbeddedServices(deps, installer, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, proofSvc, opts)
 	lifecycle := wireLifecycle(windows, embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, embedded.dockerSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
+		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, embedded.dockerSvc, embedded.kubeSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.sched.Start()
 
 	live := func() shell.QuitStatus {
@@ -245,6 +249,7 @@ func Build(opts Options) (*Wired, error) {
 		TerminalRegistry: embedded.terminalSvc.Registry,
 		OnWindowClosing: []func(string){func(key string) {
 			docker.CloseWindowBound(embedded.dockerSvc.BoundService, key)
+			kubernetes.CloseWindowBound(embedded.kubeSvc.BoundService, key)
 		}, proofTargets.Forget},
 
 		App:             &bridge.AppService{Deps: deps},
@@ -274,6 +279,7 @@ func Build(opts Options) (*Wired, error) {
 		CustomScripts:   &bridge.CustomScriptsService{Deps: deps, Changed: embedded.sched.Reload},
 		ScriptRuns:      embedded.scriptRuns,
 		Docker:          embedded.dockerSvc,
+		Kubernetes:      embedded.kubeSvc,
 		Link:            &bridge.LinkService{Browser: opts.Browser},
 		Update: &bridge.UpdateService{
 			Checker: updateChecker, Installer: updateInstaller, Quit: lifecycle.quitter.RequestQuit,
@@ -324,7 +330,7 @@ func (w *Wired) reopenWindow() {
 	}
 }
 
-// Bound returns the 33 bound services in registration order.
+// Bound returns the 35 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -335,7 +341,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.Collections), application.NewService(w.Variables),
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
-		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker), application.NewService(w.Link),
+		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker), application.NewService(w.Kubernetes), application.NewService(w.Link),
 		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc), application.NewService(w.Proof),
 	}
 }

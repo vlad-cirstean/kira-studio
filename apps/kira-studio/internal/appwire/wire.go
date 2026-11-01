@@ -23,6 +23,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/kubernetes"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
@@ -133,6 +134,7 @@ type embeddedWired struct {
 	runs         *scriptruns.Service
 	sched        *scriptruns.Scheduler
 	dockerSvc    *bridge.DockerService
+	kubeSvc      *bridge.KubernetesService
 	events       *bridge.Events
 	eventsDetach func()
 }
@@ -185,12 +187,13 @@ func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, kee
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs, Agent: agents}}
 	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts, deps.Repos.DockerRestore)...)}
 	docker.StartRestoreBound(dockerSvc.BoundService)
+	kubeSvc := &bridge.KubernetesService{BoundService: kubernetes.NewBoundService(deps.Repos.KubeClusters, deps.Events, opts.KubernetesExtra...)}
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
 	return embeddedWired{
 		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
-		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc,
+		windowsSvc: windowsSvc, terminalSvc: terminalSvc, dockerSvc: dockerSvc, kubeSvc: kubeSvc,
 		scriptRuns: &bridge.ScriptRunsService{Bound: &scriptruns.Bound{Svc: runs}}, runs: runs,
 		sched:  &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock},
 		events: events, eventsDetach: eventsDetach,
@@ -212,7 +215,7 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, dockerSvc *bridge.DockerService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, dockerSvc *bridge.DockerService, kubeSvc *bridge.KubernetesService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (replacing the single detachWindow/mainWindow pair that only ever worked because at
 	// most one window could exist at a time). beforeFlush detaches every one of them, not just the
@@ -247,6 +250,7 @@ func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsD
 		bridge.StopKeepAwake(keepAwakeSvc)
 		terminal.ShutdownBound(terminalSvc.BoundService)
 		docker.StopRestoreBound(dockerSvc.BoundService)
+		kubernetes.ServiceOf(kubeSvc.BoundService).Shutdown()
 		sched.Close()
 		runs.Close()
 		if err := repositories.Close(); err != nil {
