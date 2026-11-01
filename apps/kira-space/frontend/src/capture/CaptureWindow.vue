@@ -8,11 +8,12 @@ import { Kbd } from '@theme/components/ui/kbd';
 import { Label } from '@theme/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { t } from '@theme/i18n';
-import { useEventListener, useWindowFocus } from '@vueuse/core';
+import { tryOnScopeDispose, useEventListener, useWindowFocus } from '@vueuse/core';
 import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { errorText } from '@workbench/bridge/codedError';
 import { windowKey } from '@workbench/bridge/rpc';
 import { type ComponentPublicInstance, computed, ref, useTemplateRef, watch } from 'vue';
+import { control } from '../bridge/control';
 import { useConfirmCapture, useDismissCapture } from './queries';
 import { useCaptureWindowStore } from './state';
 import type { CaptureAction, CaptureItem } from './wire';
@@ -26,6 +27,9 @@ const selected = ref<CaptureAction | ''>('');
 const title = ref('');
 const confirm = useConfirmCapture();
 const dismiss = useDismissCapture();
+
+// A second hotkey press pushes its item here; it replaces the content.
+tryOnScopeDispose(control.onCaptureItem((next) => (store.item = next)));
 
 // A pushed item replaces the content and clears the last error.
 watch(
