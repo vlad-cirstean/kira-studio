@@ -19,12 +19,29 @@ const LIMIT = 8 * 1024 * 1024;
 const A_STAT = { size: 22, mtimeNs: 111 };
 const C_STAT = { size: 20, mtimeNs: 222 };
 
+const LONG = Array.from({ length: 400 }, (_, i) => `export const row${i} = ${i};\n`).join('');
+
 const CONTROL: ControlSnapshot[] = [
+  {
+    channel: IPC.codeWorkspaceReadFile,
+    args: { id: REPO.id, path: 'long.ts' },
+    response: {
+      kind: 'found',
+      text: LONG,
+      bytes: LONG.length,
+      limitBytes: LIMIT,
+      language: 'typescript',
+    },
+  },
   { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
   {
     channel: IPC.codeWorkspaceListFiles,
     args: { id: REPO.id },
-    response: { paths: ['a.ts', 'b.ts', 'c.ts'], status: { 'c.ts': 'M' }, truncated: false },
+    response: {
+      paths: ['a.ts', 'b.ts', 'c.ts', 'long.ts'],
+      status: { 'c.ts': 'M' },
+      truncated: false,
+    },
   },
   {
     channel: IPC.codeWorkspaceReadFile,
@@ -127,4 +144,25 @@ test('switching away from a file and a diff and back sends the previous stat and
   await expect(diff).toContainText('export const c = 2;');
   await expect.poll(() => diffReads().length).toBe(2);
   expect(diffReads()[1].args).toMatchObject({ ifStat: C_STAT, ifHeadOid: 'h1' });
+});
+
+test('a file tab reopens at the scroll position it was left at', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+  await repoRowById(page, REPO.id).click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+
+  await treeRow(page, 'long.ts').dblclick();
+  const lines = page.locator('[data-testid="repo-file-editor"] .view-lines');
+  await expect(lines).toContainText('row0 ');
+  await lines.hover();
+  await page.mouse.wheel(0, 3000);
+  await expect(lines).not.toContainText('row0 ');
+  const visible = (await lines.locator('.view-line').first().textContent()) ?? '';
+
+  await treeRow(page, 'b.ts').dblclick();
+  await expect(lines).toContainText('export const b = 2;');
+  await repoTab(page, 'repo-file').first().click();
+
+  await expect(lines).not.toContainText('row0 ');
+  await expect(lines.locator('.view-line').first()).toHaveText(visible);
 });
