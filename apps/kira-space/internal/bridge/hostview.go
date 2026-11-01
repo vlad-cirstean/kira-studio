@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/shell"
@@ -30,8 +32,11 @@ const (
 	hostViewBreakerFallback = 15 * time.Minute
 )
 
-// Host view target kinds. A later view (an issue) adds its own.
-const HostViewKindChangeRequest = "changeRequest"
+// Host view target kinds.
+const (
+	HostViewKindChangeRequest = "changeRequest"
+	HostViewKindIssue         = "issue"
+)
 
 // Host view change request result kinds.
 const (
@@ -47,11 +52,12 @@ type hostViewWindowRows interface {
 	Delete(key string) error
 }
 
-// HostViewService opens and reads the PR view: one window per change request, never restored.
+// HostViewService opens and reads the PR and issue views: one window per change request or issue, never restored.
 type HostViewService struct {
 	Deps           appcore.Deps
 	Windows        hostViewWindowRows
 	Targets        *HostViewTargets
+	Trackers       *issuetracker.Registry
 	Now            func() time.Time
 	OpenWindow     func(shell.WindowRecord)
 	FocusWindow    func(key string) bool
@@ -79,12 +85,28 @@ type HostViewWindowArgs struct {
 
 // HostViewTarget is what a host view window shows.
 type HostViewTarget struct {
-	Kind     string       `json:"kind"`
-	URL      string       `json:"url"`
-	Provider string       `json:"provider"`
-	Host     githost.Info `json:"host"`
-	Repo     string       `json:"repo"` // display "owner/name"
-	Number   int          `json:"number"`
+	Kind     string `json:"kind"`
+	URL      string `json:"url"` // '' for an issue on a site not yet known
+	Provider string `json:"provider"`
+	// Change request kind.
+	Host   *githost.Info `json:"host,omitempty"`
+	Repo   string        `json:"repo,omitempty"` // display "owner/name"
+	Number int           `json:"number,omitempty"`
+	// Issue kind.
+	Tracker *issuetracker.Terms `json:"tracker,omitempty"`
+	Key     string              `json:"key,omitempty"`
+}
+
+// HostViewIssueArgs is Issue's request: an issue key or link.
+type HostViewIssueArgs struct {
+	Ref string `json:"ref"`
+}
+
+// HostViewIssue is Issue's result. Kind unavailable carries a Reason word.
+type HostViewIssue struct {
+	Kind   string                    `json:"kind"`
+	Detail *issuetracker.IssueDetail `json:"detail,omitempty"`
+	Reason string                    `json:"reason,omitempty"`
 }
 
 // HostViewChangeRequestArgs is ChangeRequest's request.
@@ -141,13 +163,72 @@ func (s *HostViewService) parse(ctx context.Context, raw string) (hostViewLink, 
 		map[string]string{"changeRequests": hosts.ChangeRequestViewLabels()})
 }
 
-// Open opens the PR view window for a change request link, or focuses the one already open.
+// Open opens the view window for a change request link or an issue key or link, or focuses the one
+// already open.
 func (s *HostViewService) Open(ctx context.Context, args HostViewOpenArgs) (HostViewOpen, error) {
-	l, err := s.parse(ctx, args.URL)
-	if err != nil {
-		return HostViewOpen{}, err
+	raw := strings.TrimSpace(args.URL)
+	if len(raw) <= maxHostViewURLBytes {
+		if hosts := s.hosts(); hosts != nil {
+			if p, d, repo, n, ok := hosts.ParseChangeRequestLink(ctx, raw); ok {
+				return s.open(hostViewLink{p: p, details: d, repo: repo, number: n})
+			}
+		}
+		if p, ref, ok := s.issueProvider(raw); ok {
+			return s.openIssue(ctx, p, ref)
+		}
 	}
-	return s.open(l)
+	return HostViewOpen{}, s.notViewable()
+}
+
+// issueProvider resolves raw to a tracker that can show an issue view.
+func (s *HostViewService) issueProvider(raw string) (issuetracker.Provider, issuetracker.Ref, bool) {
+	p, ref, ok := s.Trackers.ParseRef(raw)
+	if !ok {
+		return nil, issuetracker.Ref{}, false
+	}
+	if _, ok := p.(issuetracker.IssueDetails); !ok {
+		return nil, issuetracker.Ref{}, false
+	}
+	return p, ref, true
+}
+
+func (s *HostViewService) notViewable() error {
+	issues := s.Trackers.IssueViewLabels()
+	if issues == "" {
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitHost.view.notChangeRequest.body",
+			map[string]string{"changeRequests": s.hosts().ChangeRequestViewLabels()})
+	}
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.issueTracker.view.notViewable.body",
+		map[string]string{"changeRequests": s.hosts().ChangeRequestViewLabels(), "issues": issues})
+}
+
+// OpenHostViewIssue opens the issue view for a key or link. It is a function, like
+// OpenHostViewChangeRequest, so it is not bound.
+func OpenHostViewIssue(ctx context.Context, s *HostViewService, raw string) (HostViewOpen, error) {
+	raw = strings.TrimSpace(raw)
+	if len(raw) <= maxHostViewURLBytes {
+		if p, ref, ok := s.issueProvider(raw); ok {
+			return s.openIssue(ctx, p, ref)
+		}
+	}
+	return HostViewOpen{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.issueTracker.view.notIssue.body",
+		map[string]string{"issues": s.Trackers.IssueViewLabels()})
+}
+
+// openIssue identifies the issue by signed-in site and key, so a bare key and its link share a window.
+func (s *HostViewService) openIssue(ctx context.Context, p issuetracker.Provider, ref issuetracker.Ref) (HostViewOpen, error) {
+	site := ref.Site
+	if site == "" {
+		site = p.Status(ctx, false).Site
+	}
+	terms := p.Terms()
+	target := HostViewTarget{Kind: HostViewKindIssue, Provider: p.ID(), Tracker: &terms, Key: ref.Key}
+	if site != "" {
+		target.URL = "https://" + site + "/browse/" + ref.Key
+	}
+	id := "issue|" + p.ID() + "|" + strings.ToLower(site) + "|" + ref.Key
+	title := i18n.T("backend.space.issueTracker.view.window.title", map[string]string{"key": ref.Key, "label": terms.Label})
+	return s.openTarget(id, target, title)
 }
 
 // OpenHostViewChangeRequest opens the PR view for repo r and change request n of provider p. It is a
@@ -161,9 +242,22 @@ func OpenHostViewChangeRequest(s *HostViewService, p githost.Provider, r githost
 }
 
 func (s *HostViewService) open(l hostViewLink) (HostViewOpen, error) {
+	terms := l.p.Terms()
+	info := githost.Describe(l.p)
+	target := HostViewTarget{
+		Kind: HostViewKindChangeRequest, URL: l.p.ChangeRequestURL(l.repo, l.number), Provider: l.p.ID(),
+		Host: &info, Repo: l.repo.Owner + "/" + l.repo.Name, Number: l.number,
+	}
+	title := i18n.T("backend.space.gitHost.view.window.title", map[string]string{
+		"short": terms.ChangeRequestShort, "number": strconv.Itoa(l.number), "repo": target.Repo,
+	})
+	return s.openTarget(l.identity(), target, title)
+}
+
+// openTarget focuses the window of identity, or creates one showing target.
+func (s *HostViewService) openTarget(id string, target HostViewTarget, title string) (HostViewOpen, error) {
 	s.openMu.Lock()
 	defer s.openMu.Unlock()
-	id := l.identity()
 	if s.OpenWindow == nil || s.FocusWindow == nil || s.Windows == nil || s.Targets == nil {
 		return HostViewOpen{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitHost.view.unavailable.body", nil)
 	}
@@ -190,19 +284,33 @@ func (s *HostViewService) open(l hostViewLink) (HostViewOpen, error) {
 	if err := s.Windows.Create(model.WindowRecord{Key: key, Order: order}); err != nil {
 		return HostViewOpen{}, ipcerr.InternalErr(err)
 	}
-	terms := l.p.Terms()
-	target := HostViewTarget{
-		Kind: HostViewKindChangeRequest, URL: l.p.ChangeRequestURL(l.repo, l.number), Provider: l.p.ID(),
-		Host: githost.Describe(l.p), Repo: l.repo.Owner + "/" + l.repo.Name, Number: l.number,
-	}
 	s.Targets.Put(key, id, target)
 	s.OpenWindow(shell.WindowRecord{Key: key, Order: order})
 	if s.SetWindowTitle != nil {
-		s.SetWindowTitle(key, i18n.T("backend.space.gitHost.view.window.title", map[string]string{
-			"short": terms.ChangeRequestShort, "number": strconv.Itoa(l.number), "repo": target.Repo,
-		}))
+		s.SetWindowTitle(key, title)
 	}
 	return HostViewOpen{Key: key, Opened: true}, nil
+}
+
+// Issue reads the issue detail. A tracker failure is data (Kind), not an error: the window shows the
+// reason and offers a retry. acli gives no rate-limit signal and every read is bounded, so no breaker.
+func (s *HostViewService) Issue(ctx context.Context, args HostViewIssueArgs) (HostViewIssue, error) {
+	raw := strings.TrimSpace(args.Ref)
+	p, ref, ok := s.issueProvider(raw)
+	if !ok || len(raw) > maxHostViewURLBytes {
+		return HostViewIssue{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.space.issueTracker.view.notIssue.body",
+			map[string]string{"issues": s.Trackers.IssueViewLabels()})
+	}
+	d, err := p.(issuetracker.IssueDetails).IssueDetail(ctx, ref)
+	switch {
+	case err == nil:
+		return HostViewIssue{Kind: HostViewOK, Detail: &d}, nil
+	case errors.Is(err, issuetracker.ErrNotFound):
+		return HostViewIssue{Kind: HostViewGone, Reason: issuetracker.ReasonNotFound}, nil
+	case ctx.Err() != nil:
+		return HostViewIssue{Kind: HostViewUnavailable, Reason: issuetracker.ReasonTimeout}, nil
+	}
+	return HostViewIssue{Kind: HostViewUnavailable, Reason: issuetracker.Reason(err)}, nil
 }
 
 // WindowTarget returns what the window with this key shows, null when it is no host view window.

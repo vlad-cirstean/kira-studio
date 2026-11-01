@@ -1363,6 +1363,19 @@
           "body": "Git doesn’t support {method}."
         }
       },
+      "issueTracker": {
+        "view": {
+          "notIssue": {
+            "body": "This view opens a {issues} only."
+          },
+          "notViewable": {
+            "body": "This view opens a {changeRequests} or a {issues}."
+          },
+          "window": {
+            "title": "{key} · {label}"
+          }
+        }
+      },
       "memory": {
         "alreadyDownloading": {
           "body": "The semantic model is already downloading."
