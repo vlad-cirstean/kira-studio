@@ -232,28 +232,8 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 	if v.err != nil {
 		return step, nil
 	}
-	step.ID = v.str(sm, sp, "id", true)
-	if v.err == nil && !idPattern.MatchString(step.ID) {
-		v.fail(sm["id"], sp, "id must be lowercase letters, digits, - or _")
-	}
-	if v.err == nil && earlier[step.ID] {
-		v.fail(sm["id"], sp, "id %q is already used by another step", step.ID)
-	}
-	step.Name = v.str(sm, sp, "name", true)
-	step.Kind = v.str(sm, sp, "kind", true)
-	if v.err != nil {
+	if !v.stepHead(&step, sm, sp, earlier) {
 		return step, nil
-	}
-	allowed, known := stepKeys[step.Kind]
-	if !known {
-		v.fail(sm["kind"], sp, "kind must be agent, script, review or manual")
-		return step, nil
-	}
-	for _, k := range []string{"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox", "settings", "review", "command", "session"} {
-		if n, has := sm[k]; has && !slices.Contains(allowed, k) {
-			v.fail(n, sp, "%s is not allowed on %s steps", k, step.Kind)
-			return step, nil
-		}
 	}
 	step.Status = v.status(sm, sp)
 	step.Skip = v.boolean(sm, sp, "skip")
@@ -261,22 +241,7 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 		return step, nil
 	}
 	if step.Kind == adewire.KindManual {
-		step.Session = v.boolean(sm, sp, "session")
-		if v.err != nil {
-			return step, nil
-		}
-		if step.Session {
-			step.Prompt = v.str(sm, sp, "prompt", false)
-		} else if n, has := sm["prompt"]; has {
-			v.fail(n, sp, "prompt is not allowed on %s steps without a session", step.Kind)
-		}
-		if n, has := sm["settings"]; has && v.err == nil {
-			if step.Session {
-				step.Settings = v.settings(n, sp)
-			} else {
-				v.fail(n, sp, "settings is not allowed on %s steps without a session", step.Kind)
-			}
-		}
+		v.manualStep(&step, sm, sp)
 		return step, nil
 	}
 	step.RunsOn = v.runsOn(sm, sp)
@@ -312,6 +277,54 @@ func (v *validator) step(sn *yaml.Node, sp string, earlier, candidates map[strin
 		step.Settings = v.settings(n, sp)
 	}
 	return step, rn
+}
+
+// stepHead reads id, name and kind and rejects keys the kind disallows. It reports whether the step may go on.
+func (v *validator) stepHead(step *adewire.WorkflowStep, sm map[string]*yaml.Node, sp string, earlier map[string]bool) bool {
+	step.ID = v.str(sm, sp, "id", true)
+	if v.err == nil && !idPattern.MatchString(step.ID) {
+		v.fail(sm["id"], sp, "id must be lowercase letters, digits, - or _")
+	}
+	if v.err == nil && earlier[step.ID] {
+		v.fail(sm["id"], sp, "id %q is already used by another step", step.ID)
+	}
+	step.Name = v.str(sm, sp, "name", true)
+	step.Kind = v.str(sm, sp, "kind", true)
+	if v.err != nil {
+		return false
+	}
+	allowed, known := stepKeys[step.Kind]
+	if !known {
+		v.fail(sm["kind"], sp, "kind must be agent, script, review or manual")
+		return false
+	}
+	for _, k := range []string{"runs_on", "before", "results", "max_returns", "timeout", "prompt", "allowed_tools", "smart_script", "params", "sandbox", "settings", "review", "command", "session"} {
+		if n, has := sm[k]; has && !slices.Contains(allowed, k) {
+			v.fail(n, sp, "%s is not allowed on %s steps", k, step.Kind)
+			return false
+		}
+	}
+	return true
+}
+
+// manualStep reads the session, prompt and settings of a manual step.
+func (v *validator) manualStep(step *adewire.WorkflowStep, sm map[string]*yaml.Node, sp string) {
+	step.Session = v.boolean(sm, sp, "session")
+	if v.err != nil {
+		return
+	}
+	if step.Session {
+		step.Prompt = v.str(sm, sp, "prompt", false)
+	} else if n, has := sm["prompt"]; has {
+		v.fail(n, sp, "prompt is not allowed on %s steps without a session", step.Kind)
+	}
+	if n, has := sm["settings"]; has && v.err == nil {
+		if step.Session {
+			step.Settings = v.settings(n, sp)
+		} else {
+			v.fail(n, sp, "settings is not allowed on %s steps without a session", step.Kind)
+		}
+	}
 }
 
 // legacyStatuses maps the names files used before statuses became ids to the ids the app first shipped;

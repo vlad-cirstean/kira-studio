@@ -17,6 +17,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 )
 
 // ErrInvalid marks a caller mistake: a bad file name, an invalid workflow, a YAML syntax error in
@@ -592,15 +593,7 @@ func applySandbox(m *yaml.Node, sb adewire.StepSandbox) {
 // applySettings writes a step's settings block, or removes it when no catalog setting is set so a
 // file without one stays unchanged. Keys and agents leave in catalog order; ones no longer set are dropped.
 func applySettings(m *yaml.Node, settings map[string]map[string]string) {
-	present := false
-	for _, set := range stageCatalog {
-		for _, st := range set.Settings {
-			if settings[set.ID][st.Key] != "" {
-				present = true
-			}
-		}
-	}
-	if !present {
+	if !anyStageSetting(settings) {
 		dropKeys(m, "settings")
 		return
 	}
@@ -614,33 +607,50 @@ func applySettings(m *yaml.Node, settings map[string]map[string]string) {
 		agentOrder = append(agentOrder, set.ID)
 	}
 	for _, set := range stageCatalog {
-		var keyOrder []string
+		applyProviderSettings(sn, set, settings[set.ID], agentOrder)
+	}
+}
+
+// anyStageSetting reports whether any catalog setting has a value.
+func anyStageSetting(settings map[string]map[string]string) bool {
+	for _, set := range stageCatalog {
 		for _, st := range set.Settings {
-			keyOrder = append(keyOrder, st.Key)
-		}
-		var pn *yaml.Node
-		for _, st := range set.Settings {
-			val := settings[set.ID][st.Key]
-			if val == "" {
-				continue
+			if settings[set.ID][st.Key] != "" {
+				return true
 			}
-			if pn == nil {
-				_, pn = find(sn, set.ID)
-				if pn == nil || pn.Kind != yaml.MappingNode {
-					pn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-					put(sn, set.ID, pn, agentOrder)
-				}
-			}
-			setScalar(pn, st.Key, kInt, val, true, keyOrder)
 		}
-		if pn == nil {
-			dropKeys(sn, set.ID)
+	}
+	return false
+}
+
+// applyProviderSettings writes one provider's block in sn, or drops it when none of its settings is set.
+func applyProviderSettings(sn *yaml.Node, set providers.StageSet, vals map[string]string, agentOrder []string) {
+	keyOrder := make([]string, 0, len(set.Settings))
+	for _, st := range set.Settings {
+		keyOrder = append(keyOrder, st.Key)
+	}
+	var pn *yaml.Node
+	for _, st := range set.Settings {
+		val := vals[st.Key]
+		if val == "" {
 			continue
 		}
-		for _, st := range set.Settings {
-			if settings[set.ID][st.Key] == "" {
-				dropKeys(pn, st.Key)
+		if pn == nil {
+			_, pn = find(sn, set.ID)
+			if pn == nil || pn.Kind != yaml.MappingNode {
+				pn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				put(sn, set.ID, pn, agentOrder)
 			}
+		}
+		setScalar(pn, st.Key, kInt, val, true, keyOrder)
+	}
+	if pn == nil {
+		dropKeys(sn, set.ID)
+		return
+	}
+	for _, st := range set.Settings {
+		if vals[st.Key] == "" {
+			dropKeys(pn, st.Key)
 		}
 	}
 }
