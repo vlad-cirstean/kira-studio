@@ -14,9 +14,14 @@ import { disposeModel } from './monaco';
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type StandaloneDiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 
+type CodeViewState = import('monaco-editor').editor.ICodeEditorViewState;
+type DiffViewState = import('monaco-editor').editor.IDiffEditorViewState;
+
 interface RepoEditorEntry {
   uris: string[];
   editor: StandaloneEditor | StandaloneDiffEditor | null;
+  /** Scroll, cursor and folds captured on unmount, so a remount reopens where the user left off. */
+  viewState: CodeViewState | DiffViewState | null;
 }
 
 const entries = new Map<string, RepoEditorEntry>();
@@ -59,11 +64,17 @@ function releaseRefs(tabId: string, uris: readonly string[]): string[] {
   return releasable;
 }
 
-/** Called on mount (and on every remount after a tab-switch-away) — replaces any previous entry. */
-export function registerEditor(tabId: string, uri: string, editor: StandaloneEditor): void {
+/** Called on mount (and on every remount after a tab-switch-away) — replaces any previous entry.
+ *  Returns true when a view state saved by the last unmount was restored, so the caller skips its
+ *  own persisted-line reveal. */
+export function registerEditor(tabId: string, uri: string, editor: StandaloneEditor): boolean {
+  const viewState = entries.get(tabId)?.viewState ?? null;
   releaseUnusedPriorRefs(tabId, [uri]);
   addRefs(tabId, [uri]);
-  entries.set(tabId, { uris: [uri], editor });
+  entries.set(tabId, { uris: [uri], editor, viewState });
+  if (!viewState) return false;
+  editor.restoreViewState(viewState as CodeViewState);
+  return true;
 }
 
 /** repo-diff's own counterpart to registerEditor — two model uris (HEAD, worktree), one diff
@@ -73,9 +84,11 @@ export function registerDiffEditor(
   uris: string[],
   editor: StandaloneDiffEditor,
 ): void {
+  const viewState = entries.get(tabId)?.viewState ?? null;
   releaseUnusedPriorRefs(tabId, uris);
   addRefs(tabId, uris);
-  entries.set(tabId, { uris, editor });
+  entries.set(tabId, { uris, editor, viewState });
+  if (viewState) editor.restoreViewState(viewState as DiffViewState);
 }
 
 // A remount always recomputes the identical uris for the same tab (they're a pure function of the
@@ -95,6 +108,7 @@ function releaseUnusedPriorRefs(tabId: string, nextUris: readonly string[]): voi
 export function unmountEditor(tabId: string): void {
   const entry = entries.get(tabId);
   if (!entry) return;
+  entry.viewState = entry.editor?.saveViewState() ?? entry.viewState;
   entry.editor?.dispose();
   entry.editor = null;
 }

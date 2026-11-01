@@ -126,7 +126,7 @@ async function mount(): Promise<void> {
       : repoRevisionFileUri(mod, repoId, props.tab.path, rev);
   const editor = viewer.createEditor(mod, uri, text);
   if (!editor) return;
-  registerEditor(props.tab.id, uri, editor);
+  const restored = registerEditor(props.tab.id, uri, editor);
   edit.attach(editor, mod);
   disposeDistill = attachDistillSelection(editor, props.tab.path);
 
@@ -166,7 +166,7 @@ async function mount(): Promise<void> {
       editor.setSelection(range);
       editor.revealRangeInCenter(range);
     }
-  } else {
+  } else if (!restored) {
     const revealLine = props.tab.state.revealLine;
     if (revealLine !== null) {
       editor.revealLineInCenter(revealLine);

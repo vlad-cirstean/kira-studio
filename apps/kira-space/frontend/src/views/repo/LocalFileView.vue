@@ -57,9 +57,9 @@ async function mountEditor(text: string): Promise<void> {
   const uri = localFileUri(mod, props.tab.path);
   const editor = viewer.createEditor(mod, uri, text);
   if (!editor) return;
-  registerEditor(props.tab.id, uri, editor);
+  const restored = registerEditor(props.tab.id, uri, editor);
   const revealLine = props.tab.state.revealLine;
-  if (revealLine !== null) {
+  if (revealLine !== null && !restored) {
     editor.revealLineInCenter(revealLine);
     editor.setPosition({ lineNumber: revealLine, column: 1 });
   }
