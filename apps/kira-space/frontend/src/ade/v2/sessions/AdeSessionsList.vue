@@ -84,7 +84,7 @@ function onKeydown(ev: KeyboardEvent): void {
       :placeholder="t('space.ade.sessionList.filter.placeholder')"
       data-testid="ade-sessions-menu-filter"
     />
-    <CommandList :class="inline ? 'max-h-none flex-1' : 'max-h-96'">
+    <CommandList :class="inline ? 'max-h-none flex-1' : 'max-h-120'">
       <InlineState
         v-if="query && !shownRunning.length && !shownStopped.length"
         kind="empty"

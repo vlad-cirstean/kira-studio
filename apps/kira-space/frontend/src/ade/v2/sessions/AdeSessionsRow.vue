@@ -100,44 +100,46 @@ defineExpose({ openMenu });
   <div class="group relative">
     <CommandItem
       :value="id"
-      class="peer/item group/row flex-col items-stretch gap-0.5 py-1 pr-16"
+      class="peer/item group/row items-start gap-0.5 py-1 pr-16"
       data-testid="ade-sessions-row"
       :data-session-id="id"
       :data-selected="selected || undefined"
       @select="onSelect"
       @contextmenu="onContext"
     >
-      <span class="flex min-w-0 items-center gap-1.5">
-        <AdeActivityIcon :kind="view.kind" bare />
-        <AdeSessionBadge :view="view" />
-        <span class="min-w-0 flex-1 truncate font-data"
-          ><HighlightedText :parts="marks(view.tabName)" /></span
-        >
-        <span class="shrink-0" :class="rowMeta">{{ ago }}</span>
-      </span>
-      <span class="flex min-w-0 items-center gap-1.5" :class="rowMeta">
-        <span
-          class="shrink-0"
-          :class="warn && 'text-tone-amber'"
-          data-testid="ade-sessions-row-state"
-          >{{
-            state
-          }}</span
-        >
-        <span class="min-w-0 truncate"
-          ><HighlightedText :parts="marks(where)" />
-          · <HighlightedText :parts="marks(view.shortId)" /></span
-        >
-        <Spinner v-if="pending" :size="12" label="" />
-        <Kbd
-          v-else-if="hint"
-          class="ml-auto hidden group-data-highlighted/row:inline-flex"
-          data-testid="ade-sessions-row-hint"
-          >{{
-            hint
-          }}</Kbd
-        >
-      </span>
+      <span class="flex min-w-0 flex-1 flex-col gap-0.5"
+        ><span class="flex min-w-0 items-center gap-1.5">
+          <AdeActivityIcon :kind="view.kind" bare />
+          <AdeSessionBadge :view="view" />
+          <span class="min-w-0 flex-1 truncate font-data"
+            ><HighlightedText :parts="marks(view.tabName)" /></span
+          >
+          <span class="shrink-0" :class="rowMeta">{{ ago }}</span>
+        </span>
+        <span class="flex min-w-0 items-center gap-1.5" :class="rowMeta">
+          <span
+            class="shrink-0"
+            :class="warn && 'text-tone-amber'"
+            data-testid="ade-sessions-row-state"
+            >{{
+              state
+            }}</span
+          >
+          <span class="min-w-0 truncate"
+            ><HighlightedText :parts="marks(where)" />
+            · <HighlightedText :parts="marks(view.shortId)" /></span
+          >
+          <Spinner v-if="pending" :size="12" label="" />
+          <Kbd
+            v-else-if="hint"
+            class="ml-auto hidden group-data-highlighted/row:inline-flex"
+            data-testid="ade-sessions-row-hint"
+            >{{
+              hint
+            }}</Kbd
+          >
+        </span></span
+      >
     </CommandItem>
     <span
       class="absolute right-1.5 top-1 flex items-center gap-0.5 peer-data-highlighted/item:opacity-100"
@@ -150,6 +152,7 @@ defineExpose({ openMenu });
         :pressed="logOpen"
         tabindex="-1"
         data-testid="ade-sessions-row-log"
+        :data-session-id="id"
         @click="toggleLog"
       />
       <TooltipIconButton
@@ -158,6 +161,7 @@ defineExpose({ openMenu });
         :label="t('common.moreActions.tooltip')"
         tabindex="-1"
         data-testid="ade-sessions-row-more"
+        :data-session-id="id"
         @click="openMenu()"
       />
     </span>

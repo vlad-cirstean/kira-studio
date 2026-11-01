@@ -1,6 +1,5 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adeBoard, emitOpenSession, openPlan } from './support/adeV2';
+import { adeBoard, emitOpenSession, openPlan, openSessions } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -9,14 +8,6 @@ import { IPC } from './support/ipcChannels';
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const row = (id: string) => `[data-testid="ade-branch-row"][data-branch-id="${id}"]`;
-
-async function openSessions(page: Page, taskId: string): Promise<void> {
-  await page
-    .locator(`[data-testid="ade-card"][data-task-id="${taskId}"] [data-testid="ade-card-head"]`)
-    .click();
-  await page.locator(t('ade-panel-tab-sessions')).click();
-  await expect(page.locator(t('ade-sessions-tab'))).toBeVisible();
-}
 
 test('the task strip lists interactive sessions first, then the most recent runs', async ({
   relaunch,
@@ -33,38 +24,6 @@ test('the task strip lists interactive sessions first, then the most recent runs
   expect(badges).toEqual(['TUI', 'claude -p', 'claude -p', 'claude -p']);
   await expect(page.locator(t('ade-session-tab-tk01'))).toContainText('(resumed)');
   await expect(page.locator(t('ade-session-tab-tk01'))).toHaveAttribute('data-selected', 'true');
-  await expect(page.locator(t('ade-stopped-row'))).toHaveCount(0);
-  await expect(page.locator(t('ade-stopped-count'))).toHaveText('2');
-  await page.locator(t('ade-stopped-trigger')).click();
-  await expect(page.locator(`${t('ade-stopped-popover')} ${t('ade-stopped-row')}`)).toHaveCount(2);
-});
-
-test('no finished sessions, no dropdown', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
-  await openSessions(page, 'T_hooks');
-  await expect(page.locator(t('ade-session-strip'))).toBeVisible();
-  await expect(page.locator(t('ade-stopped-trigger'))).toHaveCount(0);
-});
-
-test('opening a stopped session reveals it in the dropdown', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
-  await emitOpenSession(page, { taskId: 'T_bill', branchId: '', sessionId: 'sp11' });
-  const rowSel = `${t('ade-stopped-popover')} [data-testid="ade-stopped-row"][data-session-id="sp11"]`;
-  await expect(page.locator(t('ade-stopped-popover'))).toBeVisible();
-  await expect(page.locator(rowSel)).toHaveAttribute('data-selected', 'true');
-  await expect(page.locator(`${rowSel} ${t('ade-stopped-takeover')}`)).toBeFocused();
-});
-
-test('the dropdown works from the keyboard', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
-  await openSessions(page, 'T_bill');
-  await page.locator(t('ade-stopped-trigger')).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator(t('ade-stopped-popover'))).toBeVisible();
-  await expect(page.locator(t('ade-stopped-takeover')).first()).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(page.locator(t('ade-stopped-popover'))).toHaveCount(0);
-  await expect(page.locator(t('ade-stopped-trigger'))).toBeFocused();
 });
 
 test('tabs are named after the step; the tab menu copies the full Claude session id', async ({
@@ -260,16 +219,6 @@ test('Take over of a stuck run skips the confirm', async ({ relaunch }) => {
   await page.locator(t('ade-session-takeover')).click();
   await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-});
-
-test('a stopped session takes over from the list', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch);
-  await openSessions(page, 'T_bill');
-  await page.locator(t('ade-stopped-trigger')).click();
-  await page.locator(t('ade-stopped-takeover')).last().click();
-  await expect(page.locator(t('ade-stopped-popover'))).toHaveCount(0);
-  await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskTakeOver)[0]?.args).toMatchObject({ sessionId: 'sp11' });
 });
 
 test('contract: an open-session event selects that session in its Sessions tab', async ({

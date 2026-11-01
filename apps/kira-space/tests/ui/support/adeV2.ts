@@ -225,6 +225,15 @@ export async function openPlan(
   return app;
 }
 
+/** Opens the Sessions tab of task `taskId`'s panel. */
+export async function openSessions(page: Page, taskId: string): Promise<void> {
+  await page
+    .locator(`[data-testid="ade-card"][data-task-id="${taskId}"] [data-testid="ade-card-head"]`)
+    .click();
+  await page.locator('[data-testid="ade-panel-tab-sessions"]').click();
+  await expect(page.locator('[data-testid="ade-sessions-tab"]')).toBeVisible();
+}
+
 export function bandOf(page: Page, day: number) {
   return page.locator(`[data-testid="ade-day-band"][data-ade-day="${day}"]`);
 }

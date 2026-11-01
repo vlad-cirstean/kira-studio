@@ -84,7 +84,7 @@ test('a selected archived task shows all it kept, read-only', async ({ relaunch 
   await expect(page.locator(t('ade-notes-toolbar-btn'))).toHaveCount(0);
 
   await page.locator(t('ade-panel-tab-sessions')).click();
-  await expect(page.locator(t('ade-stopped-row')).first()).toContainText('feat/api-keep');
+  await expect(page.locator(t('ade-sessions-row')).first()).toContainText('feat/api-keep');
 });
 
 test('a stored change request is marked as of archive', async ({ relaunch }) => {
@@ -149,8 +149,10 @@ test('Resume restores the task, then takes the session over', async ({ relaunch 
     sessionsWith(fx.branches[0].id),
   ]);
   await openArchivedSessions(page);
-  await expect(page.locator(t('ade-stopped-takeover'))).toHaveCount(0);
-  await page.locator(t('ade-stopped-resume')).first().click();
+  await expect(
+    page.locator(t('ade-sessions-row-hint')).filter({ hasText: 'Take over' }),
+  ).toHaveCount(0);
+  await page.locator(t('ade-sessions-row')).first().click();
   await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
   const restore = calls(control, IPC.adeTaskRestoreTask);
   expect(restore).toHaveLength(1);
@@ -173,7 +175,7 @@ test('a refused Resume shows the error and launches nothing', async ({ relaunch 
     { channel: IPC.adeTaskRestoreTask, error: refusal },
   ]);
   await openArchivedSessions(page);
-  await page.locator(t('ade-stopped-resume')).first().click();
+  await page.locator(t('ade-sessions-row')).first().click();
   await expect(page.locator(t('ade-archived-resume-error'))).toContainText(
     'branch feat/api-keep is on task',
   );

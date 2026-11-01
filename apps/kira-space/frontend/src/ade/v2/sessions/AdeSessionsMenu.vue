@@ -35,12 +35,9 @@ const attention = computed(() =>
         class="shrink-0 gap-1"
         data-testid="ade-sessions-menu-trigger"
       >
-        <AdeActivityIcon
-          v-if="attention"
-          kind="input"
-          bare
-          data-testid="ade-sessions-menu-attention"
-        />
+        <span v-if="attention" class="inline-flex" data-testid="ade-sessions-menu-attention"
+          ><AdeActivityIcon kind="input" bare /></span
+        >
         {{ t('space.ade.sessionList.trigger.label') }}
         <span :class="rowMeta" data-testid="ade-sessions-menu-count">{{ count }}</span>
         <CodiconIcon name="chevron-down" :size="12" />
