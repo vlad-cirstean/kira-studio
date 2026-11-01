@@ -234,17 +234,7 @@ func mdInline(n ast.Node, src []byte, marks []adfDoc) []adfDoc {
 	with := func(m adfDoc) []adfDoc { return append(append([]adfDoc{}, marks...), m) }
 	switch v := n.(type) {
 	case *ast.Text:
-		var out []adfDoc
-		if s := string(v.Segment.Value(src)); s != "" {
-			out = append(out, mdText(s, marks))
-		}
-		switch {
-		case v.HardLineBreak():
-			out = append(out, adfDoc{"type": "hardBreak"})
-		case v.SoftLineBreak():
-			out = append(out, mdText(" ", marks))
-		}
-		return out
+		return mdTextNode(v, src, marks)
 	case *ast.String:
 		if len(v.Value) == 0 {
 			return nil
@@ -259,43 +249,20 @@ func mdInline(n ast.Node, src []byte, marks []adfDoc) []adfDoc {
 	case *extast.Strikethrough:
 		return mdInlines(n, src, with(adfDoc{"type": "strike"}))
 	case *ast.CodeSpan:
-		var b bytes.Buffer
-		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-			if t, ok := c.(*ast.Text); ok {
-				b.Write(t.Segment.Value(src))
-			}
-		}
-		if b.Len() == 0 {
-			return nil
-		}
-		return []adfDoc{mdText(b.String(), []adfDoc{{"type": "code"}})}
+		return mdCodeSpan(n, src)
 	case *ast.Link:
 		if safeHref(string(v.Destination)) {
 			return mdInlines(n, src, with(linkMark(string(v.Destination))))
 		}
 		return mdInlines(n, src, marks)
 	case *ast.AutoLink:
-		label := string(v.Label(src))
-		href := string(v.URL(src))
-		if label == "" {
-			return nil
-		}
-		if safeHref(href) {
-			return []adfDoc{mdText(label, with(linkMark(href)))}
-		}
-		return []adfDoc{mdText(label, marks)}
+		return mdLinked(string(v.Label(src)), string(v.URL(src)), marks)
 	case *ast.Image:
 		alt := strings.TrimSpace(string(v.Text(src))) //nolint:staticcheck // plain alt text of the children
 		if alt == "" {
 			alt = string(v.Destination)
 		}
-		if alt == "" {
-			return nil
-		}
-		if safeHref(string(v.Destination)) {
-			return []adfDoc{mdText(alt, with(linkMark(string(v.Destination))))}
-		}
-		return []adfDoc{mdText(alt, marks)}
+		return mdLinked(alt, string(v.Destination), marks)
 	case *ast.RawHTML:
 		var b bytes.Buffer
 		for i := range v.Segments.Len() {
@@ -310,4 +277,42 @@ func mdInline(n ast.Node, src []byte, marks []adfDoc) []adfDoc {
 		return nil
 	}
 	return mdInlines(n, src, marks)
+}
+
+func mdTextNode(v *ast.Text, src []byte, marks []adfDoc) []adfDoc {
+	var out []adfDoc
+	if s := string(v.Segment.Value(src)); s != "" {
+		out = append(out, mdText(s, marks))
+	}
+	switch {
+	case v.HardLineBreak():
+		out = append(out, adfDoc{"type": "hardBreak"})
+	case v.SoftLineBreak():
+		out = append(out, mdText(" ", marks))
+	}
+	return out
+}
+
+func mdCodeSpan(n ast.Node, src []byte) []adfDoc {
+	var b bytes.Buffer
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if t, ok := c.(*ast.Text); ok {
+			b.Write(t.Segment.Value(src))
+		}
+	}
+	if b.Len() == 0 {
+		return nil
+	}
+	return []adfDoc{mdText(b.String(), []adfDoc{{"type": "code"}})}
+}
+
+// mdLinked emits label as text, linked only when href passes safeHref.
+func mdLinked(label, href string, marks []adfDoc) []adfDoc {
+	if label == "" {
+		return nil
+	}
+	if safeHref(href) {
+		return []adfDoc{mdText(label, append(append([]adfDoc{}, marks...), linkMark(href)))}
+	}
+	return []adfDoc{mdText(label, marks)}
 }
