@@ -715,28 +715,28 @@ the pass split. Here: the container quirk that blocked two prior attempts, and t
 pre-push design.
 
 - **The preinstalled `/usr/local/bin/golangci-lint` (2.5.0, built with go1.25.1) refuses this repo**
-  outright: `go.mod` pins `go 1.27.1`, and golangci-lint's config loader rejects targeting a Go
+  outright: `go.mod` pins `go 1.27.3`, and golangci-lint's config loader rejects targeting a Go
   version newer than the one it was itself built with. `go install .../golangci-lint@latest` does
   not fix this — it produces a binary built with **go1.26.8**, one minor version short, every time.
-- **Why:** `go version` in this container reports `go1.27.1` only because `GOTOOLCHAIN=auto` reads
+- **Why:** `go version` in this container reports `go1.27.3` only because `GOTOOLCHAIN=auto` reads
   *this repo's* `go.mod` and downloads that toolchain on demand for commands run inside the module.
   `GOTOOLCHAIN=local go version` reports the container's real default: **go1.24.7**. `go install
   pkg@version` runs in module-aware mode *ignoring the current module* — it resolves only
   golangci-lint's own `go.mod` directive (`go 1.26.0`, no `toolchain` line), and `auto` downloads
-  the minimum toolchain satisfying that — go1.26.8, not the 1.27.1 already sitting in the module
+  the minimum toolchain satisfying that — go1.26.8, not the 1.27.3 already sitting in the module
   cache. `@latest` doesn't help either; it just moves which release hits the same gap.
 - **The fix**, pin `GOTOOLCHAIN` explicitly to the version this repo actually wants, on the install
   itself:
   ```sh
-  GOTOOLCHAIN=go1.27.1 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+  GOTOOLCHAIN=go1.27.3 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
   ```
   `scripts/install-golangci-lint.sh` does exactly this, validating a cached `GOPATH/bin` binary
   against the pinned version+toolchain string before trusting it (the same pattern
   `scripts/setup.sh` already uses for `wails3`). No `go.mod` change, no Go version bump, no source
   checkout needed — install only, same as any other `go install` target.
 - **No prebuilt release binary works, and neither does `golangci-lint-action`.** Every official
-  v2.13.2 release binary is itself built with go1.26.8 and fails identically. Build from source
-  everywhere, including CI — `actions/setup-go` with `go-version-file: go.mod` already makes 1.27.1
+  v2.15.0 release binary is itself built with go1.26.8 and fails identically. Build from source
+  everywhere, including CI — `actions/setup-go` with `go-version-file: go.mod` already makes 1.27.3
   the runner's default toolchain there, so a plain `go install` in CI already builds correctly; the
   `GOTOOLCHAIN` pin in the script is belt-and-braces so the same one command works locally too.
 - **Pre-commit stays exactly `bun run lint` + `bun run typecheck`** (~15s) — golangci-lint and knip

@@ -725,7 +725,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P175 moved jar cookies (`['httpJarCookies', url]`, fed by a debounced resolved URL), history lists/snapshots (`[domain, itemId, scratchTabId]`, `[domain+'Snapshot', id]`) and gRPC schema (`['grpcSchema', 'proto'|'reflection', ...]`, mirroring Go's descriptor cacheKey) onto TanStack Query.
 - Hidden panes refresh lazily via each query's `enabled` flag (P8 D11), and Pinia stores keep UI state only.
 - Mutations must call `cancelQueries` after the bridge call and before `setQueryData`, so an in-flight list fetch cannot resurrect a deleted row.
-- `internal/httpclient/cookiejar` is a fork of Go 1.27.1's `net/http/cookiejar` (BSD-3 LICENSE kept) because the stdlib jar lists and deletes nothing; it adds `Entries`/`Delete` in `entries.go`, and `Delete` removes by exact domain, path and name.
+- `internal/httpclient/cookiejar` is a fork of Go 1.27.3's `net/http/cookiejar` (BSD-3 LICENSE kept) because the stdlib jar lists and deletes nothing; it adds `Entries`/`Delete` in `entries.go`, and `Delete` removes by exact domain, path and name.
 - On a Go upgrade, re-copy the cookiejar's `jar.go`, `punycode.go` and their tests, then reapply the `ascii` import path change, the only difference from upstream.
 - Dotenv parsing (`BulkVariablesEditor`, `dotenv.ts`): an inline comment starts at whitespace plus `#`; a quoted value counts only when the closing quote is followed by nothing or a comment; an unmatched quote yields an unquoted value, never an error.
 

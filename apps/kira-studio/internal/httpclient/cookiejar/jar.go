@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Vendored from Go 1.27.1 net/http/cookiejar. The only change is the ascii import path (a copy of
+// Vendored from Go 1.27.3 net/http/cookiejar. The only change is the ascii import path (a copy of
 // net/http/internal/ascii, which cannot be imported). Additions live in entries.go. Resync: copy
 // the upstream files over, re-apply that import.
 

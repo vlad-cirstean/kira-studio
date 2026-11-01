@@ -1,11 +1,11 @@
 #!/bin/sh
 # P94: build golangci-lint from source against THIS repo's Go toolchain.
-# A prebuilt release binary is built with an older Go and refuses go.mod's `go 1.27.1`
+# A prebuilt release binary is built with an older Go and refuses go.mod's `go 1.27.3`
 # (plan §3). GOTOOLCHAIN must be pinned: `go install pkg@version` ignores the current
 # module, so `auto` picks golangci-lint's own minimum (go1.26), not ours.
 set -e
-VERSION=v2.13.2
-GOVERSION=go1.27.1
+VERSION=v2.15.0
+GOVERSION=go1.27.3
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=./lib.sh
 . "$SCRIPT_DIR/lib.sh"
