@@ -3516,14 +3516,10 @@
         },
         "description": "Docker restarted. Choose which containers to start again.",
         "gone": {
-          "body": "Deleted. Not recreated.",
-          "title": "Deleted"
+          "body": "Deleted. Not recreated."
         },
         "project": {
           "label": "Compose project {name}"
-        },
-        "submit": {
-          "label": "Restore {count} container | Restore {count} containers"
         },
         "title": "Restore containers",
         "waiting": {
