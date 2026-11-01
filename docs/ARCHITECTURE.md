@@ -2029,8 +2029,17 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Caps (`githost.DetailMax*`): 100 conversation comments, 50 reviews, 50 code threads, 30 comments per thread, 100 checks, 50 labels, 50 reviewers and 50 assignees. The newest stay; truncation flags show a note.
 - Markdown: `frontend/src/hostview/markdown.ts` (markdown-it). Raw HTML never renders: comments and tags drop and a block's text shows escaped. Images render as links. Only http, https, mailto and `#` links pass; a click opens http(s) in the OS browser through `openExternal`.
 - Frontend: `main.ts` asks for the host view target before the review target; a window with one skips workspace boot, like a review window. `App.vue` renders `HostViewWindow`. Refresh and Retry refetch; nothing refetches on focus.
-- `HostViewTarget.Kind` is `changeRequest`. A later view (Jira issue, P428) adds its own kind to the same window.
+- `HostViewTarget.Kind` is `changeRequest` or `issue` (P428). `Host`, `Repo` and `Number` are set for change requests only.
 - Entry points: the ADE branch panel's PR row and the task tab's host link row offer "View". `OpenHostViewChangeRequest` is a package function for a later opener.
+
+#### Issue view (P428)
+
+- Same window, service and frontend as the PR view. Target kind `issue`: `{url, provider, tracker (terms), key}`. Identity is `issue|<provider>|<site>|<KEY>`; a bare key resolves its site through the cached tracker status, so a key and its link share one window. Title "KEY · Label".
+- `Open(urlOrKey)` takes a change request link, else an issue key or link of a tracker that implements `IssueDetails`; anything else is a bad request naming both. `OpenHostViewIssue` is the package function for a later opener (P430).
+- `Issue(ref)` answers kind `ok` (detail), `gone` (reason `notFound`) or `unavailable` (reason: unavailable, unauthenticated, otherSite, timeout, failed). A tracker failure is data, not an IPC error. No breaker: acli has no rate-limit signal and every call is bounded (10 s per acli call, 25 s per detail).
+- Every load is a fresh read. The detail drops the 60 s `Issue` cache entry and runs two acli calls at once: the `Issue` read (Development summary, PR rows) and `workitem view` with `jira.DetailFields`. A failed `Issue` read leaves the detail with `changeRequestsReason`.
+- Caps (`issuetracker.DetailMax*`): 100 comments (newest stay), 50 labels, 50 components. Comments show oldest first.
+- Frontend: `HostViewFrame.vue` holds the chrome shared by `ChangeRequestView.vue` and `IssueView.vue` (title bar, loading, failure with Retry). `IssueView` is two columns at 900 px and up, stacked below. The sidebar opens a pull request row in the PR view and the parent in its own issue view. Entry point: the task tab issue line "View issue" button.
 
 ## Agent harness (P316)
 
@@ -2097,6 +2106,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The first read per site fetches all fields except comment, attachment, worklog and description to find the Development field id; later reads ask for `summary,status,<id>`. An oversize first read falls back to `*navigable` and marks the site without a Development field for 10 min.
 - Results cache 60 s (15 s when partial or failed), coalesced per key by singleflight on a detached 20 s context, so a caller that gives up leaves the result for the next call. A ref on another site than the signed-in one returns ErrOtherSite.
 - Wire: `IssueTrackerService.TaskIssue` (title, status, status category, summary, rows, reason), `Trackers`, `Tools` (status and setup of every host and tracker CLI, `refresh` skips the status caches). A tracker failure comes back as a `reason` (unavailable, unauthenticated, notFound, otherSite, timeout, failed, noTracker; `changeRequests<Reason>` for a failed row lookup), never as an error.
+- `IssueDetails` (P428) is an optional role beside `Provider`: `IssueDetail(ctx, ref)` returns title, fields, people, labels, components, dates, parent, description, comments and the PR rows. Jira reads it with `workitem view --fields jira.DetailFields`. When acli output passes the 1 MiB cap, it re-reads without `comment` and takes the newest 50 from `workitem comment list --key K --json --limit 50 --order -created`; if that fails too, `commentsOmitted` is set. ADF becomes Markdown in Go (`jira/adf.go`), hand-rolled: no maintained Go ADF converter (checked ajbeck/adf-to-markdown, rgonek/jira-adf-converter, seflue/adf-converter) escapes text and filters link schemes, and the output must be safe for the sanitising renderer.
 - Frontend: Settings section CLI tools (`CliToolsPane.vue`, install and sign-in commands with copy), `AdeTaskIssueLine.vue` in the Task tab, tracker label and gap text in `AdeArtifactList.vue` (`artifacts/gapText.ts`).
 - Tests: issuetracker/jira unit tests over hand-written acli fixtures, flows/adeflow `TestTaskIssueTracker` (contract `ade-issue-tracker`), flows/appflow `TestCliTools` (contract `space-cli-tools`), tests/ui/ade-v2-issue-tracker.spec.ts, tests/ui/settings-cli-tools.spec.ts. flowharness/fakeacli stands in for acli; the default locator finds none.
 
@@ -3535,5 +3545,9 @@ Performance:
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
 - **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Failures: `repo-graph-refresh` scroll test 8+ of 40, `repo-graph-paging` 9 of 48 (`graph-svg` wait in `openRepo`), `repo-graph-columns` 3 of 400, `repo-workspace` 4 of 252. All pass idle (`test:ui:space`: 576 passed). Cause: CPU starvation of the whole app boot, not a test step. Delete once the boot is cheaper or the machine faster.
+- **Jira wiki-markup descriptions and comments show as literal text (P428).** A non-ADF string body is escaped plain text, not converted.
+- **Issue comments past 100, or past the newest 50 in the fallback, are not shown (P428).** The view says so and offers the tracker link.
+- **Comments over the 1 MiB acli cap even through `comment list` are omitted (P428).** The view shows a note.
+- **acli detail and comment-list fixtures are hand-written (P428).** acli does not run in the sandbox; the JSON shape follows the REST v3 issue shape.
 - **Quitting Kira Space with an unsaved file edit discards it without asking (P419).** The quit confirm is computed in Go from agents, runs and scripts and has no renderer state. Closing the last window only hides it, so the draft survives that path.
 - **A user-exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides a step's auto compact limit (P431).** Claude Code reads the env var before `--autocompact`, and Kira passes its environment through, so the step setting has no effect while the variable is set.
