@@ -286,3 +286,16 @@ Once after step 8:
 
 - `usermcp` header use and `~/.docker/config.json` read (flagged above; user decides).
 - Attachment upload via any host REST API (forbidden by rule).
+
+## Iter2 Result
+
+Done. Rebased on `chapter/v0.2.24` (`cfbae8a0b`) clean; R1-F8 sites deleted with the staging code.
+
+- Commits: captureflow test fix (stale after `56abc4052`), `refactor!: comments are text only on every host` (steps 1-6 in one commit; contract, bridge, tests and frontend do not compile or lint apart), G5 guard, docs, gofmt, docker/claude docs follow-ups.
+- Deviation: `fakeaz.unsupported` now records a violation, and the `account` case matches `account show` only, so a token call fails and shows in `Violations()`.
+- G5 confirmed to fire (temp `get-access-token` literal), no exemptions.
+- Docs: CLAUDE.md bullet, ARCHITECTURE section, two Known open items (claude MCP headers, docker TLS/config), v0.2.25 P443 added (Code review P444, Close P445).
+- Checks: typecheck, `lint:all`, `test:flows:space`, `-count=2` on touched packages, fixtures stable.
+- UI: targeted specs 17/17. One full `test:ui:space`: 936 pass, 2 load flakes (`ade-v2-dialogs:147`, `prompts:64`), both passed on lone rerun. No second full run needed.
+- Pre-existing fix: `captureflow` `TestSettingsReRegister` expected old failed-chord behavior.
+- Env note: disk filled mid-run; `go clean -cache` freed space.
