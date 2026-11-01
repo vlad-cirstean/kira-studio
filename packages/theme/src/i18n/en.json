@@ -9409,6 +9409,77 @@
           "label": "{author} opened {when}"
         }
       },
+      "issue": {
+        "assignee": {
+          "none": {
+            "empty": "Unassigned"
+          }
+        },
+        "comments": {
+          "edited": {
+            "status": "Revised"
+          },
+          "omitted": {
+            "hint": "Comments are too large to load here. Open on {label} to read them."
+          },
+          "truncated": {
+            "hint": "Older comments are not shown. Open on {label} for the rest."
+          }
+        },
+        "components": {
+          "empty": {
+            "empty": "No components"
+          },
+          "heading": {
+            "title": "Components"
+          }
+        },
+        "date": {
+          "due": {
+            "label": "Due"
+          },
+          "updated": {
+            "label": "Last updated"
+          }
+        },
+        "field": {
+          "assignee": {
+            "label": "Assignee"
+          },
+          "priority": {
+            "label": "Priority"
+          },
+          "reporter": {
+            "label": "Reporter"
+          },
+          "resolution": {
+            "label": "Resolution"
+          }
+        },
+        "header": {
+          "created": {
+            "label": "Created {when}"
+          },
+          "reported": {
+            "label": "{author} reported {when}"
+          }
+        },
+        "parent": {
+          "heading": {
+            "title": "Parent"
+          }
+        },
+        "pullRequests": {
+          "heading": {
+            "title": "Pull requests"
+          }
+        },
+        "reporter": {
+          "none": {
+            "empty": "No reporter"
+          }
+        }
+      },
       "labels": {
         "empty": {
           "empty": "No labels"

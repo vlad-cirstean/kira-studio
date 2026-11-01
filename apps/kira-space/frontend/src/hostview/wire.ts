@@ -19,7 +19,22 @@ export interface ChangeRequestTarget {
   number: number;
 }
 
-export type HostViewTarget = ChangeRequestTarget;
+interface TrackerTerms {
+  label: string;
+  issue: string;
+  cli: string;
+}
+
+export interface IssueTarget {
+  kind: 'issue';
+  /** '' when the signed-in site was unknown at open. */
+  url: string;
+  provider: string;
+  tracker: TrackerTerms;
+  key: string;
+}
+
+export type HostViewTarget = ChangeRequestTarget | IssueTarget;
 
 export interface HostViewOpen {
   key: string;
@@ -124,4 +139,59 @@ export interface HostViewChangeRequest {
   kind: HostViewResultKind;
   detail?: ChangeRequestDetail;
   status: HostStatus;
+}
+
+export interface IssuePerson {
+  id: string;
+  name: string;
+}
+
+export interface IssueComment {
+  id: string;
+  author: IssuePerson;
+  body: string;
+  createdAt: number;
+  updatedAt?: number;
+  url?: string;
+}
+
+export interface IssueChangeRequest {
+  title: string;
+  url: string;
+  ref: string;
+  state: string;
+  repo: string;
+  provider: string;
+}
+
+export interface IssueDetail {
+  ref: { provider: string; key: string; url: string; site: string };
+  title: string;
+  status: string;
+  statusCategory: string;
+  type?: string;
+  priority?: string;
+  resolution?: string;
+  assignee?: IssuePerson;
+  reporter?: IssuePerson;
+  labels: string[];
+  components: string[];
+  createdAt: number;
+  updatedAt: number;
+  dueDate?: string;
+  parent?: { key: string; title?: string };
+  description: string;
+  comments: IssueComment[];
+  commentsTotal: number;
+  commentsTruncated?: boolean;
+  commentsOmitted?: boolean;
+  summary: { known: boolean; count: number; state: string; providers: string[] };
+  changeRequests: IssueChangeRequest[];
+  changeRequestsReason?: string;
+}
+
+export interface HostViewIssue {
+  kind: HostViewResultKind;
+  detail?: IssueDetail;
+  reason?: string;
 }

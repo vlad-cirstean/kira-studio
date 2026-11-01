@@ -1,0 +1,166 @@
+<script setup lang="ts">
+import KeyValueList from '@theme/components/KeyValueList.vue';
+import SectionHeading from '@theme/components/SectionHeading.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
+import { t } from '@theme/i18n';
+import { formatRelative } from '@workbench/behaviour/format';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
+import { computed } from 'vue';
+import { gapText } from '../ade/v2/artifacts/gapText';
+import type { ArtifactGap } from '../ade/v2/wire';
+import { useOpenHostView } from './queries';
+import type { IssueChangeRequest, IssueDetail } from './wire';
+
+const props = defineProps<{ detail: IssueDetail; provider: string; stacked: boolean }>();
+const open = useOpenHostView();
+
+function openView(urlOrKey: string): void {
+  fireAndForget(open.mutateAsync(urlOrKey), 'hostView.issue');
+}
+
+// Same derivation as the task tab's issue line: a lookup failure, else the tracker's count above the
+// rows found.
+const gap = computed<ArtifactGap | null>(() => {
+  const d = props.detail;
+  const source = props.provider;
+  if (d.changeRequestsReason) {
+    const r = d.changeRequestsReason;
+    return { source, repo: '', reason: `changeRequests${r.charAt(0).toUpperCase()}${r.slice(1)}` };
+  }
+  const missing = d.summary.known ? d.summary.count - d.changeRequests.length : 0;
+  return missing > 0 ? { source, repo: '', reason: 'changeRequestsMissing', count: missing } : null;
+});
+
+function stateVariant(cr: IssueChangeRequest) {
+  switch (cr.state) {
+    case 'merged':
+      return 'info' as const;
+    case 'closed':
+      return 'error' as const;
+    case 'draft':
+      return 'chip' as const;
+    default:
+      return 'ok' as const;
+  }
+}
+</script>
+
+<template>
+  <aside
+    class="flex shrink-0 flex-col gap-5 overflow-y-auto border-border p-4"
+    :class="stacked ? 'border-t' : 'w-72 border-l'"
+    data-testid="issue-sidebar"
+  >
+    <KeyValueList class="items-baseline gap-y-2">
+      <dt>{{ t('common.field.status.label') }}</dt>
+      <dd data-testid="issue-side-status">{{ detail.status }}</dd>
+      <template v-if="detail.type">
+        <dt>{{ t('common.field.type.label') }}</dt>
+        <dd data-testid="issue-side-type">{{ detail.type }}</dd>
+      </template>
+      <template v-if="detail.priority">
+        <dt>{{ t('space.hostView.issue.field.priority.label') }}</dt>
+        <dd data-testid="issue-side-priority">{{ detail.priority }}</dd>
+      </template>
+      <template v-if="detail.resolution">
+        <dt>{{ t('space.hostView.issue.field.resolution.label') }}</dt>
+        <dd data-testid="issue-side-resolution">{{ detail.resolution }}</dd>
+      </template>
+      <dt>{{ t('space.hostView.issue.field.assignee.label') }}</dt>
+      <dd data-testid="issue-side-assignee">{{
+        detail.assignee?.name || t('space.hostView.issue.assignee.none.empty')
+      }}</dd>
+      <dt>{{ t('space.hostView.issue.field.reporter.label') }}</dt>
+      <dd data-testid="issue-side-reporter">{{
+        detail.reporter?.name || t('space.hostView.issue.reporter.none.empty')
+      }}</dd>
+      <template v-if="detail.createdAt">
+        <dt>{{ t('common.created.label') }}</dt>
+        <dd data-testid="issue-side-created">{{ formatRelative(detail.createdAt) }}</dd>
+      </template>
+      <template v-if="detail.updatedAt">
+        <dt>{{ t('space.hostView.issue.date.updated.label') }}</dt>
+        <dd data-testid="issue-side-updated">{{ formatRelative(detail.updatedAt) }}</dd>
+      </template>
+      <template v-if="detail.dueDate">
+        <dt>{{ t('space.hostView.issue.date.due.label') }}</dt>
+        <dd data-testid="issue-side-due">{{ detail.dueDate }}</dd>
+      </template>
+    </KeyValueList>
+
+    <section v-if="detail.parent" class="flex flex-col gap-1.5" data-testid="issue-side-parent">
+      <SectionHeading :label="t('space.hostView.issue.parent.heading.title')" />
+      <Button
+        size="inline"
+        variant="link"
+        class="justify-start"
+        data-testid="issue-side-parent-open"
+        @click="openView(detail.parent.key)"
+      >
+        {{
+          detail.parent.title ? `${detail.parent.key} ${detail.parent.title}` : detail.parent.key
+        }}
+      </Button>
+    </section>
+
+    <section class="flex flex-col gap-1.5" data-testid="issue-side-labels">
+      <SectionHeading :label="t('space.hostView.labels.heading.title')" />
+      <FieldDescription v-if="detail.labels.length === 0">{{
+        t('space.hostView.labels.empty.empty')
+      }}</FieldDescription>
+      <div class="flex flex-wrap gap-1">
+        <Badge v-for="l in detail.labels" :key="l" variant="chip" data-testid="issue-side-label">{{
+          l
+        }}</Badge>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-1.5" data-testid="issue-side-components">
+      <SectionHeading :label="t('space.hostView.issue.components.heading.title')" />
+      <FieldDescription v-if="detail.components.length === 0">{{
+        t('space.hostView.issue.components.empty.empty')
+      }}</FieldDescription>
+      <div class="flex flex-wrap gap-1">
+        <Badge
+          v-for="c in detail.components"
+          :key="c"
+          variant="chip"
+          data-testid="issue-side-component"
+          >{{
+            c
+          }}</Badge
+        >
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-1.5" data-testid="issue-side-pull-requests">
+      <SectionHeading :label="t('space.hostView.issue.pullRequests.heading.title')" />
+      <FieldDescription v-if="detail.changeRequests.length === 0 && !gap">{{
+        t('space.ade.taskTab.issueLine.prsNone.label')
+      }}</FieldDescription>
+      <div
+        v-for="cr in detail.changeRequests"
+        :key="cr.url"
+        class="flex items-center gap-2 text-kira-sm"
+        data-testid="issue-side-pull-request"
+      >
+        <Button
+          size="inline"
+          variant="link"
+          class="min-w-0 flex-1 justify-start truncate"
+          :title="cr.title"
+          data-testid="issue-side-pull-request-open"
+          @click="openView(cr.url)"
+        >
+          {{ cr.ref }} {{ cr.title }}
+        </Button>
+        <Badge :variant="stateVariant(cr)" class="shrink-0">{{ cr.state }}</Badge>
+      </div>
+      <FieldDescription v-if="gap" data-testid="issue-side-pull-requests-gap">{{
+        gapText(gap)
+      }}</FieldDescription>
+    </section>
+  </aside>
+</template>

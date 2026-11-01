@@ -73,7 +73,12 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
-import type { HostViewChangeRequest, HostViewOpen, HostViewTarget } from '../hostview/wire';
+import type {
+  HostViewChangeRequest,
+  HostViewIssue,
+  HostViewOpen,
+  HostViewTarget,
+} from '../hostview/wire';
 import type { CliToolsResult, IssueTrackers } from '../state/cliToolsDomain';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
@@ -199,6 +204,8 @@ const spaceControl = {
     unwrap(HostViewService.WindowTarget(args)).then((r) => trust<HostViewTarget | null>(r)),
   hostViewChangeRequest: (args: { url: string }): Promise<HostViewChangeRequest> =>
     unwrap(HostViewService.ChangeRequest(args)).then((r) => trust<HostViewChangeRequest>(r)),
+  hostViewIssue: (args: { ref: string }): Promise<HostViewIssue> =>
+    unwrap(HostViewService.Issue(args)).then((r) => trust<HostViewIssue>(r)),
   gitHostProviders: (): Promise<V2.HostProviders> =>
     unwrap(GitHostService.Providers()).then((r) => trust<V2.HostProviders>(r)),
 
