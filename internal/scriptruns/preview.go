@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -203,7 +204,7 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 	}
 	p.mcp = pv.MCP
 	if pv.Blocker == "" {
-		pv.Blocker = s.smartBlocker(agent, pv.MCP)
+		pv.Blocker = s.smartBlocker(agent, pv.MCP, p.dir.Path)
 	}
 	p.preview = finishPreview(pv, p)
 	return p, nil
@@ -248,8 +249,9 @@ func containsVarName(text, name string) bool {
 	return false
 }
 
-// smartBlocker answers why a smart run cannot start now: the run cap, or a user MCP server that is gone.
-func (s *Service) smartBlocker(agent harness.Provider, mcp []string) string {
+// smartBlocker answers why a smart run cannot start now: the run cap, or a user MCP server that is
+// gone. The check lists servers from dir, the folder the run starts in, since claude resolves a name there.
+func (s *Service) smartBlocker(agent harness.Provider, mcp []string, dir string) string {
 	s.mu.Lock()
 	running := len(s.smart)
 	s.mu.Unlock()
@@ -259,7 +261,8 @@ func (s *Service) smartBlocker(agent harness.Provider, mcp []string) string {
 	if len(mcp) == 0 {
 		return ""
 	}
-	have, err := agent.UserMCPServers(context.Background(), s.Home)
+	dir = existingDir(dir, s.Home)
+	have, err := agent.UserMCPServers(context.Background(), dir)
 	if err != nil {
 		return err.Error()
 	}
@@ -273,6 +276,17 @@ func (s *Service) smartBlocker(agent harness.Provider, mcp []string) string {
 		}
 	}
 	return ""
+}
+
+// existingDir is dir, or its nearest existing ancestor when the run folder is not created yet, or
+// fallback when none is found.
+func existingDir(dir, fallback string) string {
+	for d := dir; d != "" && d != filepath.Dir(d); d = filepath.Dir(d) {
+		if info, err := os.Stat(d); err == nil && info.IsDir() {
+			return d
+		}
+	}
+	return fallback
 }
 
 func finishPreview(pv Preview, p *planned) Preview {

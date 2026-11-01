@@ -61,7 +61,8 @@ func settingSources(s harness.HeadlessSpec) string {
 }
 
 // userMCPSettings is the --settings value of an isolated run that loads user MCP servers: hooks off
-// and only the granted and ticked servers allowed.
+// and only the granted and ticked servers allowed. Project .mcp.json servers never load, so a repo
+// cannot supply the command behind a ticked name.
 func userMCPSettings(s harness.HeadlessSpec) string {
 	type server struct {
 		Name string `json:"serverName"`
@@ -74,9 +75,11 @@ func userMCPSettings(s harness.HeadlessSpec) string {
 		allowed = append(allowed, server{n})
 	}
 	b, _ := json.Marshal(struct {
-		DisableAllHooks   bool     `json:"disableAllHooks"`
-		AllowedMcpServers []server `json:"allowedMcpServers"`
-	}{true, allowed})
+		DisableAllHooks         bool     `json:"disableAllHooks"`
+		AllowedMcpServers       []server `json:"allowedMcpServers"`
+		EnableAllProjectServers bool     `json:"enableAllProjectMcpServers"`
+		EnabledMcpjsonServers   []string `json:"enabledMcpjsonServers"`
+	}{true, allowed, false, []string{}})
 	return string(b)
 }
 

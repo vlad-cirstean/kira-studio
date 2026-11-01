@@ -272,7 +272,7 @@ func TestSmartScript(t *testing.T) {
 		if err := os.WriteFile(budget, []byte(`{"type":"result","subtype":"error_max_budget_usd","is_error":true,"total_cost_usd":0.5,"num_turns":3}`+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(denied, []byte(`{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"permission_denials":[{"tool_name":"Write"},{"tool_name":"Bash"},{"tool_name":"Bash"}]}`+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(denied, []byte(`{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"permission_denials":[{"tool_name":"Write"},{"tool_name":"Bash"},{"tool_name":"Bash"}],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}`+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		exit0 := 0
@@ -642,7 +642,7 @@ func TestSmartScript(t *testing.T) {
 		if i := slices.Index(argv, "--permission-prompts"); i < 0 || argv[i+1] != "none" {
 			t.Errorf("argv wants --permission-prompts none:\n%v", argv)
 		}
-		if got, want := callFile(t, app, 1, ".settings"), `{"disableAllHooks":true,"allowedMcpServers":[{"serverName":"kira-ade"},{"serverName":"fake"}]}`; got != want {
+		if got, want := callFile(t, app, 1, ".settings"), `{"disableAllHooks":true,"allowedMcpServers":[{"serverName":"kira-ade"},{"serverName":"fake"}],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}`; got != want {
 			t.Errorf("--settings = %s, want %s", got, want)
 		}
 		if i := slices.Index(argv, "--allowedTools"); i < 0 || !slices.Contains(argv[i+1:], "mcp__fake__echo") {
