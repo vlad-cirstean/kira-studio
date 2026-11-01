@@ -364,6 +364,44 @@ Steps, one commit each, Conventional Commits, hooks must pass on every commit:
 - Heap probe: report-only, run in step 1 and step 7. It is not part of the full suite.
 - Real `claude` tests: not affected, not run.
 
-## Result
+## Iter2 Result
 
-To be written by the implementer.
+Commits (base `6ba267359`):
+
+- `dce7bdbe9` test(perf): five rounds
+- `df2dca178` fix(studio): B1a, B1b
+- `40698bff2` fix(workbench): B1c
+- `ef9281b37` fix(space): B2a, B2b
+- `1d7fdd569` fix(space): B3
+- `955b336a6` refactor(studio): B4
+- this docs commit (step 8)
+
+Numbers: `P433-measurements.md` "Iter2".
+
+- Space `closed2 - closed` 2.8 to 0.3 MB: target met. Closed vs baseline 19.4 to 15.5 MB.
+- Discover growth per round after round 2 about 3.7 to about 0.6 MB: target missed. Closed vs baseline
+  40.0 to 18.5 MB. Known open items entry kept, reworded with the new numbers.
+
+Deviations:
+
+- Action labels: `check-copy` (U67) rejects a literal `label`. The labels use the action id constant
+  (`kira.submit`, `kira.save`, `kira.noSuggest`), never shown, instead of catalog keys.
+- B1c: `effect` from `vue` with a microtask scheduler that re-runs the effect to re-track nested
+  properties. No `first` flag: the initial run only tracks. The echo guard is `writeStored` skipping
+  a write whose string equals storage, not a flag, since the scheduler runs after the storage
+  event handler returns. A cross-window removal resets to the default, which then writes the default back.
+- B3: `Bytes` stays 0 on an `unchanged` answer, as before. `tooLarge` and `binary` carry no `stat`
+  now (they return before the hash), so they re-read each time.
+- B3 UI spec adds file `d.ts` to the mock; the existing tests are untouched.
+- B4: no UI spec references the stream filter history menu, so none ran for it.
+- `bash scripts/setup.sh` ran twice: first for missing bindings, then to regenerate `FileStat` bindings.
+
+Tests run:
+
+- Per commit: pre-commit hook (lint:all, typechecks) green on every commit, no `--no-verify`.
+- Go: `go test -count=1` of `internal/codeworkspace`, `flows/repoflow`, `flows/adeflow`,
+  `flows/windowflow` with `KIRA_CONTRACT=write`; all ok. Studio Go untouched, not run.
+- UI: `repo-file-gate` 3 of 3 (includes the new same-size spec). Then one full Studio UI suite, 675 passed,
+  and one full Space UI suite, 940 passed. No failures, no reruns.
+- No second full run: every fix landed before the full runs, so the one run per app covers `packages/workbench`.
+- Real `claude` tests: not run (not affected).

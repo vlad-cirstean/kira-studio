@@ -191,3 +191,37 @@ What the numbers say:
   still grows about 4 MB per round and ends 33 MB over baseline, and Space still grows about 0.7 MB per
   round and 2.8 MB per open/close cycle. The cause is not query-cache retention (the query fixes did not
   move it). Recorded in `docs/ARCHITECTURE.md` Known open items.
+
+
+## Iter2
+
+Tree: `chapter/v0.2.24`, before = `dce7bdbe9` (probe at 5 rounds, no fixes), after = `955b336a6`. Same probe and
+fixtures. Noise about 0.3 MB. Discover and Space file after numbers repeat across 2-3 runs.
+
+| world | metric | before | after |
+|---|---|---|---|
+| kibana discover | rounds 1-5 (MB) | 34.5, 38.4, 42.1, 46.2, 49.5 | 31.4, 32.3, 32.8, 33.9, 34.1 |
+| kibana discover | growth per round after round 2 | about 3.7 | about 0.6 |
+| kibana discover | closed vs baseline (MB) | 40.0 | 18.5 |
+| kibana discover | `closed2` - `closed` (MB) | 5.0 | 1.9 |
+| space repo graph, file, diff | rounds 1-5 (MB) | 30.7, 32.4, 33.1, 33.8, 34.2 | 30.5, 31.8, 32.3, 32.7, 32.9 |
+| space repo graph, file, diff | growth per round after round 2 | about 0.6 | about 0.35 |
+| space repo graph, file, diff | closed vs baseline (MB) | 19.4 | 15.5 |
+| space repo graph, file, diff | `closed2` - `closed` (MB) | 2.8 | 0.3 |
+
+Other worlds, one run each after the fixes, compared to the P433 after table: unchanged within noise.
+
+| world | round1 -> round3 (MB) | closed vs baseline (MB) | closed2 - closed (MB) |
+|---|---|---|---|
+| postgres grid, definition, console | 26.8 -> 27.8 | 12.8 | 0.4 |
+| mongo document | 23.7 -> 24.1 | 9.0 | 0.2 |
+| redis browse + keyvalue | 21.9 -> 22.4 | 2.0 | 0.2 |
+| sqs stream | 14.6 -> 14.9 | 2.2 | 0.3 |
+| api grpc + http | 24.9 -> 25.8 | 3.2 | 0.3 |
+| space local file | 20.7 -> 21.5 | 2.8 | 0.0 |
+
+Targets:
+
+- Space `closed2` - `closed` under 0.5 MB: met (0.3).
+- Discover growth under 0.5 MB per round after round 2: missed (about 0.6, repeatable over 3 runs).
+  The `ARCHITECTURE.md` Known open items entry stays, reworded with these numbers.
