@@ -6,12 +6,12 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 | Phase | Title | Status |
 |---|---|---|
-| P436 | ADE session tab context menu: close and restart a Claude session | Todo |
-| P437 | ADE sessions dropdown redesign | Todo |
-| P438 | Rename Automations to Runs; icon-only module tabs | Todo |
-| P439 | Kubernetes module (read only) | Todo |
-| P440 | Kubernetes MCP tools with per-cluster approval | Todo |
-| P441 | Restore previous Runs scripts and Docker containers after app close: shared dialog | Todo |
+| P436 | ADE session tab context menu: close and restart a Claude session | Done |
+| P437 | ADE sessions dropdown redesign | Done |
+| P438 | Rename Automations to Runs; icon-only module tabs | Done |
+| P439 | Kubernetes module (read only) | Done |
+| P440 | Kubernetes MCP tools with per-cluster approval | Done |
+| P441 | Restore previous Runs scripts and Docker containers after app close: shared dialog | Done |
 | P442 | Dependency update, incl. Wails | Todo |
 | P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
 | P444 | Remove CLI credential reads: claude MCP headers | Todo |
@@ -24,9 +24,13 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 - Right click on a session tab in the ADE module offers Close session and Restart session, next to the existing Copy session id.
 
+Result: Close and Restart in the session tab menu beside Copy session ID. Backend `CloseSession` (`closeTUILocked`, `restartHeadless`, `queueResumeLocked` extracted); frontend `useCloseSession`; flow tests and UI spec cover TUI and background tabs. Space `ui` subset 36 passed.
+
 ### P437 ADE sessions dropdown redesign
 
 - The sessions dropdown looks ugly and works clunkily. Redesign both looks and interactions.
+
+Result: Sessions dropdown rebuilt as `AdeSessionsMenu`/`List`/`Row` with filter, keyboard and context-menu support; `AdeStopped*` removed; strip scrolls selected tab into view. Script run wording fixed in ADE copy and backend strings. New UI spec (9 tests) and `ade-sessions-menu` visual baseline; `branch-panel-details` baseline re-recorded. Space `ui` 949 passed; `go test` 56 packages ok.
 
 ### P438 Rename Automations to Runs; icon-only module tabs
 
@@ -36,6 +40,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Internal identifiers (mode key `automations`, `<app home>/automations/<id>` folders, DB columns, i18n namespace) stay unless the plan finds a safe, worthwhile rename; the plan decides and justifies each.
 - Check wording collisions with the existing "run" concept (step runs, script runs, Operations panel history) and resolve them in the copy.
 
+Result: Module tabs icon-only (shadcn-vue tooltip, `aria-label`). Automations reads Runs in UI copy, READMEs, site (`shared/runs` with redirect) and docs; mode key, i18n keys, test IDs and `<app home>/automations` stay. Studio `ui` 681 passed; 2 `ui-timing` failures under load. Full-window baselines moved by the new tabs re-recorded after landing.
+
 ### P439 Kubernetes module (read only)
 
 - New read-only Kubernetes module. Host app: Kira Studio next to Docker (the plan confirms or changes this).
@@ -43,6 +49,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Every list, describe and logs view supports filtering.
 - UI design consistent with the app, taking its cues from the Studio (database) module.
 - Read only: no create, edit, delete, exec or port-forward.
+
+Result: Read-only Kubernetes module in Kira Studio: cluster store (migration 0049), client-go backend (namespaces, kinds, resources, describe with Secret redaction, logs), `KubernetesService` binding, module UI with filtering. Fake HTTPS API server and flow tests; UI spec (9). Binary +25.9 MB; all new Go modules permissive. Studio `ui` 686 of 688 first run; the 2 failures were tab-count asserts, fixed.
 
 ### P440 Kubernetes MCP tools with per-cluster approval
 
@@ -53,6 +61,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Read only, same as P439: no write, exec or port-forward tools.
 - Reuse the existing DB MCP approval flow and P415 op-log origin stamping where they fit; the plan decides.
 
+Result: Kubernetes MCP tools (`kube_list_clusters`, discover, list, describe, logs) in the Studio DB MCP server. Per-cluster description and per-operation off/ask/allow, default ask (migration 0051). Bounded reads, shared approval broker, flow test, settings and approval UI with spec, real `claude` test passes. Contracts regenerated.
+
 ### P441 Restore previous Runs scripts and Docker containers after app close: shared dialog
 
 - After the app closes, on next start offer to reopen the scripts that were running in the Runs module, as the Docker module already does for containers.
@@ -60,6 +70,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Redesign the dialog: current look is ugly. Tailwind and shadcn-vue primitives; consistent with the app.
 - Depends on P438 (Runs naming) and the existing Docker restore flow; the plan finds that flow, extracts the shared dialog, and decides how "was running" is recorded for scripts.
 - Docker restore files sit in Kira Studio, Runs code in `packages/workbench/src/automations`: the plan fixes file ownership across the streams.
+
+Result: Shared restore dialog (`packages/workbench/src/restore`) used by Docker and a new Runs restore banner. Scripts running at quit recorded (Studio migration 0050, Space 0061) and offered for restart on next start. Flow, UI and visual tests; Studio `ui` 683/688 first run, failures pass alone.
 
 ### P442 Dependency update, incl. Wails
 
