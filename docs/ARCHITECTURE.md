@@ -2007,6 +2007,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
 - BranchLinks (P383) is an optional role: ParseBranchLink (pull, tree, issue links on a claimed host; no host call), ChangeRequestHead (fresh head, author) and ChangeRequestRef (refs/pull/<n>/head on GitHub). ADE ResolveHostLink is read only; AddHostLink re-resolves, fetches one refspec (fork or closed PR: the change-request ref into <owner>/<head>; same-repo open PR: the head into its tracking ref) and attaches through the AddExistingBranch path, so kind follows the tip-author rule. Repo match walks every remote, origin first. Issue links are refused.
 - ChangeRequestDetails (P427) is an optional role: ParseChangeRequestLink (a change request link on a claimed host; no host call) and ChangeRequestDetail (one request's description, conversation, reviewers and checks). It has its own link parser because `fakehost.Forge` lacks BranchLinks and adding it there would change `BranchLinkLabels()`.
+- ChangeRequestComments (P429) is an optional write role, apart from the read and review roles: CommentCapabilities (attachments, reason, replyKinds, limits) and PostChangeRequestComment (body, replyTo, attachments). GitHub posts through `gh api -f` and replies to code threads with GraphQL `addPullRequestReviewThreadReply`. Azure posts through `az devops invoke`. See Comments (P429).
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
 
 #### Azure Repos (P423)
@@ -2098,6 +2099,16 @@ rewrite of the P129 agent merge queue. v1 data is not
 migrated (D5); history of the removal is migration `0011`. Phase detail: `docs/HISTORY.md (v2.0)` P143-P149
 and `docs/HISTORY.md (v2.0)`.
 
+#### Comments (P429)
+
+- Bridge: `HostViewService.StageAttachment`, `DiscardAttachment` and `PostComment`, all keyed by window key. The target comes from `HostViewTargets`, never from the frontend. `ChangeRequest` and `Issue` results carry `compose` (capabilities, limits, replyKinds), absent when the provider has no write role.
+- Staged files live in memory only (`HostViewAttachments`): 5 files, 10 MB each, 25 MB total, a 30 min sweep, dropped on success and on window close. Files travel as base64 over the bridge. No path reaches Go and `EnableFileDrop` stays false. Names are sanitised; the extension must be on the allow list.
+- One post at a time per window (`beginPost`). A timeout answers `unavailable` with a "may have been recorded" hint, so the UI warns before a retry.
+- Attachment links live in the Markdown body; the read models gain no attachment field. Images post as `![name](url)`, other files as `[name](url)`.
+- Azure attachments: `az devops invoke` cannot send a binary body. Kira reads a token with `az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798`, then POSTs the bytes to `dev.azure.com` itself (HTTPS, `CheckRedirect` refuses every redirect). The token is never stored or logged. A failed post deletes the uploads best-effort. A PAT-only sign-in has no token: the post is text only, with a sign-in reason. Files upload as `<8hex>-name`. A reply uses `parentCommentId` 1.
+- Frontend: `hostview/CommentComposer.vue` (Markdown source in a textarea, Edit and Preview tabs, drop zone, picker, paste). TanStack mutation with optimistic pending comment, rollback on error, invalidate on settle. Draft in session storage per window, kind and thread. HostViewWindow cancels window-level dragover and drop so a stray drop never navigates the webview.
+- Tests: `flows/githostflow/comments_test.go` (contract `host-view-comments`), `tests/ui/host-view-comments.spec.ts`.
+
 ### Issue tracker abstraction (P417)
 
 - internal/issuetracker is the neutral contract, shaped like githost. A Provider offers ID, Terms (label, CLI name, issue example), Setup, ParseRef (bare key or link), Status and Issue. Registry holds providers; providers.New registers Jira first. internal/clisetup holds the Setup and Step shape shared with githost.
@@ -2107,6 +2118,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Results cache 60 s (15 s when partial or failed), coalesced per key by singleflight on a detached 20 s context, so a caller that gives up leaves the result for the next call. A ref on another site than the signed-in one returns ErrOtherSite.
 - Wire: `IssueTrackerService.TaskIssue` (title, status, status category, summary, rows, reason), `Trackers`, `Tools` (status and setup of every host and tracker CLI, `refresh` skips the status caches). A tracker failure comes back as a `reason` (unavailable, unauthenticated, notFound, otherSite, timeout, failed, noTracker; `changeRequests<Reason>` for a failed row lookup), never as an error.
 - `IssueDetails` (P428) is an optional role beside `Provider`: `IssueDetail(ctx, ref)` returns title, fields, people, labels, components, dates, parent, description, comments and the PR rows. Jira reads it with `workitem view --fields jira.DetailFields`. When acli output passes the 1 MiB cap, it re-reads without `comment` and takes the newest 50 from `workitem comment list --key K --json --limit 50 --order -created`; if that fails too, `commentsOmitted` is set. ADF becomes Markdown in Go (`jira/adf.go`), hand-rolled: no maintained Go ADF converter (checked ajbeck/adf-to-markdown, rgonek/jira-adf-converter, seflue/adf-converter) escapes text and filters link schemes, and the output must be safe for the sanitising renderer.
+- `IssueComments` (P429) is an optional write role: CommentCapabilities and PostComment (ref, body). Jira turns Markdown into ADF in Go (`jira/mdadf.go`, goldmark with GFM) and posts `acli jira workitem comment create --key K --body-file F` from a 0600 temp file, so the body never reaches argv or the op log. Body limit 32 KiB, write timeout 30 s.
 - Frontend: Settings section CLI tools (`CliToolsPane.vue`, install and sign-in commands with copy), `AdeTaskIssueLine.vue` in the Task tab, tracker label and gap text in `AdeArtifactList.vue` (`artifacts/gapText.ts`).
 - Tests: issuetracker/jira unit tests over hand-written acli fixtures, flows/adeflow `TestTaskIssueTracker` (contract `ade-issue-tracker`), flows/appflow `TestCliTools` (contract `space-cli-tools`), tests/ui/ade-v2-issue-tracker.spec.ts, tests/ui/settings-cli-tools.spec.ts. flowharness/fakeacli stands in for acli; the default locator finds none.
 
@@ -3260,6 +3272,11 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Images in PR descriptions render as links (P427).** Never inline.
 - **Azure `@<GUID>` mentions show raw (P427).** No identity lookup.
 - **Azure threads beyond the newest 200 are not read (P427).**
+- **Jira comments cannot carry attachments (P429).** acli has no upload command and Kira holds no Jira credential. The composer states this. Add files in Jira.
+- **GitHub comments cannot carry attachments (P429).** GitHub has no API for comment attachments. The composer states this. Add files on GitHub.
+- **Azure attachments need an `az login` sign-in (P429).** A PAT-only sign-in (`az devops login`) posts text only.
+- **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input and the Azure attachment upload response are not seen live; the Azure reply assumes the first comment id is 1.
+- **Drag and drop is unverified in a real macOS window (P429).** UI specs dispatch synthetic drop events; no display was available.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
