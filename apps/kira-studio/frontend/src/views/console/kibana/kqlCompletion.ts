@@ -153,13 +153,7 @@ function valueText(field: KibanaField, value: string, closeQuote: boolean, quote
 }
 
 function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
-  async function fetchValues(
-    field: string,
-    query: string,
-    prefix: string,
-    size: number,
-    signal: AbortSignal,
-  ) {
+  async function fetchValues(field: string, query: string, prefix: string, size: number) {
     const view = deps.dataView();
     const connectionId = deps.connectionId();
     if (!view) return null;
@@ -175,10 +169,13 @@ function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
         prefix,
       ] as const,
       staleTime: SUGGEST_STALE_MS,
-      queryFn: () => {
+      // The query's own signal aborts only once every sharer is gone; a caller's signal would
+      // cancel the op under later callers that joined the same in-flight fetch.
+      queryFn: ({ signal: querySignal }) => {
         const opId = crypto.randomUUID();
         const cancel = () => fireAndForget(control.opsCancel(opId), 'kibana.suggest');
-        signal.addEventListener('abort', cancel, { once: true });
+        if (querySignal.aborted) return Promise.reject(querySignal.reason);
+        querySignal.addEventListener('abort', cancel, { once: true });
         return control
           .kibanaSuggest({
             connectionId,
@@ -188,7 +185,7 @@ function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
             field,
             prefix,
           })
-          .finally(() => signal.removeEventListener('abort', cancel));
+          .finally(() => querySignal.removeEventListener('abort', cancel));
       },
     });
   }
@@ -200,13 +197,7 @@ function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
     if (!field || !VALUE_TYPES.has(field.type)) return null;
     try {
       // The unfiltered list is fetched once per field and context; a complete one filters locally.
-      const base = await fetchValues(
-        ctx.field,
-        ctx.queryWithoutValue,
-        '',
-        FIRST_FETCH_SIZE,
-        signal,
-      );
+      const base = await fetchValues(ctx.field, ctx.queryWithoutValue, '', FIRST_FETCH_SIZE);
       if (!base || signal.aborted) return null;
       let values = base.values;
       let incomplete = false;
@@ -221,7 +212,6 @@ function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
             ctx.queryWithoutValue,
             ctx.prefix,
             FIRST_FETCH_SIZE,
-            signal,
           );
           if (!narrowed || signal.aborted) return null;
           values = narrowed.values;
