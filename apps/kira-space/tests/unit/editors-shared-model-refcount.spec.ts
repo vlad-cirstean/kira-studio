@@ -50,7 +50,7 @@ function fakeMod(): MonacoModule {
 
 function fakeDiffEditor(): import('monaco-editor').editor.IStandaloneDiffEditor {
   // biome-ignore lint/suspicious/noExplicitAny: a minimal structural fake, not the real editor
-  return { dispose: () => {} } as any;
+  return { setModel: () => {}, dispose: () => {} } as any;
 }
 
 describe('C14-5: a model uri shared by two open diff tabs is only disposed once both close', () => {
