@@ -1,6 +1,7 @@
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { z } from 'zod';
 
 export type KubeDetailTab = 'describe' | 'logs';
 
@@ -16,18 +17,13 @@ interface Remembered {
 
 const EMPTY: Remembered = { clusterId: '', perCluster: {} };
 
-const rememberedSchema = {
-  safeParse: (v: unknown) => {
-    const r = v as Remembered | null;
-    const ok =
-      r !== null &&
-      typeof r === 'object' &&
-      typeof r.clusterId === 'string' &&
-      r.perCluster !== null &&
-      typeof r.perCluster === 'object';
-    return ok ? { success: true as const, data: r as Remembered } : { success: false as const };
-  },
-};
+const rememberedSchema = z.object({
+  clusterId: z.string(),
+  perCluster: z.record(
+    z.string(),
+    z.object({ kind: z.string(), namespace: z.string().nullable() }),
+  ),
+});
 
 export const useKubernetesUiStore = defineStore('kubernetesUi', () => {
   const remembered = usePersistedState<Remembered>('kira.kubernetes.selection', EMPTY, {
