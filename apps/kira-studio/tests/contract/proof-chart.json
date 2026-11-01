@@ -1,0 +1,659 @@
+{
+  "ProofService.Session": {
+    "closedAt": 0,
+    "current": {
+      "createdAt": 0,
+      "reason": "",
+      "rev": 1,
+      "steps": [
+        {
+          "bytes": 329,
+          "description": "Errors per minute around the deploy",
+          "diff": "added",
+          "language": "json",
+          "ordinal": 1,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 235,
+          "description": "Responses by service",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 2,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 182,
+          "description": "Response time histogram",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 3,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 359,
+          "description": "Requests by region",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 4,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 237,
+          "description": "Latency vs payload size",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 5,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 126,
+          "description": "Share of 5xx by endpoint",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 6,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        }
+      ]
+    },
+    "id": "<masked>",
+    "name": "Deploy health",
+    "pending": null,
+    "removed": [],
+    "summary": ""
+  },
+  "ProofService.Session#pending": {
+    "closedAt": 0,
+    "current": {
+      "createdAt": 0,
+      "reason": "",
+      "rev": 1,
+      "steps": [
+        {
+          "bytes": 329,
+          "description": "Errors per minute around the deploy",
+          "diff": "added",
+          "language": "json",
+          "ordinal": 1,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 235,
+          "description": "Responses by service",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 2,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 182,
+          "description": "Response time histogram",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 3,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 359,
+          "description": "Requests by region",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 4,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 237,
+          "description": "Latency vs payload size",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 5,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 126,
+          "description": "Share of 5xx by endpoint",
+          "diff": "added",
+          "language": "text",
+          "ordinal": 6,
+          "originOrdinal": null,
+          "source": "elasticsearch",
+          "view": "chart"
+        }
+      ]
+    },
+    "id": "<masked>",
+    "name": "Deploy health",
+    "pending": {
+      "createdAt": 0,
+      "reason": "Recount after replay",
+      "rev": 2,
+      "steps": [
+        {
+          "bytes": 329,
+          "description": "Errors per minute around the deploy",
+          "diff": "unchanged",
+          "language": "json",
+          "ordinal": 1,
+          "originOrdinal": 1,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 235,
+          "description": "Responses by service",
+          "diff": "changed",
+          "language": "text",
+          "ordinal": 2,
+          "originOrdinal": 2,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 182,
+          "description": "Response time histogram",
+          "diff": "unchanged",
+          "language": "text",
+          "ordinal": 3,
+          "originOrdinal": 3,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 359,
+          "description": "Requests by region",
+          "diff": "unchanged",
+          "language": "text",
+          "ordinal": 4,
+          "originOrdinal": 4,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 237,
+          "description": "Latency vs payload size",
+          "diff": "unchanged",
+          "language": "text",
+          "ordinal": 5,
+          "originOrdinal": 5,
+          "source": "elasticsearch",
+          "view": "chart"
+        },
+        {
+          "bytes": 126,
+          "description": "Share of 5xx by endpoint",
+          "diff": "unchanged",
+          "language": "text",
+          "ordinal": 6,
+          "originOrdinal": 6,
+          "source": "elasticsearch",
+          "view": "chart"
+        }
+      ]
+    },
+    "removed": [],
+    "summary": ""
+  },
+  "ProofService.Sessions": [
+    {
+      "closedAt": 0,
+      "id": "<masked>",
+      "name": "Deploy health",
+      "pending": false,
+      "seen": false,
+      "steps": 6
+    }
+  ],
+  "ProofService.Step#area": {
+    "bytes": 359,
+    "data": {
+      "horizontal": false,
+      "series": [
+        {
+          "name": "eu",
+          "points": [
+            [
+              1768478400000,
+              10
+            ],
+            [
+              1768478460000,
+              14
+            ],
+            [
+              1768478520000,
+              9
+            ],
+            [
+              1768478580000,
+              12
+            ],
+            [
+              1768478640000,
+              11
+            ]
+          ]
+        },
+        {
+          "name": "us",
+          "points": [
+            [
+              1768478400000,
+              20
+            ],
+            [
+              1768478460000,
+              18
+            ],
+            [
+              1768478520000,
+              25
+            ],
+            [
+              1768478580000,
+              22
+            ],
+            [
+              1768478640000,
+              19
+            ]
+          ]
+        }
+      ],
+      "stacked": true,
+      "type": "area",
+      "x": {
+        "name": "time",
+        "type": "time"
+      },
+      "y": {
+        "name": "",
+        "unit": ""
+      }
+    },
+    "description": "Requests by region",
+    "diff": "added",
+    "language": "text",
+    "ordinal": 4,
+    "originOrdinal": null,
+    "query": "",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.Step#bar": {
+    "bytes": 235,
+    "data": {
+      "horizontal": false,
+      "series": [
+        {
+          "name": "2xx",
+          "points": [
+            [
+              "api",
+              120
+            ],
+            [
+              "web",
+              80
+            ],
+            [
+              "worker",
+              30
+            ]
+          ]
+        },
+        {
+          "name": "5xx",
+          "points": [
+            [
+              "web",
+              6
+            ],
+            [
+              "api",
+              2
+            ]
+          ]
+        }
+      ],
+      "stacked": true,
+      "type": "bar",
+      "x": {
+        "name": "service",
+        "type": "category"
+      },
+      "y": {
+        "name": "",
+        "unit": ""
+      }
+    },
+    "description": "Responses by service",
+    "diff": "added",
+    "language": "text",
+    "ordinal": 2,
+    "originOrdinal": null,
+    "query": "",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.Step#bar-new": {
+    "bytes": 235,
+    "data": {
+      "horizontal": false,
+      "series": [
+        {
+          "name": "2xx",
+          "points": [
+            [
+              "api",
+              120
+            ],
+            [
+              "web",
+              80
+            ],
+            [
+              "worker",
+              30
+            ]
+          ]
+        },
+        {
+          "name": "5xx",
+          "points": [
+            [
+              "web",
+              9
+            ],
+            [
+              "api",
+              2
+            ]
+          ]
+        }
+      ],
+      "stacked": true,
+      "type": "bar",
+      "x": {
+        "name": "service",
+        "type": "category"
+      },
+      "y": {
+        "name": "",
+        "unit": ""
+      }
+    },
+    "description": "Responses by service",
+    "diff": "changed",
+    "language": "text",
+    "ordinal": 2,
+    "originOrdinal": 2,
+    "query": "",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.Step#histogram": {
+    "bytes": 182,
+    "data": {
+      "horizontal": false,
+      "series": [
+        {
+          "name": "requests",
+          "points": [
+            [
+              0,
+              12
+            ],
+            [
+              50,
+              40
+            ],
+            [
+              100,
+              22
+            ],
+            [
+              150,
+              5
+            ]
+          ]
+        }
+      ],
+      "stacked": false,
+      "type": "bar",
+      "x": {
+        "name": "ms",
+        "type": "value"
+      },
+      "y": {
+        "name": "",
+        "unit": ""
+      }
+    },
+    "description": "Response time histogram",
+    "diff": "added",
+    "language": "text",
+    "ordinal": 3,
+    "originOrdinal": null,
+    "query": "",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.Step#line": {
+    "bytes": 329,
+    "data": {
+      "horizontal": false,
+      "series": [
+        {
+          "name": "before",
+          "points": [
+            [
+              1768478400000,
+              7
+            ],
+            [
+              1768478460000,
+              5
+            ],
+            [
+              1768478520000,
+              4
+            ]
+          ]
+        },
+        {
+          "name": "after <b>fix</b>",
+          "points": [
+            [
+              1768478580000,
+              1
+            ],
+            [
+              1768478640500,
+              null
+            ],
+            [
+              1768478700000,
+              0
+            ]
+          ]
+        }
+      ],
+      "stacked": false,
+      "type": "line",
+      "x": {
+        "name": "time",
+        "type": "time"
+      },
+      "y": {
+        "name": "errors",
+        "unit": "req"
+      }
+    },
+    "description": "Errors per minute around the deploy",
+    "diff": "added",
+    "language": "json",
+    "ordinal": 1,
+    "originOrdinal": null,
+    "query": "{\"aggs\":{\"per_minute\":{\"date_histogram\":{\"field\":\"@timestamp\",\"fixed_interval\":\"1m\"}}}}",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.Step#pie": {
+    "bytes": 126,
+    "data": {
+      "slices": [
+        {
+          "name": "/checkout",
+          "value": 5
+        },
+        {
+          "name": "/login",
+          "value": 2
+        },
+        {
+          "name": "/search",
+          "value": 1
+        }
+      ],
+      "type": "pie",
+      "unit": "req"
+    },
+    "description": "Share of 5xx by endpoint",
+    "diff": "added",
+    "language": "text",
+    "ordinal": 6,
+    "originOrdinal": null,
+    "query": "",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.Step#scatter": {
+    "bytes": 237,
+    "data": {
+      "horizontal": false,
+      "series": [
+        {
+          "name": "requests",
+          "points": [
+            [
+              120,
+              8
+            ],
+            [
+              340,
+              11
+            ],
+            [
+              800,
+              15
+            ],
+            [
+              1500,
+              22
+            ],
+            [
+              2400,
+              31
+            ],
+            [
+              3900,
+              38
+            ],
+            [
+              6100,
+              60
+            ],
+            [
+              9000,
+              95
+            ]
+          ]
+        }
+      ],
+      "stacked": false,
+      "type": "scatter",
+      "x": {
+        "name": "bytes",
+        "type": "value"
+      },
+      "y": {
+        "name": "ms",
+        "unit": "ms"
+      }
+    },
+    "description": "Latency vs payload size",
+    "diff": "added",
+    "language": "text",
+    "ordinal": 5,
+    "originOrdinal": null,
+    "query": "",
+    "source": "elasticsearch",
+    "view": "chart"
+  },
+  "ProofService.ViewState#chart": [
+    {
+      "ordinal": 1,
+      "state": {
+        "chart": {
+          "hidden": [],
+          "selected": null,
+          "zoom": {
+            "end": 75,
+            "start": 25
+          }
+        },
+        "columnWidths": {},
+        "expanded": [],
+        "queryScrollTop": 0,
+        "resultScrollLeft": 0,
+        "resultScrollTop": 0,
+        "selectedRow": null,
+        "selection": null
+      }
+    },
+    {
+      "ordinal": 2,
+      "state": {
+        "chart": {
+          "hidden": [
+            "5xx"
+          ],
+          "selected": {
+            "index": 1,
+            "series": 0
+          },
+          "zoom": null
+        },
+        "columnWidths": {},
+        "expanded": [],
+        "queryScrollTop": 0,
+        "resultScrollLeft": 0,
+        "resultScrollTop": 0,
+        "selectedRow": null,
+        "selection": null
+      }
+    }
+  ]
+}
