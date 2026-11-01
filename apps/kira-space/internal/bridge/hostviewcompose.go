@@ -192,10 +192,14 @@ func (h *HostViewAttachments) Put(key string, a stagedAttachment, now time.Time)
 }
 
 // Take returns the staged files for ids without removing them, so a failed post can retry.
-func (h *HostViewAttachments) Take(key string, ids []string) ([]githost.Attachment, bool) {
+// An id past its TTL counts as missing.
+func (h *HostViewAttachments) Take(key string, ids []string, now time.Time) ([]githost.Attachment, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	st := h.byKey[key]
+	if st != nil {
+		st.sweep(now)
+	}
 	out := make([]githost.Attachment, 0, len(ids))
 	for _, id := range ids {
 		if st == nil {
@@ -455,7 +459,7 @@ func (s *HostViewService) PostComment(ctx context.Context, args HostViewPostArgs
 		return HostViewPosted{}, composeRefusal(composeKeyPosting, nil)
 	}
 	defer s.Attachments.endPost(args.WindowKey)
-	files, ok := s.Attachments.Take(args.WindowKey, args.AttachmentIDs)
+	files, ok := s.Attachments.Take(args.WindowKey, args.AttachmentIDs, s.now())
 	if !ok {
 		return HostViewPosted{}, composeRefusal(composeKeyUnknownAttachment, nil)
 	}

@@ -271,6 +271,9 @@ func (s *HostViewService) openTarget(id string, target HostViewTarget, title str
 			return HostViewOpen{Key: key}, nil
 		}
 		s.Targets.Forget(key)
+		if s.Attachments != nil {
+			s.Attachments.Forget(key)
+		}
 		if err := s.Windows.Delete(key); err != nil {
 			slog.Warn("hostview: drop stale window row", "scope", "hostview", "key", key, "err", err)
 		}
