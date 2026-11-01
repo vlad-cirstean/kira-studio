@@ -310,8 +310,15 @@ func writesDoc(t *testing.T, itemReason, wantReason string, heading bool) {
 	if err := app.W.MemoryImport.Start(args); err != nil {
 		t.Fatal(err)
 	}
-	done := waitJob(t, app, awaiting.Job.ID, importer.JobDone, importer.JobFailed)
-	f := fileNamed(t, done, "billing.md")
+	waitJob(t, app, awaiting.Job.ID, importer.JobDone, importer.JobFailed)
+	// The doc is written after the file turns done, so the job can read done a moment before its path lands.
+	var done importer.JobDetail
+	var f importer.File
+	testx.WaitUntil(t, waitFor, func() bool {
+		done = jobDetail(t, app, awaiting.Job.ID)
+		f = fileNamed(t, done, "billing.md")
+		return f.DocPath != "" || f.DocError != ""
+	})
 	if done.Job.State != importer.JobDone || f.State != importer.FileDone || f.DocError != "" || f.DocPath != filepath.Join(dir, "billing.memory.md") {
 		t.Fatalf("job = %+v file %+v, want done and a written doc beside the source", done.Job, f)
 	}
