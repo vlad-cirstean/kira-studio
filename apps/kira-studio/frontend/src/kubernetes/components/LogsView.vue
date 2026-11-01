@@ -82,8 +82,13 @@ async function close(): Promise<void> {
   });
 }
 
+// Bumped by every open() and by unmount; an await that resumes on a stale value bails out.
+let generation = 0;
+
 async function open(): Promise<void> {
+  const gen = ++generation;
   await close();
+  if (gen !== generation) return;
   lines.value = [];
   ended.value = false;
   failure.value = '';
@@ -111,6 +116,7 @@ async function open(): Promise<void> {
     });
     await opening;
   } catch (err) {
+    if (gen !== generation) return;
     failure.value = errorText(err);
     ended.value = true;
   }
@@ -137,7 +143,10 @@ watch(
   () => void open(),
   { immediate: true },
 );
-onBeforeUnmount(() => void close());
+onBeforeUnmount(() => {
+  generation++;
+  void close();
+});
 
 function segmentStyle(seg: AnsiSegment): Record<string, string> | undefined {
   if (!seg.color && !seg.background) return undefined;
