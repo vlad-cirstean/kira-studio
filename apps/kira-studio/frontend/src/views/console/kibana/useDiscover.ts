@@ -59,7 +59,6 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
       control.kibanaDataView(connectionId.value, crypto.randomUUID(), state.value.dataViewId ?? ''),
     enabled: connected.value && !!connectionId.value && !!state.value.dataViewId,
     staleTime: 5 * 60_000,
-    gcTime: KEEP_WHILE_OPEN,
   }));
   const dataView = computed<KibanaDataView | null>(() => dataViewQuery.data.value ?? null);
   const fields = computed(() => dataView.value?.fields ?? []);
@@ -229,6 +228,16 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     scopeKey: () => JSON.stringify([state.value.time, state.value.filters]),
   });
 
+  // Names everything a suggestion depends on, so another connection or data view never shares one.
+  const suggestScope = computed(
+    () =>
+      [
+        connectionId.value,
+        state.value.dataViewId ?? '',
+        JSON.stringify([state.value.time, state.value.filters]),
+      ] as const,
+  );
+
   async function suggestValues(field: string): Promise<string[]> {
     const r = await control.kibanaSuggest({
       connectionId: connectionId.value,
@@ -265,5 +274,6 @@ export function useDiscover(tab: Ref<ConsoleTabRecord>, connected: Ref<boolean>)
     unlink,
     completion,
     suggestValues,
+    suggestScope,
   };
 }

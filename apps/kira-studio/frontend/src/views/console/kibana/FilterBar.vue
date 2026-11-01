@@ -13,6 +13,7 @@ import FilterEditor from './FilterEditor.vue';
 defineProps<{
   fields: readonly KibanaField[];
   suggest: (field: string) => Promise<string[]>;
+  suggestScope: readonly string[];
 }>();
 const filters = defineModel<KibanaFilter[]>({ required: true });
 
@@ -89,6 +90,7 @@ function negate(index: number, f: KibanaFilter): void {
             :fields="fields"
             :initial="f"
             :suggest="suggest"
+            :suggest-scope="suggestScope"
             @save="onEdit(i, $event)"
             @cancel="editing = null"
           />
@@ -127,6 +129,7 @@ function negate(index: number, f: KibanaFilter): void {
           :fields="fields"
           :initial="null"
           :suggest="suggest"
+          :suggest-scope="suggestScope"
           @save="onAdd"
           @cancel="adding = false"
         />

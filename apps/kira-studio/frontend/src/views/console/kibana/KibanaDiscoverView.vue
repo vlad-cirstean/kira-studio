@@ -218,7 +218,12 @@ onUnmounted(() => {
     >
       <TimePicker v-model="time" :disabled="!d.timeField.value" @refresh="onRun" />
     </QueryBar>
-    <FilterBar v-model="filters" :fields="d.fields.value" :suggest="d.suggestValues" />
+    <FilterBar
+      v-model="filters"
+      :fields="d.fields.value"
+      :suggest="d.suggestValues"
+      :suggest-scope="d.suggestScope.value"
+    />
 
     <Alert strip v-if="savedError" variant="error" data-testid="kibana-saved-error">
       <AlertDescription>{{ savedError }}</AlertDescription>

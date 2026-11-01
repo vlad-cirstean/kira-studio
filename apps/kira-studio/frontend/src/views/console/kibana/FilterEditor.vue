@@ -19,6 +19,8 @@ const props = defineProps<{
   initial: KibanaFilter | null;
   /** Candidate values for a field, best effort. */
   suggest: (field: string) => Promise<string[]>;
+  /** Connection, data view and request scope the suggestions depend on. */
+  suggestScope: readonly string[];
 }>();
 const emit = defineEmits<{ save: [filter: KibanaFilter]; cancel: [] }>();
 
@@ -56,7 +58,7 @@ const valuePlaceholder = computed(() =>
 const isBetween = computed(() => operator.value === 'between');
 
 const suggestions = useQuery(() => ({
-  queryKey: ['kibana', 'filterValues', field.value] as const,
+  queryKey: ['kibana', 'filterValues', ...props.suggestScope, field.value] as const,
   queryFn: () => props.suggest(field.value),
   enabled: field.value !== '' && needsValues.value,
   staleTime: 30_000,
