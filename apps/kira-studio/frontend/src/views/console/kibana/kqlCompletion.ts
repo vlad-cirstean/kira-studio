@@ -153,41 +153,77 @@ function valueText(field: KibanaField, value: string, closeQuote: boolean, quote
 }
 
 function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
-  async function fetchValues(field: string, query: string, prefix: string, size: number) {
+  // Callers sharing one in-flight fetch per key; the backend op is cancelled when the last one aborts.
+  const waiters = new Map<string, number>();
+
+  async function fetchValues(
+    field: string,
+    query: string,
+    prefix: string,
+    size: number,
+    signal: AbortSignal,
+  ) {
     const view = deps.dataView();
     const connectionId = deps.connectionId();
     if (!view) return null;
-    return queryClient.fetchQuery({
-      queryKey: [
-        'kibana',
-        'suggest',
-        connectionId,
-        view.id,
-        field,
-        deps.scopeKey(),
-        query,
-        prefix,
-      ] as const,
-      staleTime: SUGGEST_STALE_MS,
-      // The query's own signal aborts only once every sharer is gone; a caller's signal would
-      // cancel the op under later callers that joined the same in-flight fetch.
-      queryFn: ({ signal: querySignal }) => {
-        const opId = crypto.randomUUID();
-        const cancel = () => fireAndForget(control.opsCancel(opId), 'kibana.suggest');
-        if (querySignal.aborted) return Promise.reject(querySignal.reason);
-        querySignal.addEventListener('abort', cancel, { once: true });
-        return control
-          .kibanaSuggest({
-            connectionId,
-            opId,
-            tabId: '',
-            request: { ...deps.request(query), size },
-            field,
-            prefix,
-          })
-          .finally(() => querySignal.removeEventListener('abort', cancel));
-      },
-    });
+    const queryKey = [
+      'kibana',
+      'suggest',
+      connectionId,
+      view.id,
+      field,
+      deps.scopeKey(),
+      query,
+      prefix,
+    ] as const;
+    const mapKey = JSON.stringify(queryKey);
+    let released = false;
+    const release = () => {
+      if (released) return false;
+      released = true;
+      const left = (waiters.get(mapKey) ?? 1) - 1;
+      if (left > 0) {
+        waiters.set(mapKey, left);
+        return false;
+      }
+      waiters.delete(mapKey);
+      return true;
+    };
+    const onAbort = () => {
+      if (release()) {
+        fireAndForget(queryClient.cancelQueries({ queryKey, exact: true }), 'kibana.suggest');
+      }
+    };
+    if (signal.aborted) return null;
+    waiters.set(mapKey, (waiters.get(mapKey) ?? 0) + 1);
+    signal.addEventListener('abort', onAbort, { once: true });
+    return queryClient
+      .query({
+        queryKey,
+        staleTime: SUGGEST_STALE_MS,
+        // The query's own signal aborts only once every sharer is gone; a caller's signal would
+        // cancel the op under later callers that joined the same in-flight fetch.
+        queryFn: ({ signal: querySignal }) => {
+          const opId = crypto.randomUUID();
+          const cancel = () => fireAndForget(control.opsCancel(opId), 'kibana.suggest');
+          if (querySignal.aborted) return Promise.reject(querySignal.reason);
+          querySignal.addEventListener('abort', cancel, { once: true });
+          return control
+            .kibanaSuggest({
+              connectionId,
+              opId,
+              tabId: '',
+              request: { ...deps.request(query), size },
+              field,
+              prefix,
+            })
+            .finally(() => querySignal.removeEventListener('abort', cancel));
+        },
+      })
+      .finally(() => {
+        signal.removeEventListener('abort', onAbort);
+        release();
+      });
   }
 
   return async ({ doc, offset }, signal) => {
@@ -197,7 +233,13 @@ function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
     if (!field || !VALUE_TYPES.has(field.type)) return null;
     try {
       // The unfiltered list is fetched once per field and context; a complete one filters locally.
-      const base = await fetchValues(ctx.field, ctx.queryWithoutValue, '', FIRST_FETCH_SIZE);
+      const base = await fetchValues(
+        ctx.field,
+        ctx.queryWithoutValue,
+        '',
+        FIRST_FETCH_SIZE,
+        signal,
+      );
       if (!base || signal.aborted) return null;
       let values = base.values;
       let incomplete = false;
@@ -212,6 +254,7 @@ function kqlValueSource(deps: KqlCompletionDeps): EditorAsyncCompletionSource {
             ctx.queryWithoutValue,
             ctx.prefix,
             FIRST_FETCH_SIZE,
+            signal,
           );
           if (!narrowed || signal.aborted) return null;
           values = narrowed.values;

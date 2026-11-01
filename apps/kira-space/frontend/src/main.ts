@@ -130,21 +130,21 @@ async function mountShell(): Promise<void> {
   }
 
   // A capture popup (ephemeral, one clipboard item) answers with its item; any other gets null.
-  const captureItem = await queryClient.fetchQuery({
+  const captureItem = await queryClient.query({
     queryKey: captureItemKey(windowKey),
     queryFn: () => control.captureWindowItem({ windowKey }),
   });
   if (captureItem) captureStore.item = captureItem;
 
   // A host view window (ephemeral, one change request) answers with its target; any other gets null.
-  const hostViewTarget = await queryClient.fetchQuery({
+  const hostViewTarget = await queryClient.query({
     queryKey: hostViewTargetKey(windowKey),
     queryFn: () => control.hostViewWindowTarget({ windowKey }),
   });
   if (hostViewTarget) hostViewStore.target = hostViewTarget;
 
   // A review window (ephemeral, one branch) answers with its target; any other window gets null.
-  const reviewTarget = await queryClient.fetchQuery({
+  const reviewTarget = await queryClient.query({
     queryKey: reviewTargetKey(windowKey),
     queryFn: () => control.adeTaskReviewWindowTarget({ windowKey }),
   });
