@@ -26,6 +26,7 @@ import type {
   EditorCompletionResult,
   EditorCompletionSource,
 } from './completion';
+import { ensureCustomLanguage } from './customLanguages';
 import type { ConsoleDiagnostic } from './diagnostics';
 import { type ConsoleHoverInfo, escapeMarkdownSyntaxTokens, fenceMarkdownValue } from './hoverInfo';
 
@@ -135,6 +136,10 @@ let decorations: DecorationsCollection | null = null;
 let completionDisposable: MonacoDisposable | null = null;
 let hoverDisposable: MonacoDisposable | null = null;
 let wrapDisposable: MonacoDisposable | null = null;
+// Never shown: the context menu is off, so the id doubles as Monaco's required label.
+const SUBMIT_ACTION = 'kira.submit';
+const SAVE_ACTION = 'kira.save';
+let actionDisposables: MonacoDisposable[] = [];
 
 function resolveWordWrap(): 'on' | 'off' {
   if (props.singleLine) return 'off';
@@ -244,15 +249,10 @@ function kindFor(m: MonacoModule, type?: EditorCompletionKind): CompletionItemKi
   }
 }
 
-const registeredLanguages = new Set<string>();
-
 function languageId(m: MonacoModule): string {
   const custom = props.monacoLanguage;
   if (!custom) return monacoLanguageIdFor(props.language);
-  if (!registeredLanguages.has(custom.id)) {
-    custom.register(m);
-    registeredLanguages.add(custom.id);
-  }
+  ensureCustomLanguage(m, custom);
   return custom.id;
 }
 
@@ -559,10 +559,25 @@ onMounted(async () => {
   });
   decorations = editor.createDecorationsCollection();
   if (props.singleLine) {
-    editor.addCommand(mod.KeyCode.Enter, () => emit('submit'), '!suggestWidgetVisible');
+    actionDisposables.push(
+      editor.addAction({
+        id: SUBMIT_ACTION,
+        label: SUBMIT_ACTION,
+        keybindings: [mod.KeyCode.Enter],
+        keybindingContext: '!suggestWidgetVisible',
+        run: () => emit('submit'),
+      }),
+    );
   }
   if (props.saveCommand) {
-    editor.addCommand(mod.KeyMod.CtrlCmd | mod.KeyCode.KeyS, () => emit('save'));
+    actionDisposables.push(
+      editor.addAction({
+        id: SAVE_ACTION,
+        label: SAVE_ACTION,
+        keybindings: [mod.KeyMod.CtrlCmd | mod.KeyCode.KeyS],
+        run: () => emit('save'),
+      }),
+    );
   }
   wrapDisposable = attachWrapOnType(editor, model);
   registerProviders(mod, languageId(mod));
@@ -610,6 +625,8 @@ onUnmounted(() => {
   hoverDisposable = null;
   wrapDisposable?.dispose();
   wrapDisposable = null;
+  for (const d of actionDisposables) d.dispose();
+  actionDisposables = [];
   editor?.dispose();
   editor = null;
   model?.dispose();
