@@ -8,7 +8,7 @@ import type { KubeClusters, KubeMcpSettings, KubeStatus } from './wire';
 
 const LIST_POLL = TIMING.pollFast * 2;
 
-export const kubeKeys = {
+const kubeKeys = {
   clusters: ['kubernetes', 'clusters'] as const,
   cluster: (id: string) => ['kubernetes', id] as const,
   status: (id: string) => ['kubernetes', id, 'status'] as const,

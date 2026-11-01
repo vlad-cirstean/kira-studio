@@ -3,9 +3,9 @@ import type { McpPermissionMode } from '@shared/domain/connection';
 
 export const KUBE_CHANNEL = { logs: 'kira:kubernetes:logs' } as const;
 
-export type ConfigState = 'ok' | 'missing' | 'invalid';
+type ConfigState = 'ok' | 'missing' | 'invalid';
 
-export interface KubeConfigInfo {
+interface KubeConfigInfo {
   state: ConfigState;
   paths: string[];
   message: string;
@@ -85,7 +85,7 @@ export interface KubeKinds {
   partial: boolean;
 }
 
-export interface KubeColumn {
+interface KubeColumn {
   name: string;
   type: string;
 }
@@ -103,7 +103,7 @@ export interface KubeList {
   truncated: boolean;
 }
 
-export interface KubeCondition {
+interface KubeCondition {
   type: string;
   status: string;
   reason: string;
@@ -111,7 +111,7 @@ export interface KubeCondition {
   lastTransition: string;
 }
 
-export interface KubeEvent {
+interface KubeEvent {
   type: string;
   reason: string;
   message: string;
