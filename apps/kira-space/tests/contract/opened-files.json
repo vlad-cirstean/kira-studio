@@ -16,6 +16,10 @@
     "kind": "found",
     "language": "json",
     "limitBytes": 8388608,
+    "stat": {
+      "mtimeNs": 0,
+      "size": 9
+    },
     "text": "{\"k\": 1}\n"
   }
 }

@@ -52,6 +52,7 @@
       "bytes": 9,
       "kind": "found",
       "limitBytes": 8388608,
+      "oid": "<masked>",
       "text": "keep.txt\n"
     },
     "language": "plaintext",
@@ -60,6 +61,10 @@
       "bytes": 23,
       "kind": "found",
       "limitBytes": 8388608,
+      "stat": {
+        "mtimeNs": 0,
+        "size": 23
+      },
       "text": "keep.txt\nunstaged edit\n"
     }
   },
