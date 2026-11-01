@@ -2896,6 +2896,22 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Flow seams: docker.WithRestoreTiming, docker.WithBootProbe, flowharness.BootGen (simulates a daemon restart). A real dockerd restart runs only with KIRA_FLOW_DOCKER_RESTART=1.
 - UI styling: start uses text-ok and stop text-error module-wide; selected rows use neutral bg-select; left-panel section tabs are the git module's ToggleGroup.
 
+## Kubernetes module (P439, Kira Studio)
+
+- The Kubernetes module is registered in Kira Studio only, next to Docker. It is read-only: the backend issues GET requests and nothing else, with no create, update, delete, exec, attach or port-forward path.
+- The backend is Go package internal/kubernetes. `Service` is the domain surface the P440 MCP tools call; `BoundService` is the Wails surface, exposed as KubernetesService. Channel: kira:kubernetes:logs.
+- Client: k8s.io/client-go, api and apimachinery v0.37.2 (Apache-2.0) with sigs.k8s.io/yaml. It adds about 25.9 MB to the stripped Studio binary (74.5 MB to 100.4 MB, same embedded frontend, `go build -ldflags="-s -w"`). `kubectl` shell-out was declined: it needs a kubectl install and parses text. The kubectl describe package was declined: it adds about 36 MB (cli-runtime, kustomize). Describe is built from unstructured objects plus an events list.
+- Environment: PATH and KUBECONFIG come from a login-shell probe (cached, `WithEnv` seam), so a Dock-launched app sees what the terminal sees. Exec credential plugins (aws, gcloud, kubelogin) run with the resolved PATH; their command is pinned to the resolved path. Interactive exec plugins are not supported.
+- Kubeconfig is loaded per call (cheap, so edits apply without restart). KUBECONFIG may list several files. A missing or invalid file is reported in `Clusters().config`, not as an error.
+- Cluster rows: one per kubeconfig context, stored in `kube_clusters` (migration 0049, unique per context and server, INTEGER ms timestamps) through `ClusterStore.Ensure`. The row id is stable and is the key P440 hangs per-cluster permissions on.
+- Connect is lazy: no cluster is probed until it is expanded or selected, so SSO plugins never fire for clusters the user does not open. Clients are built once per cluster (singleflight) and dropped by `Status{refresh: true}`.
+- Errors map to reasons (unreachable, unauthorized, forbidden, plugin, config, timeout) with details `{"reason": ...}`; the UI picks the copy by reason.
+- Lists use the server-side Table format (`Accept: application/json;as=Table;v=v1;g=meta.k8s.io`), so columns and cells match kubectl. Rows page by limit 500 and continue, capped at 5000 rows; past the cap `truncated` is true. Label selectors are validated before the call (E_BAD_REQUEST).
+- Describe returns overview fields, labels, annotations, owners, conditions, up to 200 events and a YAML manifest. Secret data and stringData become `<N bytes>`; the last-applied annotation and managedFields are dropped.
+- Logs stream per window and per stream id through a coalescer (16 ms, 500 lines). A line is capped at 64 KiB; the UI keeps the newest 20 000 lines. Follow with Tail all asks the server for 20 000 lines, because a byte limit would end the follow stream. Streams end on LogsClose, window close, service shutdown and quit.
+- Frontend: apps/kira-studio/frontend/src/kubernetes/ (app-local, no second consumer). Mode `kubernetes` has no tab strip. Server state is on TanStack Query under ['kubernetes', clusterId, ...]; lists refetch every 10 s while the document is visible. UI state is one Pinia store; the last cluster, kind and namespace per cluster persist in localStorage (kira.kubernetes.selection).
+- Flow tests run against `flowharness.KubeFake`, an in-process HTTPS API server (client-go sends no credentials over plain HTTP). It serves discovery, Table lists, objects, events, logs and an exec-plugin cluster. No real cluster is used anywhere.
+
 ## Database MCP server (v1.7)
 
 ### The server (M1)
@@ -3300,6 +3316,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Interactive exec plugins are unsupported (P439).** A kubeconfig credential plugin that prompts on a terminal fails with the `plugin` reason. Non-interactive plugins work.
 - **Studio Discover remounts still grow the renderer heap (P433).** Switching away from and back to a Kibana Discover tab adds about 0.6 MB per round after round 2 (5 rounds: 31.4, 32.3, 32.8, 33.9, 34.1 MB), and a second open/close cycle adds 1.9 MB. Close-all ends 18.5 MB over baseline, mostly first-load module code plus Monaco and KQL source strings. The Monaco `addCommand`, grammar re-registration and `usePersistedState` leaks are fixed; the rest is unattributed (V8 JIT code is the main suspect). Probe: `heap` project in Studio, `docs/DEV_ENVIRONMENT.md` "Perf probes". Find the retainer with a heap snapshot diff across rounds 3 and 5, then delete this item.
 - **Kibana search uses an internal route (P424).** `POST /internal/search/es` is not a public API; a Kibana upgrade can change its body or headers. The conformance suite runs against 9.5.3 and the 8.19 floor via `KIRA_COMPAT_IMAGE_KIBANA`.
 - **Azure Repos search covers the default project only (P423).** `SearchChangeRequests` reads 2 pages of 100 in the configured default organization and project. A PR elsewhere is not found by issue key.

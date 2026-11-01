@@ -440,6 +440,13 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 - `terminal-real.spec.ts` uses a temp `HOME` removed at process exit, not in `afterAll`: with `fullyParallel`
   `afterAll` runs between tests of one worker.
 
+## Kubernetes flow tests (P439)
+
+- `go test ./apps/kira-studio/internal/flows/kubeflow` needs no cluster and no kubectl. `flowharness.KubeFake`
+  is an HTTPS API server; `KubeFake.WriteKubeconfig` writes the kubeconfig and the exec-plugin script.
+- The harness reads PATH and KUBECONFIG from the process environment at call time (`kubeEnv`), so a test sets them with `t.Setenv`.
+- Rewrite `apps/kira-studio/tests/contract/kubernetes.json` with `KIRA_CONTRACT=write`, then rerun without it; the UI spec `kubernetes-module.spec.ts` reads the same file.
+
 ## Contract fixtures (P249)
 
 - Fixtures live in `apps/<app>/tests/contract/*.json`, written by Go flow tests and read by UI specs.
