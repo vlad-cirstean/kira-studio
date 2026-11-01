@@ -27,7 +27,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, findRow, openRowMenu, settleFrames } from './support/tree';
 
 // Ported from tests/e2e/interaction.spec.ts (P57 D16), against real captures of the
 // regions -> customers -> orders -> order_items <- products FK graph and app.composite_pk's own
@@ -1064,10 +1064,10 @@ async function rightClick(locator: Locator): Promise<void> {
     // detached element throws instead of retrying, so treat it as a failed attempt.
     try {
       await locator.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(400);
+      await settleFrames(page);
       await locator.click({ button: 'right' });
       await expect(menu).toBeVisible();
-      await page.waitForTimeout(400);
+      await settleFrames(page);
       if (await menu.isVisible()) return;
     } catch (error) {
       if (attempt === 3) throw error;

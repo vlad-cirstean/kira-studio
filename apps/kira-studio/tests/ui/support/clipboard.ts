@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 // P107 I2-25: installClipboardSpy/lastClipboardWrite were copied, byte-identically, across 3
 // spec files. One copy here, imported everywhere.
@@ -101,13 +101,17 @@ export async function clipboardReset(page: Page, browserName: string): Promise<v
 /** The next clipboard write, waiting for it to land. Throws on a rejected WebKit write. */
 export async function clipboardRead(page: Page, browserName: string): Promise<string> {
   if (browserName === 'chromium') {
-    const deadline = Date.now() + 10_000;
-    for (;;) {
-      const text = await page.evaluate(() => navigator.clipboard.readText());
-      if (text !== SENTINEL) return text;
-      if (Date.now() > deadline) throw new Error('clipboard was never written');
-      await page.waitForTimeout(50);
-    }
+    let text = SENTINEL;
+    await expect
+      .poll(
+        async () => {
+          text = await page.evaluate(() => navigator.clipboard.readText());
+          return text;
+        },
+        { timeout: 10_000, message: 'clipboard was never written' },
+      )
+      .not.toBe(SENTINEL);
+    return text;
   }
   const handle = await page.waitForFunction(() => {
     const log = (window as unknown as { __realClipboard: RealClipboardLog }).__realClipboard;
