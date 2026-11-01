@@ -213,6 +213,9 @@ func (a *Az) Calls() []string {
 	return slices.Clone(a.calls)
 }
 
+// ResetCalls forgets every recorded call.
+func (a *Az) ResetCalls() { a.set(func() { a.calls = nil }) }
+
 // Count returns how many recorded calls start with prefix.
 func (a *Az) Count(prefix string) int {
 	n := 0
