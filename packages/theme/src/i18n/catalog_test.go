@@ -25,6 +25,7 @@ var wrappers = map[string]bool{
 	"apps/kira-studio/internal/adapters/errors.go":   true,
 	"apps/kira-studio/internal/httpclient/errors.go": true,
 	"apps/kira-space/internal/mobileweb/respond.go":  true,
+	"apps/kira-space/internal/ade/stagesettings.go":  true,
 }
 
 func repoRoot(t *testing.T) string {
