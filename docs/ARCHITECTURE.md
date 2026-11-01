@@ -2109,6 +2109,18 @@ and `docs/HISTORY.md (v2.0)`.
 - Frontend: `hostview/CommentComposer.vue` (Markdown source in a textarea, Edit and Preview tabs, drop zone, picker, paste). TanStack mutation with optimistic pending comment, rollback on error, invalidate on settle. Draft in session storage per window, kind and thread. HostViewWindow cancels window-level dragover and drop so a stray drop never navigates the webview.
 - Tests: `flows/githostflow/comments_test.go` (contract `host-view-comments`), `tests/ui/host-view-comments.spec.ts`.
 
+### Clipboard capture (P430)
+
+- Global hotkey (default `CmdOrCtrl+Shift+K`, user-set in Settings > Capture, on by default) opens a small popup showing the clipboard text with actions that fit it. Wails `App.GlobalShortcut` registers the chord; `App.Clipboard.Text` reads it. No new library. No Accessibility permission, no selection reading.
+- `shell.ParseChord` validates a chord (needs CmdOrCtrl, Ctrl or Alt; key A-Z, 0-9, F1-F12, Space or punctuation) and `ConflictsWithMenu` rejects menu accelerators. `shell.HotkeyBinding` owns registration: `Apply(enabled, accel, cb)` swaps it live, `ReportError` turns a later OS refusal into `failed`. States: `off`, `active`, `requested` (Wayland: the portal decides the trigger), `failed` (with reason).
+- Wails defers a pre-`Run` register; an OS rejection arrives at `Options.ErrorHandler`. main.go routes the `failed to register global shortcut` and `global shortcuts:` prefixes to `bridge.CaptureReportShortcutError`.
+- Popup: `shell.OpenPopup` opens an ephemeral window, key prefix `capture-`, frameless, centered, always on top. macOS uses a non-activating floating panel. Rows delete on close and purge at startup (`IsCaptureKey`, `CaptureForget`, `purgeCaptureWindows`). A second press while open pushes `kira:capture:item` to the same window and focuses it.
+- `bridge.CaptureService`: `WindowItem`, `Status`, `Dismiss`, `Confirm`. Classification order: change request link (`githost.Registry.ParseChangeRequestLink`), issue (key or link), text, empty. Caps: 64 KiB text, 2048 bytes for link detection, 500 bytes title. Actions: change request: open, Later; issue: open, Later; text: Later. A stale item id is refused.
+- Later is `CaptureTask` then one `UpdateTask` (notes with the full text, `hostUrl` for a recognised link, `jira` for an issue). The two calls are not atomic: a failed patch leaves the task and shows an error in the popup.
+- Settings: `capture.enabled` and `capture.hotkey` leaves (storage `settings` table, validated in `model.validateCaptureSection`). `Settings.OnChanged` calls `CaptureApply`; each state change pushes `kira:capture:status`.
+- Frontend: `capture/CaptureWindow.vue` (radio actions, title input, Enter confirms, Esc or blur dismisses), `workbench/settings/CapturePane.vue` (chord recorder from `capture/chord.ts`, status line).
+- Tests: `flows/captureflow` (fake clipboard and shortcut manager in `flowharness`; contract `capture`), `tests/ui/capture.spec.ts`, `tests/ui/settings-capture.spec.ts`.
+
 ### Issue tracker abstraction (P417)
 
 - internal/issuetracker is the neutral contract, shaped like githost. A Provider offers ID, Terms (label, CLI name, issue example), Setup, ParseRef (bare key or link), Status and Issue. Registry holds providers; providers.New registers Jira first. internal/clisetup holds the Setup and Step shape shared with githost.
@@ -3568,3 +3580,6 @@ Performance:
 - **acli detail and comment-list fixtures are hand-written (P428).** acli does not run in the sandbox; the JSON shape follows the REST v3 issue shape.
 - **Quitting Kira Space with an unsaved file edit discards it without asking (P419).** The quit confirm is computed in Go from agents, runs and scripts and has no renderer state. Closing the last window only hides it, so the draft survives that path.
 - **A user-exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides a step's auto compact limit (P431).** Claude Code reads the env var before `--autocompact`, and Kira passes its environment through, so the step setting has no effect while the variable is set.
+- **The capture hotkey is unverified on a real macOS, Windows or Wayland desktop (P430).** Tests drive a fake shortcut manager. Chord registration, the macOS panel not stealing focus and the Wayland portal prompt need a manual run (plan checklist).
+- **The Wayland state stays `requested` (P430).** The portal does not report the trigger the user bound, so Kira cannot confirm it works.
+- **Capture reads clipboard text only (P430).** Images and files on the clipboard show the empty state.
