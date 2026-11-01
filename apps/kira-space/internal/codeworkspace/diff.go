@@ -13,10 +13,21 @@ import (
 // FileContent already gives the worktree side, so a caller sees one consistent vocabulary for
 // "what happened to this file" everywhere in the app.
 type DiffSide struct {
-	Kind       string `json:"kind"` // found | binary | tooLarge | missing
+	Kind       string `json:"kind"` // found | binary | tooLarge | missing | unchanged
 	Text       string `json:"text"`
 	Bytes      int    `json:"bytes"`
 	LimitBytes int    `json:"limitBytes"`
+	// Stat identifies the worktree side; Oid identifies the HEAD side's blob. A caller passes them
+	// back as DiffGate to skip re-reading a side that has not changed.
+	Stat *FileStat `json:"stat,omitempty"`
+	Oid  string    `json:"oid,omitempty"`
+}
+
+// DiffGate carries what a caller already holds. A side that still matches answers kind
+// "unchanged" with no text.
+type DiffGate struct {
+	WorktreeStat *FileStat
+	HeadOid      string
 }
 
 // DiffContent is ReadDiff's own wire shape — no status field (D12): the two sides already say what
@@ -36,30 +47,39 @@ type DiffContent struct {
 // relPath against the session's own root itself (§11's boundary), the one path-safety check every
 // other read primitive already performs before ever touching disk.
 func ReadDiff(ctx context.Context, s *Session, relPath string) (DiffContent, error) {
+	return ReadDiffGated(ctx, s, relPath, DiffGate{})
+}
+
+// ReadDiffGated is ReadDiff that skips a side gate still matches.
+func ReadDiffGated(ctx context.Context, s *Session, relPath string, gate DiffGate) (DiffContent, error) {
 	cf, err := s.catfileSession()
 	if err != nil {
 		return DiffContent{}, fmt.Errorf("codeworkspace: read diff HEAD side: %w", err)
 	}
-	return ReadDiffAt(ctx, cf, s.Root, "HEAD", relPath)
+	return readDiffAt(ctx, cf, s.Root, "HEAD", relPath, gate)
 }
 
 // ReadDiffAt is ReadDiff over an explicit root and revision: relPath as it stood at headRev (a
 // commit-ish; "" means no original) against the file under root. A linked worktree passes its own
 // tip, since "HEAD" through a shared cat-file session resolves the main checkout's HEAD.
 func ReadDiffAt(ctx context.Context, cf *catfile.Session, root, headRev, relPath string) (DiffContent, error) {
+	return readDiffAt(ctx, cf, root, headRev, relPath, DiffGate{})
+}
+
+func readDiffAt(ctx context.Context, cf *catfile.Session, root, headRev, relPath string, gate DiffGate) (DiffContent, error) {
 	absPath, err := ValidateRelPath(root, relPath)
 	if err != nil {
 		return DiffContent{}, fmt.Errorf("codeworkspace: read diff: %w", err)
 	}
 
-	worktree, err := ReadFile(absPath, relPath)
+	worktree, err := ReadFileIf(absPath, relPath, gate.WorktreeStat)
 	if err != nil {
 		return DiffContent{}, fmt.Errorf("codeworkspace: read diff worktree side: %w", err)
 	}
 
 	head := DiffSide{Kind: "missing", LimitBytes: MaxReadBytes}
 	if headRev != "" {
-		head, err = readHeadSide(ctx, cf, headRev+":"+relPath)
+		head, err = readHeadSide(ctx, cf, headRev+":"+relPath, gate.HeadOid)
 		if err != nil {
 			return DiffContent{}, fmt.Errorf("codeworkspace: read diff HEAD side: %w", err)
 		}
@@ -69,17 +89,23 @@ func ReadDiffAt(ctx context.Context, cf *catfile.Session, root, headRev, relPath
 		Path:     relPath,
 		Language: languageFor(relPath),
 		Head:     head,
-		Worktree: DiffSide{Kind: worktree.Kind, Text: worktree.Text, Bytes: worktree.Bytes, LimitBytes: worktree.LimitBytes},
+		Worktree: DiffSide{Kind: worktree.Kind, Text: worktree.Text, Bytes: worktree.Bytes, LimitBytes: worktree.LimitBytes, Stat: worktree.Stat},
 	}, nil
 }
 
 // readHeadSide reads relPath as it stood at HEAD via the session's own lazily-constructed
 // catfile.Session — the same 8 MiB gate as the worktree side (MaxReadBytes), not catfile's own
 // larger default, so the two sides can never disagree about what is too large.
-func readHeadSide(ctx context.Context, cf *catfile.Session, rev string) (DiffSide, error) {
+func readHeadSide(ctx context.Context, cf *catfile.Session, rev, ifOid string) (DiffSide, error) {
 	var info catfile.ObjectInfo
 	var data []byte
 	var err error
+	// --batch-check reads no content; a matching blob id means the caller's copy is current.
+	if ifOid != "" && !strings.Contains(rev, "\n") {
+		if known, cerr := cf.Check(ctx, rev); cerr == nil && known.OID == ifOid {
+			return DiffSide{Kind: "unchanged", Oid: ifOid, LimitBytes: MaxReadBytes}, nil
+		}
+	}
 	if strings.Contains(rev, "\n") {
 		// gitsession.Blob's own guard, carried here verbatim: a newline anywhere in the request
 		// desynchronises the one-line-in/one-line-out batch protocol for the life of the session,
@@ -105,8 +131,8 @@ func readHeadSide(ctx context.Context, cf *catfile.Session, rev string) (DiffSid
 		sniffLen = binarySniffBytes
 	}
 	if strings.IndexByte(string(data[:sniffLen]), 0) >= 0 {
-		return DiffSide{Kind: "binary", Bytes: int(info.Size), LimitBytes: MaxReadBytes}, nil
+		return DiffSide{Kind: "binary", Bytes: int(info.Size), LimitBytes: MaxReadBytes, Oid: info.OID}, nil
 	}
 
-	return DiffSide{Kind: "found", Text: string(data), Bytes: int(info.Size), LimitBytes: MaxReadBytes}, nil
+	return DiffSide{Kind: "found", Text: string(data), Bytes: int(info.Size), LimitBytes: MaxReadBytes, Oid: info.OID}, nil
 }

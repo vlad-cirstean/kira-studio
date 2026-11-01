@@ -138,6 +138,44 @@ func TestBrowseReadDiff(t *testing.T) {
 		}
 	})
 
+	t.Run("ifStat and ifHeadOid skip unchanged sides", func(t *testing.T) {
+		first, err := read("src/main.go")
+		if err != nil || first.Stat == nil {
+			t.Fatalf("first read = %+v, %v, want a stat", first, err)
+		}
+		same, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: first.Stat})
+		if err != nil || same.Kind != "unchanged" || same.Text != "" {
+			t.Fatalf("matching ifStat = %+v, %v, want unchanged without text", same, err)
+		}
+
+		d, err := cw.ReadDiff(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go"})
+		if err != nil || d.Worktree.Stat == nil || d.Head.Oid == "" {
+			t.Fatalf("diff = %+v, %v, want worktree stat and head oid", d, err)
+		}
+		gated := bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: d.Worktree.Stat, IfHeadOid: d.Head.Oid}
+		g, err := cw.ReadDiff(ctx, gated)
+		if err != nil || g.Worktree.Kind != "unchanged" || g.Head.Kind != "unchanged" || g.Worktree.Text != "" || g.Head.Text != "" {
+			t.Fatalf("matching gate = %+v, %v, want both sides unchanged", g, err)
+		}
+
+		r.Write("src/main.go", "package main\n\nfunc main() { println(1) }\n")
+		after, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: first.Stat})
+		if err != nil || after.Kind != "found" || !strings.Contains(after.Text, "println") {
+			t.Fatalf("read after write = %+v, %v, want fresh content", after, err)
+		}
+		g, err = cw.ReadDiff(ctx, gated)
+		if err != nil || g.Worktree.Kind != "found" || g.Head.Kind != "unchanged" {
+			t.Fatalf("gate after write = %+v, %v, want worktree found, head unchanged", g, err)
+		}
+
+		r.Git("add", "src/main.go")
+		r.Commit("rewrite main", nil)
+		g, err = cw.ReadDiff(ctx, gated)
+		if err != nil || g.Head.Kind != "found" || g.Head.Oid == d.Head.Oid {
+			t.Fatalf("gate after commit = %+v, %v, want a re-read head with a new oid", g, err)
+		}
+	})
+
 	t.Run("unknown and empty ids", func(t *testing.T) {
 		if _, err := cw.ListFiles(ctx, idArgs("nope")); errCode(err) != "E_NOT_FOUND" {
 			t.Fatalf("unknown id err = %v", err)

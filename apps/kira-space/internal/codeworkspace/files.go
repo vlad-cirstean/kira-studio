@@ -111,11 +111,24 @@ func collapseXY(staged, unstaged byte) string {
 // (found/tooLarge) plus `missing` (a path git listed that no longer exists) and `language` (this
 // app's own id, §9.4 — resolved from the extension only, never sniffed).
 type FileContent struct {
-	Kind       string `json:"kind"` // found | binary | tooLarge | missing
+	Kind       string `json:"kind"` // found | binary | tooLarge | missing | unchanged
 	Text       string `json:"text"`
 	Bytes      int    `json:"bytes"`
 	LimitBytes int    `json:"limitBytes"`
 	Language   string `json:"language"`
+	// Stat identifies the file as stat saw it before the read; a caller passes it back as ifStat.
+	Stat *FileStat `json:"stat,omitempty"`
+}
+
+// FileStat is the cheap identity a caller keeps to skip re-reading an unchanged file. It is taken
+// before the read, so a write landing mid-read only costs the next call one extra read.
+type FileStat struct {
+	Size    int64 `json:"size"`
+	MtimeNs int64 `json:"mtimeNs"`
+}
+
+func statOf(info os.FileInfo) *FileStat {
+	return &FileStat{Size: info.Size(), MtimeNs: info.ModTime().UnixNano()}
 }
 
 // ReadFile reads relPath (already validated by ValidateRelPath) and classifies it per §8.1: a NUL
@@ -137,6 +150,12 @@ type FileContent struct {
 // regular file's size can still grow between this stat and the read finishing, and that bound is
 // what classifies tooLarge on overflow instead of loading an unbounded amount.
 func ReadFile(absPath, relPath string) (FileContent, error) {
+	return ReadFileIf(absPath, relPath, nil)
+}
+
+// ReadFileIf is ReadFile that answers kind "unchanged", with no content, when ifStat still matches
+// the file on disk.
+func ReadFileIf(absPath, relPath string, ifStat *FileStat) (FileContent, error) {
 	limit := FileContent{LimitBytes: MaxReadBytes, Language: languageFor(relPath)}
 
 	info, err := os.Stat(absPath)
@@ -151,6 +170,11 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 		// A FIFO, device, socket, or anything else ListFiles' own git enumeration would never have
 		// reported as a worktree file — treated the same as "gone", never opened.
 		limit.Kind = "missing"
+		return limit, nil
+	}
+	limit.Stat = statOf(info)
+	if ifStat != nil && *ifStat == *limit.Stat {
+		limit.Kind = "unchanged"
 		return limit, nil
 	}
 	if info.Size() > MaxReadBytes {
