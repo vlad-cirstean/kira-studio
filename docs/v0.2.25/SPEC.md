@@ -12,8 +12,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P439 | Kubernetes module (read only) | Todo |
 | P440 | Kubernetes MCP tools with per-cluster approval | Todo |
 | P441 | Dependency update, incl. Wails | Todo |
-| P442 | Code review (2 rounds) | Todo |
-| P443 | Close chapter v0.2.25 | Todo |
+| P442 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
+| P443 | Code review (2 rounds) | Todo |
+| P444 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -54,12 +55,23 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Upgrade Wails to the latest release. Regenerate bindings; fix any API or build changes in both apps.
 - Check the license of every changed dependency against the open-source-only rule.
 - Run the full suites after the bump (Go, typecheck, lint, UI, visual). Re-record visual baselines only if the upgrade shifts rendering.
-- Scope for v0.2.25 is closed: no further phases.
+- Scope for v0.2.25 is closed after P442: no further phases.
 
-### P442 Code review (2 rounds)
+### P442 Slow test audit and speed-up: UI suites wait 30+ min per phase
+
+- PR CI keeps running the full suite. Goal: cut the wait on each phase locally.
+- Measure first. Run each UI suite (Studio, Space) once on an idle host with `--reporter=json`. Write the slowest 30 specs per app, plus total time per Playwright project, to a file under `plans/`.
+- Static signals to check against the numbers: Studio has 68 `waitForTimeout` calls, Space 17; `workers: 1` projects in the Studio config (perf, budgets); `ade-v2-review.spec.ts` 15 s waits; large files (`ade-v2-workflows`, `api-ui-consistency`, `ade-v2-plan`, `ade-v2-panel`).
+- Fix what the numbers show: replace fixed sleeps with condition waits, share setup and builds across specs, trim duplicate coverage, tune worker counts to the host (load-induced timeouts cost reruns).
+- Local test selection, only if the numbers justify it: per-app selection (a Studio-only change skips Space specs and the reverse; `packages/**` runs both), path rules from a small hand-kept table, full suite as fallback for unknown paths. A coverage-based spec-to-source map was weighed and deferred; where to store it (gitignored local cache or CI artifact; not committed, not an orphan branch because `.githooks/pre-push` blocks it) stays open.
+- Sharding (`--shard`) only if the host has spare cores.
+- Before and after suite times recorded in the plan. No loss of coverage: each removed or merged spec is named with the spec that still covers it.
+- Standing rule already in `CLAUDE.md`: one full run per phase, targeted reruns after.
+
+### P443 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P443 Close chapter v0.2.25
+### P444 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
