@@ -1,3 +1,4 @@
+import type { FileStat } from '@shared/domain/repo';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 // P94 pass 3 §4.3: RepoFileView.vue's mount() read its file two different ways (worktree vs a
@@ -9,7 +10,7 @@ import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 
 export type FileContentResult =
-  | { kind: 'found'; text: string }
+  | { kind: 'found'; text: string; stat?: FileStat }
   | { kind: 'missing' | 'binary' | 'tooLarge' }
   | { kind: 'error'; message: string };
 
@@ -21,12 +22,20 @@ export async function loadFileContent(
   repoId: string,
   path: string,
   rev: string | null,
+  /** The worktree text a previous mount read, with the stat it had. When the file still matches,
+   *  the backend sends no content and this text is the result. */
+  known?: { stat: FileStat; text: () => string },
 ): Promise<FileContentResult> {
   if (rev === null) {
     try {
-      const content = await control.codeWorkspaceReadFile(repoId, path);
+      const content = await control.codeWorkspaceReadFile(repoId, path, known?.stat);
+      if (content.kind === 'unchanged') {
+        return known
+          ? { kind: 'found', text: known.text(), stat: known.stat }
+          : loadFileContent(repoId, path, rev);
+      }
       return content.kind === 'found'
-        ? { kind: 'found', text: content.text }
+        ? { kind: 'found', text: content.text, stat: content.stat }
         : { kind: content.kind };
     } catch (err) {
       return { kind: 'error', message: errorText(err) };

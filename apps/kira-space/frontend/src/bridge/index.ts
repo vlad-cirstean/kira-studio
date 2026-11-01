@@ -41,11 +41,14 @@ import type {
 import type {
   CodeSearchEvent,
   DiffContent,
+  DiffRead,
   EditContent,
   FileContent,
   FileHandlersSetResult,
   FileHandlersStatus,
   FileListing,
+  FileRead,
+  FileStat,
   OpenedFileTarget,
   RepoSummary,
   SearchRequest,
@@ -327,8 +330,8 @@ const spaceControl = {
     unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.ListFiles>>>(
       CodeWorkspaceService.ListFiles({ id }),
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
-  codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
-    unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+  codeWorkspaceReadFile: (id: string, path: string, ifStat?: FileStat): Promise<FileRead> =>
+    unwrap(CodeWorkspaceService.ReadFile({ id, path, ifStat })).then((r) => trust<FileRead>(r)),
   codeWorkspaceReadFileForEdit: (id: string, path: string): Promise<EditContent> =>
     unwrap(CodeWorkspaceService.ReadFileForEdit({ id, path })).then((r) => trust<EditContent>(r)),
   codeWorkspaceWriteFile: (
@@ -364,8 +367,12 @@ const spaceControl = {
     unwrap(CodeWorkspaceService.OpenWorkspace({ id })),
   codeWorkspaceCloseWorkspace: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.CloseWorkspace({ id })),
-  codeWorkspaceReadDiff: (id: string, path: string): Promise<DiffContent> =>
-    unwrap(CodeWorkspaceService.ReadDiff({ id, path })).then((r) => trust<DiffContent>(r)),
+  codeWorkspaceReadDiff: (
+    id: string,
+    path: string,
+    gate?: { ifStat?: FileStat; ifHeadOid?: string },
+  ): Promise<DiffRead> =>
+    unwrap(CodeWorkspaceService.ReadDiff({ id, path, ...gate })).then((r) => trust<DiffRead>(r)),
 
   // C7 §5/D7: StartSearch returns as soon as the background scan starts — its own searchId is how
   // the renderer matches a later onCodeSearch event to the run that's waiting on it.
