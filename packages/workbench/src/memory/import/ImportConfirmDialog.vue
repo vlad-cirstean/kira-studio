@@ -124,7 +124,9 @@ async function dismiss(): Promise<void> {
         <p v-else-if="empty" class="m-0" data-testid="import-nothing">
           {{
             job && job.totals.skippedFiles > 0
-              ? t('memory.import.confirm.nothingSkipped.description', { count: job.totals.skippedFiles })
+              ? t('memory.import.confirm.nothingSkipped.description', {
+                  count: job.totals.skippedFiles,
+                })
               : t('memory.import.confirm.nothing.description')
           }}
         </p>
@@ -142,7 +144,9 @@ async function dismiss(): Promise<void> {
           <p class="m-0 text-muted-foreground">
             {{
               t('memory.import.confirm.cost.description', {
-                skipped: t('memory.import.confirm.skipped.label', { count: job.totals.skippedFiles }),
+                skipped: t('memory.import.confirm.skipped.label', {
+                  count: job.totals.skippedFiles,
+                }),
                 ignored: t('memory.import.confirm.ignored.label', { count: job.ignoredCount }),
               })
             }}

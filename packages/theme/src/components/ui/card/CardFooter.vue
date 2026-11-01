@@ -8,7 +8,12 @@ const props = defineProps<{ class?: HTMLAttributes['class'] }>();
 <template>
   <div
     data-slot="card-footer"
-    :class="cn('flex items-center gap-1.5 group-data-[variant=section]/card:border-t group-data-[variant=section]/card:border-border group-data-[variant=section]/card:px-3 group-data-[variant=section]/card:py-2', props.class)"
+    :class="
+      cn(
+        'flex items-center gap-1.5 group-data-[variant=section]/card:border-t group-data-[variant=section]/card:border-border group-data-[variant=section]/card:px-3 group-data-[variant=section]/card:py-2',
+        props.class,
+      )
+    "
   >
     <slot />
   </div>

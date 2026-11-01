@@ -461,13 +461,19 @@ function onClose(): void {
                   </li>
                 </ul>
                 <p>{{
-                  t(pending.verb === 'pop' ? 'git.dialog.stash.keptPop.hint' : 'git.dialog.stash.keptApply.hint')
+                  t(
+                    pending.verb === 'pop'
+                      ? 'git.dialog.stash.keptPop.hint'
+                      : 'git.dialog.stash.keptApply.hint',
+                  )
                 }}</p>
               </AlertDescription></Alert
             >
             <FieldDescription v-else>
               {{
-                t('git.dialog.preflight.unknown.error', { reason: pending.preflight.prediction.reason })
+                t('git.dialog.preflight.unknown.error', {
+                  reason: pending.preflight.prediction.reason,
+                })
               }}
             </FieldDescription>
           </template>

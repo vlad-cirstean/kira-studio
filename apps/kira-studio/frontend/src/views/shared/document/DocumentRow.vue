@@ -48,7 +48,13 @@ function onHeadKeydown(e: KeyboardEvent): void {
   >
     <div
       class="doc-head"
-      :class="cn(rowVariants({ layout: 'tree', selected: expanded }), 'shrink-0 gap-1.5 px-2', selected && 'shadow-[inset_2px_0_0_var(--primary)]')"
+      :class="
+        cn(
+          rowVariants({ layout: 'tree', selected: expanded }),
+          'shrink-0 gap-1.5 px-2',
+          selected && 'shadow-[inset_2px_0_0_var(--primary)]',
+        )
+      "
       role="option"
       v-bind="navProps"
       :tabindex="navProps?.tabindex ?? 0"

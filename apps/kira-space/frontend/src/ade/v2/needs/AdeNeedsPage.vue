@@ -60,7 +60,9 @@ function taskOf(taskId: string): { title: string; color: string } {
             @click="ui.showAllSessions = !ui.showAllSessions"
           >
             {{
-              ui.showAllSessions ? t('space.ade.needsPage.hideAll.label') : t('space.ade.needsPage.showAll.label')
+              ui.showAllSessions
+                ? t('space.ade.needsPage.hideAll.label')
+                : t('space.ade.needsPage.showAll.label')
             }}
           </Button>
         </div>

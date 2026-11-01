@@ -54,7 +54,9 @@ useSortableReorder(
     <div ref="list" class="flex min-h-16 flex-col" data-testid="ade-shelf-list">
       <AdeShelfRow v-for="card in cards" :key="card.task.id" :card="card" />
       <InlineState v-if="!cards.length" kind="empty">{{
-        shelf === 'later' ? t('space.ade.later.laterEmpty.empty') : t('space.common.backlogEmpty.empty')
+        shelf === 'later'
+          ? t('space.ade.later.laterEmpty.empty')
+          : t('space.common.backlogEmpty.empty')
       }}</InlineState>
     </div>
   </section>

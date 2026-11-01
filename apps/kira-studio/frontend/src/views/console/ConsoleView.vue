@@ -150,7 +150,7 @@ function onShowAutoExplainPlan(): void {
 // The popover unmounts its focused entry on close; without this focus falls to <body>.
 function onSavedMenuClose(): void {
   savedMenuOpen.value = false;
-  void nextTick(() => editorHost.value?.focus());
+  void nextTick().then(() => editorHost.value?.focus());
 }
 
 const localDoc = shallowRef(props.tab.state.text);
@@ -338,9 +338,11 @@ onUnmounted(() => {
       <ToolbarSeparator />
       <TooltipIconButton
         icon="layers"
-        :label="tab.state.newResultSet
-              ? t('studio.console.newResultSet.add.tooltip')
-              : t('studio.console.newResultSet.replace.tooltip')"
+        :label="
+          tab.state.newResultSet
+            ? t('studio.console.newResultSet.add.tooltip')
+            : t('studio.console.newResultSet.replace.tooltip')
+        "
         :aria-label="t('studio.console.newResultSet.toggle.aria')"
         :pressed="!tab.state.newResultSet"
         data-testid="console-new-result-toggle"

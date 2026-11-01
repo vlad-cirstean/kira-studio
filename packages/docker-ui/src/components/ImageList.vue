@@ -37,7 +37,11 @@ function open(row: { image: { id: string } }): void {
         data-testid="docker-list-empty"
         icon="package"
         :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.image.none.empty')"
-        :description="ui.search.trim() ? t('docker.image.noMatches.emptyHint') : t('docker.image.none.emptyHint')"
+        :description="
+          ui.search.trim()
+            ? t('docker.image.noMatches.emptyHint')
+            : t('docker.image.none.emptyHint')
+        "
       />
     </template>
     <VirtualList :rows="rows" testid="docker-image-list" :select="open" :open="open">
@@ -45,11 +49,14 @@ function open(row: { image: { id: string } }): void {
         <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
         <div
           :class="
-          cn(
-            rowVariants({ layout: 'tree', selected: ui.selection?.kind === 'image' && ui.selection.id === row.image.id }),
-            'group/row h-full gap-1.5',
-          )
-        "
+            cn(
+              rowVariants({
+                layout: 'tree',
+                selected: ui.selection?.kind === 'image' && ui.selection.id === row.image.id,
+              }),
+              'group/row h-full gap-1.5',
+            )
+          "
           :style="rowIndent(0)"
           data-testid="docker-row"
           :data-id="row.image.id"

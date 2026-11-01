@@ -531,7 +531,9 @@ function onToggleFolder(path: string): void {
             @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
           >
             <CodiconIcon
-              :name="reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'"
+              :name="
+                reviewCheckboxState(row.node.change.path) === 'indeterminate' ? 'dash' : 'check'
+              "
               :size="13"
             />
           </Checkbox>

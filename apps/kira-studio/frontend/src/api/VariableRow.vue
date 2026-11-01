@@ -194,7 +194,9 @@ function onHistoryOpenChange(open: boolean): void {
         </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{
-        secretsUnavailable ? t('studio.api.variables.secretsUnavailable.tooltip') : t('common.secret.label')
+        secretsUnavailable
+          ? t('studio.api.variables.secretsUnavailable.tooltip')
+          : t('common.secret.label')
       }}</TooltipContent>
     </Tooltip>
     <Popover

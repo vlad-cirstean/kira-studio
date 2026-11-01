@@ -162,7 +162,12 @@ async function confirmTakeOver(): Promise<void> {
       :confirm-label="t('common.action.takeOver.label')"
       :pending="writes.takeOver.isPending.value"
       :error="takeOverError"
-      :testids="{ root: 'confirm-dialog', cancel: 'confirm-cancel', confirm: 'confirm-yes', error: 'confirm-error' }"
+      :testids="{
+        root: 'confirm-dialog',
+        cancel: 'confirm-cancel',
+        confirm: 'confirm-yes',
+        error: 'confirm-error',
+      }"
       @cancel="takingOver = null"
       @confirm="confirmTakeOver"
     />

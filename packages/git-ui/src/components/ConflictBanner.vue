@@ -96,7 +96,9 @@ const PATH_DISPLAY_CAP = 20;
         variant="toolbar"
         size="kira"
         :pending="activeAction === 'continue'"
-        :disabled="inProgress.unmergedCount > 0 || activeAction === 'skip' || activeAction === 'abort'"
+        :disabled="
+          inProgress.unmergedCount > 0 || activeAction === 'skip' || activeAction === 'abort'
+        "
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
       >
@@ -127,7 +129,9 @@ const PATH_DISPLAY_CAP = 20;
     <FieldDescription v-if="inProgress.unmergedCount > 0" :id="CONTINUE_REASON_ID" class="mt-0.5">
       {{
         t(
-          inProgress.canSkip ? 'git.conflict.resolveOrSkip.description' : 'git.conflict.resolve.description',
+          inProgress.canSkip
+            ? 'git.conflict.resolveOrSkip.description'
+            : 'git.conflict.resolve.description',
           { count: inProgress.unmergedCount },
         )
       }}

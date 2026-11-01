@@ -33,7 +33,7 @@ export function stepMoves(
     { id: DONE_STEP_ID, name: 'Done', skipped: false },
   ];
   const found = options.findIndex((o) => o.id === stepId);
-  const at = found < 0 ? 0 : found;
+  const at = Math.max(found, 0);
   return {
     options,
     at,

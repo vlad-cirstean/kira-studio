@@ -38,7 +38,9 @@ useEventListener(addonEl, 'click', handleInputGroupAddonClick);
     ref="addonEl"
     data-slot="input-group-addon"
     :data-align="props.align"
-    :class="cn('m-0 min-w-0 border-0 p-0', inputGroupAddonVariants({ align: props.align }), props.class)"
+    :class="
+      cn('m-0 min-w-0 border-0 p-0', inputGroupAddonVariants({ align: props.align }), props.class)
+    "
   >
     <slot />
   </fieldset>

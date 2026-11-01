@@ -140,7 +140,12 @@ function onKeydown(e: KeyboardEvent): void {
       aria-hidden="true"
       data-testid="tree-drop-indicator"
       :data-zone="dropZone"
-      :class="cn('pointer-events-none absolute inset-x-0 h-0.5 bg-focus', dropZone === 'before' ? 'top-0' : 'bottom-0')"
+      :class="
+        cn(
+          'pointer-events-none absolute inset-x-0 h-0.5 bg-focus',
+          dropZone === 'before' ? 'top-0' : 'bottom-0',
+        )
+      "
     />
 
     <!-- Same reasoning as project/TreeRow.vue's twisty: its entire meaning is drawn by the

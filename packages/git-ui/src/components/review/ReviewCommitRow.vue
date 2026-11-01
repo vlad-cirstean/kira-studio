@@ -223,7 +223,9 @@ function onOpenFile(index: number, pinned: boolean): void {
         data-testid="review-row-actions"
         :class="[
           'flex items-center gap-0.5 shrink-0',
-          focused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+          focused
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
         ]"
       >
         <TooltipIconButton

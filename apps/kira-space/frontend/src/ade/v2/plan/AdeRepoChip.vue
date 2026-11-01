@@ -71,7 +71,11 @@ const tint = computed(() => repoTint(repoLinks.repoColorOf(props.codeRepoId)));
       }}</span
     >
     <AdeTip
-      :text="remote === '' ? t('space.ade.plan.repoChip.rescan.tooltip', { label }) : t('common.fetchTarget.tooltip', { name: label })"
+      :text="
+        remote === ''
+          ? t('space.ade.plan.repoChip.rescan.tooltip', { label })
+          : t('common.fetchTarget.tooltip', { name: label })
+      "
     >
       <Button
         variant="toolbar"

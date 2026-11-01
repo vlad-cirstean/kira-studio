@@ -55,7 +55,9 @@ function pick(kind: ConnectionKind): void {
           >
             <span
               class="flex mb-1"
-              :class="SUPPORTED_KINDS.has(option) ? KIND_ACCENT_CLASS[option] : 'text-muted-foreground'"
+              :class="
+                SUPPORTED_KINDS.has(option) ? KIND_ACCENT_CLASS[option] : 'text-muted-foreground'
+              "
             >
               <EngineIcon :kind="option" :size="22" />
             </span>
@@ -63,7 +65,11 @@ function pick(kind: ConnectionKind): void {
           </RadioGroupItem>
         </TooltipTrigger>
         <TooltipContent>{{
-          SUPPORTED_KINDS.has(option) ? KIND_LABEL[option] : t('studio.project.connectionDialog.kind.unsupported.tooltip', { kind: KIND_LABEL[option] })
+          SUPPORTED_KINDS.has(option)
+            ? KIND_LABEL[option]
+            : t('studio.project.connectionDialog.kind.unsupported.tooltip', {
+                kind: KIND_LABEL[option],
+              })
         }}</TooltipContent>
       </Tooltip>
     </RadioGroup>

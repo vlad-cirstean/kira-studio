@@ -105,7 +105,9 @@ function pickTask(id: string): void {
 
     <div v-if="ade" class="text-kira-sm text-muted-foreground" data-testid="run-ade-context">
       <CatalogText
-        :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'"
+        :k="
+          ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'
+        "
       >
         <template #task><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template>
         <template #branch

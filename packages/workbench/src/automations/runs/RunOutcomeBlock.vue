@@ -52,7 +52,9 @@ async function copyForAgent(): Promise<void> {
       data-testid="run-outcome-denials"
     >
       {{
-        t('automations.run.outcome.denied.label', { tools: run.outcome.permissionDenials.join(', ') })
+        t('automations.run.outcome.denied.label', {
+          tools: run.outcome.permissionDenials.join(', '),
+        })
       }}
     </span>
     <template v-if="!compact">

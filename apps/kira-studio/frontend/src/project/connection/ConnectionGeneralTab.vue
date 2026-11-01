@@ -339,14 +339,22 @@ async function onBrowseDatabaseFile(): Promise<void> {
                   :model-value="draft.password ?? ''"
                   :type="showPassword ? 'text' : 'password'"
                   class="font-data"
-                  :placeholder="revealed ? undefined : t('studio.project.connectionDialog.unchanged.placeholder')"
+                  :placeholder="
+                    revealed
+                      ? undefined
+                      : t('studio.project.connectionDialog.unchanged.placeholder')
+                  "
                   data-testid="connection-password"
                   @update:model-value="(v) => onPasswordInput(String(v))"
                 />
               </div>
               <TooltipIconButton
                 :icon="showPassword ? 'eye-closed' : 'eye'"
-                :label="showPassword ? t('studio.project.connectionDialog.hidePassword.label') : t('studio.project.connectionDialog.showPassword.label')"
+                :label="
+                  showPassword
+                    ? t('studio.project.connectionDialog.hidePassword.label')
+                    : t('studio.project.connectionDialog.showPassword.label')
+                "
                 @click="onEyeClick"
               />
             </div>
@@ -364,14 +372,20 @@ async function onBrowseDatabaseFile(): Promise<void> {
               v-bind="invalidAttrs('uri')"
               :type="showPassword ? 'text' : 'password'"
               class="font-data"
-              :placeholder="revealed ? undefined : t('studio.project.connectionDialog.unchanged.placeholder')"
+              :placeholder="
+                revealed ? undefined : t('studio.project.connectionDialog.unchanged.placeholder')
+              "
               data-testid="connection-uri"
               @update:model-value="(v) => setUri(String(v))"
             />
           </div>
           <TooltipIconButton
             :icon="showPassword ? 'eye-closed' : 'eye'"
-            :label="showPassword ? t('studio.project.connectionDialog.hideUri.label') : t('studio.project.connectionDialog.showUri.label')"
+            :label="
+              showPassword
+                ? t('studio.project.connectionDialog.hideUri.label')
+                : t('studio.project.connectionDialog.showUri.label')
+            "
             @click="onEyeClick"
           />
         </div>

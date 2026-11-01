@@ -221,7 +221,7 @@ async function submitRename(from: string, to: string): Promise<void> {
             :aria-label="row.isHead ? t('git.common.currentBranch.tooltip') : undefined"
             :aria-hidden="!row.isHead"
             >{{
-              row.isHead ? "●" : ""
+              row.isHead ? '●' : ''
             }}</span
           >
           <span class="truncate">{{ row.shortName }}</span>

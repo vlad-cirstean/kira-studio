@@ -628,7 +628,7 @@ const searchBoxRef = ref<InstanceType<typeof SearchBox> | null>(null);
  *  until this reactive change renders. */
 function openSearch(): void {
   searchOpen.value = true;
-  void nextTick(() => searchBoxRef.value?.focusInput());
+  void nextTick().then(() => searchBoxRef.value?.focusInput());
 }
 
 /** Closing clears the query (`SearchState.clear()`) — a hidden row holding a live query that
@@ -1846,7 +1846,7 @@ onBeforeUnmount(() => {
               :report-error="reportAsyncError"
             />
             <span class="sr-only" data-testid="chunk-source">{{
-              graphView.lastChunkSource.value ?? ""
+              graphView.lastChunkSource.value ?? ''
             }}</span>
           </section>
 
@@ -1948,7 +1948,10 @@ onBeforeUnmount(() => {
             <span
               class="fixed size-0"
               aria-hidden="true"
-              :style="{ left: `${forceDeleteRefCandidate?.x ?? 0}px`, top: `${forceDeleteRefCandidate?.y ?? 0}px` }"
+              :style="{
+                left: `${forceDeleteRefCandidate?.x ?? 0}px`,
+                top: `${forceDeleteRefCandidate?.y ?? 0}px`,
+              }"
             />
           </PopoverAnchor>
           <PopoverContent

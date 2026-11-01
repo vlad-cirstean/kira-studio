@@ -363,7 +363,9 @@ function onDeleteRow(): void {
             </Button>
           </TooltipTrigger>
           <TooltipContent>{{
-            columnCount ? t('studio.grid.columns.shown.tooltip', columnCount) : t('studio.common.columns.label')
+            columnCount
+              ? t('studio.grid.columns.shown.tooltip', columnCount)
+              : t('studio.common.columns.label')
           }}</TooltipContent>
         </Tooltip>
         <PopoverAnchor :reference="columnsAnchorRef ?? undefined" />

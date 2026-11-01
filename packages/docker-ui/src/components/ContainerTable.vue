@@ -83,7 +83,13 @@ const nav = useListNavigation<DockerContainer>({
       <div
         v-for="c in rows"
         :key="c.id"
-        :class="cn(tableRowClass, 'group/row grid h-auto min-h-row cursor-default select-none items-center gap-x-3 px-3 py-1 last:border-b-0', COLUMNS)"
+        :class="
+          cn(
+            tableRowClass,
+            'group/row grid h-auto min-h-row cursor-default select-none items-center gap-x-3 px-3 py-1 last:border-b-0',
+            COLUMNS,
+          )
+        "
         data-testid="docker-table-row"
         :data-name="c.name"
         :data-state="c.state"

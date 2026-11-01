@@ -163,7 +163,12 @@ async function onClear(): Promise<void> {
       <div
         v-for="entry in filteredEntries"
         :key="entry.id"
-        :class="cn(rowVariants({ layout: 'tree', selected: entry.id === viewingId }), 'border-b border-border py-1')"
+        :class="
+          cn(
+            rowVariants({ layout: 'tree', selected: entry.id === viewingId }),
+            'border-b border-border py-1',
+          )
+        "
         data-testid="grpc-history-row"
         role="option"
         v-bind="nav.rowProps(entry.id)"

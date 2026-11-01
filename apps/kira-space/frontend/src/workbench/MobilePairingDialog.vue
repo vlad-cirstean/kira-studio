@@ -44,7 +44,9 @@ async function onApprove(): Promise<void> {
       </p>
       <p class="m-0 text-subtle break-all" data-testid="mobile-pairing-label">
         {{
-          t('space.mobilePairing.says.label', { name: current.label || t('space.mobilePairing.unnamed.label') })
+          t('space.mobilePairing.says.label', {
+            name: current.label || t('space.mobilePairing.unnamed.label'),
+          })
         }}
       </p>
       <p class="m-0 text-subtle break-all" data-testid="mobile-pairing-origin">

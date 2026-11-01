@@ -533,7 +533,10 @@ useReviewAnnouncements(review, announce);
           data-testid="review-unrelated"
         >
           {{
-            t('git.review.unrelated.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' })
+            t('git.review.unrelated.body', {
+              branch: review.branch.value,
+              base: review.resolution.value?.base ?? '',
+            })
           }}
         </p>
 
@@ -543,12 +546,17 @@ useReviewAnnouncements(review, announce);
           data-testid="review-empty"
         >
           {{
-            t('git.review.empty.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' })
+            t('git.review.empty.body', {
+              branch: review.branch.value,
+              base: review.resolution.value?.base ?? '',
+            })
           }}
         </p>
 
         <template
-          v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits' && rowActions"
+          v-else-if="
+            review.phase.value === 'listing' && review.pane.value === 'commits' && rowActions
+          "
         >
           <ReviewCommitList
             :review="review"

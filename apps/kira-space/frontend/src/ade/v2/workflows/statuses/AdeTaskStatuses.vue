@@ -231,7 +231,11 @@ async function confirmRemove(): Promise<void> {
             />
             <TooltipIconButton
               :icon="ICON.delete"
-              :label="statuses.length < 2 ? t('space.ade.statuses.lastOne.tooltip') : t('space.ade.statuses.delete.tooltip')"
+              :label="
+                statuses.length < 2
+                  ? t('space.ade.statuses.lastOne.tooltip')
+                  : t('space.ade.statuses.delete.tooltip')
+              "
               :aria-label="t('space.ade.statuses.delete.tooltip')"
               :disabled="statuses.length < 2"
               disabled-trigger

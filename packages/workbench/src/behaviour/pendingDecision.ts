@@ -40,7 +40,7 @@ export function usePendingDecision(source: PendingDecisionSource) {
         resumeTick();
         // Deny is the default focus — a trust/approval prompt whose Enter key grants access or
         // runs a statement is the wrong default.
-        void nextTick(() => denyButton.value?.$el?.focus());
+        void nextTick().then(() => denyButton.value?.$el?.focus());
       } else {
         pauseTick();
       }

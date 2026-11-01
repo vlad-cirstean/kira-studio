@@ -418,7 +418,9 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
         <template #actions>
           <TooltipIconButton
             icon="search"
-            :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
+            :label="
+              showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')
+            "
             :pressed="showSearch"
             data-testid="toggle-search"
             @click="toggleSearch"
@@ -508,14 +510,14 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
                   :class="['flex flex-col', group.rows.length === 0 && 'min-h-2']"
                   @add="(id, beforeId) => dropScript(group.collection.id, id, beforeId)"
                   @move="
-                  (from, to) =>
-                    reorderScripts(
-                      group.collection.id,
-                      group.rows.map((s) => s.id),
-                      from,
-                      to,
-                    )
-                "
+                    (from, to) =>
+                      reorderScripts(
+                        group.collection.id,
+                        group.rows.map((s) => s.id),
+                        from,
+                        to,
+                      )
+                  "
                 >
                   <ScriptRow
                     v-for="script in group.rows"

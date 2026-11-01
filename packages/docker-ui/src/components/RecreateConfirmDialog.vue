@@ -74,14 +74,19 @@ const COMPOSE = 'Compose';
         <Alert v-if="spec.dependents.length" variant="warn" data-testid="docker-edit-dependents">
           <AlertDescription>
             {{
-              t('docker.dialog.recreateConfirm.dependents.body', { names: spec.dependents.join(', ') })
+              t('docker.dialog.recreateConfirm.dependents.body', {
+                names: spec.dependents.join(', '),
+              })
             }}
           </AlertDescription>
         </Alert>
         <Alert v-if="spec.origin === 'compose'" variant="info" data-testid="docker-edit-compose">
           <AlertDescription>
             {{
-              t('docker.dialog.recreateConfirm.compose.body', { tool: COMPOSE, name: spec.originName })
+              t('docker.dialog.recreateConfirm.compose.body', {
+                tool: COMPOSE,
+                name: spec.originName,
+              })
             }}
           </AlertDescription>
         </Alert>

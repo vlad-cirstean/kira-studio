@@ -47,11 +47,16 @@ function open(): void {
     <div class="flex items-center gap-1.5">
       <span class="min-w-0 flex-1 truncate">
         {{
-          t(STATUS_LABEL[job.state === 'paused' ? 'paused' : job.state === 'running' ? 'running' : 'ready'], {
-            title: jobTitle(job),
-            done: job.progress.filesDone,
-            count: job.progress.filesTotal,
-          })
+          t(
+            STATUS_LABEL[
+              job.state === 'paused' ? 'paused' : job.state === 'running' ? 'running' : 'ready'
+            ],
+            {
+              title: jobTitle(job),
+              done: job.progress.filesDone,
+              count: job.progress.filesTotal,
+            },
+          )
         }}
       </span>
       <Button variant="toolbar" size="kira" data-testid="memory-import-open" @click="open">{{

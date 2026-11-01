@@ -249,7 +249,7 @@ function onGoToMatch(match: Match): void {
   if (!view) return;
   if (!documentViewStore.isDocumentExpanded(props.tab.id, view.id))
     documentViewStore.toggleExpanded(props.tab.id, view.id);
-  void nextTick(() => {
+  void nextTick().then(() => {
     const index = rows.value.indexOf(row);
     if (index >= 0) scrollToIndex(index);
   });
@@ -457,7 +457,14 @@ onUnmounted(() => {
           @focusin="showRowTip"
           @focusout="hideRowTip"
         >
-          <Tooltip :open="rowTip !== null" @update:open="(o) => { if (!o) rowTip = null; }">
+          <Tooltip
+            :open="rowTip !== null"
+            @update:open="
+              (o) => {
+                if (!o) rowTip = null;
+              }
+            "
+          >
             <TooltipTrigger as-child>
               <span
                 aria-hidden="true"
@@ -478,7 +485,9 @@ onUnmounted(() => {
                 :nav-props="nav.rowProps(String(rows[vi.index]))"
                 :view="rowAt(rows[vi.index])!.view"
                 :row-scope="tab.id"
-                :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                :expanded="
+                  documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)
+                "
                 :selected="rt?.selectedRow === vi.index"
                 :search-match="isSearchMatch(rows[vi.index])"
                 :search-match-current="isCurrentSearchMatch(rows[vi.index])"
@@ -498,7 +507,13 @@ onUnmounted(() => {
                       :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
                       :disabled="!editGateFor(rows[vi.index]).editable"
                       data-testid="document-edit"
-                      @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
+                      @click.stop="
+                        startEdit(
+                          rows[vi.index],
+                          rowAt(rows[vi.index])!.view.id,
+                          rowAt(rows[vi.index])!.body,
+                        )
+                      "
                     />
                     <RowActionButton
                       :icon="ICON.delete"
@@ -512,7 +527,10 @@ onUnmounted(() => {
                 </template>
                 <template #body>
                   <div
-                    v-if="isSearchMatch(rows[vi.index]) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                    v-if="
+                      isSearchMatch(rows[vi.index]) &&
+                      !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)
+                    "
                     class="truncate text-muted-foreground text-kira-sm font-data px-2 pb-1 in-[.search-match-current]:text-bg"
                     data-testid="document-search-preview"
                   >
@@ -521,7 +539,9 @@ onUnmounted(() => {
                     />
                   </div>
                   <div
-                    v-if="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
+                    v-if="
+                      documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)
+                    "
                     class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-border bg-elevated"
                     data-testid="document-body"
                   >
@@ -540,7 +560,9 @@ onUnmounted(() => {
                       v-else-if="rowAt(rows[vi.index])!.view.root"
                       :tab-id="tab.id"
                       :row="rows[vi.index]"
-                      @toggle-path="(path) => documentRowsStore.togglePath(tab.id, rows[vi.index], path)"
+                      @toggle-path="
+                        (path) => documentRowsStore.togglePath(tab.id, rows[vi.index], path)
+                      "
                     />
                     <MonacoHost
                       v-else

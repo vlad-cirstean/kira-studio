@@ -41,7 +41,10 @@ watch(() => props.selectedId, revealSelected, { flush: 'post' });
           type="button"
           variant="toolbar"
           size="kira-lg"
-          :class="[tabChipVariants({ active: v.session.id === selectedId }), 'font-data overflow-hidden']"
+          :class="[
+            tabChipVariants({ active: v.session.id === selectedId }),
+            'font-data overflow-hidden',
+          ]"
           :data-testid="`ade-session-tab-${v.session.id}`"
           :data-selected="v.session.id === selectedId || undefined"
           :data-mode="v.session.mode"

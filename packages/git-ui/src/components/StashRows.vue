@@ -88,7 +88,12 @@ function onMenuSelect(entry: StashEntry, id: string): void {
     <button
       data-testid="branch-row-main"
       type="button"
-      :class="cn(rowVariants({ selected: stash.selectedSha.value === entry.sha }), 'flex-1 min-w-0 text-left')"
+      :class="
+        cn(
+          rowVariants({ selected: stash.selectedSha.value === entry.sha }),
+          'flex-1 min-w-0 text-left',
+        )
+      "
       @click="select(entry)"
     >
       <CodiconIcon name="archive" :size="13" />

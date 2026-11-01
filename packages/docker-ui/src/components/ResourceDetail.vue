@@ -164,7 +164,12 @@ const usedByRows = computed(() =>
             v-for="row in usedByRows"
             :key="row.id"
             type="button"
-            :class="cn(rowVariants({ layout: 'menu' }), 'h-control-lg w-full cursor-default gap-2 rounded-none px-3 text-left')"
+            :class="
+              cn(
+                rowVariants({ layout: 'menu' }),
+                'h-control-lg w-full cursor-default gap-2 rounded-none px-3 text-left',
+              )
+            "
             data-testid="docker-used-by"
             @click="ui.select({ kind: 'container', id: row.id })"
           >

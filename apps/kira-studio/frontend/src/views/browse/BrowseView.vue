@@ -523,12 +523,15 @@ onMounted(() => {
                 :data-path="filteredNodes[vi.index]?.path"
                 :data-kind="filteredNodes[vi.index]?.kind"
                 :class="
-                    cn(
-                      rowVariants({ layout: 'tree', selected: rt?.selected === filteredNodes[vi.index]?.path }),
-                      'border-b border-border px-2',
-                      VIRTUAL_ROW_CLASS,
-                    )
-                  "
+                  cn(
+                    rowVariants({
+                      layout: 'tree',
+                      selected: rt?.selected === filteredNodes[vi.index]?.path,
+                    }),
+                    'border-b border-border px-2',
+                    VIRTUAL_ROW_CLASS,
+                  )
+                "
                 :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
                 role="option"
                 v-bind="nav.rowProps(filteredNodes[vi.index]!.path)"
@@ -545,10 +548,10 @@ onMounted(() => {
                 <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"
                   ><CodiconIcon
                     :name="
-                        filteredNodes[vi.index]?.kind === 'key'
-                          ? redisTypeIcon(keyType(filteredNodes[vi.index]!.path))
-                          : nodeIcon(filteredNodes[vi.index]!.kind)
-                      "
+                      filteredNodes[vi.index]?.kind === 'key'
+                        ? redisTypeIcon(keyType(filteredNodes[vi.index]!.path))
+                        : nodeIcon(filteredNodes[vi.index]!.kind)
+                    "
                     :size="13"
                   /></span
                 >
@@ -556,9 +559,9 @@ onMounted(() => {
                 <Badge
                   data
                   v-if="
-                      filteredNodes[vi.index]?.kind === 'key' &&
-                      redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
-                    "
+                    filteredNodes[vi.index]?.kind === 'key' &&
+                    redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
+                  "
                   data-testid="browse-key-type"
                   >{{
                     redisTypeLabel(keyType(filteredNodes[vi.index]!.path))

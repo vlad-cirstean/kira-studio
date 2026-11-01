@@ -590,7 +590,11 @@ onMounted(async () => {
       ref="rootRef"
       class="relative min-h-0 flex-1 overflow-hidden"
       data-testid="data-grid"
-      :style="{ width: params.width ? `${params.width}px` : undefined, height: params.height ? `${params.height}px` : undefined, flex: params.height ? 'none' : undefined }"
+      :style="{
+        width: params.width ? `${params.width}px` : undefined,
+        height: params.height ? `${params.height}px` : undefined,
+        flex: params.height ? 'none' : undefined,
+      }"
     >
       <TooltipProxy ref="tip" :container="rootRef" />
       <NavPreview :target="nav" @close="nav = null" />

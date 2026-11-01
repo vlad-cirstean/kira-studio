@@ -281,7 +281,9 @@ onUnmounted(() => {
       <ToolbarSeparator />
       <TooltipIconButton
         icon="filter"
-        :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
+        :label="
+          t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')
+        "
         :aria-label="t('studio.search.filterRows.tooltip')"
         :pressed="filtering"
         :data-testid="`${testidPrefix}search-filter-rows`"

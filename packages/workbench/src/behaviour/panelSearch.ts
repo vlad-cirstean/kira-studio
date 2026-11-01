@@ -47,7 +47,7 @@ export function usePanelHeaderSearch(
     const wasHidden = !showSearch.value;
     revealSearch();
     if (wasHidden) {
-      void nextTick(() =>
+      void nextTick().then(() =>
         container.querySelector<HTMLInputElement>(`[data-testid="${testid}"]`)?.focus(),
       );
     } else {

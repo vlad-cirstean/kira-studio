@@ -122,7 +122,13 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     :class="
-      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, dragging && SORTABLE_GHOST_CLASS, props.class)
+      cn(
+        rowVariants({ layout: 'tree', selected }),
+        'h-row',
+        stickyClass,
+        dragging && SORTABLE_GHOST_CLASS,
+        props.class,
+      )
     "
     :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'tree-sticky-row' : 'tree-row'"
@@ -147,7 +153,12 @@ function onKeydown(e: KeyboardEvent): void {
       v-if="dropEdge"
       aria-hidden="true"
       data-testid="tree-drop-indicator"
-      :class="cn('pointer-events-none absolute inset-x-0 h-0.5 bg-focus', dropEdge === 'top' ? 'top-0' : 'bottom-0')"
+      :class="
+        cn(
+          'pointer-events-none absolute inset-x-0 h-0.5 bg-focus',
+          dropEdge === 'top' ? 'top-0' : 'bottom-0',
+        )
+      "
     />
 
     <!-- The twisty is the one control in the app whose entire meaning is already

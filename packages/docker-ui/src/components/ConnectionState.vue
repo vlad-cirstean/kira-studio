@@ -14,7 +14,9 @@ const { retrying, retry } = useRetryStatus();
     fill
     :loading="!status.data.value"
     data-testid="docker-panel-unavailable"
-    :title="status.data.value ? t('docker.panel.unavailable.title') : t('common.connecting.loading')"
+    :title="
+      status.data.value ? t('docker.panel.unavailable.title') : t('common.connecting.loading')
+    "
     :description="status.data.value ? t('docker.panel.unavailable.description') : undefined"
   >
     <template #media>

@@ -262,7 +262,11 @@ function clear(): void {
           :style="segmentStyle(seg)"
           ><HighlightedText
             :parts="splitMatches(seg.text, needle)"
-            :current="index === currentLine ? splitMatches(seg.text, needle).findIndex((p) => p.match) : undefined"
+            :current="
+              index === currentLine
+                ? splitMatches(seg.text, needle).findIndex((p) => p.match)
+                : undefined
+            "
           /></span
         >
       </template>

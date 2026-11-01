@@ -33,7 +33,9 @@ function open(row: { network: { id: string } }): void {
         fill
         data-testid="docker-list-empty"
         icon="globe"
-        :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.network.none.empty')"
+        :title="
+          ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.network.none.empty')
+        "
         :description="ui.search.trim() ? t('docker.network.noMatches.emptyHint') : undefined"
       />
     </template>
@@ -42,11 +44,14 @@ function open(row: { network: { id: string } }): void {
         <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
         <div
           :class="
-          cn(
-            rowVariants({ layout: 'tree', selected: ui.selection?.kind === 'network' && ui.selection.id === row.network.id }),
-            'group/row h-full gap-1.5',
-          )
-        "
+            cn(
+              rowVariants({
+                layout: 'tree',
+                selected: ui.selection?.kind === 'network' && ui.selection.id === row.network.id,
+              }),
+              'group/row h-full gap-1.5',
+            )
+          "
           :style="rowIndent(0)"
           data-testid="docker-row"
           :data-id="row.network.id"

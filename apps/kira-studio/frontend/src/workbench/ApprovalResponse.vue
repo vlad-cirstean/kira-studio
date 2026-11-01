@@ -164,7 +164,10 @@ const padBottom = computed(() => {
             }}</template>
             <template v-else>
               {{
-                t('studio.dbMcp.preview.summary.status', { returned: parsed.returned, count: parsed.rowCount })
+                t('studio.dbMcp.preview.summary.status', {
+                  returned: parsed.returned,
+                  count: parsed.rowCount,
+                })
               }}
               <template v-if="parsed.truncated">
                 · {{ t('studio.dbMcp.preview.truncated.status') }}</template
@@ -211,7 +214,11 @@ const padBottom = computed(() => {
                     <TooltipContent>
                       <TooltipDetails
                         :title="col.label"
-                        :rows="col.title ? [{ label: t('common.field.type.label'), value: col.title }] : []"
+                        :rows="
+                          col.title
+                            ? [{ label: t('common.field.type.label'), value: col.title }]
+                            : []
+                        "
                         :hint="col.masked ? t('studio.dbMcp.preview.masked.hint') : undefined"
                       />
                     </TooltipContent>

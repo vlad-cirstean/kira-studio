@@ -98,7 +98,9 @@ async function refresh(): Promise<void> {
       <template #actions>
         <TooltipIconButton
           icon="search"
-          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
+          :label="
+            showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')
+          "
           :pressed="showSearch"
           :disabled="!ok"
           data-testid="toggle-search"
@@ -153,7 +155,9 @@ async function refresh(): Promise<void> {
           t('docker.panel.showStopped.label')
         }}</Label>
         <span class="ml-auto" data-testid="docker-summary">{{
-          stopped ? t('docker.panel.summaryStopped.label', { running, stopped }) : t('common.state.runningCount.status', { count: running })
+          stopped
+            ? t('docker.panel.summaryStopped.label', { running, stopped })
+            : t('common.state.runningCount.status', { count: running })
         }}</span>
       </div>
       <ContainerList v-if="ui.section === 'containers'" />

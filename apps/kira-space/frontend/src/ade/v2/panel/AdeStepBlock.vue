@@ -338,7 +338,11 @@ function logToggleLabel(runId: string): string {
           </Button>
           <AdeTip
             v-if="canTakeOver(rl.run)"
-            :text="rl.run.sandbox && rl.run.sandbox.access !== 'off' ? t('space.ade.sandbox.takeOver.hint') : ''"
+            :text="
+              rl.run.sandbox && rl.run.sandbox.access !== 'off'
+                ? t('space.ade.sandbox.takeOver.hint')
+                : ''
+            "
           >
             <Button
               variant="dialog"

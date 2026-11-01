@@ -135,7 +135,9 @@ onUnmounted(() => {
       <ViewToolbar border="none">
         <TooltipIconButton
           :icon="section.expanded ? 'chevron-down' : 'chevron-right'"
-          :label="section.expanded ? t('common.action.collapse.label') : t('common.action.expand.label')"
+          :label="
+            section.expanded ? t('common.action.collapse.label') : t('common.action.expand.label')
+          "
           data-testid="repo-multi-diff-toggle"
           @click="toggle(section)"
         />

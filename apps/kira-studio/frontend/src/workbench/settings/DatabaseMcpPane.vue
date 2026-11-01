@@ -242,7 +242,9 @@ const dbMcpFocusId = useId();
         {{
           dbMcpTokenExpired
             ? t('studio.settings.dbMcp.tokenExpired.body')
-            : t('studio.settings.dbMcp.tokenValid.body', { date: formatDateTime(dbMcpStore.status.expiresAt) })
+            : t('studio.settings.dbMcp.tokenValid.body', {
+                date: formatDateTime(dbMcpStore.status.expiresAt),
+              })
         }}
       </FieldDescription>
     </template>
@@ -264,11 +266,16 @@ const dbMcpFocusId = useId();
           <div class="flex flex-col min-w-0 gap-0.5">
             <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
             <FieldDescription>{{
-              t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
-                read: conn.mcpReadMode,
-                write: conn.mcpWriteMode,
-                ddl: conn.mcpDdlMode,
-              })
+              t(
+                conn.mcpAutoExplain
+                  ? 'studio.settings.dbMcp.modesPlans.status'
+                  : 'studio.settings.dbMcp.modes.status',
+                {
+                  read: conn.mcpReadMode,
+                  write: conn.mcpWriteMode,
+                  ddl: conn.mcpDdlMode,
+                },
+              )
             }}</FieldDescription>
             <FieldDescription
               v-if="conn.mcpReviewResults !== 'inherit'"
@@ -291,7 +298,9 @@ const dbMcpFocusId = useId();
               v-if="maskRuleCountsQuery.data.value?.[conn.id]"
               :data-testid="`db-mcp-connection-masked-${conn.id}`"
               >{{
-                t('studio.settings.dbMcp.masked.status', { count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0 })
+                t('studio.settings.dbMcp.masked.status', {
+                  count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0,
+                })
               }}</FieldDescription
             >
           </div>

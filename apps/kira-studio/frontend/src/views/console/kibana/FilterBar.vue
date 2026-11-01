@@ -98,7 +98,11 @@ function negate(index: number, f: KibanaFilter): void {
       </Popover>
       <TooltipIconButton
         :icon="f.disabled ? 'eye-closed' : 'eye'"
-        :label="f.disabled ? t('studio.kibana.filter.enable.tooltip') : t('studio.kibana.filter.disable.tooltip')"
+        :label="
+          f.disabled
+            ? t('studio.kibana.filter.enable.tooltip')
+            : t('studio.kibana.filter.disable.tooltip')
+        "
         data-testid="kibana-filter-toggle"
         @click="replace(i, { ...f, disabled: !f.disabled })"
       />

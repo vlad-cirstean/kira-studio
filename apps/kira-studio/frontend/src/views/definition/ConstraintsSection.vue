@@ -94,7 +94,9 @@ function onNavigate(c: ConstraintRow): void {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{{
-                t('studio.definition.constraint.openReferenced.tooltip', { table: referencedTableName(c) ?? '' })
+                t('studio.definition.constraint.openReferenced.tooltip', {
+                  table: referencedTableName(c) ?? '',
+                })
               }}</TooltipContent>
             </Tooltip>
           </TableCell>

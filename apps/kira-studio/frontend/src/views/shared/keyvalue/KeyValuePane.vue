@@ -230,14 +230,22 @@ onUnmounted(() => {
             <AlertDescription>{{ rt.actionError }}</AlertDescription>
           </Alert>
           <Alert
-            v-if="gate.isSingleObjectPage.value && page && gate.objectBodyRow.value === null && page.memoryBytes !== null"
+            v-if="
+              gate.isSingleObjectPage.value &&
+              page &&
+              gate.objectBodyRow.value === null &&
+              page.memoryBytes !== null
+            "
             variant="warn"
             strip
             data-testid="keyvalue-object-too-large"
           >
             <AlertDescription>
               {{
-                t('studio.keyValue.tooLarge.description', { size: formatBytes(page.memoryBytes), limit: formatBytes(SINGLE_ROW_MAX_BYTES) })
+                t('studio.keyValue.tooLarge.description', {
+                  size: formatBytes(page.memoryBytes),
+                  limit: formatBytes(SINGLE_ROW_MAX_BYTES),
+                })
               }}
             </AlertDescription>
           </Alert>
@@ -250,7 +258,9 @@ onUnmounted(() => {
             <AlertDescription>
               <span data-testid="keyvalue-object-edit-note">{{
                 actions.objectSaveError.value
-                  ? t('studio.keyValue.objectEdit.pendingError.status', { error: actions.objectSaveError.value })
+                  ? t('studio.keyValue.objectEdit.pendingError.status', {
+                      error: actions.objectSaveError.value,
+                    })
                   : t('studio.keyValue.objectEdit.pending.status')
               }}</span>
             </AlertDescription>

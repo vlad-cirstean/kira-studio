@@ -133,7 +133,9 @@ function onTools(v: string | number): void {
     @patch="(sandbox) => emit('patch', { sandbox })"
   />
   <AdeStepSettings
-    v-if="step.kind === 'agent' || step.kind === 'review' || (step.kind === 'manual' && step.session)"
+    v-if="
+      step.kind === 'agent' || step.kind === 'review' || (step.kind === 'manual' && step.session)
+    "
     :settings="step.settings"
     :step-id="step.id"
     @patch="(settings) => emit('patch', { settings })"

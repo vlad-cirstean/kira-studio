@@ -116,7 +116,9 @@ const listEl = useTemplateRef<HTMLElement>('list');
       <div v-else class="flex items-center gap-1 ml-auto text-graph-md">
         <Button variant="toolbar" size="kira" @click="reviewComments.clear()">
           {{
-            t('git.review.comments.confirmClear.label', { count: reviewComments.comments.value.length })
+            t('git.review.comments.confirmClear.label', {
+              count: reviewComments.comments.value.length,
+            })
           }}
         </Button>
         <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">{{
@@ -157,7 +159,12 @@ const listEl = useTemplateRef<HTMLElement>('list');
                     variant="link"
                     size="inline"
                     class="font-data text-muted-foreground text-graph-sm after:absolute after:inset-0"
-                    :aria-label="t('git.review.comments.open.aria', { path: group.path, line: lineLabel(c.range) })"
+                    :aria-label="
+                      t('git.review.comments.open.aria', {
+                        path: group.path,
+                        line: lineLabel(c.range),
+                      })
+                    "
                     @click="emit('select', group.path, c.origin)"
                   >
                     {{ lineLabel(c.range) }}

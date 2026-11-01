@@ -52,7 +52,7 @@ function url(server: UiServer, variant: Variant): string {
   return `${server.url}proto/grid/${PAGES[variant].path}w=${VIEWPORT.width}&h=${VIEWPORT.height}&rowHeight=28`;
 }
 
-function describe(values: number[]): string {
+function summarise(values: number[]): string {
   if (values.length === 0) return 'no moving frames';
   const sorted = [...values].sort((a, b) => a - b);
   const at = (q: number): number =>
@@ -124,7 +124,7 @@ function reportLate(variant: Variant, px: number, trace: TraceResult): void {
   const moving = trace.frames.filter((f) => f.pxPerFrame > 0);
   const gaps = moving.map((f) => f.gapPx);
   const label = variant === 'cheetah' ? 'lagPx' : 'uncoveredPx';
-  let line = `PERF ${variant} late-${px}px/frame ${label} ${describe(gaps)}`;
+  let line = `PERF ${variant} late-${px}px/frame ${label} ${summarise(gaps)}`;
   if (variant === 'cheetah') {
     const blank = moving.map((f) => f.blankRows ?? 0);
     const worst = Math.max(0, ...blank);

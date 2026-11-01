@@ -157,7 +157,9 @@ const disableCookieJarId = useId();
         }}</option>
       </NativeSelect>
       <FieldDescription>{{
-        t('studio.http.settings.global.status', { value: t('studio.http.settings.versionOption.option', { version: global.httpVersion }) })
+        t('studio.http.settings.global.status', {
+          value: t('studio.http.settings.versionOption.option', { version: global.httpVersion }),
+        })
       }}</FieldDescription>
     </Field>
 
@@ -188,7 +190,11 @@ const disableCookieJarId = useId();
       />
       <FieldDescription>
         {{
-          global.requestTimeoutMs === 0 ? t('studio.http.settings.globalNoTimeout.status') : t('studio.http.settings.global.status', { value: formatDuration(global.requestTimeoutMs) })
+          global.requestTimeoutMs === 0
+            ? t('studio.http.settings.globalNoTimeout.status')
+            : t('studio.http.settings.global.status', {
+                value: formatDuration(global.requestTimeoutMs),
+              })
         }}
       </FieldDescription>
     </Field>
@@ -220,7 +226,11 @@ const disableCookieJarId = useId();
       />
       <FieldDescription>
         {{
-          global.maxResponseMb === 0 ? t('studio.http.settings.globalUnlimited.status') : t('studio.http.settings.global.status', { value: formatBytes(global.maxResponseMb * 1024 * 1024) })
+          global.maxResponseMb === 0
+            ? t('studio.http.settings.globalUnlimited.status')
+            : t('studio.http.settings.global.status', {
+                value: formatBytes(global.maxResponseMb * 1024 * 1024),
+              })
         }}
       </FieldDescription>
     </Field>
@@ -250,7 +260,11 @@ const disableCookieJarId = useId();
       </Label>
     </FieldGroup>
     <FieldDescription>{{
-      t(global.sslVerify ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status')
+      t(
+        global.sslVerify
+          ? 'studio.http.settings.globalOn.status'
+          : 'studio.http.settings.globalOff.status',
+      )
     }}</FieldDescription>
 
     <FieldGroup class="items-center">
@@ -280,7 +294,11 @@ const disableCookieJarId = useId();
       </Label>
     </FieldGroup>
     <FieldDescription>{{
-      t(global.followRedirects ? 'studio.http.settings.globalOn.status' : 'studio.http.settings.globalOff.status')
+      t(
+        global.followRedirects
+          ? 'studio.http.settings.globalOn.status'
+          : 'studio.http.settings.globalOff.status',
+      )
     }}</FieldDescription>
 
     <Field>
@@ -341,7 +359,11 @@ const disableCookieJarId = useId();
       </Label>
     </FieldGroup>
     <FieldDescription>{{
-      t(global.disableCookieJar ? 'studio.http.settings.globalOff.status' : 'studio.http.settings.globalOn.status')
+      t(
+        global.disableCookieJar
+          ? 'studio.http.settings.globalOff.status'
+          : 'studio.http.settings.globalOn.status',
+      )
     }}</FieldDescription>
 
     <Button

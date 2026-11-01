@@ -24,7 +24,12 @@ const { busy, error, confirm } = useConfirmRun(
     tone="danger"
     :pending="busy"
     :error="error ?? ''"
-    :testids="{ root: 'ade-confirm-dialog', cancel: 'ade-confirm-no', confirm: 'ade-confirm-yes', error: 'ade-confirm-error' }"
+    :testids="{
+      root: 'ade-confirm-dialog',
+      cancel: 'ade-confirm-no',
+      confirm: 'ade-confirm-yes',
+      error: 'ade-confirm-error',
+    }"
     @confirm="confirm"
     @cancel="dialogs.abortTarget = null"
   />

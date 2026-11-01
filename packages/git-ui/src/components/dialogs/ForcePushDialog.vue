@@ -102,7 +102,11 @@ function confirmPlain(): void {
       <DialogBody>
         <DialogDescription>
           <CatalogText
-            :k="pending.preflight.remoteTip === null ? 'git.dialog.forcePushConfirm.bodyNew.body' : 'git.dialog.forcePushConfirm.body'"
+            :k="
+              pending.preflight.remoteTip === null
+                ? 'git.dialog.forcePushConfirm.bodyNew.body'
+                : 'git.dialog.forcePushConfirm.body'
+            "
           >
             <template #ref><Identifier :value="`${pending.remote}/${resolvedBranch}`" /></template>
             <template #sha

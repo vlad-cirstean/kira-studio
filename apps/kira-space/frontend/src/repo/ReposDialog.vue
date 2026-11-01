@@ -288,7 +288,9 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 <Tooltip v-if="selectedConfig" :disabled="selectedConfig.source === 'added'">
                   <TooltipTrigger as-child>
                     <Badge class="shrink-0" data-testid="repos-dialog-repo-source">{{
-                      selectedConfig.source === 'added' ? t('common.added.status') : baseName(selectedConfig.source)
+                      selectedConfig.source === 'added'
+                        ? t('common.added.status')
+                        : baseName(selectedConfig.source)
                     }}</Badge>
                   </TooltipTrigger>
                   <TooltipContent>{{ selectedConfig.source }}</TooltipContent>
@@ -305,7 +307,11 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 <div class="ml-auto flex shrink-0 items-center gap-1">
                   <TooltipIconButton
                     :icon="selected.hidden ? 'eye' : 'eye-closed'"
-                    :label="selected.hidden ? t('space.repo.dialog.show.tooltip') : t('space.repo.dialog.hide.tooltip')"
+                    :label="
+                      selected.hidden
+                        ? t('space.repo.dialog.show.tooltip')
+                        : t('space.repo.dialog.hide.tooltip')
+                    "
                     :aria-pressed="selected.hidden"
                     data-testid="repos-dialog-repo-hide"
                     @click="onHideRepo(selected.id, !selected.hidden)"
@@ -362,11 +368,15 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
                 data-testid="repos-dialog-folder-count"
                 >{{
                   f.hiddenCount > 0
-                  ? t('common.dotPair.label', {
-                      first: t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount }),
-                      second: t('space.repo.dialog.folder.hiddenCount.label', { count: f.hiddenCount }),
-                    })
-                  : t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount })
+                    ? t('common.dotPair.label', {
+                        first: t('space.repo.dialog.folder.repoCount.label', {
+                          count: f.repoCount,
+                        }),
+                        second: t('space.repo.dialog.folder.hiddenCount.label', {
+                          count: f.hiddenCount,
+                        }),
+                      })
+                    : t('space.repo.dialog.folder.repoCount.label', { count: f.repoCount })
                 }}</span
               >
               <Tooltip>
@@ -391,7 +401,11 @@ function repoRowClass(r: { id: string; hidden: boolean }): string {
               </Tooltip>
               <TooltipIconButton
                 :icon="f.hidden ? 'eye' : 'eye-closed'"
-                :label="f.hidden ? t('common.action.showAll.label') : t('space.repo.dialog.folder.hideAll.label')"
+                :label="
+                  f.hidden
+                    ? t('common.action.showAll.label')
+                    : t('space.repo.dialog.folder.hideAll.label')
+                "
                 :aria-pressed="f.hidden"
                 data-testid="repos-dialog-folder-hide"
                 @click="onHideFolder(f.path, !f.hidden)"

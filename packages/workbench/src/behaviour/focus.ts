@@ -12,7 +12,7 @@ export function useFocusOnMount(target: MaybeElementRef, opts: { select?: boolea
   useFocus(target, { initialValue: true });
   if (!opts.select) return;
   onMounted(() =>
-    nextTick(() => {
+    nextTick().then(() => {
       const el = unrefElement(target);
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.select();
     }),

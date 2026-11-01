@@ -167,7 +167,11 @@ async function focus(): Promise<void> {
           </TooltipDisabledTrigger>
         </AdeTip>
         <AdeTip
-          :text="openCount === 0 ? t('space.ade.review.copy.none.tooltip') : t('space.ade.review.copy.tooltip')"
+          :text="
+            openCount === 0
+              ? t('space.ade.review.copy.none.tooltip')
+              : t('space.ade.review.copy.tooltip')
+          "
         >
           <TooltipDisabledTrigger :disabled="copyOff">
             <Button
@@ -221,7 +225,11 @@ async function focus(): Promise<void> {
         @click="start"
       >
         {{
-          waitingSetup ? t('space.ade.agentDialog.startsWhenReady.loading') : session ? t('space.ade.review.agent.resume.label') : t('space.ade.review.agent.start.label')
+          waitingSetup
+            ? t('space.ade.agentDialog.startsWhenReady.loading')
+            : session
+              ? t('space.ade.review.agent.resume.label')
+              : t('space.ade.review.agent.start.label')
         }}
       </Button>
     </div>

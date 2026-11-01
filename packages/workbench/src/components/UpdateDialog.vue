@@ -65,7 +65,10 @@ function onEscapeOrOutside(e: Event): void {
           >
             <Spinner :size="13" label="" />
             {{
-              t('workbench.update.installing.body', { app: store.appName, version: store.latestVersion })
+              t('workbench.update.installing.body', {
+                app: store.appName,
+                version: store.latestVersion,
+              })
             }}
           </p>
         </template>
@@ -83,18 +86,29 @@ function onEscapeOrOutside(e: Event): void {
         </FieldError>
         <p v-else-if="state === 'upToDate'" class="m-0" data-testid="update-dialog-up-to-date">
           {{
-            t('workbench.update.upToDate.body', { app: store.appName, current: store.currentVersion })
+            t('workbench.update.upToDate.body', {
+              app: store.appName,
+              current: store.currentVersion,
+            })
           }}
         </p>
         <template v-else>
           <p class="m-0" data-testid="update-dialog-versions">
             {{
-              t('workbench.update.versions.body', { app: store.appName, latest: store.latestVersion, current: store.currentVersion })
+              t('workbench.update.versions.body', {
+                app: store.appName,
+                latest: store.latestVersion,
+                current: store.currentVersion,
+              })
             }}
           </p>
           <p class="m-0 text-subtle">
             {{
-              t('workbench.update.explain.body', { app: store.appName, folder: '/Applications', log: store.installLogPath })
+              t('workbench.update.explain.body', {
+                app: store.appName,
+                folder: '/Applications',
+                log: store.installLogPath,
+              })
             }}
           </p>
           <FieldError v-if="state === 'error'" data-testid="update-dialog-error">
@@ -160,7 +174,9 @@ function onEscapeOrOutside(e: Event): void {
             @click="store.install()"
           >
             {{
-              state === 'error' ? t('common.action.retry.label') : t('workbench.update.install.label')
+              state === 'error'
+                ? t('common.action.retry.label')
+                : t('workbench.update.install.label')
             }}
           </Button>
         </template>

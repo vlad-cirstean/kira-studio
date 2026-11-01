@@ -31,7 +31,10 @@ const facts = computed(() =>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds buttons a button cannot. -->
   <div
     :class="
-      cn(rowVariants({ layout: 'tree', selected: card.selected }), 'cursor-grab gap-2 border-b border-border py-1')
+      cn(
+        rowVariants({ layout: 'tree', selected: card.selected }),
+        'cursor-grab gap-2 border-b border-border py-1',
+      )
     "
     :style="rowIndent(0)"
     role="button"

@@ -35,7 +35,9 @@ const restricted = computed(() => props.data?.restricted === true);
     :placeholder="t('studio.common.nodeKind.namespace.label')"
     :trigger-label="value === ALL ? t('kubernetes.namespace.all.option') : value"
     :search-placeholder="t('kubernetes.namespace.picker.search.placeholder')"
-    :empty-text="restricted ? t('kubernetes.namespace.restricted.hint') : t('common.state.noMatches.empty')"
+    :empty-text="
+      restricted ? t('kubernetes.namespace.restricted.hint') : t('common.state.noMatches.empty')
+    "
     :custom-label="restricted ? (q) => t('common.picker.useValue.label', { value: q }) : undefined"
     size="kira"
     trigger="toolbar"

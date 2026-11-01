@@ -19,10 +19,7 @@ const props = withDefaults(
   <div
     data-slot="field"
     :data-orientation="orientation"
-    :class="cn(
-      fieldVariants({ orientation }),
-      props.class,
-    )"
+    :class="cn(fieldVariants({ orientation }), props.class)"
   >
     <slot />
   </div>

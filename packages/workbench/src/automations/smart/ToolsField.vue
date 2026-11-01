@@ -76,7 +76,9 @@ function resetTools(): void {
     </div>
     <div v-if="bashOn" class="flex flex-col gap-1" data-testid="smart-bash-patterns">
       <FieldDescription>{{
-        t('automations.smart.bashHint.hint', { example: t('automations.smart.bashExample.example') })
+        t('automations.smart.bashHint.hint', {
+          example: t('automations.smart.bashExample.example'),
+        })
       }}</FieldDescription>
       <div
         v-for="p in smart.bashPatterns"

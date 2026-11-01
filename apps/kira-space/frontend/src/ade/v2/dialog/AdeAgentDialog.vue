@@ -346,7 +346,9 @@ async function discard(): Promise<void> {
           @click="send"
         >
           {{
-            dialogs.waitingSetup ? t('space.ade.agentDialog.startsWhenReady.loading') : view.sendLabel
+            dialogs.waitingSetup
+              ? t('space.ade.agentDialog.startsWhenReady.loading')
+              : view.sendLabel
           }}
         </Button>
       </DialogFooter>

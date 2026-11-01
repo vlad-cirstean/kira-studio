@@ -74,7 +74,13 @@ function streamClass(stream: string): string {
 <template>
   <div
     ref="scrollEl"
-    :class="cn(cardVariants(), 'min-h-0 flex-1 gap-0 overflow-auto font-data text-kira-sm leading-relaxed', !maxHeight && 'max-h-60')"
+    :class="
+      cn(
+        cardVariants(),
+        'min-h-0 flex-1 gap-0 overflow-auto font-data text-kira-sm leading-relaxed',
+        !maxHeight && 'max-h-60',
+      )
+    "
     :style="style"
     :data-testid="testid"
     @scroll.passive="onScroll"
@@ -91,7 +97,13 @@ function streamClass(stream: string): string {
           :key="lines[item.index]?.id ?? item.key"
           :ref="measure"
           :data-index="item.index"
-          :class="cn(VIRTUAL_ROW_CLASS, wrap === false ? 'whitespace-pre' : 'whitespace-pre-wrap break-words', streamClass(lines[item.index]?.stream ?? ''))"
+          :class="
+            cn(
+              VIRTUAL_ROW_CLASS,
+              wrap === false ? 'whitespace-pre' : 'whitespace-pre-wrap break-words',
+              streamClass(lines[item.index]?.stream ?? ''),
+            )
+          "
           :style="{ transform: `translateY(${item.start}px)` }"
           :data-testid="`${testid}-line`"
           :data-stream="lines[item.index]?.stream"

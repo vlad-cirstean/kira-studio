@@ -31,7 +31,10 @@ const label = computed(() => {
 <template>
   <span
     data-testid="run-state"
-    :class="['inline-flex items-center gap-1 font-data text-kira-sm tabular-nums', TONE[state.status]]"
+    :class="[
+      'inline-flex items-center gap-1 font-data text-kira-sm tabular-nums',
+      TONE[state.status],
+    ]"
   >
     <span data-testid="run-state-label">{{ label }}</span>
     <Spinner v-if="state.status === 'running'" :size="12" label="" />

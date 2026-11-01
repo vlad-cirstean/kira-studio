@@ -8,7 +8,13 @@ const props = defineProps<{ class?: HTMLAttributes['class']; flush?: boolean }>(
 <template>
   <div
     data-slot="card-content"
-    :class="cn('min-w-0 group-data-[variant=section]/card:p-3', flush && 'group-data-[variant=section]/card:p-0', props.class)"
+    :class="
+      cn(
+        'min-w-0 group-data-[variant=section]/card:p-3',
+        flush && 'group-data-[variant=section]/card:p-0',
+        props.class,
+      )
+    "
   >
     <slot />
   </div>

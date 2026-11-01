@@ -229,7 +229,14 @@ function selectMethod(service: string, method: string): void {
             v-for="m in svc.methods"
             :key="m.name"
             type="button"
-            :class="cn(rowVariants({ selected: tab.state.service === svc.fullName && tab.state.method === m.name }), 'w-full justify-between border-0 bg-none text-left')"
+            :class="
+              cn(
+                rowVariants({
+                  selected: tab.state.service === svc.fullName && tab.state.method === m.name,
+                }),
+                'w-full justify-between border-0 bg-none text-left',
+              )
+            "
             data-testid="grpc-method-row"
             @click="selectMethod(svc.fullName, m.name)"
           >

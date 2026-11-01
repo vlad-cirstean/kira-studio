@@ -29,7 +29,13 @@ const props = withDefaults(defineProps<Props>(), {
     :as-child="asChild"
     :disabled="pending || undefined"
     :aria-busy="pending || undefined"
-    :class="cn(buttonVariants({ variant, size }), pending && '[&_.codicon:not(.animate-spin)]:hidden', props.class)"
+    :class="
+      cn(
+        buttonVariants({ variant, size }),
+        pending && '[&_.codicon:not(.animate-spin)]:hidden',
+        props.class,
+      )
+    "
   >
     <Spinner v-if="pending && !asChild" label="" />
     <slot />

@@ -204,7 +204,10 @@ function closeDialog(): void {
                   k="git.dialog.stack.planEntry.label"
                   :params="{
                     count: entry.commits,
-                    reason: entry.reason === 'stale' ? t('common.stale.status') : t('git.dialog.stack.reasonAncestor.status'),
+                    reason:
+                      entry.reason === 'stale'
+                        ? t('common.stale.status')
+                        : t('git.dialog.stack.reasonAncestor.status'),
                     source: entry.baseSource,
                   }"
                 >
@@ -215,7 +218,9 @@ function closeDialog(): void {
             </ul>
             <p v-if="preflight.needsForcePush.length > 0" class="text-muted-foreground">
               {{
-                t('git.dialog.stack.forcePush.hint', { branches: preflight.needsForcePush.join(', ') })
+                t('git.dialog.stack.forcePush.hint', {
+                  branches: preflight.needsForcePush.join(', '),
+                })
               }}
             </p>
           </template>
@@ -225,7 +230,11 @@ function closeDialog(): void {
             <ul class="max-h-50 overflow-y-auto p-1 bg-bg border border-border text-kira-md">
               <li v-for="(p, i) in stack.progress.value" :key="i">
                 {{
-                  t('git.dialog.stack.progress.status', { branch: p.branch, index: p.index, total: p.total })
+                  t('git.dialog.stack.progress.status', {
+                    branch: p.branch,
+                    index: p.index,
+                    total: p.total,
+                  })
                 }}
               </li>
             </ul>
@@ -255,7 +264,9 @@ function closeDialog(): void {
             <Button
               variant="dialog-primary"
               size="kira-lg"
-              :disabled="!preflight || preflight.verdict === 'blocked' || preflight.verdict === 'noop'"
+              :disabled="
+                !preflight || preflight.verdict === 'blocked' || preflight.verdict === 'noop'
+              "
               @click="submitRestack"
             >
               {{ t('git.common.restack.label') }}

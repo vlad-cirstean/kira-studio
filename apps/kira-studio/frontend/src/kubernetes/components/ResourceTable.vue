@@ -117,8 +117,19 @@ const nav = useListNavigation<KubeRow>({
           <div
             v-for="vi in virtualItems"
             :key="refKey(rows[vi.index]!)"
-            :class="cn(tableRowClass, rowVariants({ layout: 'tree', selected: isSelected(rows[vi.index]!) }), VIRTUAL_ROW_CLASS, 'grid gap-x-3 px-3')"
-            :style="{ ...gridStyle, height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
+            :class="
+              cn(
+                tableRowClass,
+                rowVariants({ layout: 'tree', selected: isSelected(rows[vi.index]!) }),
+                VIRTUAL_ROW_CLASS,
+                'grid gap-x-3 px-3',
+              )
+            "
+            :style="{
+              ...gridStyle,
+              height: `${vi.size}px`,
+              transform: `translateY(${vi.start}px)`,
+            }"
             role="option"
             :aria-selected="isSelected(rows[vi.index]!)"
             data-testid="kube-row"
@@ -126,7 +137,9 @@ const nav = useListNavigation<KubeRow>({
             :data-namespace="rows[vi.index]!.namespace"
             v-bind="nav.rowProps(refKey(rows[vi.index]!))"
             :tabindex="nav.tabindexFor(refKey(rows[vi.index]!))"
-            @click="ui.selectRow({ namespace: rows[vi.index]!.namespace, name: rows[vi.index]!.name })"
+            @click="
+              ui.selectRow({ namespace: rows[vi.index]!.namespace, name: rows[vi.index]!.name })
+            "
           >
             <span v-for="(cell, ci) in rows[vi.index]!.cells" :key="ci" class="min-w-0 truncate"
               ><HighlightedText :parts="splitMatches(cell, needle)" /></span

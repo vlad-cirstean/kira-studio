@@ -103,7 +103,10 @@ function copyLink(): void {
             })
           }}</span>
           <span class="font-data" data-testid="host-view-branches">{{
-            t('space.hostView.header.branches.label', { head: detail.headRef, base: detail.baseRef })
+            t('space.hostView.header.branches.label', {
+              head: detail.headRef,
+              base: detail.baseRef,
+            })
           }}</span>
         </div>
         <MarkdownBody :source="detail.body" />

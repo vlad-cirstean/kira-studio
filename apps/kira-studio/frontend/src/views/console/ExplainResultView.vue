@@ -158,7 +158,12 @@ const rawLanguage = computed(() =>
         <div
           v-for="row in flatRows"
           :key="row.id"
-          :class="cn(rowVariants({ layout: 'tree' }), 'flex-wrap items-baseline gap-1.5 py-0.5 pr-1.5 whitespace-normal')"
+          :class="
+            cn(
+              rowVariants({ layout: 'tree' }),
+              'flex-wrap items-baseline gap-1.5 py-0.5 pr-1.5 whitespace-normal',
+            )
+          "
           data-testid="explain-plan-node"
           :style="{ paddingLeft: `${row.depth * 18 + 4}px` }"
         >

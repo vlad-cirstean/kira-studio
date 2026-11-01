@@ -164,7 +164,10 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         data-testid="http-cookies-filtered-count"
       >
         {{
-          t('studio.http.cookies.count.status', { shown: filteredRequestCookies.length, count: requestCookies.length })
+          t('studio.http.cookies.count.status', {
+            shown: filteredRequestCookies.length,
+            count: requestCookies.length,
+          })
         }}
       </span>
       <Alert strip v-if="requestError" variant="error" data-testid="http-cookies-error">

@@ -157,7 +157,9 @@ const onSubmitKey = shortcutKeydown(['form.submit'], run);
     <DialogContent @keydown="onSubmitKey" size="lg" :dirty="dirty" data-testid="run-dialog">
       <DialogHeader>
         <DialogTitle>{{
-          script ? t('automations.dialog.run.title', { name: script.name }) : t('automations.dialog.run.untitled.title')
+          script
+            ? t('automations.dialog.run.title', { name: script.name })
+            : t('automations.dialog.run.untitled.title')
         }}</DialogTitle>
         <SmartBadge v-if="isSmart" />
       </DialogHeader>

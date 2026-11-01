@@ -30,7 +30,9 @@ const variant = computed(() => {
 
 <template>
   <div
-    :class="cn(rowVariants({ layout: 'tree', selected }), 'h-full gap-1.5 border-b border-border pr-3')"
+    :class="
+      cn(rowVariants({ layout: 'tree', selected }), 'h-full gap-1.5 border-b border-border pr-3')
+    "
     :data-testid="`import-file-${file.relPath}`"
     :data-state="file.state"
   >

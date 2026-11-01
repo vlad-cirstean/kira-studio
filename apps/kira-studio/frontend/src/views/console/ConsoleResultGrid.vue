@@ -33,18 +33,14 @@ const parse = useParseWorker();
 const documentRowsStore = useDocumentRowsStore();
 const consoleViewStore = useConsoleViewStore();
 
-// A three-way switch over a console result's own kind — tabular results render through
-// ConsoleSlickGrid.vue (the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
-// views/grid/SlickGridHost.vue uses); document and key-value results stay on VirtualList,
-// since their rows are Vue component trees (DocumentRow/DocumentTree) or two flex cells, not
-// formatted cells with a column axis to virtualize. The page cache itself is `./resultPages.ts`,
-// a generic-`Page` sibling of `grid/page.ts` since a console result can be tabular (SQL),
-// document (Mongo shell) or key-value (Redis) unlike a data tab.
+// Three-way switch over a console result's kind. Tabular results render through ConsoleSlickGrid.vue
+// (same layer as views/grid/SlickGridHost.vue). Document and key-value results stay on VirtualList:
+// their rows are Vue component trees or two flex cells, with no column axis to virtualize. The page
+// cache is `./resultPages.ts`, a generic-`Page` sibling of `grid/page.ts`: a result can be tabular
+// (SQL), document (Mongo shell) or key-value (Redis).
 //
-// tabId/connectionId/path are only here to publish into cellSelection.ts's shared slot —
-// a console result has no addressable row/table to write back to, so every SelectedCell
-// published from here leaves `onEdit` unset and the cell editor panel stays read-only for it,
-// same as a page with no primary key.
+// tabId/connectionId/path only publish into cellSelection.ts's shared slot. A console result has no
+// row/table to write back to, so published cells leave `onEdit` unset and the cell editor stays read-only.
 const props = defineProps<{
   pageKey: string;
   tabId: string;
@@ -171,13 +167,10 @@ const kvNav = useListNavigation<number>({
   rendered: () => kvVirtual.virtualItems.value,
 });
 
-// Search state here is keyed by tabId, same as every watcher below — the
-// virtualizers report positions within `rowIndices`/`documentRows`, which are ascending but,
-// while filtering, non-contiguous page-row indices (same reasoning as DocumentView.vue's own
-// onVisibleRange). The same bounds also prune resultPages.ts's decode cache — keyed by
-// pageKey (a decode cache is per result set), not tabId (search priority is per tab, resolved to
-// whichever result is active) — reusing this one report instead of resultPages.ts growing its own
-// watch.
+// Search state is keyed by tabId, like every watcher below. The virtualizers report positions within
+// `rowIndices`/`documentRows`: ascending, but non-contiguous while filtering (as DocumentView.vue's
+// onVisibleRange). The same bounds prune resultPages.ts's decode cache, keyed by pageKey (a decode
+// cache is per result set; search priority is per tab), so resultPages.ts needs no watch of its own.
 watch(kvVirtual.virtualItems, (items) => {
   if (items.length === 0) return;
   const list = rowIndices.value;
@@ -494,7 +487,9 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           :view="documentRows[vi.index]!"
           :row-scope="pageKey"
           :nav-props="docNav.rowProps(String(documentRows[vi.index]!.index))"
-          :expanded="consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)"
+          :expanded="
+            consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)
+          "
           :selected="isSelected(documentRows[vi.index]!.index, 0)"
           :search-match="isSearchMatch(documentRows[vi.index]!.index, 0)"
           :search-match-current="isCurrentSearchMatch(documentRows[vi.index]!.index, 0)"
@@ -505,7 +500,9 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         >
           <template #body>
             <div
-              v-if="consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)"
+              v-if="
+                consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)
+              "
               class="flex-1 min-h-0 border-t border-border bg-elevated overflow-hidden"
               data-testid="document-body"
             >
@@ -513,7 +510,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
                 v-if="documentRows[vi.index]!.root"
                 :tab-id="pageKey"
                 :row="documentRows[vi.index]!.index"
-                @toggle-path="(path) => documentRowsStore.togglePath(pageKey, documentRows[vi.index]!.index, path)"
+                @toggle-path="
+                  (path) =>
+                    documentRowsStore.togglePath(pageKey, documentRows[vi.index]!.index, path)
+                "
               />
               <pre
                 v-else
@@ -554,7 +554,11 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
             class="cell"
             :class="
               cn(
-                rowVariants({ layout: 'tree', selected: isSelected(rowIndices[vi.index]!, 0), muted: true }),
+                rowVariants({
+                  layout: 'tree',
+                  selected: isSelected(rowIndices[vi.index]!, 0),
+                  muted: true,
+                }),
                 'w-52 select-text overflow-hidden text-ellipsis px-2',
                 {
                   'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),

@@ -155,7 +155,9 @@ async function onSave(): Promise<void> {
     <DialogContent size="2xl" fixed-height :dirty="dirty" data-testid="connection-dialog">
       <DialogHeader v-if="step === 'engine'" close-testid="connection-dialog-close">
         <DialogTitle>{{
-          isEdit ? t('studio.project.connectionDialog.changeEngine.title') : t('studio.project.connectionDialog.newConnection.title')
+          isEdit
+            ? t('studio.project.connectionDialog.changeEngine.title')
+            : t('studio.project.connectionDialog.newConnection.title')
         }}</DialogTitle>
         <span class="min-w-0 grow" />
         <Button v-if="isEdit" variant="toolbar" size="kira" @click="step = 'details'">
@@ -169,7 +171,11 @@ async function onSave(): Promise<void> {
           <EngineIcon :kind="draft.kind" :size="13" />
         </span>
         <DialogTitle>{{
-          isEdit ? t('studio.project.connectionDialog.editTitle.title', { kind: KIND_LABEL[draft.kind] }) : t('studio.project.connectionDialog.newKindTitle.title', { kind: KIND_LABEL[draft.kind] })
+          isEdit
+            ? t('studio.project.connectionDialog.editTitle.title', { kind: KIND_LABEL[draft.kind] })
+            : t('studio.project.connectionDialog.newKindTitle.title', {
+                kind: KIND_LABEL[draft.kind],
+              })
         }}</DialogTitle>
         <span class="min-w-0 grow" />
         <Tooltip>
@@ -281,7 +287,9 @@ async function onSave(): Promise<void> {
           <Badge
             v-if="testState.status !== 'idle'"
             class="min-w-0"
-            :variant="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'error' : 'info'"
+            :variant="
+              testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'error' : 'info'
+            "
             data-testid="connection-test-result"
           >
             <TruncatedText :text="testLabel" />

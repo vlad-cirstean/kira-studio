@@ -1,6 +1,5 @@
 <script setup lang="ts" generic="R extends OpLogRecord">
 import type { EditorLanguageId } from '@shared/domain/editor';
-// biome-ignore lint/correctness/noUnusedImports: resolves the generic="R extends OpLogRecord" attribute above — biome only sees the <script> body, never that tag's own attribute string.
 import type { OpLogRecord } from '@shared/domain/ops';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
@@ -361,7 +360,9 @@ function alignClass(column: OpLogColumn): string {
     </div>
     <template v-else>
       <div
-        :class="cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-2 px-2 shrink-0 h-4.5')"
+        :class="
+          cn(tableHeadRowClass, tableHeadClass, 'grid items-center gap-2 px-2 shrink-0 h-4.5')
+        "
         :style="{ gridTemplateColumns }"
       >
         <span v-for="column in fitted" :key="column.id" :class="alignClass(column)">{{
@@ -383,13 +384,20 @@ function alignClass(column: OpLogColumn): string {
             <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the list container. -->
             <li
               v-if="entry.item.kind === 'op'"
-              :style="{ transform: `translateY(${entry.vi.start}px)`, height: `${OP_ROW_PX}px`, gridTemplateColumns }"
-              :class="cn(
-                VIRTUAL_ROW_CLASS,
-                tableRowClass,
-                'group/row grid items-center gap-2 px-2 select-text h-4.5',
-                entry.item.row.record.status === 'error' && 'bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] shadow-[inset_2px_0_0_var(--color-error)]',
-              )"
+              :style="{
+                transform: `translateY(${entry.vi.start}px)`,
+                height: `${OP_ROW_PX}px`,
+                gridTemplateColumns,
+              }"
+              :class="
+                cn(
+                  VIRTUAL_ROW_CLASS,
+                  tableRowClass,
+                  'group/row grid items-center gap-2 px-2 select-text h-4.5',
+                  entry.item.row.record.status === 'error' &&
+                    'bg-[color-mix(in_srgb,var(--color-error)_10%,transparent)] shadow-[inset_2px_0_0_var(--color-error)]',
+                )
+              "
               data-testid="op-row"
               :data-status="entry.item.row.record.status"
               :data-op-id="entry.item.row.record.id"
@@ -468,7 +476,11 @@ function alignClass(column: OpLogColumn): string {
                 <span
                   v-else-if="column.id === 'command'"
                   class="flex items-center gap-1 min-w-0"
-                  :style="entry.item.row.depth > 0 ? { paddingLeft: `${(entry.item.row.depth - 1) * 12}px` } : undefined"
+                  :style="
+                    entry.item.row.depth > 0
+                      ? { paddingLeft: `${(entry.item.row.depth - 1) * 12}px` }
+                      : undefined
+                  "
                 >
                   <CodiconIcon
                     v-if="entry.item.row.depth > 0"
@@ -486,7 +498,12 @@ function alignClass(column: OpLogColumn): string {
                   >
                   <span
                     v-else
-                    :class="cn('block min-w-0 flex-1 font-data', entry.item.row.record.status === 'error' && 'text-error')"
+                    :class="
+                      cn(
+                        'block min-w-0 flex-1 font-data',
+                        entry.item.row.record.status === 'error' && 'text-error',
+                      )
+                    "
                     ><TruncatedText :text="commandText(entry.item.row.record)"
                       ><HighlightedText
                         :parts="highlightParts(commandText(entry.item.row.record))"
@@ -507,7 +524,10 @@ function alignClass(column: OpLogColumn): string {
                 class="absolute right-1 top-0 flex h-full items-center gap-0.5 group-hover/row:bg-elevated group-focus-within/row:bg-elevated"
               >
                 <Button
-                  v-if="entry.item.row.record.status === 'running' && canCancelRecord(entry.item.row.record)"
+                  v-if="
+                    entry.item.row.record.status === 'running' &&
+                    canCancelRecord(entry.item.row.record)
+                  "
                   variant="toolbar"
                   size="inline"
                   :aria-label="t('workbench.opLog.cancel.aria')"
@@ -525,7 +545,11 @@ function alignClass(column: OpLogColumn): string {
                   tabindex="-1"
                   class="opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100"
                   data-testid="op-copy"
-                  @click.stop="copy(entry.item.row.record.command ?? '', { message: t('workbench.opLog.copiedCommand.announce') })"
+                  @click.stop="
+                    copy(entry.item.row.record.command ?? '', {
+                      message: t('workbench.opLog.copiedCommand.announce'),
+                    })
+                  "
                 />
               </span>
             </li>

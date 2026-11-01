@@ -95,7 +95,11 @@ function onKeydown(ev: KeyboardEvent): void {
       >
       <CommandGroup
         v-if="shownRunning.length"
-        :heading="grouped ? t('space.ade.allSessions.running.label', { count: shownRunning.length }) : undefined"
+        :heading="
+          grouped
+            ? t('space.ade.allSessions.running.label', { count: shownRunning.length })
+            : undefined
+        "
       >
         <AdeSessionsRow
           v-for="v in shownRunning"
@@ -109,7 +113,11 @@ function onKeydown(ev: KeyboardEvent): void {
       </CommandGroup>
       <CommandGroup
         v-if="shownStopped.length"
-        :heading="grouped ? t('space.ade.allSessions.stopped.label', { count: shownStopped.length }) : undefined"
+        :heading="
+          grouped
+            ? t('space.ade.allSessions.stopped.label', { count: shownStopped.length })
+            : undefined
+        "
       >
         <AdeSessionsRow
           v-for="v in shownStopped"

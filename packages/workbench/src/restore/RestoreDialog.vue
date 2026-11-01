@@ -73,7 +73,10 @@ function toggle(id: string, on: boolean): void {
       <DialogBody>
         <div v-if="ready.length" class="flex items-center justify-between gap-2">
           <span class="text-kira-sm text-muted-foreground" data-testid="restore-selection">{{
-            t('workbench.restore.selection.status', { selected: chosen.length, total: ready.length })
+            t('workbench.restore.selection.status', {
+              selected: chosen.length,
+              total: ready.length,
+            })
           }}</span>
           <div class="flex items-center gap-1">
             <Button

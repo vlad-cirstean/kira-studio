@@ -12,11 +12,7 @@ const { shot, eager = false, glow = false } = Astro.props;
 
 <figure class="relative m-0">
   {glow && (
-    <div
-      aria-hidden="true"
-      class="absolute -inset-4 -z-10 rounded-3xl bg-tint/10 blur-3xl"
-    >
-    </div>
+    <div aria-hidden="true" class="absolute -inset-4 -z-10 rounded-3xl bg-tint/10 blur-3xl"></div>
   )}
   <a
     href={shot.framedPng}

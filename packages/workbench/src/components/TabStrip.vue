@@ -173,7 +173,7 @@ watch(
   activeTabId,
   (id) => {
     if (!id) return;
-    void nextTick(() => {
+    void nextTick().then(() => {
       const tab = stripRef.value?.querySelector<HTMLElement>(`[data-tab-id="${id}"]`);
       if (tab) revealElement(tab);
     });

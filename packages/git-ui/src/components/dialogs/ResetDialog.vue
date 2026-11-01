@@ -138,7 +138,10 @@ function confirm(): void {
         </template>
         <DialogDescription v-else-if="preflight">
           {{
-            t('git.dialog.reset.diverged.body', { leaving: preflight.leaving, gaining: preflight.gaining })
+            t('git.dialog.reset.diverged.body', {
+              leaving: preflight.leaving,
+              gaining: preflight.gaining,
+            })
           }}
         </DialogDescription>
 
@@ -227,7 +230,9 @@ function confirm(): void {
           @click="confirm"
         >
           {{
-            stashFirst ? t('git.dialog.reset.stashAndReset.confirm') : t('git.dialog.reset.discardAndReset.confirm')
+            stashFirst
+              ? t('git.dialog.reset.stashAndReset.confirm')
+              : t('git.dialog.reset.discardAndReset.confirm')
           }}
         </Button>
         <Button
