@@ -77,12 +77,12 @@ func (s *HostViewService) noWindow() error {
 }
 
 const (
-	composeKeyBadReply            = "backend.space.hostView.compose.badReply.body"
-	composeKeyBadText             = "backend.space.hostView.compose.badText.body"
-	composeKeyEmpty               = "backend.space.hostView.compose.empty.body"
-	composeKeyPosting             = "backend.space.hostView.compose.posting.body"
-	composeKeyReplyUnsupported    = "backend.space.hostView.compose.replyUnsupported.body"
-	composeKeyTooLong             = "backend.space.hostView.compose.tooLong.body"
+	composeKeyBadReply         = "backend.space.hostView.compose.badReply.body"
+	composeKeyBadText          = "backend.space.hostView.compose.badText.body"
+	composeKeyEmpty            = "backend.space.hostView.compose.empty.body"
+	composeKeyPosting          = "backend.space.hostView.compose.posting.body"
+	composeKeyReplyUnsupported = "backend.space.hostView.compose.replyUnsupported.body"
+	composeKeyTooLong          = "backend.space.hostView.compose.tooLong.body"
 )
 
 const composeKeyNoWindow = "backend.space.hostView.compose.noWindow.body"
