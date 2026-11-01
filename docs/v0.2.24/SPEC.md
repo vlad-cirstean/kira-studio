@@ -16,7 +16,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P430 | Clipboard capture hotkey: link or text into Kira Space | Done |
 | P431 | Stage settings injection in the workflow editor (auto compact limit) | Done |
 | P432 | Operations panel overhaul: looks and interactions | Done |
-| P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Todo |
+| P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Done |
 | P434 | Code review (2 rounds) | Todo |
 | P435 | Close chapter v0.2.24 | Todo |
 
@@ -102,6 +102,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Switching tabs never loses state or data, and never refetches only because the user interacts with the UI.
 - Memory use is as low as practical: audit kept-alive views, query caches (TanStack gcTime/staleTime), stores, large lists and editors, and release what is not needed.
 - Measure before and after (heap per tab/view); goal is a great experience with the least RAM.
+
+**Result:** State kept across tabs in both apps (`KEEP_WHILE_OPEN`, Discover data view and histogram, keyvalue page, mask rules, Monaco view state). Saved-query and filter-history reads drop `staleTime: 0` via Go events. Space repo file and diff reads gated on stat (`unchanged` answer). Heap probe and before/after numbers in `P433-measurements.md`. Space `closed2 - closed` 2.8 to 0.3 MB: target met. Studio Discover growth per round about 3.7 to about 0.6 MB after iter2: target 0.5 missed, JIT code suspected, Known open items entry kept, reworded. Skipped Space local-file refetch: no OpenedFiles watcher, so a skipped read is unsafe. Named exceptions kept: Kibana data view picker (60 s) and `staleTime: 0` reads of data Kira does not own. Studio UI 675 passed, Space UI 940 passed, Go tests passed.
 
 ### P434 Code review (2 rounds)
 
