@@ -10,15 +10,16 @@ interface HostInfo {
   cli: string;
 }
 
-export interface HostViewTarget {
-  /** 'changeRequest' today; a later view adds its own kind. */
-  kind: string;
+export interface ChangeRequestTarget {
+  kind: 'changeRequest';
   url: string;
   provider: string;
   host: HostInfo;
   repo: string;
   number: number;
 }
+
+export type HostViewTarget = ChangeRequestTarget;
 
 export interface HostViewOpen {
   key: string;
