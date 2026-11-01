@@ -8629,8 +8629,14 @@
         }
       },
       "sessionTab": {
+        "close": {
+          "label": "Close session"
+        },
         "copyId": {
           "label": "Copy session ID"
+        },
+        "restart": {
+          "label": "Restart session"
         }
       },
       "setup": {

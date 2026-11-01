@@ -11,7 +11,7 @@ import type { SessionView } from './sessionView';
 import { useSessionMenu } from './useSessionMenu';
 
 // Tab strip of the running sessions in scope (mockup `termTabs`): activity glyph, TUI / headless
-// badge, name; hover for state and age, right-click for Restart and Copy session ID.
+// badge, name; hover for state and age, right-click for Restart, Close and Copy session ID.
 defineProps<{ views: SessionView[]; selectedId: string | null }>();
 const emit = defineEmits<{ select: [id: string] }>();
 const phones = useMobileTerminalsStore();

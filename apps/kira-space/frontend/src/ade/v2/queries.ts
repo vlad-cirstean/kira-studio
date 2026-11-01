@@ -16,6 +16,7 @@ import type {
   BranchArgs,
   BranchRequestArgs,
   CaptureTaskArgs,
+  CloseSessionArgs,
   CreateTaskArgs,
   FinishReviewArgs,
   FocusSessionArgs,
@@ -376,6 +377,12 @@ export function useTakeOver() {
 export function useRestartSession() {
   return useMutation({
     mutationFn: (args: RestartSessionArgs) => control.adeTaskRestartSession(args),
+  });
+}
+
+export function useCloseSession() {
+  return useMutation({
+    mutationFn: (args: CloseSessionArgs) => control.adeTaskCloseSession(args),
   });
 }
 

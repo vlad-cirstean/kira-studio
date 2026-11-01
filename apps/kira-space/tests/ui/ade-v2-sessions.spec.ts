@@ -138,12 +138,62 @@ test('a refused Restart shows its error on the panel', async ({ relaunch }) => {
   );
 });
 
-test('a headless tab has no Restart', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
+test('contract: Restart of a background run starts a new attempt', async ({ relaunch }) => {
+  const launch = contract<Record<string, string>>(
+    'ade-session-restart-headless',
+    'AdeTaskService.RestartSession',
+  );
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskRestartSession, response: { ...launch, sessionId: 'b1c2' } },
+  ]);
   await openSessions(page, 'T_bill');
   await page.locator(t('ade-session-tab-b1c2')).click({ button: 'right' });
-  await expect(page.locator(t('menu-item-ade-session-restart'))).toHaveCount(0);
-  await expect(page.locator(t('menu-item-ade-session-copy-id'))).toBeVisible();
+  await page.locator(t('menu-item-ade-session-restart')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskRestartSession)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskRestartSession)[0]?.args).toEqual({ sessionId: 'b1c2' });
+  expect(calls(control, IPC.terminalOpen)).toHaveLength(0);
+});
+
+test('the tab menu lists Restart, Close and Copy session ID in order', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-tk01')).click({ button: 'right' });
+  const ids = await page
+    .locator('[data-testid^="menu-item-ade-session-"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
+  expect(ids).toEqual([
+    'menu-item-ade-session-restart',
+    'menu-item-ade-session-close',
+    'menu-item-ade-session-copy-id',
+  ]);
+});
+
+test('Close sends the session id, for a TUI and a background tab', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-tk01')).click({ button: 'right' });
+  await page.locator(t('menu-item-ade-session-close')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskCloseSession)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskCloseSession)[0]?.args).toEqual({ sessionId: 'tk01' });
+  await page.locator(t('ade-session-tab-b1c2')).click({ button: 'right' });
+  await page.locator(t('menu-item-ade-session-close')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskCloseSession)).toHaveLength(2);
+  expect(calls(control, IPC.adeTaskCloseSession)[1]?.args).toEqual({ sessionId: 'b1c2' });
+});
+
+test('a refused Close shows its error on the panel', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskCloseSession,
+      error: { code: 'E_BAD_REQUEST', message: 'the session is not running' },
+    },
+  ]);
+  await openSessions(page, 'T_bill');
+  await page.locator(t('ade-session-tab-tk01')).click({ button: 'right' });
+  await page.locator(t('menu-item-ade-session-close')).click();
+  await expect(page.locator(t('ade-panel-action-error'))).toContainText(
+    'the session is not running',
+  );
 });
 
 test('a branch scope shows only that branch', async ({ relaunch }) => {
