@@ -126,3 +126,54 @@ export function issueControl(
     ...extra,
   ];
 }
+
+// host-view-comments.json is written by githostflow/comments_test.go.
+const commentContract = <T>(key: string) => contract<T>('host-view-comments', key);
+export const composeForge = commentContract<Wire>('HostViewService.ChangeRequest#composeForge');
+export const composeGitHub = commentContract<Wire>('HostViewService.ChangeRequest#composeGitHub');
+export const issueCompose = commentContract<IssueWire>('HostViewService.Issue#compose');
+// The contract masks the random id to ''; the mock needs a real one.
+export const stagedPng = {
+  ...commentContract<Record<string, unknown>>('HostViewService.StageAttachment#png'),
+  id: 'staged-1',
+};
+export const postedOk = commentContract<unknown>('HostViewService.PostComment#ok');
+export const postUnavailable = commentContract<unknown>('HostViewService.PostComment#unavailable');
+
+export const stageSnap = (): ControlSnapshot => ({
+  channel: IPC.hostViewStageAttachment,
+  response: stagedPng,
+});
+export const discardSnap = (): ControlSnapshot => ({
+  channel: IPC.hostViewDiscardAttachment,
+  response: true,
+});
+export const postSnap = (response: unknown, hold = false): ControlSnapshot => ({
+  channel: IPC.hostViewPostComment,
+  response,
+  hold,
+});
+
+/** Hands a File to an element as a drop or paste event would. */
+export async function sendFiles(
+  page: Page,
+  selector: string,
+  type: 'drop' | 'paste',
+  files: readonly { name: string; mime: string; bytes: number }[],
+): Promise<void> {
+  await page.evaluate(
+    ({ selector, type, files }) => {
+      const dt = new DataTransfer();
+      for (const f of files) {
+        dt.items.add(new File([new Uint8Array(f.bytes)], f.name, { type: f.mime }));
+      }
+      const el = document.querySelector(selector) as HTMLElement;
+      const ev =
+        type === 'drop'
+          ? new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })
+          : new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+      el.dispatchEvent(ev);
+    },
+    { selector, type, files },
+  );
+}

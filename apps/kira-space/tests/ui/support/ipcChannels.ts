@@ -11,6 +11,9 @@ export const IPC = {
   hostViewWindowTarget: 'kira:hostview:windowTarget',
   hostViewChangeRequest: 'kira:hostview:changeRequest',
   hostViewIssue: 'kira:hostview:issue',
+  hostViewStageAttachment: 'kira:hostview:stageAttachment',
+  hostViewDiscardAttachment: 'kira:hostview:discardAttachment',
+  hostViewPostComment: 'kira:hostview:postComment',
   linkOpenExternal: 'kira:link:openExternal',
 
   settingsGetAll: 'kira:settings:getAll',
