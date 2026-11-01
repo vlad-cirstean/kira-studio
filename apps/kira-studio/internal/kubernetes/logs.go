@@ -232,7 +232,7 @@ func (s *Service) LogsOpen(args LogsOpenArgs) error {
 		cancel()
 		return ipcerr.Contract("streamId is already open")
 	}
-	body, err := openLogStream(ctx, cs, args)
+	body, err := openLogStream(ctx, cancel, cs, args)
 	if err != nil {
 		s.logs.remove(args.StreamID)
 		cancel()
@@ -242,13 +242,14 @@ func (s *Service) LogsOpen(args LogsOpenArgs) error {
 	return nil
 }
 
-func openLogStream(ctx context.Context, cs *clusterClient, args LogsOpenArgs) (io.ReadCloser, error) {
-	octx, ocancel := context.WithCancel(ctx)
-	defer ocancel()
-	timer := time.AfterFunc(callTimeout, ocancel)
-	body, err := cs.core.Pods(args.Namespace).GetLogs(args.Pod, args.options()).Stream(octx)
-	if !timer.Stop() && err == nil {
-		_ = body.Close()
+// openLogStream opens the stream under ctx; cancel is ctx's own, fired if the open outlives callTimeout.
+func openLogStream(ctx context.Context, cancel context.CancelFunc, cs *clusterClient, args LogsOpenArgs) (io.ReadCloser, error) {
+	timer := time.AfterFunc(callTimeout, cancel)
+	body, err := cs.core.Pods(args.Namespace).GetLogs(args.Pod, args.options()).Stream(ctx)
+	if !timer.Stop() {
+		if err == nil {
+			_ = body.Close()
+		}
 		return nil, context.DeadlineExceeded
 	}
 	return body, err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"k8s.io/apimachinery/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -54,8 +56,15 @@ func WithListLimits(page, max int) Option {
 // WithClock replaces the wall clock used for stored timestamps.
 func WithClock(now func() time.Time) Option { return func(s *Service) { s.now = now } }
 
+var quietKlog sync.Once
+
 // NewService builds the service over the real kubeconfig.
 func NewService(store ClusterStore, emit appevent.Emitter, opts ...Option) *Service {
+	// client-go logs partial discovery failures to stderr; Status and Kinds report them instead.
+	quietKlog.Do(func() {
+		klog.LogToStderr(false)
+		klog.SetOutput(io.Discard)
+	})
 	probe := &shellEnv{}
 	s := &Service{
 		store: store, emit: emit, now: time.Now, env: probe.get,
