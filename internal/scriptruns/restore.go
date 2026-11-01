@@ -72,7 +72,9 @@ type RestoreItem struct {
 	Color       string  `json:"color"`
 	Kind        string  `json:"kind"`
 	Trigger     Trigger `json:"trigger"`
+	TaskID      string  `json:"taskId"`
 	TaskTitle   string  `json:"taskTitle"`
+	BranchID    string  `json:"branchId"`
 	BranchLabel string  `json:"branchLabel"`
 	// Cwd and Command are what the new run would use, not what the old one did.
 	Cwd     string `json:"cwd"`
@@ -172,7 +174,7 @@ func (s *Service) RestoreState() (RestoreState, error) {
 func (s *Service) restoreItem(run Run) (RestoreItem, error) {
 	item := RestoreItem{
 		RunID: run.ID, ScriptID: run.ScriptID, ScriptName: run.ScriptName, Color: run.Color, Kind: run.Kind,
-		Trigger: run.Trigger, TaskTitle: run.TaskTitle, BranchLabel: run.BranchLabel, Cwd: run.Cwd,
+		Trigger: run.Trigger, TaskID: run.TaskID, TaskTitle: run.TaskTitle, BranchID: run.BranchID, BranchLabel: run.BranchLabel, Cwd: run.Cwd,
 		Resume: run.Kind == KindSmart && run.Resumable, Params: nonNilParams(run.Params), EndedAt: endedAt(run),
 	}
 	rec, err := s.Scripts.Get(run.ScriptID)
