@@ -6,11 +6,21 @@ import { reactive } from 'vue';
 import { useLaunchOpener } from '../dialog/useLaunchOpener';
 import { useCloseSession, useRestartSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import type { SessionView } from './sessionView';
 
-/** Right-click menu of a session tab: Restart and Close (running session), Copy session ID. */
+export interface SessionMenuOptions {
+  /** Session of an archived task: Resume replaces Take over. */
+  archived?: boolean;
+  /** Row-local items, such as the log toggle; placed before Copy session ID. */
+  extra?: MenuItem[];
+}
+
+/** Menu of a session tab or dropdown row: Take over / Resume (stopped), Restart and Close
+ *  (running), the caller's `extra` items, Copy session ID. */
 export function useSessionMenu(): {
-  open: (ev: MouseEvent, view: SessionView) => void;
+  open: (ev: MouseEvent, view: SessionView, opts?: SessionMenuOptions) => void;
+  openFor: (el: Element, view: SessionView, opts?: SessionMenuOptions) => void;
   busy: Set<string>;
 } {
   const ui = useAdeBoardUiStore();
@@ -18,6 +28,7 @@ export function useSessionMenu(): {
   const launchOpener = useLaunchOpener();
   const restartM = useRestartSession();
   const closeM = useCloseSession();
+  const takeOver = useAdeTakeOverStore();
   const { copy } = useCopy();
   const busy = reactive(new Set<string>());
 
@@ -49,8 +60,8 @@ export function useSessionMenu(): {
     }
   }
 
-  function items(view: SessionView): MenuItem[] {
-    const { id, agentSessionId } = view.session;
+  function items(view: SessionView, opts: SessionMenuOptions = {}): MenuItem[] {
+    const { id, taskId, agentSessionId } = view.session;
     const list: MenuItem[] = [];
     if (view.session.state === 'running') {
       const noConversation = view.headless && !agentSessionId;
@@ -72,9 +83,30 @@ export function useSessionMenu(): {
           disabled: busy.has(id),
           run: () => close(view),
         },
-        { type: 'separator' },
       );
+    } else if (opts.archived) {
+      if (agentSessionId) {
+        list.push({
+          type: 'item',
+          id: 'ade-session-resume-menu',
+          label: t('common.action.resume.label'),
+          icon: 'debug-continue',
+          disabled: takeOver.pending.has(id),
+          run: () => takeOver.resumeArchived(taskId, id),
+        });
+      }
+    } else {
+      list.push({
+        type: 'item',
+        id: 'ade-session-takeover-menu',
+        label: t('common.action.takeOver.label'),
+        icon: 'debug-continue',
+        disabled: takeOver.pending.has(id),
+        run: () => takeOver.request(id),
+      });
     }
+    if (opts.extra?.length) list.push(...opts.extra);
+    if (list.length) list.push({ type: 'separator' });
     list.push({
       type: 'item',
       id: 'ade-session-copy-id',
@@ -89,10 +121,14 @@ export function useSessionMenu(): {
     return list;
   }
 
-  function open(ev: MouseEvent, view: SessionView): void {
+  function open(ev: MouseEvent, view: SessionView, opts?: SessionMenuOptions): void {
     ev.preventDefault();
-    contextMenu.openContextMenu(ev, items(view));
+    contextMenu.openContextMenu(ev, items(view, opts));
   }
 
-  return { open, busy };
+  function openFor(el: Element, view: SessionView, opts?: SessionMenuOptions): void {
+    contextMenu.openContextMenuFor(el, items(view, opts));
+  }
+
+  return { open, openFor, busy };
 }

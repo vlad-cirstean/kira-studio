@@ -7217,9 +7217,6 @@
         "restore": {
           "hint": "Restore to edit."
         },
-        "resume": {
-          "tooltip": "Restores the task, then continues this session"
-        },
         "snapshot": {
           "hint": "Taken when the task was archived."
         }
@@ -8612,6 +8609,9 @@
         "empty": {
           "empty": "Nothing running"
         },
+        "filter": {
+          "placeholder": "Filter sessions"
+        },
         "interactive": {
           "label": "Interactive"
         },
@@ -8623,6 +8623,9 @@
         },
         "stopped": {
           "label": "Finished or stopped"
+        },
+        "trigger": {
+          "label": "Sessions"
         },
         "waitingId": {
           "status": "Waiting for session ID"

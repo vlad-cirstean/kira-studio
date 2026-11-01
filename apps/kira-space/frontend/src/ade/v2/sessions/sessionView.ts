@@ -33,13 +33,11 @@ export interface SessionView {
   /** Strip tab: `Implement · repo` / `Implement · Create PR · repo`; `Review agent` for the review agent. */
   tabName: string;
   badge: string;
-  /** Finished / stopped row: `run · Create PR · repo · branch · c81a` / `TUI · spec · 3c3c`. */
-  stoppedLabel: string;
+  /** Last characters of the session id, as the rows show it. */
+  shortId: string;
   /** All sessions kind column: `<headless label> · <step>` / `TUI · interactive` / `TUI · spec session`. */
   allLabel: string;
 }
-
-const basename = (path: string): string => path.split('/').filter(Boolean).pop() ?? path;
 
 function stepNameOf(workflow: Workflow | undefined, stepId: string): string {
   if (!stepId) return '';
@@ -57,7 +55,6 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const step = headless ? stepName : '';
   const run = task?.runs.find((r) => r.id === s.runId) ?? null;
   const specLabel = t('space.ade.needs.scope.spec.label');
-  const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : specLabel;
   const id = shortId(s.id);
   const review = s.purpose === 'review';
   const named = (...parts: string[]): string => parts.filter(Boolean).join(' · ');
@@ -80,9 +77,7 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     run,
     tabName,
     badge: headless ? look.headlessLabel : 'TUI',
-    stoppedLabel: review
-      ? `TUI · ${reviewAgent} · ${id}`
-      : `${headless ? named(step) : named('TUI', stepName)} · ${scope} · ${id}`,
+    shortId: id,
     allLabel: review
       ? `TUI · ${reviewAgent}`
       : headless
