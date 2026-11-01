@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paletteColorSchema } from './color';
 import { runOutcomeSchema } from './runOutcome';
 import { scriptDirSchema } from './scripts';
 
@@ -30,7 +31,7 @@ export const scriptRunSchema = /*#__PURE__*/ z.object({
   id: z.string(),
   scriptId: z.string(),
   scriptName: z.string(),
-  color: z.string(),
+  color: paletteColorSchema,
   kind: z.enum(['script', 'smart']),
   trigger: z.enum(['terminal', 'manual', 'ade', 'scheduled']),
   state: scriptRunStateSchema,
@@ -176,7 +177,7 @@ export const scriptRunRestoreItemSchema = /*#__PURE__*/ z.object({
   runId: z.string(),
   scriptId: z.string(),
   scriptName: z.string(),
-  color: z.string(),
+  color: paletteColorSchema,
   kind: z.enum(['script', 'smart']),
   trigger: z.enum(['terminal', 'manual', 'ade', 'scheduled']),
   taskId: z.string(),

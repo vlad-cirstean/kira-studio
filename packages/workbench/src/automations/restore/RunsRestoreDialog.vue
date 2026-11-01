@@ -65,14 +65,12 @@ function openStarted(it: ScriptRunRestoreItem, started: ScriptRunStarted): void 
     tabs.openRun({ ...key, runId: started.runId, label: it.scriptName });
     return;
   }
-  const script = ctx.scripts.records().find((s) => s.id === it.scriptId);
-  if (!script) return;
   ctx.openTerminalTab({
     cwd: started.terminal.cwd,
     launch: {
-      command: script.command,
-      label: script.name,
-      color: script.color,
+      command: it.command,
+      label: it.scriptName,
+      color: it.color,
       kind: 'script',
       scriptId: it.scriptId,
       launchToken: started.terminal.token,
