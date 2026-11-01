@@ -1,6 +1,6 @@
 // Wire types of CaptureService (apps/kira-space/internal/bridge/capture.go) and shell.HotkeyState.
 
-export type CaptureKind = 'changeRequest' | 'issue' | 'text' | 'empty';
+type CaptureKind = 'changeRequest' | 'issue' | 'text' | 'empty';
 export type CaptureAction = 'openChangeRequest' | 'openIssue' | 'later';
 
 export interface CaptureItem {
@@ -22,7 +22,7 @@ export interface CaptureResult {
   taskId?: string;
 }
 
-export type HotkeyStateKind = 'off' | 'active' | 'requested' | 'failed';
+type HotkeyStateKind = 'off' | 'active' | 'requested' | 'failed';
 
 export interface HotkeyState {
   state: HotkeyStateKind;

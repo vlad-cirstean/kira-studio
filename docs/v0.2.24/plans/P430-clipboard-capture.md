@@ -342,3 +342,40 @@ All paths Stream B's per `streams.md`:
   need argv forwarding (close to the out-of-scope URL scheme); not planned.
 - Default enabled with `CmdOrCtrl+Shift+K`: confirm or flip (see Risks).
 - No new shadcn-vue primitive, so no cross-stream duplicate check needed.
+
+## Result
+
+Landed on `chapter/v0.2.24-stream-b`, no push.
+
+Commits, in order:
+- `feat(shell)`: `ParseChord`, `HotkeyBinding`, `OpenPopup`, `wireLifecycle` extract.
+- `feat(space)` settings leaves `capture.enabled` and `capture.hotkey` (storage, validation, frontend domain).
+- `feat(space)` capture service and wiring (`CaptureService`, appwire, main.go purge and error routing).
+- `feat(space)` capture popup and settings pane.
+- `test(space)` capture fakes and flows (`flows/captureflow`, contract `capture`).
+- `test(space)` capture UI specs.
+- `docs` clipboard capture (ARCHITECTURE section and Known open items).
+- This result plus a dead-export cleanup.
+
+User changes, applied:
+- Default chord is `CmdOrCtrl+Shift+K` (three keys), in Go, TS, plan, ARCHITECTURE and tests.
+- Chord is user-customisable in Settings > Capture: recorder input, saved as `capture.hotkey`, re-registered live, conflict and failure status shown.
+
+Deviations:
+- Bridge types are TS interfaces with `trust<>`, not zod (repo bridge convention).
+- Popup actions are a shadcn `RadioGroup`, not `command`; Up and Down keys not used.
+- Push channel names are local consts in `capture/wire.ts`; `packages/shared` is not owned.
+- Popup and settings pane share one commit.
+- `scripts/check-ui-primitives.sh` gained a U41 exemption for `capture/chord.ts` (reads modifier flags to build an accelerator, not a shortcut). Outside the ownership table.
+- Dead-export cleanup also un-exported `ThreadKind` in `hostview/wire.ts` (pre-existing knip finding).
+- `CaptureWindow.vue` subscribes to `kira:capture:item`; the first draft had no subscriber, found while writing the UI spec.
+
+Tests (all pass):
+- `go test` of shell, bridge, appwire, flowharness, storage.
+- `bun run test:flows:space` (incl. `captureflow`, coverage gate).
+- `bun run test:ui:space`: 924 passed.
+- `bun run lint:all`, `bun scripts/copy/check-catalog.ts --unused`, `bun run typecheck`.
+- go.mod and go.sum unchanged; latest migration still 0060.
+- The UI tier WebKit reports a Mac, so the recorder spec checks Meta as `CmdOrCtrl` and Control as `Ctrl`.
+
+Unverified here (no display; also in ARCHITECTURE Known open items): real hotkey on macOS, Windows and Wayland, macOS panel not stealing focus, Linux X11. Manual checklist above stands.

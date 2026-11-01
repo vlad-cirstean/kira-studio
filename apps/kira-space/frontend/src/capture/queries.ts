@@ -4,7 +4,7 @@ import { control } from '../bridge/control';
 import type { CaptureAction } from './wire';
 
 export const captureItemKey = (windowKey: string) => ['capture', 'item', windowKey] as const;
-export const captureStatusKey = ['capture', 'status'] as const;
+const captureStatusKey = ['capture', 'status'] as const;
 
 /** The hotkey binding state; the backend pushes every change into the cache. */
 export function useCaptureStatus() {
