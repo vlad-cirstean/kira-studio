@@ -64,6 +64,7 @@ var names = []sqlitex.MigrationSource{
 	{Version: 46, Name: "p420_validation_proof", File: "0046_p420_validation_proof.sql"},
 	{Version: 47, Name: "p425_discover_saved_queries", File: "0047_p425_discover_saved_queries.sql"},
 	{Version: 48, Name: "p426_proof_chart_view", File: "0048_p426_proof_chart_view.sql"},
+	{Version: 49, Name: "p439_kube_clusters", File: "0049_p439_kube_clusters.sql"},
 	{Version: 50, Name: "p441_script_run_restore", File: "0050_p441_script_run_restore.sql"},
 }
 
