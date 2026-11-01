@@ -148,20 +148,6 @@ export interface HostViewChangeRequest {
 export interface HostViewCompose {
   maxBodyBytes: number;
   replyKinds: ThreadKind[];
-  attachments: boolean;
-  attachmentsReason?: string;
-  maxAttachments: number;
-  maxAttachmentBytes: number;
-  maxAttachmentTotalBytes: number;
-  allowedExtensions: string[];
-}
-
-export interface HostViewStaged {
-  id: string;
-  name: string;
-  size: number;
-  contentType: string;
-  image: boolean;
 }
 
 export interface HostViewPosted {

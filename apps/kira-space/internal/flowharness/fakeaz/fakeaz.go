@@ -103,9 +103,6 @@ type Az struct {
 	votes      map[int][]string
 	threads    map[int][]string
 	replies    map[int][]Reply
-	uploads    map[int][]Upload
-	noToken    bool
-	uploadCode int
 	calls      []string
 	violations []string
 }
@@ -115,7 +112,7 @@ func New() *Az {
 	return &Az{
 		installed: true, extension: true, loggedIn: true, account: "me@acme.test",
 		repos: map[string]*repoState{}, votes: map[int][]string{}, threads: map[int][]string{},
-		replies: map[int][]Reply{}, uploads: map[int][]Upload{},
+		replies: map[int][]Reply{},
 	}
 }
 
@@ -132,12 +129,6 @@ func (a *Az) SetLoggedIn(v bool) { a.set(func() { a.loggedIn = v }) }
 func (a *Az) SetDefaults(orgURL, project string) {
 	a.set(func() { a.defOrg, a.defProject = orgURL, project })
 }
-
-// SetTokenUnavailable makes `az account get-access-token` fail as a PAT-only sign-in does.
-func (a *Az) SetTokenUnavailable(v bool) { a.set(func() { a.noToken = v }) }
-
-// SetUploadStatus forces the next attachment upload's HTTP status (413, 401, 429); 0 clears it.
-func (a *Az) SetUploadStatus(code int) { a.set(func() { a.uploadCode = code }) }
 
 // SetFailure makes every organization-scoped call after sign-in fail with stderr; "" clears it.
 func (a *Az) SetFailure(stderr string) { a.set(func() { a.failure = stderr }) }
@@ -227,7 +218,8 @@ func (a *Az) Count(prefix string) int {
 	return n
 }
 
-// Violations lists the calls that broke the argv contract (a missing `--detect false` or `--org`).
+// Violations lists the calls that broke the argv contract (a missing `--detect false` or `--org`) or that the
+// fake does not support (e.g. `account get-access-token`).
 func (a *Az) Violations() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -269,9 +261,7 @@ func (a *Az) Run(ctx context.Context, _ string, args []string) ([]byte, error) {
 			ext = `{"azure-devops":"1.0.10"}`
 		}
 		return []byte(`{"azure-cli":"2.91.0","azure-cli-core":"2.91.0","extensions":` + ext + `}`), nil
-	case len(args) > 1 && args[0] == "account" && args[1] == "get-access-token":
-		return a.accessToken(args)
-	case args[0] == "account":
+	case len(args) > 1 && args[0] == "account" && args[1] == "show":
 		a.calls = append(a.calls, "account")
 		if !a.loggedIn {
 			return nil, fail("ERROR: Please run 'az login' to setup account.")
@@ -309,6 +299,7 @@ func (a *Az) Run(ctx context.Context, _ string, args []string) ([]byte, error) {
 }
 
 func (a *Az) unsupported(args []string) error {
+	a.violations = append(a.violations, "unsupported: "+strings.Join(args, " "))
 	return &toolexec.ExecError{ExitCode: 2, Stderr: "fakeaz: unsupported: " + strings.Join(args, " ")}
 }
 

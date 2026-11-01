@@ -1,30 +1,6 @@
 {
   "HostViewService.ChangeRequest#composeForge": {
     "compose": {
-      "allowedExtensions": [
-        "png",
-        "jpg",
-        "jpeg",
-        "gif",
-        "webp",
-        "pdf",
-        "txt",
-        "log",
-        "md",
-        "json",
-        "csv",
-        "yaml",
-        "yml",
-        "xml",
-        "zip",
-        "gz",
-        "diff",
-        "patch"
-      ],
-      "attachments": true,
-      "maxAttachmentBytes": 10485760,
-      "maxAttachmentTotalBytes": 26214400,
-      "maxAttachments": 5,
       "maxBodyBytes": 65536,
       "replyKinds": [
         "comment",
@@ -116,31 +92,6 @@
   },
   "HostViewService.ChangeRequest#composeGitHub": {
     "compose": {
-      "allowedExtensions": [
-        "png",
-        "jpg",
-        "jpeg",
-        "gif",
-        "webp",
-        "pdf",
-        "txt",
-        "log",
-        "md",
-        "json",
-        "csv",
-        "yaml",
-        "yml",
-        "xml",
-        "zip",
-        "gz",
-        "diff",
-        "patch"
-      ],
-      "attachments": false,
-      "attachmentsReason": "GitHub has no API for comment attachments. Add files on GitHub.",
-      "maxAttachmentBytes": 10485760,
-      "maxAttachmentTotalBytes": 26214400,
-      "maxAttachments": 5,
       "maxBodyBytes": 65536,
       "replyKinds": [
         "code"
@@ -377,31 +328,6 @@
   },
   "HostViewService.Issue#compose": {
     "compose": {
-      "allowedExtensions": [
-        "png",
-        "jpg",
-        "jpeg",
-        "gif",
-        "webp",
-        "pdf",
-        "txt",
-        "log",
-        "md",
-        "json",
-        "csv",
-        "yaml",
-        "yml",
-        "xml",
-        "zip",
-        "gz",
-        "diff",
-        "patch"
-      ],
-      "attachments": false,
-      "attachmentsReason": "Jira attachments can’t be added from Kira: acli has no upload command. Add files in Jira.",
-      "maxAttachmentBytes": 10485760,
-      "maxAttachmentTotalBytes": 26214400,
-      "maxAttachments": 5,
       "maxBodyBytes": 32768,
       "replyKinds": []
     },
@@ -489,15 +415,6 @@
   "HostViewService.PostComment#azure": {
     "kind": "ok"
   },
-  "HostViewService.PostComment#azureSignIn": {
-    "kind": "unavailable",
-    "status": {
-      "host": "dev.azure.com",
-      "kind": "unauthenticated",
-      "reason": "Attaching files needs an az login sign-in. A PAT sign-in (az devops login) can post text only.",
-      "site": "https://dev.azure.com/acme"
-    }
-  },
   "HostViewService.PostComment#issue": {
     "kind": "ok"
   },
@@ -512,22 +429,9 @@
       "reason": "no such thread"
     }
   },
-  "HostViewService.StageAttachment#png": {
-    "contentType": "image/png",
-    "id": "<masked>",
-    "image": true,
-    "name": "shot.png",
-    "size": 70
-  },
   "args:HostViewService.PostComment": {
-    "attachmentIds": [],
     "body": "Looks good",
     "replyTo": "",
-    "windowKey": "<masked>"
-  },
-  "args:HostViewService.StageAttachment": {
-    "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "name": "shot.png",
     "windowKey": "<masked>"
   }
 }

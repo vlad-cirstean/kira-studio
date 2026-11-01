@@ -84,7 +84,6 @@ import type {
   HostViewIssue,
   HostViewOpen,
   HostViewPosted,
-  HostViewStaged,
   HostViewTarget,
 } from '../hostview/wire';
 import type { CliToolsResult, IssueTrackers } from '../state/cliToolsDomain';
@@ -230,19 +229,10 @@ const spaceControl = {
     unwrap(HostViewService.ChangeRequest(args)).then((r) => trust<HostViewChangeRequest>(r)),
   hostViewIssue: (args: { ref: string }): Promise<HostViewIssue> =>
     unwrap(HostViewService.Issue(args)).then((r) => trust<HostViewIssue>(r)),
-  hostViewStageAttachment: (args: {
-    windowKey: string;
-    name: string;
-    data: string;
-  }): Promise<HostViewStaged> =>
-    unwrap(HostViewService.StageAttachment(args)).then((r) => trust<HostViewStaged>(r)),
-  hostViewDiscardAttachment: (args: { windowKey: string; id: string }): Promise<boolean> =>
-    unwrap(HostViewService.DiscardAttachment(args)),
   hostViewPostComment: (args: {
     windowKey: string;
     body: string;
     replyTo: string;
-    attachmentIds: string[];
   }): Promise<HostViewPosted> =>
     unwrap(HostViewService.PostComment(args)).then((r) => trust<HostViewPosted>(r)),
   gitHostProviders: (): Promise<V2.HostProviders> =>

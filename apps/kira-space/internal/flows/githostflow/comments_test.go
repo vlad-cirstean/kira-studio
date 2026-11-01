@@ -1,14 +1,10 @@
 package githostflow_test
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -33,20 +29,6 @@ import (
 // Contract host-view-comments: tests/ui/host-view-comments.spec.ts reads these.
 const hcScenario = "host-view-comments"
 
-// A real 1x1 PNG.
-const hcPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-
-func hcPNGBytes(t *testing.T) []byte {
-	t.Helper()
-	b, err := base64.StdEncoding.DecodeString(hcPNG)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
-}
-
-func hcB64(b []byte) string { return base64.StdEncoding.EncodeToString(b) }
-
 func hcOpen(t *testing.T, app *flowharness.App, url string) string {
 	t.Helper()
 	o, err := app.W.HostView.Open(ctx, bridge.HostViewOpenArgs{URL: url})
@@ -54,15 +36,6 @@ func hcOpen(t *testing.T, app *flowharness.App, url string) string {
 		t.Fatalf("Open(%s) = %+v, %v", url, o, err)
 	}
 	return o.Key
-}
-
-func hcStage(t *testing.T, app *flowharness.App, key, name string, data []byte) bridge.HostViewStaged {
-	t.Helper()
-	got, err := app.W.HostView.StageAttachment(ctx, bridge.HostViewStageArgs{WindowKey: key, Name: name, Data: hcB64(data)})
-	if err != nil {
-		t.Fatalf("StageAttachment(%s) = %v", name, err)
-	}
-	return got
 }
 
 // hcBadRequest fails unless err is a bad request containing want.
@@ -83,8 +56,7 @@ func hcPost(t *testing.T, app *flowharness.App, a bridge.HostViewPostArgs) bridg
 	return got
 }
 
-// Posting to the PR view over the in-process fake host: compose caps, staging and its refusals, a post
-// with an attachment, a reply, the refetch, the breaker and the window close. Backend half of
+// Posting to the PR view over the in-process fake host: compose caps, a post, a reply, the refetch, the breaker and the window close. Backend half of
 // host-view-comments.spec.ts.
 func TestHostViewCommentsForge(t *testing.T) {
 	forge := fakehost.New()
@@ -98,85 +70,28 @@ func TestHostViewCommentsForge(t *testing.T) {
 	app := flowharness.New(t, flowharness.WithGitHost(forge), flowharness.WithoutGh(), flowharness.WithClock(clock))
 	const link = "https://forge.test/acme/api/-/merge_requests/12"
 	key := hcOpen(t, app, link)
-	png := hcPNGBytes(t)
 
 	// 1. The read result says what the composer may do.
 	got := hvDetail(t, app, link)
-	if got.Kind != bridge.HostViewOK || got.Compose == nil || !got.Compose.Attachments || got.Compose.MaxAttachments != 5 ||
-		!slices.Equal(got.Compose.ReplyKinds, []string{"comment", "review", "code"}) {
+	if got.Kind != bridge.HostViewOK || got.Compose == nil || !slices.Equal(got.Compose.ReplyKinds, []string{"comment", "review", "code"}) {
 		t.Fatalf("ChangeRequest compose = %+v", got.Compose)
 	}
 	app.Contract(t, hcScenario, "HostViewService.ChangeRequest#composeForge", got)
 
-	// 2. Staging: accepted files, then every refusal.
-	shot := hcStage(t, app, key, "shot.png", png)
-	notes := hcStage(t, app, key, "notes.txt", []byte("hello\n"))
-	if shot.ContentType != "image/png" || !shot.Image || shot.Size != len(png) || notes.Image || notes.ContentType != "text/plain" {
-		t.Fatalf("staged = %+v, %+v", shot, notes)
-	}
-	app.Contract(t, hcScenario, "HostViewService.StageAttachment#png", shot, flowharness.Mask("id"))
-	app.Contract(t, hcScenario, "args:HostViewService.StageAttachment", bridge.HostViewStageArgs{WindowKey: key, Name: "shot.png", Data: hcPNG}, flowharness.Mask("windowKey"))
-	stage := func(name string, data []byte) error {
-		_, err := app.W.HostView.StageAttachment(ctx, bridge.HostViewStageArgs{WindowKey: key, Name: name, Data: hcB64(data)})
-		return err
-	}
-	hcBadRequest(t, stage("run.exe", []byte("MZ")), "exe", ".exe")
-	hcBadRequest(t, stage("fake.png", []byte("not a png")), "png with text bytes", ".png")
-	hcBadRequest(t, stage("page.txt", []byte("<html><body>x</body></html>")), "html in txt", ".txt")
-	hcBadRequest(t, stage("empty.txt", nil), "empty", "empty")
-	hcBadRequest(t, stage("..", []byte("x")), "dots", "name")
-	hcBadRequest(t, stage("big.txt", make([]byte, 11<<20)), "11 MiB", "10 MB")
-	_, err := app.W.HostView.StageAttachment(ctx, bridge.HostViewStageArgs{WindowKey: key, Name: "a.txt", Data: "***"})
-	if err == nil || !strings.Contains(err.Error(), "base64") {
-		t.Errorf("bad base64: err = %v", err)
-	}
-	_, err = app.W.HostView.StageAttachment(ctx, bridge.HostViewStageArgs{WindowKey: "no-such-window", Name: "a.txt", Data: hcB64([]byte("x"))})
-	hcBadRequest(t, err, "unknown window", "can’t post")
-	traversal := hcStage(t, app, key, "../x.png", png)
-	if traversal.Name != "x.png" {
-		t.Fatalf("sanitized name = %q, want x.png", traversal.Name)
-	}
-	dup := hcStage(t, app, key, "x.png", png)
-	if dup.Name != "x-2.png" {
-		t.Fatalf("duplicate name = %q, want x-2.png", dup.Name)
-	}
-	fifth := hcStage(t, app, key, "fifth.txt", []byte("x"))
-	hcBadRequest(t, stage("sixth.txt", []byte("x")), "6th file", "at most 5")
-	for _, id := range []string{traversal.ID, dup.ID, fifth.ID} {
-		if ok, err := app.W.HostView.DiscardAttachment(ctx, bridge.HostViewDiscardArgs{WindowKey: key, ID: id}); err != nil || !ok {
-			t.Fatalf("Discard(%s) = %v, %v", id, ok, err)
-		}
-	}
-
-	// 3. Discard: true once, then false.
-	dArgs := bridge.HostViewDiscardArgs{WindowKey: key, ID: notes.ID}
-	if ok, err := app.W.HostView.DiscardAttachment(ctx, dArgs); err != nil || !ok {
-		t.Fatalf("Discard = %v, %v", ok, err)
-	}
-	if ok, err := app.W.HostView.DiscardAttachment(ctx, dArgs); err != nil || ok {
-		t.Fatalf("second Discard = %v, %v", ok, err)
-	}
-
-	// 4. A post with the PNG reaches the host with the staged bytes.
-	pArgs := bridge.HostViewPostArgs{WindowKey: key, Body: "Looks good", AttachmentIDs: []string{shot.ID}}
-	app.Contract(t, hcScenario, "args:HostViewService.PostComment", pArgs, flowharness.Mask("windowKey"), flowharness.Mask("attachmentIds"))
+	// 2. A post reaches the host as body and reply target only.
+	pArgs := bridge.HostViewPostArgs{WindowKey: key, Body: "Looks good"}
+	app.Contract(t, hcScenario, "args:HostViewService.PostComment", pArgs, flowharness.Mask("windowKey"))
 	res := hcPost(t, app, pArgs)
 	if res.Kind != bridge.HostViewOK {
 		t.Fatalf("PostComment = %+v", res)
 	}
 	app.Contract(t, hcScenario, "HostViewService.PostComment#ok", res)
-	sum := sha256.Sum256(png)
 	posted := forge.Posted(12)
-	want := fakehost.PostedAttachment{Name: "shot.png", ContentType: "image/png", Size: len(png), SHA256: hex.EncodeToString(sum[:])}
-	if len(posted) != 1 || posted[0].Body != "Looks good" || posted[0].ReplyTo != "" || len(posted[0].Attachments) != 1 || posted[0].Attachments[0] != want {
-		t.Fatalf("posted = %+v, want one comment with %+v", posted, want)
+	if len(posted) != 1 || posted[0] != (fakehost.PostedComment{Body: "Looks good"}) {
+		t.Fatalf("posted = %+v", posted)
 	}
 
-	// 5. The file is consumed.
-	_, err = app.W.HostView.PostComment(ctx, pArgs)
-	hcBadRequest(t, err, "reused attachment", "no longer available")
-
-	// 6. A reply targets a thread; an unknown thread is data.
+	// 3. A reply targets a thread; an unknown thread is data.
 	if res := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "Thanks", ReplyTo: "t1"}); res.Kind != bridge.HostViewOK {
 		t.Fatalf("reply = %+v", res)
 	}
@@ -189,7 +104,7 @@ func TestHostViewCommentsForge(t *testing.T) {
 	}
 	app.Contract(t, hcScenario, "HostViewService.PostComment#unavailable", bad)
 
-	// 7. A refetch shows both comments.
+	// 4. A refetch shows both comments.
 	after := hvDetail(t, app, link)
 	var ids []string
 	for _, th := range after.Detail.Threads {
@@ -201,7 +116,7 @@ func TestHostViewCommentsForge(t *testing.T) {
 		t.Fatalf("thread comments after the posts = %v", ids)
 	}
 
-	// 8. A rate limit arms the breaker: the next post does not reach the host.
+	// 5. A rate limit arms the breaker: the next post does not reach the host.
 	forge.SetRateLimited(time.Now().Add(time.Hour))
 	forge.ResetCalls()
 	for range 2 {
@@ -215,25 +130,18 @@ func TestHostViewCommentsForge(t *testing.T) {
 	clock.Advance(2 * time.Hour)
 	forge.SetRateLimited(time.Time{})
 
-	// 9. Guards, then the window close.
-	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: "  \n"})
+	// 6. Guards.
+	_, err := app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: "  \n"})
 	hcBadRequest(t, err, "empty body", "Write a comment")
 	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: strings.Repeat("a", githost.MaxHostCommentBytes+1)})
 	hcBadRequest(t, err, "long body", "at most")
 	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: "x", ReplyTo: strings.Repeat("a", 257)})
 	hcBadRequest(t, err, "long reply target", "reply target")
-	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: "x", AttachmentIDs: []string{"a", "a"}})
-	hcBadRequest(t, err, "duplicate ids", "twice")
 	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: "no-such-window", Body: "x"})
 	hcBadRequest(t, err, "unknown window", "can’t post")
-	left := hcStage(t, app, key, "left.txt", []byte("x"))
-	app.W.HostView.Attachments.Forget(key)
-	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: "x", AttachmentIDs: []string{left.ID}})
-	hcBadRequest(t, err, "staged file after the window closed", "no longer available")
 }
 
-// Posting over az: attachments upload over HTTPS with an az-issued token, then ride as links in the
-// thread. Backend half of host-view-comments.spec.ts.
+// Posting over az: text only, through the CLI; az is never asked for a token. Backend half of host-view-comments.spec.ts.
 func TestHostViewCommentsAzure(t *testing.T) {
 	az := fakeaz.New()
 	az.SetDefaults("https://dev.azure.com/acme", "Web App")
@@ -245,96 +153,39 @@ func TestHostViewCommentsAzure(t *testing.T) {
 	})
 	clock := &azClock{now: time.Now()}
 	app := flowharness.New(t, flowharness.WithoutGh(),
-		flowharness.WithAzure(azure.Options{Locator: az, Runner: az, Clock: clock, HTTP: az.Transport()}))
+		flowharness.WithAzure(azure.Options{Locator: az, Runner: az, Clock: clock}))
 	key := hcOpen(t, app, azPR12)
-	png := hcPNGBytes(t)
-	sum := sha256.Sum256(png)
-	tokenCalls := func() int { return az.Count("token") }
 
-	// 1. Upload then thread, in that order; the thread ends with the image link.
+	// 1. A post is a thread through the CLI.
 	got := hvDetail(t, app, azPR12)
-	if got.Compose == nil || !got.Compose.Attachments || !slices.Equal(got.Compose.ReplyKinds, []string{"comment", "code"}) {
+	if got.Compose == nil || !slices.Equal(got.Compose.ReplyKinds, []string{"comment", "code"}) {
 		t.Fatalf("compose = %+v", got.Compose)
 	}
-	shot := hcStage(t, app, key, "shot.png", png)
 	az.ResetCalls()
-	res := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "see this", AttachmentIDs: []string{shot.ID}})
+	res := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "see this"})
 	if res.Kind != bridge.HostViewOK {
 		t.Fatalf("PostComment = %+v", res)
 	}
 	app.Contract(t, hcScenario, "HostViewService.PostComment#azure", res)
-	var order []string
-	for _, c := range az.Calls() {
-		if c == "token" || strings.HasPrefix(c, "upload:") || strings.HasPrefix(c, "invoke:pullRequestThreads:") {
-			order = append(order, c)
-		}
+	if az.Count("invoke:pullRequestThreads:"+azKey) != 1 {
+		t.Fatalf("calls = %v", az.Calls())
 	}
-	if len(order) != 3 || order[0] != "token" || !regexp.MustCompile(`^upload:12:[0-9a-f]{8}-shot\.png$`).MatchString(order[1]) ||
-		order[2] != "invoke:pullRequestThreads:"+azKey {
-		t.Fatalf("calls = %v", order)
-	}
-	threads := az.Threads(12)
-	linkRe := regexp.MustCompile(`\n\n!\[shot\.png\]\(https://dev\.azure\.com/acme/Web%20App/_apis/git/repositories/api/pullRequests/12/attachments/[0-9a-f]{8}-shot\.png\)$`)
-	if len(threads) != 1 || !strings.HasPrefix(threads[0], "see this") || !linkRe.MatchString(threads[0]) {
+	if threads := az.Threads(12); len(threads) != 1 || threads[0] != "see this" {
 		t.Fatalf("threads = %q", threads)
 	}
-	if up := az.Uploads(12); len(up) != 1 || up[0].Size != len(png) || up[0].SHA256 != hex.EncodeToString(sum[:]) {
-		t.Fatalf("uploads = %+v", up)
-	}
 
-	// 2. A reply goes into the thread under its first comment; no token without attachments.
-	before := tokenCalls()
+	// 2. A reply goes into the thread under its first comment.
 	if r := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "Done", ReplyTo: "1"}); r.Kind != bridge.HostViewOK {
 		t.Fatalf("reply = %+v", r)
 	}
 	if rep := az.Replies(12); len(rep) != 1 || rep[0] != (fakeaz.Reply{ThreadID: 1, ParentCommentID: 1, Content: "Done"}) {
 		t.Fatalf("replies = %+v", rep)
 	}
-	if az.Count("invoke:pullRequestThreadComments:"+azKey+":1") != 1 || tokenCalls() != before {
+	if az.Count("invoke:pullRequestThreadComments:"+azKey+":1") != 1 {
 		t.Fatalf("calls = %v", az.Calls())
 	}
-	if r := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "plain"}); r.Kind != bridge.HostViewOK || tokenCalls() != before {
-		t.Fatalf("plain post = %+v, token calls %d -> %d", r, before, tokenCalls())
-	}
 
-	// 3. A PAT-only sign-in has no token: unavailable with the reason; nothing uploaded; the staged file survives.
-	threadsBefore := len(az.Threads(12))
-	again := hcStage(t, app, key, "again.png", png)
-	az.SetTokenUnavailable(true)
-	aArgs := bridge.HostViewPostArgs{WindowKey: key, Body: "with file", AttachmentIDs: []string{again.ID}}
-	noTok := hcPost(t, app, aArgs)
-	if noTok.Kind != bridge.HostViewUnavailable || noTok.Status == nil || !strings.Contains(noTok.Status.Reason, "az login") ||
-		az.Count("upload:") != 1 || len(az.Threads(12)) != threadsBefore {
-		t.Fatalf("no token: %+v, uploads %d", noTok, az.Count("upload:"))
-	}
-	app.Contract(t, hcScenario, "HostViewService.PostComment#azureSignIn", noTok)
-	az.SetTokenUnavailable(false)
-
-	// 4. A refused upload posts nothing; the retry sends the same file.
-	az.SetUploadStatus(413)
-	big := hcPost(t, app, aArgs)
-	if big.Kind != bridge.HostViewUnavailable || big.Status == nil || !strings.Contains(big.Status.Reason, "too large") || len(az.Threads(12)) != threadsBefore {
-		t.Fatalf("413 = %+v", big)
-	}
-	if r := hcPost(t, app, aArgs); r.Kind != bridge.HostViewOK || len(az.Threads(12)) != threadsBefore+1 {
-		t.Fatalf("retry = %+v", r)
-	}
-
-	// 5. A failed thread post removes the uploaded file again.
-	last := hcStage(t, app, key, "last.png", png)
-	az.SetFailure("ERROR: something broke")
-	az.ResetCalls()
-	fail := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "doomed", AttachmentIDs: []string{last.ID}})
-	if fail.Kind != bridge.HostViewUnavailable || az.Count("upload:") != 1 || az.Count("delete:12:") != 1 {
-		t.Fatalf("failed thread: %+v, calls %v", fail, az.Calls())
-	}
-	for _, u := range az.Uploads(12) {
-		if strings.HasSuffix(u.Name, "-last.png") {
-			t.Fatalf("uploaded file left behind: %+v", u)
-		}
-	}
-	az.SetFailure("")
-
+	// 3. A token request is an unsupported call, so Violations catches it.
 	if v := az.Violations(); len(v) != 0 {
 		t.Fatalf("az contract violations: %v", v)
 	}
@@ -363,7 +214,7 @@ func hcLastGhArgs(t *testing.T, app *flowharness.App) []string {
 	return strings.Split(string(raw), "\n")
 }
 
-// Posting over gh: no attachments, REST for a comment, GraphQL for a reply on a code thread.
+// Posting over gh: REST for a comment, GraphQL for a reply on a code thread.
 func TestHostViewCommentsGitHub(t *testing.T) {
 	fixture, err := filepath.Abs("../../githost/github/testdata/pr_detail.json")
 	if err != nil {
@@ -381,19 +232,14 @@ func TestHostViewCommentsGitHub(t *testing.T) {
 	const link = "https://github.com/acme/api/pull/7"
 	key := hcOpen(t, app, link)
 
-	// 1. Attachments are unsupported, with the reason.
+	// 1. Compose: reply kinds only.
 	got := hvDetail(t, app, link)
-	if got.Compose == nil || got.Compose.Attachments || !strings.Contains(got.Compose.AttachmentsReason, "GitHub has no API") ||
-		!slices.Equal(got.Compose.ReplyKinds, []string{"code"}) {
+	if got.Compose == nil || !slices.Equal(got.Compose.ReplyKinds, []string{"code"}) {
 		t.Fatalf("compose = %+v", got.Compose)
 	}
 	app.Contract(t, hcScenario, "HostViewService.ChangeRequest#composeGitHub", got)
 
-	// 2. Staging is refused with that reason.
-	_, err = app.W.HostView.StageAttachment(ctx, bridge.HostViewStageArgs{WindowKey: key, Name: "a.txt", Data: hcB64([]byte("x"))})
-	hcBadRequest(t, err, "stage", "GitHub has no API")
-
-	// 3. A comment is a REST call; the body travels via -f.
+	// 2. A comment is a REST call; the body travels via -f.
 	if r := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "hi @alice"}); r.Kind != bridge.HostViewOK {
 		t.Fatalf("post = %+v", r)
 	}
@@ -406,7 +252,7 @@ func TestHostViewCommentsGitHub(t *testing.T) {
 		t.Fatalf("gh args = %q", args)
 	}
 
-	// 4. A reply on a code thread is GraphQL.
+	// 3. A reply on a code thread is GraphQL.
 	if r := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "ok then", ReplyTo: "PRRT_abc"}); r.Kind != bridge.HostViewOK {
 		t.Fatalf("reply = %+v", r)
 	}
@@ -417,7 +263,7 @@ func TestHostViewCommentsGitHub(t *testing.T) {
 		t.Fatalf("gh args = %q", args)
 	}
 
-	// 5. A thread id that is not a review thread never spawns gh.
+	// 4. A thread id that is not a review thread never spawns gh.
 	calls := hcGhCalls(app)
 	bad := hcPost(t, app, bridge.HostViewPostArgs{WindowKey: key, Body: "x", ReplyTo: "IC_kwDOabc"})
 	if bad.Kind != bridge.HostViewUnavailable || bad.Status == nil || bad.Status.Reason != "no such thread" || hcGhCalls(app) != calls {
@@ -435,10 +281,9 @@ func TestIssueComments(t *testing.T) {
 		flowharness.WithIssueTracker(jira.Options{Locator: acli, Runner: acli, Clock: clock}))
 	key := hcOpen(t, app, ivLink)
 
-	// 1. Compose: no attachments, no replies, the Jira reason.
+	// 1. Compose: no replies.
 	got := ivIssue(t, app, ivLink)
-	if got.Compose == nil || got.Compose.Attachments || len(got.Compose.ReplyKinds) != 0 || got.Compose.MaxBodyBytes != 32<<10 ||
-		!strings.Contains(got.Compose.AttachmentsReason, "acli has no upload command") {
+	if got.Compose == nil || len(got.Compose.ReplyKinds) != 0 || got.Compose.MaxBodyBytes != 32<<10 {
 		t.Fatalf("compose = %+v", got.Compose)
 	}
 	app.Contract(t, hcScenario, "HostViewService.Issue#compose", got)
@@ -484,9 +329,7 @@ func TestIssueComments(t *testing.T) {
 		t.Fatalf("no workitem comment row in %d rows", len(rows))
 	}
 
-	// 4. Attachments and replies are refused.
-	_, err = app.W.HostView.StageAttachment(ctx, bridge.HostViewStageArgs{WindowKey: key, Name: "a.txt", Data: hcB64([]byte("x"))})
-	hcBadRequest(t, err, "stage", "acli has no upload command")
+	// 4. Replies are refused.
 	_, err = app.W.HostView.PostComment(ctx, bridge.HostViewPostArgs{WindowKey: key, Body: "x", ReplyTo: "1"})
 	hcBadRequest(t, err, "reply", "no replies")
 

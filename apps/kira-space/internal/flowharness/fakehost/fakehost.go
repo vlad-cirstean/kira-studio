@@ -4,8 +4,6 @@ package fakehost
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -495,18 +493,10 @@ func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status {
 	return f.Status(ctx, githost.Repo{Host: Host})
 }
 
-// PostedAttachment is what the fake host kept of one uploaded file.
-type PostedAttachment struct {
-	Name, ContentType string
-	Size              int
-	SHA256            string
-}
-
 // PostedComment is one comment posted through the comment role.
 type PostedComment struct {
-	Body        string
-	ReplyTo     string
-	Attachments []PostedAttachment
+	Body    string
+	ReplyTo string
 }
 
 // Posted returns the comments posted on merge request number, in order.
@@ -516,11 +506,8 @@ func (f *Forge) Posted(number int) []PostedComment {
 	return slices.Clone(f.posted[number])
 }
 
-func (f *Forge) CommentCapabilities(githost.Repo) githost.CommentCapabilities {
-	return githost.CommentCapabilities{
-		ReplyKinds:  []string{githost.ThreadComment, githost.ThreadReview, githost.ThreadCode},
-		Attachments: true,
-	}
+func (f *Forge) ReplyKinds(githost.Repo) []string {
+	return []string{githost.ThreadComment, githost.ThreadReview, githost.ThreadCode}
 }
 
 // PostChangeRequestComment records the comment and appends it to the detail overlay, so a refetch shows it.
@@ -550,12 +537,6 @@ func (f *Forge) PostChangeRequestComment(_ context.Context, _ githost.Repo, numb
 		}
 	}
 	pc := PostedComment{Body: c.Body, ReplyTo: c.ReplyTo}
-	for _, a := range c.Attachments {
-		sum := sha256.Sum256(a.Data)
-		pc.Attachments = append(pc.Attachments, PostedAttachment{
-			Name: a.Name, ContentType: a.ContentType, Size: len(a.Data), SHA256: hex.EncodeToString(sum[:]),
-		})
-	}
 	f.posted[number] = append(f.posted[number], pc)
 	id := "posted-" + strconv.Itoa(len(f.posted[number]))
 	comment := githost.Comment{ID: id, Author: githost.Person{Login: f.account}, Body: c.Body, CreatedAt: time.Now().UnixMilli()}

@@ -5,7 +5,6 @@ import (
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
-	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 var _ githost.ChangeRequestComments = (*Provider)(nil)
@@ -15,17 +14,9 @@ var threadIDPattern = regexp.MustCompile(`^PRRT_[A-Za-z0-9_-]{1,200}$`)
 
 const replyThreadMutation = `mutation($threadId:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId,body:$body}){comment{id}}}`
 
-func (p *Provider) CommentCapabilities(githost.Repo) githost.CommentCapabilities {
-	return githost.CommentCapabilities{
-		ReplyKinds:        []string{githost.ThreadCode},
-		AttachmentsReason: i18n.T("backend.space.gitHost.comment.attachmentsUnsupported.body", map[string]string{"label": "GitHub"}),
-	}
-}
+func (p *Provider) ReplyKinds(githost.Repo) []string { return []string{githost.ThreadCode} }
 
 func (p *Provider) PostChangeRequestComment(ctx context.Context, r githost.Repo, number int, c githost.NewComment) githost.Status {
-	if len(c.Attachments) > 0 {
-		return githost.Status{Kind: githost.KindForbidden, Host: r.Host, Reason: p.CommentCapabilities(r).AttachmentsReason}
-	}
 	if c.ReplyTo == "" {
 		return p.Comment(ctx, r, number, c.Body)
 	}

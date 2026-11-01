@@ -2,7 +2,6 @@ package azure
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/clisetup"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
@@ -16,14 +15,11 @@ type Options struct {
 	Locator Locator
 	Runner  Runner
 	Clock   Clock
-	// HTTP is the attachment upload transport; nil takes http.DefaultTransport.
-	HTTP http.RoundTripper
 }
 
 // Provider adapts Client to the githost roles.
 type Provider struct {
-	client   *Client
-	uploader *uploader
+	client *Client
 }
 
 var (
@@ -47,7 +43,7 @@ func New(o Options) *Provider {
 	if o.Clock == nil {
 		o.Clock = realClock{}
 	}
-	return &Provider{client: NewClient(NewDiscovery(o.Locator, o.Runner, o.Clock), o.Runner), uploader: newUploader(o.HTTP)}
+	return &Provider{client: NewClient(NewDiscovery(o.Locator, o.Runner, o.Clock), o.Runner)}
 }
 
 func (p *Provider) ID() string { return ProviderID }

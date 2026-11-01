@@ -7,21 +7,12 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker"
-	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
 var _ issuetracker.IssueComments = (*Provider)(nil)
 
 // writeTimeout bounds `acli jira workitem comment create`.
 const writeTimeout = 30 * time.Second
-
-// CommentCapabilities: acli has no attachment upload and Kira holds no Jira credential.
-func (p *Provider) CommentCapabilities() issuetracker.CommentCapabilities {
-	return issuetracker.CommentCapabilities{
-		AttachmentsReason: i18n.T("backend.space.issueTracker.comment.attachmentsUnsupported.body",
-			map[string]string{"label": ProviderLabel, "cli": "acli"}),
-	}
-}
 
 // PostIssueComment posts body as an ADF comment. The body travels in a private temp file, never argv,
 // so the op log row holds no comment text.

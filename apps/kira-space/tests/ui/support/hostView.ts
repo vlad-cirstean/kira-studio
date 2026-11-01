@@ -132,22 +132,9 @@ const commentContract = <T>(key: string) => contract<T>('host-view-comments', ke
 export const composeForge = commentContract<Wire>('HostViewService.ChangeRequest#composeForge');
 export const composeGitHub = commentContract<Wire>('HostViewService.ChangeRequest#composeGitHub');
 export const issueCompose = commentContract<IssueWire>('HostViewService.Issue#compose');
-// The contract masks the random id to ''; the mock needs a real one.
-export const stagedPng = {
-  ...commentContract<Record<string, unknown>>('HostViewService.StageAttachment#png'),
-  id: 'staged-1',
-};
 export const postedOk = commentContract<unknown>('HostViewService.PostComment#ok');
 export const postUnavailable = commentContract<unknown>('HostViewService.PostComment#unavailable');
 
-export const stageSnap = (): ControlSnapshot => ({
-  channel: IPC.hostViewStageAttachment,
-  response: stagedPng,
-});
-export const discardSnap = (): ControlSnapshot => ({
-  channel: IPC.hostViewDiscardAttachment,
-  response: true,
-});
 export const postSnap = (response: unknown, hold = false): ControlSnapshot => ({
   channel: IPC.hostViewPostComment,
   response,

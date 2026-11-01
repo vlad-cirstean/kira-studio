@@ -48,7 +48,6 @@ export class PostRejected extends Error {
 export interface PostVars {
   body: string;
   replyTo: string;
-  attachmentIds: string[];
 }
 
 type Cached = HostViewChangeRequest | HostViewIssue | undefined;
@@ -108,19 +107,5 @@ export function usePostComment(opts: {
       (old, vars) => withPending(old, opts.kind, vars),
       { invalidate: 'settled' },
     ),
-  });
-}
-
-/** Holds a file for this window's next post. No cache write. */
-export function useStageAttachment(windowKey: string) {
-  return useMutation({
-    mutationFn: (file: { name: string; data: string }) =>
-      control.hostViewStageAttachment({ windowKey, ...file }),
-  });
-}
-
-export function useDiscardAttachment(windowKey: string) {
-  return useMutation({
-    mutationFn: (id: string) => control.hostViewDiscardAttachment({ windowKey, id }),
   });
 }

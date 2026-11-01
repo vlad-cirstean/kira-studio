@@ -57,7 +57,8 @@ type HostViewService struct {
 	Deps           appcore.Deps
 	Windows        hostViewWindowRows
 	Targets        *HostViewTargets
-	Attachments    *HostViewAttachments
+	postMu         sync.Mutex
+	posting        map[string]bool
 	Trackers       *issuetracker.Registry
 	Now            func() time.Time
 	OpenWindow     func(shell.WindowRecord)
@@ -271,9 +272,6 @@ func (s *HostViewService) openTarget(id string, target HostViewTarget, title str
 			return HostViewOpen{Key: key}, nil
 		}
 		s.Targets.Forget(key)
-		if s.Attachments != nil {
-			s.Attachments.Forget(key)
-		}
 		if err := s.Windows.Delete(key); err != nil {
 			slog.Warn("hostview: drop stale window row", "scope", "hostview", "key", key, "err", err)
 		}
@@ -313,8 +311,8 @@ func (s *HostViewService) Issue(ctx context.Context, args HostViewIssueArgs) (Ho
 	switch {
 	case err == nil:
 		out := HostViewIssue{Kind: HostViewOK, Detail: &d}
-		if w, ok := p.(issuetracker.IssueComments); ok {
-			out.Compose = issueCompose(w.CommentCapabilities())
+		if _, ok := p.(issuetracker.IssueComments); ok {
+			out.Compose = issueCompose()
 		}
 		return out, nil
 	case errors.Is(err, issuetracker.ErrNotFound):
@@ -354,7 +352,7 @@ func (s *HostViewService) ChangeRequest(ctx context.Context, args HostViewChange
 	case st.OK():
 		out := HostViewChangeRequest{Kind: HostViewOK, Detail: &d, Status: st}
 		if w, ok := l.p.(githost.ChangeRequestComments); ok {
-			out.Compose = changeRequestCompose(w.CommentCapabilities(l.repo))
+			out.Compose = changeRequestCompose(w.ReplyKinds(l.repo))
 		}
 		return out, nil
 	case st.Gone:
