@@ -248,3 +248,27 @@ func (b *Bound) ConfirmDecline(args IDArgs) error {
 	b.Svc.ConfirmDecline(args.ID)
 	return nil
 }
+
+// RestoreState lists the runs the last quit or crash ended, planned against their scripts now.
+func (b *Bound) RestoreState() (RestoreState, error) {
+	state, err := b.Svc.RestoreState()
+	if err != nil {
+		return RestoreState{}, ipcerr.Wrap(err)
+	}
+	return state, nil
+}
+
+// Restore starts the runs the user confirmed from that offer.
+func (b *Bound) Restore(args RestoreArgs) (RestoreResult, error) {
+	res, err := b.Svc.Restore(args)
+	if err != nil {
+		return RestoreResult{}, ipcerr.Wrap(err)
+	}
+	return res, nil
+}
+
+// RestoreDismiss forgets the offer.
+func (b *Bound) RestoreDismiss() error {
+	b.Svc.RestoreDismiss()
+	return nil
+}

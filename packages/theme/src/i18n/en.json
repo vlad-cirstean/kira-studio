@@ -718,6 +718,12 @@
         "promptTooLong": {
           "body": "The prompt is longer than {max} characters."
         },
+        "restoreNeedsInput": {
+          "body": "Needs values for: {names}. Kira never stores secrets, so start it yourself."
+        },
+        "restoreNotOffered": {
+          "body": "That run isn’t on the restore list."
+        },
         "resumeCommandNone": {
           "body": "Only a smart run with a saved conversation can continue in a terminal."
         },

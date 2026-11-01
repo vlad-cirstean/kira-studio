@@ -71,6 +71,9 @@ type Service struct {
 
 	tailMu sync.Mutex
 	tails  map[string]*termtext.Tail
+
+	// restore is the offer to run again what the last quit or crash ended; it lives for one app session.
+	restore restoreOffer
 }
 
 var _ terminal.ScriptLauncher = (*Service)(nil)
@@ -284,6 +287,11 @@ func (s *Service) Recover() error {
 	for _, r := range runs {
 		s.emit(r)
 	}
+	ids, err := s.Runs.TakeRestore()
+	if err != nil {
+		return err
+	}
+	s.restore.set(ids)
 	s.skipWaiting(skipAll, "", "Kira "+s.App+" closed before you answered", runoutcome.SourceRestart)
 	return s.Runs.Purge()
 }

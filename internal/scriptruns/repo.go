@@ -117,6 +117,10 @@ func (r *Repo) ListByTask(taskID string, limit int) ([]Run, error) {
 	})
 }
 
+// restoreExpr marks a run a quit or crash ended (source `restart`) to be offered at the next start;
+// the argument is the source the outcome carries.
+const restoreExpr = `CASE WHEN ? = 'restart' THEN 1 ELSE restore_pending END`
+
 // resumeExpr keeps a smart run's Claude session as resume_id when a restart ended it; the argument
 // is the source the outcome carries.
 const resumeExpr = `CASE WHEN kind = 'smart' AND ? = 'restart' THEN session_id ELSE '' END`
@@ -129,8 +133,8 @@ func (r *Repo) finish(column, value string, out runoutcome.Outcome, now int64) (
 		return nil, err
 	}
 	var id string
-	err = r.DB.QueryRow(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?, resume_id = `+resumeExpr+`
-		WHERE `+column+` = ? AND state = 'running' RETURNING id`, string(out.Status), outcome, now, string(out.Source), value).Scan(&id)
+	err = r.DB.QueryRow(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?, resume_id = `+resumeExpr+`, restore_pending = `+restoreExpr+`
+		WHERE `+column+` = ? AND state = 'running' RETURNING id`, string(out.Status), outcome, now, string(out.Source), string(out.Source), value).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -160,12 +164,26 @@ func (r *Repo) FailRunning(out runoutcome.Outcome, now int64) ([]Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := r.DB.Query(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?, resume_id = `+resumeExpr+`
-		WHERE state = 'running' RETURNING `+columns, string(out.Status), outcome, now, string(out.Source))
+	rows, err := r.DB.Query(`UPDATE script_runs SET state = ?, outcome_json = ?, finished_at = ?, resume_id = `+resumeExpr+`, restore_pending = `+restoreExpr+`
+		WHERE state = 'running' RETURNING `+columns, string(out.Status), outcome, now, string(out.Source), string(out.Source))
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Run, bool, error) {
 		run, err := scan(rows)
 		return run, true, err
 	})
+}
+
+// TakeRestore clears every restore mark and returns the marked run ids.
+func (r *Repo) TakeRestore() ([]string, error) {
+	rows, err := r.DB.Query(`UPDATE script_runs SET restore_pending = 0 WHERE restore_pending = 1 RETURNING id`)
+	ids, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (string, bool, error) {
+		var id string
+		err := rows.Scan(&id)
+		return id, true, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scriptruns: take restore: %w", err)
+	}
+	return ids, nil
 }
 
 // TakeResume claims a run's resume spec once: it clears resume_id and returns the Claude session

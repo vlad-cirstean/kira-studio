@@ -14,7 +14,10 @@ import (
 // Resume continues the Claude session of a smart run a restart ended, as a new run. The script is
 // planned again from its current definition; secret values are never stored, so a script with a
 // secret param cannot resume.
-func (s *Service) Resume(id string) (Started, error) {
+func (s *Service) Resume(id string) (Started, error) { return s.resume(id, "", false) }
+
+// resume is Resume; checkHash also refuses a run whose plan differs from the hash the user saw.
+func (s *Service) resume(id, hash string, checkHash bool) (Started, error) {
 	run, err := s.Runs.Get(id)
 	if err != nil {
 		return Started{}, err
@@ -38,6 +41,9 @@ func (s *Service) Resume(id string) (Started, error) {
 	p, err := s.plan(args, planOpts{provider: prov.ID()})
 	if err != nil {
 		return Started{}, err
+	}
+	if checkHash && p.preview.Hash != hash {
+		return Started{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.scriptRun.changedSincePreview.body", nil)
 	}
 	names = append(names, p.preview.Missing...)
 	if len(names) > 0 {
