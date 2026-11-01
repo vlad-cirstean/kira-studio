@@ -73,7 +73,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 - Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. One known violation remains, tracked in Known open items (docker half fixed in v0.2.24 P429 Part 2).
 - `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers (incl. `Authorization`) in `listTools` and copies them into the run's `--mcp-config` file. Replace with a path that never reads or forwards those headers (let `claude` load its own config); the plan decides.
-- Extend guard G5 to the claude harness and `internal/docker` once clean: no `LoadX509KeyPair`, no `config.json` read.
+- Extend guard G5 to the claude harness once clean: no `.claude.json` header reads or forwarding.
 
 ### P444 Code review (2 rounds)
 
