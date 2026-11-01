@@ -13,8 +13,9 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P440 | Kubernetes MCP tools with per-cluster approval | Todo |
 | P441 | Dependency update, incl. Wails | Todo |
 | P442 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Todo |
-| P443 | Code review (2 rounds) | Todo |
-| P444 | Close chapter v0.2.25 | Todo |
+| P443 | Remove CLI credential reads: claude MCP headers and docker config | Todo |
+| P444 | Code review (2 rounds) | Todo |
+| P445 | Close chapter v0.2.25 | Todo |
 
 ## Rows
 
@@ -55,7 +56,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Upgrade Wails to the latest release. Regenerate bindings; fix any API or build changes in both apps.
 - Check the license of every changed dependency against the open-source-only rule.
 - Run the full suites after the bump (Go, typecheck, lint, UI, visual). Re-record visual baselines only if the upgrade shifts rendering.
-- Scope for v0.2.25 is closed after P442: no further phases.
+- Scope for v0.2.25 is closed after P443: no further phases.
 
 ### P442 Slow test audit and speed-up: UI suites wait 30+ min per phase
 
@@ -68,10 +69,17 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Before and after suite times recorded in the plan. No loss of coverage: each removed or merged spec is named with the spec that still covers it.
 - Standing rule already in `CLAUDE.md`: one full run per phase, targeted reruns after.
 
-### P443 Code review (2 rounds)
+### P443 Remove CLI credential reads: claude MCP headers and docker config
+
+- Rule (CLAUDE.md, ARCHITECTURE.md "CLI credentials: never touched"): Kira never touches a credential a driven CLI owns. Two known violations remain, tracked in Known open items.
+- `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers (incl. `Authorization`) in `listTools` and copies them into the run's `--mcp-config` file. Replace with a path that never reads or forwards those headers (let `claude` load its own config); the plan decides.
+- `internal/docker/endpoint.go` reads `~/.docker/config.json` for `currentContext`; the file can hold `auths`. Resolve the context through the `docker` CLI output instead.
+- Extend guard G5 to both packages once clean.
+
+### P444 Code review (2 rounds)
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
-### P444 Close chapter v0.2.25
+### P445 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.

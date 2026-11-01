@@ -468,7 +468,6 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 - P427 detail fixtures (`pr_detail.json`, `policy_detail.json`, `threads_get.json`) are hand-written too. Check the invoke GET projection with `az devops invoke --area git --resource pullRequestThreads --route-parameters project=<p> repositoryId=<r> pullRequestId=<n> --http-method GET --query "<ThreadsQuery>" --org https://dev.azure.com/<org> --detect false -o json` (`--query` is a global argument; `--help` lists it).
 - GitHub `githost/github/testdata/pr_detail.json` is hand-written from the GraphQL schema. Optional check: `gh api graphql -f query=@<detailQuery text> -f owner=<o> -f name=<r> -F number=<n>` against a real PR.
 - Refresh PR JSON: `az repos pr list --org https://dev.azure.com/<org> --project <p> --repository <r> --detect false -o json`, then redact.
-- P429: attachments need `az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv` (an `az login` sign-in). `fakeaz` answers it, and `SetTokenUnavailable` mimics a PAT-only sign-in. The upload goes straight to `dev.azure.com` over HTTPS; flows swap the transport (`fakeaz.Transport()`).
 - Flow tests use `flowharness/fakeaz`; no test needs `az` installed.
 
 ## Kira Space flow suites (P231)

@@ -233,6 +233,11 @@ duplicated here; this file only points at them.
   at the package level *and* for the specific feature used, not just the headline badge (AG Grid
   Community's own license is fine; the context menu/range selection/clipboard features this app
   needed are Enterprise-only, so declined). Applies to every new dependency.
+- **Never touch a credential a driven CLI owns** (gh, az, acli, …): no token commands, config reads,
+  or auth headers. Run the CLI, read its output. Rule and facts in `docs/ARCHITECTURE.md` "CLI
+  credentials: never touched". Guard G5 enforces it under `githost/` and `issuetracker/`. Known
+  violations, tracked in ARCHITECTURE "Known open items" and v0.2.25 P443: `usermcp.go` (claude MCP
+  headers) and `docker/endpoint.go` (docker config).
 - **Measure when there's a real, concrete question at stake, not as a default ritual.** A
   real-hardware trace, CDP tracing, or a byte-for-byte bundle comparison earns its keep when a
   claimed fix, regression, or cost genuinely can't be checked another way. Don't extend that rigor

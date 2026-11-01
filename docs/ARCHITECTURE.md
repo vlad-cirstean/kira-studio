@@ -1233,7 +1233,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 
 ### Consistency conventions (P266)
 
-- Consistency conventions are enforced by guards: scripts/check-ui-primitives.sh (U72-U82), scripts/check-conventions.ts (N1-N7), internal/conventiontest (G1-G4), Biome noConsole, golangci sloglint.
+- Consistency conventions are enforced by guards: scripts/check-ui-primitives.sh (U72-U82), scripts/check-conventions.ts (N1-N7), internal/conventiontest (G1-G5), Biome noConsole, golangci sloglint.
 - Each convention guard keeps a named exemption list with a reason per entry; an entry that exempts nothing fails, so the lists only shrink.
 - The UI uses one glyph set: codicons, referenced by bare names (e.g. trash, not codicon-trash).
 - Use simple-icons for third-party brand marks and seti for file types.
@@ -1331,6 +1331,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - New timestamp columns are INTEGER unix ms named *_at; older TEXT ISO columns stay as legacy, and N7 refuses new ones.
 - Migrations are named NNNN_<phase>_<slug>.sql.
 - Files a person or another program reads must be written with renameio.WriteFile; exempt are test tooling and temp snapshots (G4).
+- G5: no CLI credential access under githost/ and issuetracker/ (see CLI credentials: never touched).
 - File naming: .vue files PascalCase; .ts files camelCase with role suffixes .worker, .check; colocated tests are <module>.spec.ts, never .test.ts (N1, N2).
 - Name helper folders lib/, never util, utils or helpers (N3).
 - Stores live in state/ and workbench composables in behaviour/; a Pinia id is the export name without use/create and Store, camelCase (N4).
@@ -2014,7 +2015,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
 - BranchLinks (P383) is an optional role: ParseBranchLink (pull, tree, issue links on a claimed host; no host call), ChangeRequestHead (fresh head, author) and ChangeRequestRef (refs/pull/<n>/head on GitHub). ADE ResolveHostLink is read only; AddHostLink re-resolves, fetches one refspec (fork or closed PR: the change-request ref into <owner>/<head>; same-repo open PR: the head into its tracking ref) and attaches through the AddExistingBranch path, so kind follows the tip-author rule. Repo match walks every remote, origin first. Issue links are refused.
 - ChangeRequestDetails (P427) is an optional role: ParseChangeRequestLink (a change request link on a claimed host; no host call) and ChangeRequestDetail (one request's description, conversation, reviewers and checks). It has its own link parser because `fakehost.Forge` lacks BranchLinks and adding it there would change `BranchLinkLabels()`.
-- ChangeRequestComments (P429) is an optional write role, apart from the read and review roles: CommentCapabilities (attachments, reason, replyKinds, limits) and PostChangeRequestComment (body, replyTo, attachments). GitHub posts through `gh api -f` and replies to code threads with GraphQL `addPullRequestReviewThreadReply`. Azure posts through `az devops invoke`. See Comments (P429).
+- ChangeRequestComments (P429) is an optional write role, apart from the read and review roles: ReplyKinds (thread kinds a reply may target) and PostChangeRequestComment (body, replyTo). GitHub posts through `gh api -f` and replies to code threads with GraphQL `addPullRequestReviewThreadReply`. Azure posts through `az devops invoke`. See Comments (P429).
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
 
 #### Azure Repos (P423)
@@ -2108,12 +2109,11 @@ and `docs/HISTORY.md (v2.0)`.
 
 #### Comments (P429)
 
-- Bridge: `HostViewService.StageAttachment`, `DiscardAttachment` and `PostComment`, all keyed by window key. The target comes from `HostViewTargets`, never from the frontend. `ChangeRequest` and `Issue` results carry `compose` (capabilities, limits, replyKinds), absent when the provider has no write role.
-- Staged files live in memory only (`HostViewAttachments`): 5 files, 10 MB each, 25 MB total, a 30 min sweep, dropped on success and on window close. Files travel as base64 over the bridge. No path reaches Go and `EnableFileDrop` stays false. Names are sanitised; the extension must be on the allow list.
-- One post at a time per window (`beginPost`). A timeout answers `unavailable` with a "may have been recorded" hint, so the UI warns before a retry.
-- Attachment links live in the Markdown body; the read models gain no attachment field. Images post as `![name](url)`, other files as `[name](url)`.
-- Azure attachments: `az devops invoke` cannot send a binary body. Kira reads a token with `az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798`, then POSTs the bytes to `dev.azure.com` itself (HTTPS, `CheckRedirect` refuses every redirect). The token is never stored or logged. A failed post deletes the uploads best-effort. A PAT-only sign-in has no token: the post is text only, with a sign-in reason. Files upload as `<8hex>-name`. A reply uses `parentCommentId` 1.
-- Frontend: `hostview/CommentComposer.vue` (Markdown source in a textarea, Edit and Preview tabs, drop zone, picker, paste). TanStack mutation with optimistic pending comment, rollback on error, invalidate on settle. Draft in session storage per window, kind and thread. HostViewWindow cancels window-level dragover and drop so a stray drop never navigates the webview.
+- Bridge: `HostViewService.PostComment`, keyed by window key. The target comes from `HostViewTargets`, never from the frontend. `ChangeRequest` and `Issue` results carry `compose` (`maxBodyBytes`, `replyKinds`), absent when the provider has no write role.
+- Text only on every host: no attachments, no drop zone, no picker, no paste handling. Kira never touches a CLI's credentials, and no driven CLI uploads a comment attachment (see CLI credentials: never touched).
+- One post at a time per window (`HostViewService.beginPost`). A timeout answers `unavailable` with a "may have been recorded" hint, so the UI warns before a retry.
+- Azure replies use `parentCommentId` 1.
+- Frontend: `hostview/CommentComposer.vue` (Markdown source in a textarea, Edit and Preview tabs). TanStack mutation with optimistic pending comment, rollback on error, invalidate on settle. Draft in session storage per window, kind and thread. HostViewWindow cancels window-level dragover and drop so a stray drop never navigates the webview.
 - Tests: `flows/githostflow/comments_test.go` (contract `host-view-comments`), `tests/ui/host-view-comments.spec.ts`.
 
 ### Clipboard capture (P430)
@@ -3043,6 +3043,18 @@ Agent-written evidence the user reviews in a dedicated window. Part 1 is storage
 - **Chart screenshot.** Inline SVG clones with the DOM; the capture filter drops `.kira-proof-chart-tooltip`. Measured in headless WebKit: 1000 scatter points 5.7-6.3 s, one line series of 1000 points with symbols 6.8 s, 20 series of 1000 points 3.5-4.1 s. 2000 scatter points took 10.6-12.6 s, so the bar and scatter cap is 1000.
 - **Screenshot.** `modern-screenshot` (`screenshot.ts`) clones the step element to a canvas; `restoreScrollPosition` makes the clone match the live scroll. `includeStyleProperties` must list painted properties only; without it a clone of a 160-row grid takes minutes in WebKit. Capture waits for every `[data-step-key]` to report `data-ready`. Default action copies a PNG to the clipboard; the dropdown saves via `ProofService.SavePng`. All tabs stack in order.
 
+## CLI credentials: never touched
+
+Kira drives gh, az and acli but never touches their credentials. It runs the CLI and reads its output (JSON or text). No token commands, no reads of CLI config or credential files, no auth headers on Kira's own HTTP.
+
+- gh: runner passes os.Environ through plus hygiene vars; never reads GH_TOKEN or GITHUB_TOKEN. `gh auth status --hostname` is parsed for the account name only.
+- az: env passthrough. `az account show --query user.name` only.
+- acli: env passthrough. `jira auth status` parsed for site and account only. Comment body goes through a 0600 temp file.
+- Setup steps are copy-only commands the user runs in their own terminal.
+- Consequence: comments carry no attachments (no driven CLI uploads one; Azure would need a bearer token).
+- Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/.
+- Known violations, outside G5 until fixed: `usermcp.go` and `docker/endpoint.go`. See Known open items; planned v0.2.25 P443.
+
 ## Renderer security surface
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what
@@ -3292,11 +3304,10 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Images in PR descriptions render as links (P427).** Never inline.
 - **Azure `@<GUID>` mentions show raw (P427).** No identity lookup.
 - **Azure threads beyond the newest 200 are not read (P427).**
-- **Jira comments cannot carry attachments (P429).** acli has no upload command and Kira holds no Jira credential. The composer states this. Add files in Jira.
-- **GitHub comments cannot carry attachments (P429).** GitHub has no API for comment attachments. The composer states this. Add files on GitHub.
-- **Azure attachments need an `az login` sign-in (P429).** A PAT-only sign-in (`az devops login`) posts text only.
-- **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input and the Azure attachment upload response are not seen live; the Azure reply assumes the first comment id is 1.
-- **Drag and drop is unverified in a real macOS window (P429).** UI specs dispatch synthetic drop events; no display was available.
+- **Comments carry no attachments (P429).** Kira never touches a CLI's credentials, and none of gh, az, acli uploads a comment attachment. Add files on the host.
+- **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input is not seen live; the Azure reply assumes the first comment id is 1.
+- **Kira reads and forwards Claude MCP server headers (CLI credentials rule violation).** `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers, including `Authorization`, when listing tools, and copies the raw entries into the run's 0600 `--mcp-config` file. Pending user decision; planned v0.2.25 P443.
+- **Kira reads the Docker CLI config (CLI credentials rule violation).** `internal/docker/endpoint.go` reads `~/.docker/config.json`. Only `currentContext` is used, but the file may hold `auths`. Pending user decision; planned v0.2.25 P443.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.

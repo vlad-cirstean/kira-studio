@@ -70,7 +70,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Post comments in the PR view and the issue view.
 - Comments can carry attachments; drag and drop supported.
 
-**Result:** Post comments and replies on PRs and issues with a Markdown composer, VueUse `useDropZone` drag and drop. Attachments: Azure only, over HTTPS with an `az` access token (needs `az login`, not PAT-only). GitHub and Jira comments carry no attachments (no API; no Jira credential held). Narrows the spec line on attachments; follow-up needs a stored Atlassian token (v0.2.25). Live acli post, live Azure upload and macOS drag and drop unverified (Known open items).
+**Result:** Post comments and replies on PRs and issues with a Markdown composer. No attachments on any host (user decision, iter2): Kira never touches a CLI's credentials, and no driven CLI uploads a comment attachment. Narrows the spec lines on attachments and drag and drop. Live acli post unverified (Known open items).
 
 ### P430 Clipboard capture hotkey: link or text into Kira Space
 
