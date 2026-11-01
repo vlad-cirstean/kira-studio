@@ -9,9 +9,11 @@ import { rowVariants } from '@theme/lib/rowVariants';
 import { useCappedList } from '@workbench/behaviour/cappedList';
 import { matchesQuery } from '@workbench/behaviour/match';
 import ShowMoreButton from '@workbench/components/ShowMoreButton.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, watch } from 'vue';
+import { useConsoleUiStore } from '../viewState';
 
 const props = defineProps<{
+  tabId: string;
   fields: readonly KibanaField[];
   columns: readonly string[];
   loading: boolean;
@@ -32,7 +34,20 @@ const ICONS: Record<string, string> = {
   geo_point: 'location',
 };
 
-const search = ref('');
+// Search and "show more" outlive the component: a tab switch unmounts it.
+const uiState = useConsoleUiStore().ui(props.tabId);
+const search = computed({
+  get: () => uiState.fieldSearch,
+  set: (value: string) => {
+    uiState.fieldSearch = value;
+  },
+});
+const cap = computed({
+  get: () => uiState.fieldCap ?? STEP,
+  set: (value: number) => {
+    uiState.fieldCap = value;
+  },
+});
 const matches = computed(() => {
   return props.fields.filter((f) => matchesQuery(f.name, search.value));
 });
@@ -40,7 +55,7 @@ const selected = computed(() =>
   props.columns.flatMap((c) => matches.value.filter((f) => f.name === c)),
 );
 const available = computed(() => matches.value.filter((f) => !props.columns.includes(f.name)));
-const { visible, hiddenCount, showMore, reset } = useCappedList(() => available.value, STEP);
+const { visible, hiddenCount, showMore, reset } = useCappedList(() => available.value, STEP, cap);
 watch(search, reset);
 </script>
 

@@ -76,6 +76,8 @@ const props = defineProps<{
   keepSelectionOnExternalSync?: boolean;
   /** Restored once the first content lands (the proof window's saved query scroll). */
   scrollTop?: number;
+  /** Caret offset restored with the first content, before `scrollTop`; never scrolls to it. */
+  cursor?: number;
 }>();
 
 const docModel = defineModel<string>('doc', { required: true });
@@ -578,6 +580,9 @@ onMounted(async () => {
   }).then(() => {
     if (!editor) return;
     editor.layout();
+    if (props.cursor && model) {
+      editor.setPosition(model.getPositionAt(Math.min(props.cursor, model.getValueLength())));
+    }
     if (props.scrollTop) editor.setScrollTop(props.scrollTop);
     emit('update:contentHeight', editor.getContentHeight());
     requestAnimationFrame(() => requestAnimationFrame(() => emit('ready')));

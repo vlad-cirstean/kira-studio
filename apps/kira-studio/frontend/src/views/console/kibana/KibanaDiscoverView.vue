@@ -242,6 +242,7 @@ onUnmounted(() => {
         data-testid="kibana-sidebar"
       >
         <FieldSidebar
+          :tab-id="tab.id"
           :fields="d.fields.value"
           :columns="d.state.value.columns"
           :loading="d.dataViewQuery.isFetching.value"
