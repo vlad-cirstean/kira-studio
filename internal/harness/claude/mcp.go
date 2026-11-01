@@ -47,6 +47,10 @@ func (p *Provider) ToolArgs(pol harness.ToolPolicy) (tools, allowed []string) {
 		add(t)
 	}
 	for _, c := range pol.MCP {
+		if c.AllTools {
+			add("mcp__" + c.Server)
+			continue
+		}
 		for _, t := range c.Tools {
 			add(p.MCPToolName(harness.MCPTool{Server: c.Server, Tool: t}))
 		}

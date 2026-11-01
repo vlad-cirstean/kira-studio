@@ -30,8 +30,14 @@ type HeadlessSpec struct {
 	MCPConfigs []string
 	Config     ConfigScope
 	// Isolated loads no settings file, only the MCPConfigs servers, and denies instead of
-	// prompting; it overrides Config.
+	// prompting; it overrides Config. With UserMCP the user's own settings source loads too,
+	// bounded to the GrantMCP and UserMCP servers, hooks off.
 	Isolated bool
+	// UserMCP names servers from the user's own agent config that the agent loads itself. Kira never
+	// reads their definitions.
+	UserMCP []string
+	// GrantMCP names the servers in MCPConfigs (Kira's grants).
+	GrantMCP []string
 	// Model is the model to run; "" omits it.
 	Model string
 	// MaxBudgetUSD caps the run's cost; 0 omits it.

@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -45,6 +46,9 @@ func onStdout(h harness.Handler, line string, emit func(harness.Line)) {
 // settingSources is the --setting-sources value of a scope.
 func settingSources(s harness.HeadlessSpec) string {
 	if s.Isolated {
+		if len(s.UserMCP) > 0 {
+			return "user"
+		}
 		return ""
 	}
 	switch s.Config {
@@ -54,6 +58,26 @@ func settingSources(s harness.HeadlessSpec) string {
 		return "user,project,local"
 	}
 	return ""
+}
+
+// userMCPSettings is the --settings value of an isolated run that loads user MCP servers: hooks off
+// and only the granted and ticked servers allowed.
+func userMCPSettings(s harness.HeadlessSpec) string {
+	type server struct {
+		Name string `json:"serverName"`
+	}
+	allowed := make([]server, 0, len(s.GrantMCP)+len(s.UserMCP))
+	for _, n := range s.GrantMCP {
+		allowed = append(allowed, server{n})
+	}
+	for _, n := range s.UserMCP {
+		allowed = append(allowed, server{n})
+	}
+	b, _ := json.Marshal(struct {
+		DisableAllHooks   bool     `json:"disableAllHooks"`
+		AllowedMcpServers []server `json:"allowedMcpServers"`
+	}{true, allowed})
+	return string(b)
 }
 
 // Script is the shell text that execs claude; run under the user's login shell it sees the same
@@ -96,7 +120,12 @@ func Script(s harness.HeadlessSpec) string {
 	words = append(words, stageArgs(s.Stage, loginshell.Quote)...)
 	words = append(words, "--setting-sources", loginshell.Quote(settingSources(s)))
 	if s.Isolated {
-		words = append(words, "--strict-mcp-config", "--permission-prompts", "none")
+		if len(s.UserMCP) > 0 {
+			words = append(words, "--settings", loginshell.Quote(userMCPSettings(s)))
+		} else {
+			words = append(words, "--strict-mcp-config")
+		}
+		words = append(words, "--permission-prompts", "none")
 	}
 	if len(s.AddDirs) > 0 {
 		words = append(words, "--add-dir")
