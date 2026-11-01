@@ -218,3 +218,28 @@ Playwright wall time (stats.duration): 1162.0 s
 #### ui: failures (0)
 
 
+
+## Worker sweep
+
+Subset, `--project=ui`, idle start (1-min load below 1 before each run), 4 cores.
+
+- Studio (7 files, 124 tests, 25% of `ui` sum): slick-grid, console, autocomplete, api-ui-consistency, sql-schema, grpc-request, console-explain.
+- Space (8 files, 212 tests, 25% of `ui` sum): ade-v2-workflows, ade-v2-review, ade-v2-panel, ade-v2-plan, ade-v2-run, ade-v2-sessions, ade-v2-base-rebase, copy-coverage-git.
+
+| app | --workers | wall s (stats.duration) | effective parallelism | failed | timed out |
+|---|---|---|---|---|---|
+| studio | 2 | 354.1 | 1.98 | 0 | 0 |
+| studio | 3 | 328.4 | 2.96 | 0 | 0 |
+| studio | 4 | 314.5 | 3.92 | 0 | 0 |
+| studio | 6 | 297.5 | 3.93 | 0 | 0 |
+| space | 2 | 350.1 | 1.97 | 0 | 0 |
+| space | 3 | 291.9 | 2.95 | 0 | 0 |
+| space | 4 | 288.7 | 3.91 | 0 | 0 |
+| space | 6 | 296.2 | 3.91 | 0 | 0 |
+
+Reading:
+
+- `--workers=6` never ran 6 workers: parallelism stays 3.9. Each `ui` project sets `workers: '100%'` (4 here), and a project value narrows the CLI/top-level pool, never widens it. The 6 rows are a second 4-worker sample; they give the noise floor (Studio 314.5 vs 297.5 s, Space 288.7 vs 296.2 s: up to 6%).
+- Scaling is linear to 3 workers and flat to 4 inside that noise. No failure or timeout at any count.
+- Choice: keep `'100%'` (4). Raising the pool past the 4 cores needs a top-level and project change, and 6 workers on 4 cores would add load-induced timeouts for no measured gain (the sweep cannot show a gain). No config change.
+- Sharding: not added. `--shard` on one 4-core host splits the same cores.
