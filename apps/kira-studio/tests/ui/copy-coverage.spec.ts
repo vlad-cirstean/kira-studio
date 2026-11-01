@@ -462,3 +462,35 @@ test('Kubernetes panel, list, describe and logs use catalog text', async ({ rela
   await expect(loc(page, 'kube-unavailable')).toBeVisible();
   await expectCatalogText(loc(page, 'kube-unavailable'), { allow: KUBE_DATA });
 });
+
+test('Kubernetes MCP dialog and approval use catalog text', async ({ relaunch }) => {
+  const { page } = await setupKubernetes(relaunch);
+  await setPseudoLocale(page);
+  await openKubernetes(page);
+  await page
+    .locator('[data-testid="kube-cluster-row"][data-context="kind-dev"]')
+    .click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-kube-cluster-mcp"]').click();
+  await expect(loc(page, 'kube-mcp-dialog')).toBeVisible();
+  await expectCatalogText(loc(page, 'kube-mcp-dialog'), { allow: KUBE_DATA });
+});
+
+test('Kubernetes MCP approval dialog', async ({ relaunch }) => {
+  const snap = contract<{ pending: { requestId: string; statement: string } }>(
+    'dbmcp-kube',
+    'DbMcpService.PendingApprovals',
+  );
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.dbMcpPendingApprovals,
+        response: { ...snap, pending: { ...snap.pending, expiresAtMs: Date.now() + 60_000 } },
+      },
+    ],
+  });
+  await setPseudoLocale(page);
+  await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
+  const dialog = loc(page, 'db-mcp-approval-dialog');
+  await expect(dialog).toBeVisible();
+  await expectCatalogText(dialog, { allow: [...ALLOW, ...KUBE_DATA, /<kube>|kubectl/] });
+});

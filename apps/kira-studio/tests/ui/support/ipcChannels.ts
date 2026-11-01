@@ -194,6 +194,7 @@ export const IPC = {
   kubernetesLogsClose: 'kira:kubernetes:logsClose',
   kubernetesLogsOpen: 'kira:kubernetes:logsOpen',
   kubernetesNamespaces: 'kira:kubernetes:namespaces',
+  kubernetesSetMcp: 'kira:kubernetes:setMcp',
   kubernetesStatus: 'kira:kubernetes:status',
 
   // P200: the Docker module's bound surface; pushes (changed/stats/logs/exec) are events, no entry.

@@ -238,6 +238,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   kubernetesLogsClose: 'KubernetesService.LogsClose',
   kubernetesLogsOpen: 'KubernetesService.LogsOpen',
   kubernetesNamespaces: 'KubernetesService.Namespaces',
+  kubernetesSetMcp: 'KubernetesService.SetMcp',
   kubernetesStatus: 'KubernetesService.Status',
 
   dockerContainerEditSpec: 'DockerService.ContainerEditSpec',

@@ -45,6 +45,7 @@ function defaults(): Record<string, KubeHandler> {
       if (a.clusterId === idOf('plugin-ctx')) return k(KEY('Status:plugin'));
       return k(KEY('Status'));
     },
+    SetMcp: () => contract('dbmcp-kube', KEY('SetMcp')),
     Namespaces: () => k(KEY('Namespaces')),
     Kinds: () => k(KEY('Kinds')),
     List: (a) => {
