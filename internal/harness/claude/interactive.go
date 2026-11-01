@@ -21,6 +21,9 @@ func (p *Provider) InteractiveCommand(s harness.InteractiveSpec) string {
 	var b strings.Builder
 	b.WriteString(bin + flag + loginshell.Quote(s.SessionID))
 	word := func(w string) { b.WriteString(" " + loginshell.Quote(w)) }
+	for _, w := range stageArgs(s.Stage, func(w string) string { return w }) {
+		word(w)
+	}
 	if len(s.AddDirs) > 0 {
 		word("--add-dir")
 		for _, d := range s.AddDirs {

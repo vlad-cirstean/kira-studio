@@ -359,10 +359,10 @@ test('Automations panel, row menu and runs section use catalog text', async ({ r
   await expectCatalogText(tid(page, 'runs-section'), { allow: AUTOMATIONS_DATA });
 
   await tid(page, 'toggle-operations-panel').click();
-  await expect(page.locator('[data-op-id="run:r-b"]')).toBeVisible();
-  await page.locator('[data-op-id="run:r-b"]').click();
+  await expect(page.locator('[data-testid="op-row"][data-op-id="run:r-b"]')).toBeVisible();
+  await page.locator('[data-testid="op-row"][data-op-id="run:r-b"]').click();
   await expectCatalogText(tid(page, 'operations-panel'), { allow: AUTOMATIONS_DATA });
-  await page.locator('[data-op-id="run:r-b"]').click({ button: 'right' });
+  await page.locator('[data-testid="op-row"][data-op-id="run:r-b"]').click({ button: 'right' });
   await expectCatalogText(tid(page, 'context-menu'));
   await page.keyboard.press('Escape');
   await tid(page, 'toggle-operations-panel').click();

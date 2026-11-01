@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
 import { TIMING } from '@workbench/behaviour/timing';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
-import { queryClient } from '@workbench/state/queryClient';
-import { computed, type MaybeRefOrGetter, toValue } from 'vue';
+import { KEEP_WHILE_OPEN, queryClient } from '@workbench/state/queryClient';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
+import { computed, type MaybeRefOrGetter, toValue, watch } from 'vue';
 import { loadVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
 import { mergeVariableRows, useVariablesStore } from '../../api/state/variables';
@@ -123,6 +124,24 @@ async function describeSchema(
   });
 }
 
+// Schemas are kept while their tab is open (a tab switch or 5 min away refetches nothing). A key
+// belongs to the source, so it goes when its tab leaves that source or closes, unless another
+// observer still reads it.
+const keyByTab = new Map<string, readonly unknown[]>();
+
+function dropSchemaKey(key: readonly unknown[]): void {
+  const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+  if (query && query.getObserversCount() === 0) {
+    queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+}
+
+registerTabRuntimeCleanup((tabId) => {
+  const key = keyByTab.get(tabId);
+  keyByTab.delete(tabId);
+  if (key) dropSchemaKey(key);
+});
+
 /** The tab's schema, fetched once its source is complete; debounced like a fast typist (the
  *  schema watcher this replaces). A source change is a new query — nothing to supersede. */
 export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
@@ -134,8 +153,20 @@ export function useGrpcSchema(tab: MaybeRefOrGetter<GrpcRequestTabRecord>) {
       queryKey: grpcSchemaKey(s),
       queryFn: ({ signal }) => describeSchema(s, false, signal),
       enabled: s.ready && isComplete(s),
+      gcTime: KEEP_WHILE_OPEN,
     };
   }, queryClient);
+  watch(
+    () => JSON.stringify(grpcSchemaKey(debounced.value)),
+    () => {
+      const id = toValue(tab).id;
+      const prev = keyByTab.get(id);
+      const key = grpcSchemaKey(debounced.value);
+      keyByTab.set(id, key);
+      if (prev && JSON.stringify(prev) !== JSON.stringify(key)) dropSchemaKey(prev);
+    },
+    { immediate: true, flush: 'post' },
+  );
 
   /** Go invalidates its own descriptor cache on `reload`; the reply replaces this key's data. A
    *  failure lands in the query's own error state. */

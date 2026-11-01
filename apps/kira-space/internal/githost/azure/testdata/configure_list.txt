@@ -1,0 +1,5 @@
+[defaults]
+organization = https://dev.azure.com/acme
+project = Web App
+
+Use git alias = No

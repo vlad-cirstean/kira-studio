@@ -20,6 +20,7 @@ import { scriptRunTabKind } from '@workbench/tabs/scriptRunTabKind';
 import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
 import { useTreeStore } from '../project/state/tree';
+import { discoverDirty } from '../views/console/kibana/savedDiscover';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
@@ -71,6 +72,7 @@ import {
   variableSetTabStateSchema,
 } from './tabDomain';
 import { useTabIncognitoStore } from './tabIncognito';
+import { useTabsStore } from './tabs';
 import { useTerminalsStore } from './terminals';
 
 // The tab-kind registry, split from workbench/tabViews.ts by the lint rules —
@@ -172,11 +174,34 @@ export const TAB_KINDS: TabKindRegistry<
   },
   console: {
     mode: STUDIO_TAB_KIND_MODE.console,
-    title: tabTitle,
-    icon: () => 'terminal',
+    title: (tab) =>
+      tab.kind === 'console' && tab.state.kibana
+        ? (tab.state.kibana.saved?.name ??
+          tab.state.kibana.dataViewName ??
+          t('studio.kibana.tab.title'))
+        : tabTitle(tab),
+    icon: (tab) => (tab.kind === 'console' && tab.state.kibana ? 'search' : 'terminal'),
     railColor,
+    badge: (tab) =>
+      tab.kind === 'console' && discoverDirty(tab.state)
+        ? {
+            icon: 'circle-filled',
+            tooltip: t('studio.kibana.saved.dirty.tooltip', {
+              name: tab.state.kibana?.saved?.name ?? '',
+            }),
+          }
+        : null,
     defaultState: () => defaultConsoleTabState(),
-    duplicateState: (_tab: ConsoleTabRecord): ConsoleTabState => defaultConsoleTabState(),
+    // A duplicate is an unsaved copy of the same query.
+    duplicateState: (tab: ConsoleTabRecord): ConsoleTabState =>
+      tab.state.kibana
+        ? {
+            ...defaultConsoleTabState(),
+            text: tab.state.text,
+            kibana: { ...tab.state.kibana, saved: null },
+          }
+        : defaultConsoleTabState(),
+    isDirty: (tabId) => discoverDirty(useTabsStore().findConsoleTab(tabId)?.state),
     dropResources: dropConsoleResultPagesForTab,
     menuExtras: revealInProjectPanel,
     parseState: parseStateWith(consoleTabStateSchema),

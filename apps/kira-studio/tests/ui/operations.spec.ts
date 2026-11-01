@@ -236,13 +236,22 @@ test('Operations panel — arrows, Home/End, Enter and Space toggle detail, Shif
   await expect(rows.nth(2)).toBeFocused();
   await page.keyboard.press('Home');
   await expect(rows.first()).toBeFocused();
+  // Up from the first row returns to the filter field.
   await page.keyboard.press('ArrowUp');
-  await expect(rows.first()).toBeFocused();
+  await expect(page.locator('[data-testid="ops-filter"]')).toBeFocused();
+  await rows.first().focus();
 
   await page.keyboard.press('Enter');
   await expect(items).toHaveCount(4);
   await page.keyboard.press('Space');
   await expect(items).toHaveCount(3);
+
+  // Right opens the detail, Left closes it; focus stays on the row.
+  await page.keyboard.press('ArrowRight');
+  await expect(items).toHaveCount(4);
+  await page.keyboard.press('ArrowLeft');
+  await expect(items).toHaveCount(3);
+  await expect(rows.first()).toBeFocused();
 
   await page.keyboard.press('Shift+F10');
   const menu = page.locator('[data-testid="context-menu"]');
@@ -370,4 +379,76 @@ test('contract: an op shows whether the user or MCP ran it', async ({ relaunch }
   const byKind = Object.fromEntries(ops.map((o, i) => [o.kind as string, i]));
   await expect(sources.nth(byKind.execute)).toHaveText('MCP');
   await expect(sources.nth(byKind.children)).toHaveText('User');
+});
+
+// P432: detail is plain code, not an editor. A two-line error shows both lines, the command is
+// highlighted through Monaco's colorizer, and the fields name the tab and path.
+test('Operations panel — detail shows highlighted command, full error and fields without an editor', async ({
+  relaunch,
+}) => {
+  const CONN = postgresConnectionSummary('conn-ops-3', 'Warehouse DB', 'blue');
+  const op = opRecord({
+    id: 'op-err',
+    connectionId: 'conn-ops-3',
+    tabId: 'tab-1',
+    status: 'error',
+    command: 'select * from missing',
+    error: 'relation "missing" does not exist\nLINE 1: select * from missing',
+  });
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONN] },
+      { channel: IPC.opsRecent, response: [op] },
+    ],
+  });
+
+  await page.click('[data-testid="toggle-operations-panel"]');
+  const row = page.locator('[data-testid="op-row"]');
+  await expect(row).toHaveCount(1);
+  await row.click();
+  const detail = page.locator('[data-testid="op-detail"]');
+  await expect(detail).toBeVisible();
+  await expect(detail.locator('.monaco-editor')).toHaveCount(0);
+  const error = detail.locator('[data-testid="op-detail-error"]');
+  await expect(error).toContainText('does not exist');
+  await expect(error).toContainText('LINE 1: select * from missing');
+  await expect(
+    detail.locator('[data-testid="op-detail-command"] span[class^="mtk"]').first(),
+  ).toBeVisible();
+  await expect(detail).toContainText('Warehouse DB');
+});
+
+// P432: the Connection facet narrows the list; a narrow dock keeps the command and drops Source.
+test('Operations panel — Connection facet filters and a narrow dock drops Source, keeps command', async ({
+  relaunch,
+}) => {
+  const A = postgresConnectionSummary('conn-f-a', 'Alpha DB', 'blue');
+  const B = postgresConnectionSummary('conn-f-b', 'Beta DB', 'green');
+  const ops = [
+    opRecord({ id: 'op-fa', connectionId: 'conn-f-a', command: 'select 1' }),
+    opRecord({ id: 'op-fb', connectionId: 'conn-f-b', command: 'select 2' }),
+  ];
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [A, B] },
+      { channel: IPC.opsRecent, response: ops },
+    ],
+  });
+
+  await page.click('[data-testid="toggle-operations-panel"]');
+  const rows = page.locator('[data-testid="op-row"]');
+  await expect(rows).toHaveCount(2);
+  await page.click('[data-testid="ops-facet"]');
+  await page.click('[data-testid="ops-facet-conn-f-b"]');
+  await page.keyboard.press('Escape');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Beta DB');
+  await page.click('[data-testid="ops-facet"]');
+  await page.click('[data-testid="ops-facet-all"]');
+  await page.keyboard.press('Escape');
+  await expect(rows).toHaveCount(2);
+
+  await page.setViewportSize({ width: 820, height: 700 });
+  await expect(rows.first()).toContainText('select');
+  await expect(page.locator('[data-testid="op-source-cell"]')).toHaveCount(0);
 });

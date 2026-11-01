@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TruncatedText from '@theme/components/TruncatedText.vue';
 import { t } from '@theme/i18n';
-import { computed, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { type StreamFilterHistoryEntry, useStreamFilterHistoryStore } from './streamFilterHistory';
@@ -22,17 +22,10 @@ function target(): { connectionId: string; path: string } | null {
   return tab?.connectionId ? { connectionId: tab.connectionId, path: tab.path } : null;
 }
 
-const entries = ref<StreamFilterHistoryEntry[]>([]);
-
-function reload(): void {
+const entries = computed<StreamFilterHistoryEntry[]>(() => {
   const dest = target();
-  entries.value = dest
-    ? streamFilterHistoryStore.listStreamFilterHistory(dest.connectionId, dest.path)
-    : [];
-}
-onMounted(reload);
-
-const savedEntries = computed<StreamFilterHistoryEntry[]>(() => entries.value);
+  return dest ? streamFilterHistoryStore.listStreamFilterHistory(dest.connectionId, dest.path) : [];
+});
 
 function summarize(entry: StreamFilterHistoryEntry): string {
   const parts: string[] = [];
@@ -56,21 +49,19 @@ function togglePin(entry: StreamFilterHistoryEntry): void {
   const dest = target();
   if (!dest) return;
   streamFilterHistoryStore.toggleStreamFilterHistoryPin(dest.connectionId, dest.path, entry.id);
-  reload();
 }
 
 function remove(entry: StreamFilterHistoryEntry): void {
   const dest = target();
   if (!dest) return;
   streamFilterHistoryStore.deleteStreamFilterHistoryEntry(dest.connectionId, dest.path, entry.id);
-  reload();
 }
 </script>
 
 <template>
   <SavedListMenu
     :title="t('studio.common.filterHistory.placeholder')"
-    :saved="savedEntries"
+    :saved="entries"
     panel-testid="stream-filter-history"
     saved-entry-testid="stream-filter-history-entry"
     :empty-saved-text="t('studio.stream.noFilterHistory.empty')"

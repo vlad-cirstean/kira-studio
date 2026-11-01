@@ -42,10 +42,12 @@ export interface OpLogStoreOptions<R extends OpLogRecord> {
   searchText?: (record: R) => string;
   /** Marks high-volume records: a separate 300-row lane, hidden until `showBackground`. */
   background?: (record: R) => boolean;
+  /** Value the facet dropdown filters on (Space: module, Studio: connection id). */
+  facet?: (record: R) => string;
 }
 
 export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptions<R>) {
-  const { control, searchText, background } = options;
+  const { control, searchText, background, facet } = options;
 
   return defineStore('opLog', () => {
     // Vue's own `reactive<T>` return type (`UnwrapNestedRefs<T>`) recomputes a structurally-equal
@@ -56,12 +58,18 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       records: [] as R[], // newest first
       filterText: '',
       statusFilter: 'all' as 'all' | 'running' | 'error',
+      // Selected facet values; empty means all.
+      facetValues: [] as string[],
+      // False until the first snapshot lands (or fails): the panel shows a loading skeleton.
+      hydrated: false,
       // Rows derived from other stores (automation runs) older than this stay hidden after Clear.
       clearedAt: 0,
     }) as {
       records: R[];
       filterText: string;
       statusFilter: 'all' | 'running' | 'error';
+      facetValues: string[];
+      hydrated: boolean;
       clearedAt: number;
     };
 
@@ -108,15 +116,15 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       // snapshot lands is buffered here (by id, so a start-then-finish pair for the same op
       // collapses to just its final state) instead of touching state.records; replayed over the
       // snapshot once it resolves, in arrival order, matching applyUpdate's own newest-first
-      // unshift for an id the snapshot never had. `hydrated` flips the handler over to applying
+      // unshift for an id the snapshot never had. `live` flips the handler over to applying
       // live from then on.
-      let hydrated = false;
+      let live = false;
       const buffered = new Map<string, R>();
       unsubscribe?.();
       unsubscribeBatch?.();
       const receive = (record: R): void => {
         const raw = markRaw(record);
-        if (!hydrated) {
+        if (!live) {
           buffered.set(raw.id, raw);
           return;
         }
@@ -139,7 +147,8 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
       }
       for (const raw of buffered.values()) applyUpdate(records, raw);
       state.records = records;
-      hydrated = true;
+      live = true;
+      state.hydrated = true;
       if (failure !== undefined) throw failure;
     }
 
@@ -148,6 +157,17 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
     function clearOps(): void {
       state.records = [];
       state.clearedAt = Date.now();
+    }
+
+    function resetFilters(): void {
+      state.filterText = '';
+      state.statusFilter = 'all';
+      state.facetValues = [];
+    }
+
+    /** True when the facet filter lets `value` through; for rows the wrapper merges in itself. */
+    function facetAllows(value: string): boolean {
+      return state.facetValues.length === 0 || state.facetValues.includes(value);
     }
 
     async function cancelOp(id: string): Promise<void> {
@@ -161,6 +181,7 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
     const visibleOps = computed<R[]>(() => {
       return state.records.filter((record) => {
         if (background?.(record) && !showBackground.value) return false;
+        if (facet && !facetAllows(facet(record))) return false;
         return opLogMatches(
           record,
           state.filterText,
@@ -176,11 +197,18 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
           .length,
     );
 
+    const backgroundCount = computed(
+      () => state.records.filter((record) => background?.(record) ?? false).length,
+    );
+
     return {
       ...toRefs(state),
       showBackground,
       hydrateOps,
       clearOps,
+      resetFilters,
+      facetAllows,
+      backgroundCount,
       cancelOp,
       visibleOps,
       runningCount,

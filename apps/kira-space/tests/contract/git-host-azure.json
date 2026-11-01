@@ -1,0 +1,163 @@
+{
+  "git:branch.changeRequestIndex#pending": {
+    "branches": [
+      {
+        "changeRequest": {
+          "baseRef": "main",
+          "checksState": "PENDING",
+          "headRef": "feature/login",
+          "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "number": 12,
+          "reviewDecision": "APPROVED",
+          "state": "open",
+          "title": "PROJ-7 Add login",
+          "updatedAt": 1777802400000,
+          "url": "https://dev.azure.com/acme/Web%20App/_git/api/pullrequest/12"
+        },
+        "name": "feature/login"
+      },
+      {
+        "changeRequest": {
+          "baseRef": "main",
+          "headRef": "release",
+          "headSha": "9999999999999999999999999999999999999999",
+          "number": 9,
+          "state": "merged",
+          "title": "Ship v1",
+          "updatedAt": 1777629600000,
+          "url": "https://dev.azure.com/acme/Web%20App/_git/api/pullrequest/9"
+        },
+        "name": "release"
+      }
+    ],
+    "complete": true,
+    "syncedAt": 0
+  },
+  "git:branch.changeRequestIndex#success": {
+    "branches": [
+      {
+        "changeRequest": {
+          "baseRef": "main",
+          "checksState": "SUCCESS",
+          "headRef": "feature/new",
+          "headSha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "number": 16,
+          "state": "open",
+          "title": "New work",
+          "updatedAt": 1777975200000,
+          "url": "https://dev.azure.com/acme/Web%20App/_git/api/pullrequest/16"
+        },
+        "name": "feature/new"
+      },
+      {
+        "changeRequest": {
+          "baseRef": "main",
+          "headRef": "feature/login",
+          "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "number": 12,
+          "reviewDecision": "APPROVED",
+          "state": "closed",
+          "title": "PROJ-7 Add login",
+          "updatedAt": 1777802400000,
+          "url": "https://dev.azure.com/acme/Web%20App/_git/api/pullrequest/12"
+        },
+        "name": "feature/login"
+      },
+      {
+        "changeRequest": {
+          "baseRef": "main",
+          "headRef": "release",
+          "headSha": "9999999999999999999999999999999999999999",
+          "number": 9,
+          "state": "merged",
+          "title": "Ship v1",
+          "updatedAt": 1777629600000,
+          "url": "https://dev.azure.com/acme/Web%20App/_git/api/pullrequest/9"
+        },
+        "name": "release"
+      }
+    ],
+    "complete": true,
+    "syncedAt": 0
+  },
+  "git:branch.resolveChangeRequest": {
+    "changeRequests": [
+      {
+        "baseRef": "main",
+        "headRef": "feature/login",
+        "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 12,
+        "reviewDecision": "APPROVED",
+        "state": "open",
+        "title": "PROJ-7 Add login",
+        "updatedAt": 1777802400000,
+        "url": "https://dev.azure.com/acme/Web%20App/_git/api/pullrequest/12"
+      }
+    ],
+    "kind": "ok"
+  },
+  "git:branch.resolveChangeRequest#unavailable": {
+    "kind": "unavailable",
+    "status": {
+      "host": "dev.azure.com",
+      "kind": "unauthenticated",
+      "path": "/fake/bin/az",
+      "reason": "Sign in with `az login`, or `az devops login --organization https://dev.azure.com/acme` with a PAT"
+    }
+  },
+  "git:changeRequest.comment": {
+    "kind": "ok"
+  },
+  "git:changeRequest.reviewState": {
+    "author": "ann@example.com",
+    "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host": {
+      "changeRequest": "Pull request",
+      "changeRequestNoun": "pull request",
+      "changeRequestShort": "PR",
+      "cli": "Azure CLI (az)",
+      "id": "azure",
+      "label": "Azure Repos"
+    },
+    "kind": "ok",
+    "localHeadSha": "cccccccccccccccccccccccccccccccccccccccc",
+    "number": 12,
+    "own": false,
+    "state": "closed",
+    "title": "PROJ-7 Add login",
+    "viewer": "me@acme.test"
+  },
+  "git:changeRequest.submitReview": {
+    "kind": "ok"
+  },
+  "git:gitHost.info": {
+    "host": {
+      "changeRequest": "Pull request",
+      "changeRequestNoun": "pull request",
+      "changeRequestShort": "PR",
+      "cli": "Azure CLI (az)",
+      "id": "azure",
+      "label": "Azure Repos"
+    }
+  },
+  "git:gitHost.providers": {
+    "providers": [
+      {
+        "changeRequest": "Pull request",
+        "changeRequestNoun": "pull request",
+        "changeRequestShort": "PR",
+        "cli": "GitHub CLI (gh)",
+        "id": "github",
+        "label": "GitHub"
+      },
+      {
+        "changeRequest": "Pull request",
+        "changeRequestNoun": "pull request",
+        "changeRequestShort": "PR",
+        "cli": "Azure CLI (az)",
+        "id": "azure",
+        "label": "Azure Repos"
+      }
+    ]
+  }
+}

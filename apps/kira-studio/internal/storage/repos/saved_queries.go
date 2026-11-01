@@ -16,6 +16,13 @@ import (
 // ErrSavedQueryNotFound is a read or patch of a saved-query id that has no row.
 var ErrSavedQueryNotFound = errors.New("repos/saved_queries: not found")
 
+// ErrSavedQueryNameTaken is a rename or save into a name another discover query of the connection holds.
+var ErrSavedQueryNameTaken = errors.New("repos/saved_queries: name taken")
+
+func isUniqueViolation(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
+}
+
 const savedQuerySelectColumns = `id, connection_id, path, name, kind, body, pinned, created_at, used_at`
 
 type SavedQueriesRepo struct {
@@ -59,6 +66,15 @@ func scanSavedQueryRow(row rowScanner) (*model.SavedQuery, error) {
 			slog.Warn("dropping saved query: body does not match console shape", "scope", "storage/saved-queries", "id", q.ID)
 			return nil, nil
 		}
+	case "discover":
+		body, err := decodeStrict[model.DiscoverBody](body)
+		if err == nil {
+			err = body.Validate()
+		}
+		if err != nil {
+			slog.Warn("dropping saved query: body does not match discover shape", "scope", "storage/saved-queries", "id", q.ID)
+			return nil, nil
+		}
 	default:
 		slog.Warn("dropping saved query: unrecognised kind", "scope", "storage/saved-queries", "id", q.ID, "kind", q.Kind)
 		return nil, nil
@@ -78,13 +94,28 @@ func decodeStrict[T any](body string) (T, error) {
 }
 
 func (r *SavedQueriesRepo) listByKind(connectionID, path, kind string) ([]model.SavedQuery, error) {
-	rows, err := r.DB.Query(
+	return r.queryRows(
 		`SELECT `+savedQuerySelectColumns+`
 		   FROM saved_queries
 		  WHERE connection_id = ? AND path = ? AND kind = ?
 		  ORDER BY pinned DESC, used_at DESC, name`,
 		connectionID, path, kind,
 	)
+}
+
+// ListDiscover lists a connection's discover queries regardless of path.
+func (r *SavedQueriesRepo) ListDiscover(connectionID string) ([]model.SavedQuery, error) {
+	return r.queryRows(
+		`SELECT `+savedQuerySelectColumns+`
+		   FROM saved_queries
+		  WHERE connection_id = ? AND kind = 'discover'
+		  ORDER BY pinned DESC, used_at DESC, name`,
+		connectionID,
+	)
+}
+
+func (r *SavedQueriesRepo) queryRows(query string, args ...any) ([]model.SavedQuery, error) {
+	rows, err := r.DB.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repos/saved_queries: query: %w", err)
 	}
@@ -126,10 +157,16 @@ func (r *SavedQueriesRepo) insert(connectionID, path, name, kind string, body []
 		 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
 		newID, connectionID, path, name, kind, string(body), now, now,
 	); err != nil {
+		if isUniqueViolation(err) {
+			return model.SavedQuery{}, fmt.Errorf("%w: %s", ErrSavedQueryNameTaken, name)
+		}
 		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: insert: %w", err)
 	}
 	return r.mustGet(newID)
 }
+
+// Get returns one saved query, ErrSavedQueryNotFound when it does not exist.
+func (r *SavedQueriesRepo) Get(queryID string) (model.SavedQuery, error) { return r.mustGet(queryID) }
 
 func (r *SavedQueriesRepo) mustGet(queryID string) (model.SavedQuery, error) {
 	row := r.DB.QueryRow(`SELECT `+savedQuerySelectColumns+` FROM saved_queries WHERE id = ?`, queryID)
@@ -174,6 +211,34 @@ func (r *SavedQueriesRepo) SaveConsole(connectionID, path, name string, body mod
 	return r.save(connectionID, path, name, "console", body, pinned)
 }
 
+// SaveDiscover stores a Discover state under a name unique within the connection.
+func (r *SavedQueriesRepo) SaveDiscover(connectionID, name string, body model.DiscoverBody, pinned bool) (model.SavedQuery, error) {
+	if err := body.Validate(); err != nil {
+		return model.SavedQuery{}, err
+	}
+	return r.save(connectionID, "", name, "discover", body.Normalized(), pinned)
+}
+
+// UpdateDiscover replaces the body of a discover query in place.
+func (r *SavedQueriesRepo) UpdateDiscover(queryID string, body model.DiscoverBody) (model.SavedQuery, error) {
+	if err := body.Validate(); err != nil {
+		return model.SavedQuery{}, err
+	}
+	encoded, err := json.Marshal(body.Normalized())
+	if err != nil {
+		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: encode discover body: %w", err)
+	}
+	res, err := r.DB.Exec(`UPDATE saved_queries SET body = ?, used_at = ? WHERE id = ? AND kind = 'discover'`,
+		string(encoded), kiratime.NowISO(), queryID)
+	if err != nil {
+		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: update body %s: %w", queryID, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return model.SavedQuery{}, fmt.Errorf("%w: %s", ErrSavedQueryNotFound, queryID)
+	}
+	return r.mustGet(queryID)
+}
+
 func (r *SavedQueriesRepo) setPinned(queryID string, pinned bool) error {
 	if _, err := r.DB.Exec(`UPDATE saved_queries SET pinned = ? WHERE id = ?`, boolToInt(pinned), queryID); err != nil {
 		return fmt.Errorf("repos/saved_queries: set pinned %s: %w", queryID, err)
@@ -189,6 +254,9 @@ func (r *SavedQueriesRepo) Update(queryID string, patch model.SavedQueryPatch) (
 			return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: %w", err)
 		}
 		if _, err := r.DB.Exec(`UPDATE saved_queries SET name = ? WHERE id = ?`, strings.TrimSpace(*patch.Name), queryID); err != nil {
+			if isUniqueViolation(err) {
+				return model.SavedQuery{}, fmt.Errorf("%w: %s", ErrSavedQueryNameTaken, strings.TrimSpace(*patch.Name))
+			}
 			return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: update name %s: %w", queryID, err)
 		}
 	}

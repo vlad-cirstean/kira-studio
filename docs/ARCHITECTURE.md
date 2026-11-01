@@ -176,6 +176,8 @@ whatever sandbox a session happens to be in),
 - C6's diff editor uses mod.editor.createDiffEditor with hideUnchangedRegions.enabled and renderSideBySide on, and renderMarginRevertIcon and renderGutterMenu off; the diff contribution was already in register.all.js, so the Monaco chunk is unchanged.
 - As of P67c, 81 basic languages get a registered Monarch grammar via the register.all.js import in packages/workbench/src/editor/monacoEntry.ts (up from 19).
 - .json/.jsonc are colored by Monaco's worker-free JSON tokenizer, not the JavaScript grammar; .vue/.svelte are colored as plain HTML because no grammar exists for either.
+- Monaco `editor.addCommand` registers its handler in the global command registry and returns no disposable, so the handler's closure outlives the editor. Use `editor.addAction` and dispose the result on unmount (MonacoHost, `useFileEdit`).
+- Call `setModel(null)` before `dispose()` on an editor whose models outlive it (Space `editors.ts` `releaseWidget`); a widget disposed with cached models attached stays reachable from them.
 - The git graph in the native workspace moved to Kira Space in v1.9 P100; apps/kira-studio/frontend/package.json no longer depends on @kira/git-ui, @kira/git-ipc, @kira/git-core or seti-icons. @kira/kira-ui was deleted in P267.
 - Database drivers are Go-native for all ten kinds as of P58e M9.3: pgx/v5 (postgres), go-sql-driver/mysql (mariadb/mysql via shared mysqlfamily core), modernc.org/sqlite (pure Go), hand-rolled net/http client (clickhouse), mongo-driver/v2, go-redis/v9, aws-sdk-go-v2 sqs/s3 (shared awscfg package), franz-go + kadm (kafka).
 - The database/adapter surface is cgo-free, but some darwin-only files use cgo for OS integrations (Kira Studio internal/secrets and internal/localauth, repo-root internal/metrics, Kira Space internal/gitclient FSEvents watcher), each behind a darwin && cgo build tag with a non-cgo companion.
@@ -349,6 +351,18 @@ whatever sandbox a session happens to be in),
 - Redis's DbConnectionSet is a mysql-family-style LRU with an 8-entry cap, keyed by db index rather than database name.
 - go-redis Protocol: 2 is pinned explicitly because the RESP3 default changes HGETALL/CONFIG GET and console generic dispatch replies from a flat array to a map.
 - The Redis console runs bounded forms only of commands that can return unbounded replies; other commands (SUNION, SINTER, SDIFF, EVAL/FCALL, module commands, GET of a huge string) are read whole by go-redis before the page cap applies.
+
+### Kibana (P424)
+
+- Talks to the Kibana HTTP API only; read-only kind. A data view is a leaf `collection` tree node; its path segment is the data view id. A connection `database` value names a Kibana space (non-default spaces prefix every route with `/s/<space>`).
+- Routes: `GET /api/status` (version; absent for low-privilege users on 9.x, then the 8.19 floor is unchecked), `GET /api/spaces/space/{id}`, `GET /api/data_views`, `GET /api/data_views/data_view/{id}`, `POST /internal/search/es`. Every request sends `kbn-xsrf`; internal routes also send `elastic-api-version: 1` and `x-elastic-internal-origin: Kibana`.
+- Auth: username plus password is Basic; blank username with a password is `Authorization: ApiKey` (encoded key); both blank sends no header. `/api/status` answers anyone, so listing data views is what proves credentials (401 and 403 map to `E_AUTH`).
+- Execute statement is one JSON `KibanaDiscoverRequest` (`dataView`, `query`, `language`, `timeRange`, `filters`, `sort`, `size`, `timeZone`), decoded with `DisallowUnknownFields`. One statement per run; `_id` and `_index` merge into each hit's document body. Results are `document` pages. Tab and operations-panel re-run send the raw JSON, never split on `;`.
+- KQL compiles to Elasticsearch query DSL in Go (`adapters/kibana/kql`). Hand-rolled: no Go KQL library exists and the Kibana parser is TypeScript under a non-OSI license. Lucene syntax goes through `query_string`.
+- Histogram interval: `auto` picks the nearest of the standard intervals that yields at most 100 and closest to 50 buckets; `1w`, `1M`, `1y` are calendar intervals. The response reports the interval used and whether it was scaled up. Value suggestions are a `terms` aggregation over the current query and time range; `Complete` is false when more distinct values exist than returned.
+- Optional `columns` on the request switches Execute to a `tabular` page: `fields` API with `_source:false`, time field first, nested values read from the nested group. Unknown or duplicate column fails the run. Empty `columns` keeps the `document` page.
+- Saved Discover queries reuse `saved_queries` with kind `discover` (path `''`, per connection). Partial unique index `saved_queries_discover_name` on `(connection_id, lower(name))` enforces one name per connection; SQLite `lower` folds ASCII only, so `É` and `é` are distinct names. Body is `model.DiscoverBody` (query, dataViewId, dataViewName, language, time, filters, columns, sort, sampleSize, interval; 256 KiB cap). A preset time stays relative. Update is last-write-wins: no version check, a second window overwrites.
+- ES|QL and saved objects are not supported. Fixture: Elasticsearch plus Kibana 9.5.3 (floor 8.19), about 1.5 GB of memory (see DEV_ENVIRONMENT.md).
 
 ### `sslmode` semantics per engine (P21 round 1)
 
@@ -706,6 +720,8 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - API client data (collections tree, saved HTTP/gRPC requests, variables, environments, active environment) are query entries with staleTime Infinity: never refetched on a timer, only invalidated.
 - Go broadcasts `kira:api:dataChanged` on every API-data mutation (`emitApiData` in bridge/apidata.go) with a batch of {kind, ...scope} changes; the boot-time listener maps each to `queryClient.invalidateQueries` so every window refetches only the changed scopes.
 - `draftMerge.ts` keeps an unsaved edit in the active window from being clobbered by the invalidation refetch.
+- The default `gcTime` is 5 minutes, so a query nobody observes for 5 minutes is dropped and its next mount reads again. `KEEP_WHILE_OPEN` (`gcTime: Infinity`, in `queryClient.ts`) is only for keys with bounded cardinality: a singleton, an app-wide list, or a per-open-tab key removed when that tab closes (gRPC schema, Discover data view and histogram, API history lists, mask rules). Input-keyed transient keys (completion, filter editors, memory search, previews, docker per id) keep the default, since `Infinity` would grow without bound.
+- Kira-owned data is `staleTime: Infinity` and invalidated by the write that changes it. `staleTime: 0` or a short `staleTime` stays only for data Kira does not own and cannot observe: the Kibana data view picker list (60 s), CLI tool and agent usage polls, docker polls, git branch and rebase previews, and the stream partition list.
 - P175 moved jar cookies (`['httpJarCookies', url]`, fed by a debounced resolved URL), history lists/snapshots (`[domain, itemId, scratchTabId]`, `[domain+'Snapshot', id]`) and gRPC schema (`['grpcSchema', 'proto'|'reflection', ...]`, mirroring Go's descriptor cacheKey) onto TanStack Query.
 - Hidden panes refresh lazily via each query's `enabled` flag (P8 D11), and Pinia stores keep UI state only.
 - Mutations must call `cancelQueries` after the bridge call and before `setQueryData`, so an in-flight list fetch cannot resurrect a deleted row.
@@ -738,7 +754,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Bind interaction behaviours from their single implementation in packages/workbench/src/behaviour/ (or the theme primitive it names); never re-implement them in app code.
 - List and tree keyboard handling uses useListNavigation; context menus use one store and renderer (state/contextMenu.ts, ContextMenu.vue), with git MenuSection[] passed through sectionsToMenuItems.
 - A danger confirm and any DialogContent destructive open focused on the data-dialog-dismiss control; confirms use confirm({ message, title?, confirmLabel, tone, run? }) over ConfirmDialogView.
-- Shared behaviour primitives: useInlineEdit/InlineEditInput for inline edit, usePersistedState (key kira.<module>.<name>) for per-device UI state, useCopy/copyText, useAsyncAction, errorText for bridge errors, behaviour/format.ts for formats, TIMING for timers, optimisticUpdate, PointPopover.
+- Shared behaviour primitives: useInlineEdit/InlineEditInput for inline edit, usePersistedState (key kira.<module>.<name>; its shared refs hold no component instance) for per-device UI state, useCopy/copyText, useAsyncAction, errorText for bridge errors, behaviour/format.ts for formats, TIMING for timers, optimisticUpdate, PointPopover.
 - Data states use QueryState over a client from createQueryClient({ remote }) with staleTime Infinity, push-invalidated; a query that must refetch on mount sets staleTime: 0.
 - Local chords use useShortcut over SHORTCUTS, which carries scope; a unit test forbids two bindings on one chord in a scope.
 - Pane and column resize uses ResizeHandle over usePaneResize (VueUse useDraggable; paneResizeMath holds clamp, direction and percent arithmetic). reka SplitterGroup is retired app-wide.
@@ -844,12 +860,13 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - The Operations dock is a full-width flex sibling below the shell's project/main row, outside any split, because nesting it as a vertical group hung the render process on a tree-row click (never root-caused).
 - WorkbenchShell.vue renders the project panel and the dock through ResizeHandle (px, clamped to [180, 480] and [100, 500]), previewing locally and emitting resize-project/resize-ops on release; project and main share one row so their heights match.
 - Project width and dock height are keyed by active module (`modes.<mode>.project.width`, `modes.<mode>.project.widthUserSet`, `modes.<mode>.operations.height`); each shell passes `layoutStore.sizesFor(modeStore.active)`. Visibility and cell editor height stay app-wide.
-- The Operations panel is shared: OpLogPanel.vue (generic over R extends OpLogRecord) in packages/workbench is the panel shell, and createOpLogStore<R>({ control, searchText? }) is the Pinia store factory.
+- The Operations panel is shared: OpLogPanel.vue (generic over R extends OpLogRecord) in packages/workbench is the panel shell, and createOpLogStore<R>({ control, searchText?, facet? }) is the Pinia store factory. It adds `hydrated`, `facetValues`/`facetAllows`, `backgroundCount` and `resetFilters`.
 - opLogRecordSchema/OpLogRecord in packages/shared/domain/ops.ts (id, startedAt, durationMs, kind as plain z.string(), status, command, error) is the base contract that consumers' own op records extend.
 - Kira Studio's OpRecord extends opLogRecordSchema with connectionId, tabId, kind: opKindSchema, rows, commandTruncated and path; it is the first consumer, and Kira Space's SpaceOpRecord is the second (P132 Part 2).
-- Kira Studio's OperationsPanel.vue wraps OpLogPanel with its own columns array, #cell/#detail slots, and a menuFor prop building a five-item context menu around Studio-only actions (reveal tab, re-run).
+- Kira Studio's OperationsPanel.vue wraps OpLogPanel with prioritised columns, `fieldsFor`, `codeLanguage` (colorize, no editor instance), a Connection facet, and a `menuFor` with Reveal tab and Re-run first.
+- OpLogPanel owns the status column, time format, column fitting (`fitColumns`, `COMMAND_MIN_PX` 240), tree order (`orderOpTree`, `parentOf`), several open details measured by TanStack Virtual through `useVirtualRows`' `virtualizer`, row actions, loading/empty/no-match states and the facet dropdown. `OpLogDetail` renders the detail.
 - OpLogPanel.vue shows a live elapsed clock (op-elapsed, m:ss) for every running row, ticked by one shared VueUse interval paused while runningCount is 0; finished rows show the formatted durationMs.
-- opLogMenuItems supplies the three generic menu items (copy-command, copy-error, cancel) in a fixed order so a consumer can destructure them.
+- opLogMenuItems supplies copy-command, copy-error, optional copy-details, a separator, then cancel; consumers find items by `id`.
 - toggleOperationsPanel/setOperationsHeight moved from Kira Studio's state/layout.ts into the shared createLayoutStore.ts core, used by both apps.
 - Automation runs show in both apps' Operations panel as a projection of `script_runs` (`automationOp`, id `run:<id>`), never rows in `op_log`. Panel retention for them is `script_runs`: newest 500 finished kept, newest 200 loaded.
 - `useAutomationOps` merges them into each app's panel list. Cancel maps to Stop (running) or Decline (waiting); the menu adds Copy for agent, Open run, Resume and Run again. A waiting run shows its state in the command cell, not the status cell, so Cancel stays reachable.
@@ -871,7 +888,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Redaction runs before anything is stored or sent: URL userinfo, secret-keyed `-c` and `--config-env` values, `--password=`-style flags, secret keys and `args` arrays in MCP arguments.
 - Session ops (category `session`: `start`, `adHoc`, `takeOver`, `restart`, `manual`, `reviewAgent`, `run`, `resume`, `rebase`, `review`, `setup`, `stop`) and in-app MCP ops (category `mcp`, `trigger mcp`) share the record shape; a running session op registers Cancel that stops the run. MCP calls, in-app and memory, are recorded by one receiving middleware (`mcpcall.Record`, fed by `agentmcp.Options.OnToolCall` and `mcpserver.Options.OnToolCall`), so no tool wraps itself; the status mapping is `oplog.FinishCall`.
 - Issue tracker ops (P417, category `tracker`): `oplog.RecordingToolRunner` decorates `jira.Runner`, one background row per acli call. Kind is the subcommand path (`version`, `auth status`, `workitem view`), source is the provider label, command is the redacted argv with `acli` first. A failure persists and folds like any background error. `gh` calls stay unrecorded.
-- The panel's steps list, `×N` repeat badge, "Via <tool>" and Copy details are Space's own; OpLogPanel only gains the `toolbar` slot, `statusNote` and `detailLines`.
+- Space supplies `stepsFor`, `parentOf`, the module facet and badges. "Via <tool>" shows only when the parent is filtered out. Copy details is shared through `opLogMenuItems`.
 - The op command is taken from argv only, so the askpass token in the environment is never recorded.
 - Cancel is registered only for fetch, pull's fetch stage and restack (CancelRemote/CancelRestack); the push family is never cancellable.
 - Each op unregisters its cancel before releasing its opSlot, and Log.Cancel calls the func under the log lock, so a late cancel never hits the next op.
@@ -1098,6 +1115,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P104 (§3) deleted ViewChrome and ViewHeader because there is no components/ui/reka counterpart for a bespoke layout container, and inlined their markup at each call site over components/ui parts and Tailwind utilities.
 - The shared view chrome look is now a convention each view's own template repeats, not a component it mounts; the logic beneath stays shared.
 - The per-tab runtime store (createRuntimeStore) owns setActionError, toggleSearchOpen and setSearchOpen, so views do not re-implement them.
+- Saved queries and filter history are cached with `staleTime: Infinity`. Go emits `kira:savedQueries:changed` ({connectionId, kind}) after each Save, SaveConsole, SaveDiscover, Update, UpdateDiscover, Delete and Touch, and `kira:filterHistory:changed` ({connectionId, path}) after each recorded filter, both with Emit; `state/savedQueriesSync.ts` invalidates the matching menu keys. The tree's saved-filters submenu still reads on right-click.
 - Studio tab views unmount on every tab switch (no keepMounted). Per-tab view UI state (filter inputs, open flags, find query and matches, unapplied filter-row drafts) lives in the view's runtime store, session-only and cleared on tab close, never in a component ref. An open find bar keeps its scan across a switch and rescans only when its page changed; closing the bar clears query and filter-rows toggle (P375).
 - views/shared/viewOp.ts's beginOp/applyLoadFailure are the one load-op preamble and load-failure tail behind every view's load() except Browse, which supersedes by loadSeq, not opId, and has no E_CANCELLED branch.
 - views/shared/page/store.ts is the one two-level page-cache implementation behind all five page modules (grid, documents, keyvalue, stream, console).
@@ -1215,7 +1233,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 
 ### Consistency conventions (P266)
 
-- Consistency conventions are enforced by guards: scripts/check-ui-primitives.sh (U72-U82), scripts/check-conventions.ts (N1-N7), internal/conventiontest (G1-G4), Biome noConsole, golangci sloglint.
+- Consistency conventions are enforced by guards: scripts/check-ui-primitives.sh (U72-U82), scripts/check-conventions.ts (N1-N7), internal/conventiontest (G1-G5), Biome noConsole, golangci sloglint.
 - Each convention guard keeps a named exemption list with a reason per entry; an entry that exempts nothing fails, so the lists only shrink.
 - The UI uses one glyph set: codicons, referenced by bare names (e.g. trash, not codicon-trash).
 - Use simple-icons for third-party brand marks and seti for file types.
@@ -1313,6 +1331,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - New timestamp columns are INTEGER unix ms named *_at; older TEXT ISO columns stay as legacy, and N7 refuses new ones.
 - Migrations are named NNNN_<phase>_<slug>.sql.
 - Files a person or another program reads must be written with renameio.WriteFile; exempt are test tooling and temp snapshots (G4).
+- G5: no CLI credential access under githost/ and issuetracker/ (see CLI credentials: never touched).
 - File naming: .vue files PascalCase; .ts files camelCase with role suffixes .worker, .check; colocated tests are <module>.spec.ts, never .test.ts (N1, N2).
 - Name helper folders lib/, never util, utils or helpers (N3).
 - Stores live in state/ and workbench composables in behaviour/; a Pinia id is the export name without use/create and Store, camelCase (N4).
@@ -1856,6 +1875,8 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - ServeGitStream in apps/kira-space/internal/bridge/gitstream.go mirrors ServeEngineStream over gitrpc.Router as an in-process Wails stream, with no handshake and no pairing token because the peer is this process's own webview.
 - packages/git-ipc/src/streamChannel.ts is a Wails-stream channel using the blob-frame body shape with no length prefix, no recvBuffer and no drain loop, because a Wails stream is already message-framed.
 - Kira Space graph view stays mounted, hidden via v-show in MainView.vue, from first activation until its tab closes or 4 more recently used kept views displace it (evicted views restore cold from view state). Opt-in by TabKindDef.keepMounted; only repo-graph sets it. A full-layout module (ADE) keeps MainView mounted and passes `suspended`, so kept views go inactive.
+- A Space file or diff editor's view state (scroll, cursor, folds) is saved on unmount and restored on the next mount, held with the tab's models in `views/repo/editors.ts` until the tab closes. A restored view state replaces the persisted `revealLine` reveal; a pending reveal request still wins.
+- `ReadFile` and `ReadDiff` take optional `ifStat` {size, hash} (SHA-256 of the bytes) and `ifHeadOid`, and answer kind `unchanged` with no content for a side that still matches. The frontend sends them only while the tab's model is unedited (Monaco version id), and skips the read for a fixed commit whose models are cached. An unchanged answer still reads and hashes the file; it skips the payload, not the disk read.
 - RepoGraphView.vue constructs a TabViewStateStore per mount; git-ui's unmount()/mount() serialize the lane layout, scroll position and loaded rows into the pinned graph tab's persisted state.viewState. Restore applies to a cold mount only (app restart, tab reopen).
 - RepoGraphView.vue drives MountHandle.setVisible from its active prop (graphVisibility.ts's GRAPH_VISIBLE_KEY). A hidden graph defers grid rebuilds and GraphViewState auto-refresh (setSuspended) to one catch-up on show. RepoGraphView pushes appearance.dateFormat and the repo head through MountHandle.update.
 - Change request ancestry is rebuilt with a base cutoff (state/changeRequests.ts rebuildAncestry): each baseRef is resolved locally via rowOfBranchTip (a decoration scan, no new RPC) and its ancestors excluded, so badges no longer tag nearly all loaded history behind a branch.
@@ -1974,9 +1995,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 
 ### Git host abstraction (P318)
 
-- internal/githost is the neutral contract. A Provider composes four roles: Remotes (ParseRemote, Claims), Auth (Status, Account), ChangeRequests (ForCommit, ForBranch, Open) and URLs (ChangeRequestURL, RepoURL, BranchURL, IsChangeRequestURL, ParseLink). Callers depend on the narrowest role.
+- internal/githost is the neutral contract. A Provider composes four roles: Remotes (ParseRemote, Claims), Auth (Status, Account; both take the Repo, since Azure signs in per organization), ChangeRequests (ForCommit, ForBranch, Open) and URLs (ChangeRequestURL, RepoURL, BranchURL, IsChangeRequestURL, ParseLink). Callers depend on the narrowest role.
 - "Change request" is the neutral name for a pull or merge request. A provider supplies Terms (label, change request, noun, short, CLI); the UI reads them from githost.Info. No neutral caller holds a provider word.
-- providers.New builds the Registry: github first, then extras. appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
+- providers.New builds the Registry: github first, then extras. appwire default is github then azure; flowharness order is github, azure, extras (`WithAzure` swaps the az runner). `githost.Status.Site` carries the account scope (Azure organization URL). appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
 - Selector.Resolve(setting, remoteURL) picks the provider. Setting kiraSpace.gitHost.provider (per repo) is auto, off or a provider id. auto picks the first provider that parses the origin remote and Claims its host. An unknown id logs a warning and falls back to auto. A pinned id that does not parse the remote resolves to none.
 - The server composes every link (changeRequest.browserUrl, ChangeRequestsResult.BranchURLs, HostLink on tasks); the renderer never builds a host URL. Only URLs a provider approves via IsChangeRequestURL open. Contract 53 drops GitHostInfo.fileReviewSync (P369). Contract 54 adds changeRequest.reviewState, changeRequest.submitReview and changeRequest.comment (P370). Contract 55 adds optional number on changeRequest.reviewState (P392).
 - git-ipc adds gitHost.info (the repo's resolved host, null for none) and gitHost.providers. Space adds GitHostService.Providers and AdeTaskService.HostProviders (phone). Contract version 50 renames the PR-named requests and fields to change request names. Contract 51 adds branch.changeRequestIndex, branch.syncChangeRequests and the changeRequestsChanged event kind.
@@ -1993,7 +2014,41 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - ADE storage: ade_tasks.host_url. Migration 0044 renames github_url, ade_gh_synced and pr_number. Migration 0050 (P369) drops ade_viewed_sync. Migration 0051 (P379) adds ade_task_statuses with 4 seeds and ade_tasks.status_id, status_by, status_step, backfilled from the entry step. Migration 0055 (P405) adds ade_task_plan.backlog. Migration 0056 (P405) folds ade_backlog rows into repo-less tasks on the Backlog shelf and drops the table. Migration 0059 (P411) drops ade_task_statuses.category, renames tone to color (16 colours) and adds ade_task_status_defaults, seeded from the first status of each old category.
 - ChangeRequestReviews (P370) is an optional role: ReviewTarget (fresh state, head and author), SubmitReview (event approve, comment or requestChanges, body, commit) and Comment (conversation). GitHub uses REST: GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments. Every field goes through `gh api -f`, never `-F` (an @-prefixed value would be read from a file). A 422 reason is GitHub's first errors[] entry.
 - BranchLinks (P383) is an optional role: ParseBranchLink (pull, tree, issue links on a claimed host; no host call), ChangeRequestHead (fresh head, author) and ChangeRequestRef (refs/pull/<n>/head on GitHub). ADE ResolveHostLink is read only; AddHostLink re-resolves, fetches one refspec (fork or closed PR: the change-request ref into <owner>/<head>; same-repo open PR: the head into its tracking ref) and attaches through the AddExistingBranch path, so kind follows the tip-author rule. Repo match walks every remote, origin first. Issue links are refused.
+- ChangeRequestDetails (P427) is an optional role: ParseChangeRequestLink (a change request link on a claimed host; no host call) and ChangeRequestDetail (one request's description, conversation, reviewers and checks). It has its own link parser because `fakehost.Forge` lacks BranchLinks and adding it there would change `BranchLinkLabels()`.
+- ChangeRequestComments (P429) is an optional write role, apart from the read and review roles: ReplyKinds (thread kinds a reply may target) and PostChangeRequestComment (body, replyTo). GitHub posts through `gh api -f` and replies to code threads with GraphQL `addPullRequestReviewThreadReply`. Azure posts through `az devops invoke`. See Comments (P429).
 - No CI status role exists. Add one as a new optional role, like ChangeRequestSync.
+
+#### Azure Repos (P423)
+
+- `githost/azure` is the `az` provider with `az devops` (extension azure-devops). Same roles as GitHub: Remotes, Auth, ChangeRequests, URLs, ChangeRequestSync, ChangeRequestReviews, BranchLinks, ChangeRequestSearch, CLISetup.
+- Repo mapping: `Repo{Host: "dev.azure.com", Owner: "<org>/<project>", Name: "<repo>"}`. Remotes parsed: `dev.azure.com`, `{org}.visualstudio.com` (optional collection segment), ssh `v3/` forms. Links parsed: PR, work item, `?version=GB<branch>`.
+- Every org-scoped call goes through one `argv()` helper: `--org <url> --detect false --only-show-errors -o json`. Env sets `AZURE_EXTENSION_USE_DYNAMIC_INSTALL=no` and `AZURE_CORE_ONLY_SHOW_ERRORS=true`. `--detect false` stops az reading the cwd git remote.
+- Discovery: tool probe (az version and extension) cached apart from the per-org probe (`az devops project list --top 1`) and the cached `az devops configure --list` defaults. TTL 5 min when ok, 30 s when not. A refresh forgets the defaults.
+- Sync: Azure gives no PR update time. `UpdatedAt` is the creation time; Page orders by id descending; Probe uses the newest PR id as etag. Page marks open rows `ChecksState=EXPECTED`, so the pending checks pass reads their policies in the same run. Checks lists active PRs and runs `az repos pr policy list` per PR (limit 4); a PR that left active is read with `pr show`; a gone PR is omitted.
+- Reviews: the body posts as a new thread through `az devops invoke` (git, pullRequestThreads, API 7.1) from a 0600 temp file, then `set-vote` (approve to approve, requestChanges to wait-for-author, comment to no vote). `ForCommit` uses the pullRequestQuery resource.
+- Azure serves no PR head ref. `ChangeRequestRef` is `refs/pull/<n>/merge`, so ADE fetches the merge ref.
+- Differs from the GitHub op log: `az` calls are not in the op log. Flows use the in-process `flowharness/fakeaz`, not the binary.
+
+#### Pull request view (P427)
+
+- Window: `HostViewService` (bridge) opens one window per change request. Key `hostview-<uuid>` (`HostWindowKeyPrefix`). Ephemeral: never restored, row dropped on close, never the last window. `main.go` purges `hostview-` rows at boot, before `Windows.List()`. `OnWindowClosing` forgets the key in `HostViewTargets`.
+- Calls: `Open(url)` resolves the link against the registry, stores the canonical URL as the target and focuses an existing window for the same request (`opened` false). `WindowTarget(windowKey)` answers the window's target, `null` for any other window. `ChangeRequest(url)` reads the detail and answers kind `ok`, `unavailable` (reason in `status`) or `gone`. A host failure is data, not an IPC error. A non-change-request link is refused as bad request.
+- Breaker: per repo (`provider|host|owner|name`). A rate limited read arms it until `ResetAt`, else 15 minutes; reads in that window answer `unavailable` without a host call.
+- GitHub: one GraphQL query through `gh api graphql`. Azure: three concurrent `az` reads: `repos pr show`, `repos pr policy list` and `az devops invoke` GET `pullRequestThreads` (newest 200 threads). Every read carries a `--query` projection, since `toolexec` caps stdout at 1 MiB.
+- Caps (`githost.DetailMax*`): 100 conversation comments, 50 reviews, 50 code threads, 30 comments per thread, 100 checks, 50 labels, 50 reviewers and 50 assignees. The newest stay; truncation flags show a note.
+- Markdown: `frontend/src/hostview/markdown.ts` (markdown-it). Raw HTML never renders: comments and tags drop and a block's text shows escaped. Images render as links. Only http, https, mailto and `#` links pass; a click opens http(s) in the OS browser through `openExternal`.
+- Frontend: `main.ts` asks for the host view target before the review target; a window with one skips workspace boot, like a review window. `App.vue` renders `HostViewWindow`. Refresh and Retry refetch; nothing refetches on focus.
+- `HostViewTarget.Kind` is `changeRequest` or `issue` (P428). `Host`, `Repo` and `Number` are set for change requests only.
+- Entry points: the ADE branch panel's PR row and the task tab's host link row offer "View". `OpenHostViewChangeRequest` is a package function for a later opener.
+
+#### Issue view (P428)
+
+- Same window, service and frontend as the PR view. Target kind `issue`: `{url, provider, tracker (terms), key}`. Identity is `issue|<provider>|<site>|<KEY>`; a bare key resolves its site through the cached tracker status, so a key and its link share one window. Title "KEY · Label".
+- `Open(urlOrKey)` takes a change request link, else an issue key or link of a tracker that implements `IssueDetails`; anything else is a bad request naming both. `OpenHostViewIssue` is the package function for a later opener (P430).
+- `Issue(ref)` answers kind `ok` (detail), `gone` (reason `notFound`) or `unavailable` (reason: unavailable, unauthenticated, otherSite, timeout, failed). A tracker failure is data, not an IPC error. No breaker: acli has no rate-limit signal and every call is bounded (10 s per acli call, 25 s per detail).
+- Every load is a fresh read. The detail drops the 60 s `Issue` cache entry and runs two acli calls at once: the `Issue` read (Development summary, PR rows) and `workitem view` with `jira.DetailFields`. A failed `Issue` read leaves the detail with `changeRequestsReason`.
+- Caps (`issuetracker.DetailMax*`): 100 comments (newest stay), 50 labels, 50 components. Comments show oldest first.
+- Frontend: `HostViewFrame.vue` holds the chrome shared by `ChangeRequestView.vue` and `IssueView.vue` (title bar, loading, failure with Retry). `IssueView` is two columns at 900 px and up, stacked below. The sidebar opens a pull request row in the PR view and the parent in its own issue view. Entry point: the task tab issue line "View issue" button.
 
 ## Agent harness (P316)
 
@@ -2036,6 +2091,8 @@ The agent CLI sits behind one interface, so a second provider needs no caller ch
   CLI double); real-claude tests (`apps/*/tests/claude`) test the Claude provider; the built-in tool
   vocabulary of scripts and the `--allowedTools` argv use Claude's tool names, which a new provider maps in
   `MCPHost.ToolArgs`; the `--color-agent` CSS token keeps Claude's colour value.
+- Stage settings (P431): `Provider.StageSettings()` declares per-workflow-stage settings (`harness.StageSetting`: key, kind `int`, min, max, i18n label and hint keys). The step's validated values reach the provider as `HeadlessSpec.Stage` and `InteractiveSpec.Stage` (`harness.StageValues`); only the provider maps them onto its CLI. `providers.StageCatalog()` is static, like `ConfigDirs`, and feeds YAML validation and the editor.
+- Claude declares `auto_compact_window` (100000 to 1000000 tokens, CLI 2.1.316) and maps it to `--autocompact <n>` in `Script` and `InteractiveCommand`, ahead of `--setting-sources`/`--add-dir`. Per process, so tools the agent runs do not inherit it. An old CLI without the flag fails the launch loudly. Measured with `claude -p --debug-file` (effective window = setting minus 20000): the flag alone gives 280000 for 300000. An exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000` wins over `--autocompact 300000` (130000). Kira does not strip the variable; see Known open items.
 - Add a provider: implement `harness.Provider` and any optional roles in `internal/harness/<id>`, add it to
   `providers.New`, and keep its CLI strings and error texts inside its package. No caller changes.
 - Test: `flows/harnessflow` `TestSecondProviderRegistered` registers `internal/flowtest/fakeprovider`
@@ -2050,6 +2107,27 @@ rewrite of the P129 agent merge queue. v1 data is not
 migrated (D5); history of the removal is migration `0011`. Phase detail: `docs/HISTORY.md (v2.0)` P143-P149
 and `docs/HISTORY.md (v2.0)`.
 
+#### Comments (P429)
+
+- Bridge: `HostViewService.PostComment`, keyed by window key. The target comes from `HostViewTargets`, never from the frontend. `ChangeRequest` and `Issue` results carry `compose` (`maxBodyBytes`, `replyKinds`), absent when the provider has no write role.
+- Text only on every host: no attachments, no drop zone, no picker, no paste handling. Kira never touches a CLI's credentials, and no driven CLI uploads a comment attachment (see CLI credentials: never touched).
+- One post at a time per window (`HostViewService.beginPost`). A timeout answers `unavailable` with a "may have been recorded" hint, so the UI warns before a retry.
+- Azure replies use `parentCommentId` 1.
+- Frontend: `hostview/CommentComposer.vue` (Markdown source in a textarea, Edit and Preview tabs). TanStack mutation with optimistic pending comment, rollback on error, invalidate on settle. Draft in session storage per window, kind and thread. HostViewWindow cancels window-level dragover and drop so a stray drop never navigates the webview.
+- Tests: `flows/githostflow/comments_test.go` (contract `host-view-comments`), `tests/ui/host-view-comments.spec.ts`.
+
+### Clipboard capture (P430)
+
+- Global hotkey (default `CmdOrCtrl+Shift+K`, user-set in Settings > Capture, on by default) opens a small popup showing the clipboard text with actions that fit it. Wails `App.GlobalShortcut` registers the chord; `App.Clipboard.Text` reads it. No new library. No Accessibility permission, no selection reading.
+- `shell.ParseChord` validates a chord (needs CmdOrCtrl, Ctrl or Alt; key A-Z, 0-9, F1-F12, Space or punctuation) and `ConflictsWithMenu` rejects menu accelerators. `shell.HotkeyBinding` owns registration: `Apply(enabled, accel, cb)` swaps it live, `ReportError` turns a later OS refusal into `failed`. States: `off`, `active`, `requested` (Wayland: the portal decides the trigger), `failed` (with reason).
+- Wails defers a pre-`Run` register; an OS rejection arrives at `Options.ErrorHandler`. main.go routes the `failed to register global shortcut` and `global shortcuts:` prefixes to `bridge.CaptureReportShortcutError`.
+- Popup: `shell.OpenPopup` opens an ephemeral window, key prefix `capture-`, frameless, centered, always on top. macOS uses a non-activating floating panel. Rows delete on close and purge at startup (`IsCaptureKey`, `CaptureForget`, `purgeCaptureWindows`). A second press while open pushes `kira:capture:item` to the same window and focuses it.
+- `bridge.CaptureService`: `WindowItem`, `Status`, `Dismiss`, `Confirm`. Classification order: change request link (`githost.Registry.ParseChangeRequestLink`), issue (key or link), text, empty. Caps: 64 KiB text, 2048 bytes for link detection, 500 bytes title. Actions: change request: open, Later; issue: open, Later; text: Later. A stale item id is refused.
+- Later is `CaptureTask` then one `UpdateTask` (notes with the full text, `hostUrl` for a recognised link, `jira` for an issue). The two calls are not atomic: a failed patch leaves the task and shows an error in the popup.
+- Settings: `capture.enabled` and `capture.hotkey` leaves (storage `settings` table, validated in `model.validateCaptureSection`). `Settings.OnChanged` calls `CaptureApply`; each state change pushes `kira:capture:status`.
+- Frontend: `capture/CaptureWindow.vue` (radio actions, title input, Enter confirms, Esc or blur dismisses), `workbench/settings/CapturePane.vue` (chord recorder from `capture/chord.ts`, status line).
+- Tests: `flows/captureflow` (fake clipboard and shortcut manager in `flowharness`; contract `capture`), `tests/ui/capture.spec.ts`, `tests/ui/settings-capture.spec.ts`.
+
 ### Issue tracker abstraction (P417)
 
 - internal/issuetracker is the neutral contract, shaped like githost. A Provider offers ID, Terms (label, CLI name, issue example), Setup, ParseRef (bare key or link), Status and Issue. Registry holds providers; providers.New registers Jira first. internal/clisetup holds the Setup and Step shape shared with githost.
@@ -2058,6 +2136,8 @@ and `docs/HISTORY.md (v2.0)`.
 - The first read per site fetches all fields except comment, attachment, worklog and description to find the Development field id; later reads ask for `summary,status,<id>`. An oversize first read falls back to `*navigable` and marks the site without a Development field for 10 min.
 - Results cache 60 s (15 s when partial or failed), coalesced per key by singleflight on a detached 20 s context, so a caller that gives up leaves the result for the next call. A ref on another site than the signed-in one returns ErrOtherSite.
 - Wire: `IssueTrackerService.TaskIssue` (title, status, status category, summary, rows, reason), `Trackers`, `Tools` (status and setup of every host and tracker CLI, `refresh` skips the status caches). A tracker failure comes back as a `reason` (unavailable, unauthenticated, notFound, otherSite, timeout, failed, noTracker; `changeRequests<Reason>` for a failed row lookup), never as an error.
+- `IssueDetails` (P428) is an optional role beside `Provider`: `IssueDetail(ctx, ref)` returns title, fields, people, labels, components, dates, parent, description, comments and the PR rows. Jira reads it with `workitem view --fields jira.DetailFields`. When acli output passes the 1 MiB cap, it re-reads without `comment` and takes the newest 50 from `workitem comment list --key K --json --limit 50 --order -created`; if that fails too, `commentsOmitted` is set. ADF becomes Markdown in Go (`jira/adf.go`), hand-rolled: no maintained Go ADF converter (checked ajbeck/adf-to-markdown, rgonek/jira-adf-converter, seflue/adf-converter) escapes text and filters link schemes, and the output must be safe for the sanitising renderer.
+- `IssueComments` (P429) is an optional write role: PostIssueComment (ref, body). Text only, no reply kinds, no attachments. Jira turns Markdown into ADF in Go (`jira/mdadf.go`, goldmark with GFM) and posts `acli jira workitem comment create --key K --body-file F` from a 0600 temp file, so the body never reaches argv or the op log. Body limit 32 KiB, write timeout 30 s.
 - Frontend: Settings section CLI tools (`CliToolsPane.vue`, install and sign-in commands with copy), `AdeTaskIssueLine.vue` in the Task tab, tracker label and gap text in `AdeArtifactList.vue` (`artifacts/gapText.ts`).
 - Tests: issuetracker/jira unit tests over hand-written acli fixtures, flows/adeflow `TestTaskIssueTracker` (contract `ade-issue-tracker`), flows/appflow `TestCliTools` (contract `space-cli-tools`), tests/ui/ade-v2-issue-tracker.spec.ts, tests/ui/settings-cli-tools.spec.ts. flowharness/fakeacli stands in for acli; the default locator finds none.
 
@@ -2141,7 +2221,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Workflows are YAML files in <home>/workflows, parsed by adeflow.Reader; no workflow is seeded (D2).
 - The workflows folder is watched with fsnotify; a broken edit keeps the last valid version and reports the line plus a message. The writer keeps key order and comments.
 - A workflow has a flat list `steps` of kind agent|script|review|manual (P293); `kind` is required and each kind allows only its own keys.
-- Allowed keys: agent: runs_on before results max_returns timeout prompt allowed_tools smart_script params sandbox; script: command runs_on before results max_returns timeout; review: review runs_on before results max_returns timeout sandbox; manual: session and, with it, prompt.
+- Allowed keys: agent: runs_on before results max_returns timeout prompt allowed_tools smart_script params sandbox settings; script: command runs_on before results max_returns timeout; review: review runs_on before results max_returns timeout sandbox settings; manual: session and, with it, prompt and settings.
 - A top-level `stages` key fails with the error "stages" is no longer supported: list every step under "steps".
 - Agent `allowed_tools` feeds the headless `--allowedTools` list.
 - Sample workflows in apps/kira-space/internal/adeflow/testdata/ import and validate in the app.
@@ -2161,6 +2241,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The editor mode is graph | yaml; the graph editor loads asynchronously so the board bundle stays free of Vue Flow.
 - Graph layout is locked (P255): top to bottom only, every node 256x104, steps and end node on one spine column, results branches fan to the side, loops dashed in a left gutter entering the target from above, native vertical scroll, no zoom or pan.
 - Workflow edits save explicitly (P196): Save and Discard, Cmd/Ctrl+S, no autosave; leaving with unsaved edits asks through ConfirmDialog. Validation stays debounced.
+- Stage settings (P431): a step's `settings:` block is keyed by agent provider id, then setting key (`settings: {claude: {auto_compact_window: 200000}}`). Allowed on agent, review and manual-with-session steps. The parser checks provider ids and keys against `providers.StageCatalog()`, so an unknown id or key fails with its line. Absent means the provider's default. The writer adds the block only when a value is set and drops it when cleared, so a file without it stays byte-identical. Wire `WorkflowStep.settings` is always a map; `WorkflowsResult.stageSettings` lists the catalog for the editor, whose step inspector (Advanced) renders one field per entry.
 - A review step (P286) has `review: {send_to: implementer|new, implementer}`, takes no prompt, tools or smart script, and `timeout` stays required.
 - On reaching a review step, startRun calls enterReview (ade/reviewstep.go): the run goes to state `review` and the step waits. Wire Run.review carries phase waiting|sent|working|stuck|done, round and note, derived from the latest round.
 - A review send is a round: its own ade_runs row (purpose='review', spec_json = model.AdeReviewSpec) run through superviseAgent with the reply_review_comment tool and implicit results.
@@ -2444,6 +2525,15 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - ade/v2/tones.ts and palette.ts are dark-only; scripts/check-ade-colours.sh (part of bun run lint) fails any other colour literal under ade/.
 - Plan board colour: status colour (16-colour palette, `--kira-status-*`) on the task status tag, red failures and amber needs-you/stale; branch tags other than red/amber render grey; task colour is the head dot and a 3px left card edge; the branch row repo badge wears the repo colour (repoTint). Plan pane ground is bg-chrome (terminal ground); cards of one day have no line between, 16px apart; weekend and day-off bands carry no tint. Task cards have a 1px border-badge edge. The task open in the panel wears a focus frame (border-focus ring-1) and aria-current; its head, branch row, span and history rows use bg-select.
 - Plan window: shows today plus 6 days (`WINDOW_DAYS` in `timeline.ts`). Work scheduled later sits in Later, in date order before unscheduled and parked items; its card meta starts with the date. No horizon setting, no add-day control. Past bands come only from history or overdue work.
+
+### Kibana Discover (P424)
+
+- A Discover tab is a console tab carrying `kibana` state (data view, language, time, filters, sort, sample size, interval); the query text is the tab's own `text`. `ConsoleTabView.vue` dispatches on connection kind: kibana opens `views/kibana/KibanaDiscoverView.vue`, everything else `ConsoleView.vue`.
+- `MonacoHost` props added for it: `monacoLanguage` (`{id, register(m)}`, registered once per id), `triggerCharacters`, `asyncCompletionSources` (abortable, may return `incomplete`), plus a `submit` emit on Enter in single-line hosts.
+- `kqlContext.ts` is a tolerant lexer that classifies the cursor as field, operator, value or conjunction. `kqlCompletion.ts` serves fields, operators and conjunctions synchronously; values come from the `kibanaSuggest` bridge call through `queryClient.fetchQuery` (30 s stale, 150 ms debounce, aborted via `opsCancel`).
+- Charts use Apache ECharts 6.1.0 with vue-echarts 8.3.2 (exact pins, Apache-2.0 and MIT, tree-shaken in `charts/echarts.ts`, SVG renderer so P426 can capture exact vector output). Declined: the shadcn-vue chart (Unovis; registry files carry a second plain `<script>` block and `@unovis/ts` pulls `three`, `maplibre-gl`, `leaflet`, `elkjs`), Chart.js (no brush range select), a hand-rolled SVG histogram (brush, ticks, tooltips, time axis).
+- Saved-query link: tab state `kibana.saved` holds `{id, name, body}`, the body as last saved. Dirty is pure over tab state (`discoverDirty`, ignores `dataViewName`), so unmounted tabs show it in the tab strip. Save with no link prompts a name; with a link it updates, and on `E_NOT_FOUND` it unlinks and saves as the old name. Duplicating a tab drops the link. Bridge: `QueriesService.ListDiscover|SaveDiscover|UpdateDiscover`; rename, pin and delete reuse `Update` and `Delete`. `form.save` binds on the view root; the Monaco query bar emits `save` itself because Monaco consumes the chord.
+
 
 ### Review code (P150)
 
@@ -2765,7 +2855,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Live logs virtualize unless Wrap is on; with Wrap on, the last 2000 filtered lines render. The log buffer cap is 20 000.
 - Docker exec uses TerminalHostView with storeId 'docker-exec'; the Terminal tab opens no session until New session is clicked.
 - Per-container CPU and RAM show in the engine overview table, the container header and a Stats view; the side list shows none.
-- Docker endpoint resolution order (endpoint.go): selected UI context, DOCKER_HOST, DOCKER_CONTEXT/currentContext (TLS contexts included), default socket, then socket probe (Desktop, Colima, OrbStack).
+- Docker endpoint resolution order (endpoint.go): selected UI context, DOCKER_HOST, DOCKER_CONTEXT, then `docker context show` (cached until the client is rebuilt; TLS contexts included), default socket, then socket probe (Desktop, Colima, OrbStack).
 - Docker streams are per window (windowKey); they end on WindowOpenerDeps.OnWindowClosing, service shutdown and quit, and run only while the module is visible. One exception: the restore tracker (P334).
 - Stats share one engine stream per container across windows.
 - ModeDef.tabStrip: false hides the tab strip.
@@ -2825,6 +2915,7 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Each connection has three independent permission modes (read, write, DDL), each allow, deny or prompt, defaulting to allow/prompt/deny (migration 0021).
 - OpClass in internal/adapters/classify.go is one of read, write, ddl or unknown.
 - Statement classification is exposed through an optional StatementClassifier interface rather than a required Adapter method, because only kinds with a console can answer it.
+- Discover-style engines implement the optional `adapters.Discoverer` interface (`Histogram`, `Suggest`; adapters/discover.go), type-asserted by the Router like `StatementClassifier`. Only kibana implements it.
 - ClassifySQL is shared by the five SQL kinds: postgres, mysql, mariadb, sqlite and clickhouse. Mongo and Redis reuse their own existing statement/command inspection.
 - Kafka, S3 and SQS implement no classifier, so calls against them resolve to unknown with no error.
 - run_query gate order (tools.go): resolve, refuse before connecting if all three modes deny, clamp maxRows, connect, classify, verdict (a deny refuses before any EXPLAIN work), forced EXPLAIN when mcp_auto_explain is on, heavy check, at most one approval, execute, render.
@@ -2946,7 +3037,24 @@ Agent-written evidence the user reviews in a dedicated window. Part 1 is storage
 - **Window UI.** `frontend/src/proof/`. Three panes like the Kira Space review window: history list, tab strip plus step body, and a change panel while an edit is pending. Pane widths persist (`kira.proof.leftWidth`, `kira.proof.rightWidth`). Server state is TanStack Query (`['proof', ...]` keys); `kira:proof:changed` invalidates all but view state. One Pinia store (`useProofWindowStore`) holds the open session, side (current/proposed/compare) and active tab.
 - **Result views reuse the console.** Each step builds a page with the console page builders (`pages.ts`) and renders `ConsoleResultGrid`; the query shows in a read-only `MonacoHost`. No separate renderer.
 - **View state.** Per step and revision: query scroll, result scroll, highlighted cell or row, expanded document ids, column widths. `ConsoleResultGrid` takes a `viewState` prop and emits `update:viewState`; `useStepViewState` seeds from the backend once, mirrors into the query cache on each change, and writes the backend after `TIMING.scrollPersist` or on unmount.
+- **Chart view (P426).** View `chart`, `data.type` bar, line, area, scatter or pie; a histogram is a bar chart and a time series a line or area chart by axis type. `proof/chart.go` validates and normalizes: time x becomes epoch ms, line and area points are sorted, every field is present, number text is kept. Caps: 20 series, 1000 categories, 50 slices, 20000 points for line and area, 1000 for bar and scatter. Each bar and scatter point is one SVG node and the screenshot capture cost grows with node count. Migration 0048 rebuilds `proof_steps` and `proof_view_state` to widen the view CHECK, children first, with foreign keys on.
+- **Chart rendering.** `ProofChart.vue` and `chartOption.ts` over `charts/echarts.ts`: SVG renderer, animation off. Selection, hidden series and zoom are built into the option, so the first `finished` event is the ready signal. The tooltip is the one HTML sink; every agent string passes `format.encodeHTML`. Line and area charts over 1000 points draw no symbols and have no point selection. Legend entries are mouse-only: ECharts has no keyboard legend.
+- **Chart view state.** `chart {hidden, selected, zoom}` is optional on `ViewState` and omitted for other views. Bounds are checked in `proof/viewstate.go`.
+- **Chart screenshot.** Inline SVG clones with the DOM; the capture filter drops `.kira-proof-chart-tooltip`. Measured in headless WebKit: 1000 scatter points 5.7-6.3 s, one line series of 1000 points with symbols 6.8 s, 20 series of 1000 points 3.5-4.1 s. 2000 scatter points took 10.6-12.6 s, so the bar and scatter cap is 1000.
 - **Screenshot.** `modern-screenshot` (`screenshot.ts`) clones the step element to a canvas; `restoreScrollPosition` makes the clone match the live scroll. `includeStyleProperties` must list painted properties only; without it a clone of a 160-row grid takes minutes in WebKit. Capture waits for every `[data-step-key]` to report `data-ready`. Default action copies a PNG to the clipboard; the dropdown saves via `ProofService.SavePng`. All tabs stack in order.
+
+## CLI credentials: never touched
+
+Kira drives gh, az and acli but never touches their credentials. It runs the CLI and reads its output (JSON or text). No token commands, no reads of CLI config or credential files, no auth headers on Kira's own HTTP.
+
+- gh: runner passes os.Environ through plus hygiene vars; never reads GH_TOKEN or GITHUB_TOKEN. `gh auth status --hostname` is parsed for the account name only.
+- az: env passthrough. `az account show --query user.name` only.
+- acli: env passthrough. `jira auth status` parsed for site and account only. Comment body goes through a 0600 temp file.
+- Setup steps are copy-only commands the user runs in their own terminal.
+- Consequence: comments carry no attachments (no driven CLI uploads one; Azure would need a bearer token).
+- Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/, and `LoadX509KeyPair`, `X509KeyPair`, `AppendCertsFromPEM` and `config.json` literals under internal/docker.
+- Non-secret reads are allowed: docker context `meta.json` (name, host, SkipTLSVerify) and stat of PEM paths. Never a CLI config file that can hold credentials (`~/.docker/config.json`): ask the CLI (`docker context show`). Key material is opened only by the owning library (`go-connections/tlsconfig`).
+- Known violation, outside G5 until fixed: `usermcp.go`. See Known open items; planned v0.2.25 P443.
 
 ## Renderer security surface
 
@@ -3184,6 +3292,22 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Studio Discover remounts still grow the renderer heap (P433).** Switching away from and back to a Kibana Discover tab adds about 0.6 MB per round after round 2 (5 rounds: 31.4, 32.3, 32.8, 33.9, 34.1 MB), and a second open/close cycle adds 1.9 MB. Close-all ends 18.5 MB over baseline, mostly first-load module code plus Monaco and KQL source strings. The Monaco `addCommand`, grammar re-registration and `usePersistedState` leaks are fixed; the rest is unattributed (V8 JIT code is the main suspect). Probe: `heap` project in Studio, `docs/DEV_ENVIRONMENT.md` "Perf probes". Find the retainer with a heap snapshot diff across rounds 3 and 5, then delete this item.
+- **Kibana search uses an internal route (P424).** `POST /internal/search/es` is not a public API; a Kibana upgrade can change its body or headers. The conformance suite runs against 9.5.3 and the 8.19 floor via `KIRA_COMPAT_IMAGE_KIBANA`.
+- **Azure Repos search covers the default project only (P423).** `SearchChangeRequests` reads 2 pages of 100 in the configured default organization and project. A PR elsewhere is not found by issue key.
+- **A reactivated Azure PR stays closed in the index (P423).** Azure has no update time, so the delta walk never revisits it. A re-backfill (account change or schema bump) fixes it.
+- **Azure serves no PR head ref (P423).** ADE fetches `refs/pull/<n>/merge` for fork and closed PRs. It is a merge preview and disappears once the PR closes.
+- **`az` calls are not in the op log (P423).** Like `gh`. Needs a host category in `oplog`.
+- **`ade.changeRequestRepo` has no Azure URL form (P423).** Title-search hits on Azure show no repo label.
+- **PR view caps its content (P427).** Comments, threads and checks past the caps show the newest, with a note. Open the request on the host for the rest.
+- **The PR view has no live update (P427).** It refreshes on demand only.
+- **Azure PR detail fixtures are hand-written (P427).** No org was reachable. Confirm `pr_detail.json`, `policy_detail.json` and `threads_get.json` against a real org.
+- **Images in PR descriptions render as links (P427).** Never inline.
+- **Azure `@<GUID>` mentions show raw (P427).** No identity lookup.
+- **Azure threads beyond the newest 200 are not read (P427).**
+- **Comments carry no attachments (P429).** Kira never touches a CLI's credentials, and none of gh, az, acli uploads a comment attachment. Add files on the host.
+- **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input is not seen live; the Azure reply assumes the first comment id is 1.
+- **Kira reads and forwards Claude MCP server headers (CLI credentials rule violation).** `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers, including `Authorization`, when listing tools, and copies the raw entries (headers and env) into the run's 0600 `--mcp-config` file. Planned v0.2.25 P443.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
@@ -3469,4 +3593,12 @@ Performance:
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
 - **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Failures: `repo-graph-refresh` scroll test 8+ of 40, `repo-graph-paging` 9 of 48 (`graph-svg` wait in `openRepo`), `repo-graph-columns` 3 of 400, `repo-workspace` 4 of 252. All pass idle (`test:ui:space`: 576 passed). Cause: CPU starvation of the whole app boot, not a test step. Delete once the boot is cheaper or the machine faster.
+- **Jira wiki-markup descriptions and comments show as literal text (P428).** A non-ADF string body is escaped plain text, not converted.
+- **Issue comments past 100, or past the newest 50 in the fallback, are not shown (P428).** The view says so and offers the tracker link.
+- **Comments over the 1 MiB acli cap even through `comment list` are omitted (P428).** The view shows a note.
+- **acli detail and comment-list fixtures are hand-written (P428).** acli does not run in the sandbox; the JSON shape follows the REST v3 issue shape.
 - **Quitting Kira Space with an unsaved file edit discards it without asking (P419).** The quit confirm is computed in Go from agents, runs and scripts and has no renderer state. Closing the last window only hides it, so the draft survives that path.
+- **A user-exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides a step's auto compact limit (P431).** Claude Code reads the env var before `--autocompact`, and Kira passes its environment through, so the step setting has no effect while the variable is set.
+- **The capture hotkey is unverified on a real macOS, Windows or Wayland desktop (P430).** Tests drive a fake shortcut manager. Chord registration, the macOS panel not stealing focus and the Wayland portal prompt need a manual run (plan checklist).
+- **The Wayland state stays `requested` (P430).** The portal does not report the trigger the user bound, so Kira cannot confirm it works.
+- **Capture reads clipboard text only (P430).** Images and files on the clipboard show the empty state.

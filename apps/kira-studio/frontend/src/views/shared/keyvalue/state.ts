@@ -29,6 +29,8 @@ import { getPage, setPage } from './page';
 interface KeyValueViewRuntime extends PagedViewRuntime {
   rowCount: number;
   prevToken: string | null;
+  /** Path the held page was read for; a remount skips the read while it still matches. */
+  loadedPath: string | null;
 }
 
 function defaultRuntime(): KeyValueViewRuntime {
@@ -36,6 +38,7 @@ function defaultRuntime(): KeyValueViewRuntime {
     ...defaultPagedRuntime(),
     rowCount: 0,
     prevToken: null,
+    loadedPath: null,
   };
 }
 
@@ -115,6 +118,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
       tabNoun: 'key/value tab',
       apply: (page) => {
         setPage(viewKey, page);
+        rt.loadedPath = host.path;
         useStaleDataStore().stamp(viewKey, host.connectionId as string);
         applyPagePosition(rt, page);
       },
@@ -180,9 +184,17 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     );
   }
 
+  /** The held page already shows `path` and is not stale, so a remount needs no read. */
+  function hasPageFor(viewKey: string, path: string): boolean {
+    return (
+      runtime[viewKey]?.loadedPath === path && getPage(viewKey) !== undefined && !isStale(viewKey)
+    );
+  }
+
   return {
     runtime,
     isStale,
+    hasPageFor,
     load,
     reload,
     runCount,

@@ -138,6 +138,80 @@ func TestBrowseReadDiff(t *testing.T) {
 		}
 	})
 
+	t.Run("ifStat and ifHeadOid skip unchanged sides", func(t *testing.T) {
+		first, err := read("src/main.go")
+		if err != nil || first.Stat == nil {
+			t.Fatalf("first read = %+v, %v, want a stat", first, err)
+		}
+		same, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: first.Stat})
+		if err != nil || same.Kind != "unchanged" || same.Text != "" {
+			t.Fatalf("matching ifStat = %+v, %v, want unchanged without text", same, err)
+		}
+
+		d, err := cw.ReadDiff(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go"})
+		if err != nil || d.Worktree.Stat == nil || d.Head.Oid == "" {
+			t.Fatalf("diff = %+v, %v, want worktree stat and head oid", d, err)
+		}
+		gated := bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: d.Worktree.Stat, IfHeadOid: d.Head.Oid}
+		g, err := cw.ReadDiff(ctx, gated)
+		if err != nil || g.Worktree.Kind != "unchanged" || g.Head.Kind != "unchanged" || g.Worktree.Text != "" || g.Head.Text != "" {
+			t.Fatalf("matching gate = %+v, %v, want both sides unchanged", g, err)
+		}
+
+		// Same size, different bytes, mtime restored: a stat-only gate would miss this.
+		abs := filepath.Join(r.Dir, "src/main.go")
+		orig, err := os.ReadFile(abs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.Stat(abs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		edited := []byte(strings.Replace(string(orig), "main", "mein", 1))
+		if err := os.WriteFile(abs, edited, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(abs, before.ModTime(), before.ModTime()); err != nil {
+			t.Fatal(err)
+		}
+		sameSize, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: first.Stat})
+		if err != nil || sameSize.Kind != "found" || !strings.Contains(sameSize.Text, "mein") {
+			t.Fatalf("same-size edit with restored mtime = %+v, %v, want found with new text", sameSize, err)
+		}
+		g, err = cw.ReadDiff(ctx, gated)
+		if err != nil || g.Worktree.Kind != "found" {
+			t.Fatalf("diff gate after same-size edit = %+v, %v, want worktree found", g, err)
+		}
+		if err := os.WriteFile(abs, orig, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(abs, before.ModTime().Add(time.Hour), before.ModTime().Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		rewritten, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: first.Stat})
+		if err != nil || rewritten.Kind != "unchanged" {
+			t.Fatalf("identical rewrite with new mtime = %+v, %v, want unchanged", rewritten, err)
+		}
+
+		r.Write("src/main.go", "package main\n\nfunc main() { println(1) }\n")
+		after, err := cw.ReadFile(ctx, bridge.CodeWorkspaceReadFileArgs{ID: rec.ID, Path: "src/main.go", IfStat: first.Stat})
+		if err != nil || after.Kind != "found" || !strings.Contains(after.Text, "println") {
+			t.Fatalf("read after write = %+v, %v, want fresh content", after, err)
+		}
+		g, err = cw.ReadDiff(ctx, gated)
+		if err != nil || g.Worktree.Kind != "found" || g.Head.Kind != "unchanged" {
+			t.Fatalf("gate after write = %+v, %v, want worktree found, head unchanged", g, err)
+		}
+
+		r.Git("add", "src/main.go")
+		r.Commit("rewrite main", nil)
+		g, err = cw.ReadDiff(ctx, gated)
+		if err != nil || g.Head.Kind != "found" || g.Head.Oid == d.Head.Oid {
+			t.Fatalf("gate after commit = %+v, %v, want a re-read head with a new oid", g, err)
+		}
+	})
+
 	t.Run("unknown and empty ids", func(t *testing.T) {
 		if _, err := cw.ListFiles(ctx, idArgs("nope")); errCode(err) != "E_NOT_FOUND" {
 			t.Fatalf("unknown id err = %v", err)

@@ -92,6 +92,7 @@ func agentStep(id string) adewire.WorkflowStep {
 		ID: id, Name: "S", Kind: adewire.KindAgent, Status: "", RunsOn: "once", Before: "auto",
 		Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "10m", Prompt: "go",
 		AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(),
+		Settings: map[string]map[string]string{},
 	}
 }
 
@@ -218,7 +219,7 @@ func TestSave_edits(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		i := stepIndex(wf, "spec")
 		wf.Steps[i] = adewire.WorkflowStep{ID: "spec", Name: "Spec", Kind: adewire.KindScript, Status: "todo", Command: "make spec",
-			RunsOn: "once", Before: "auto", Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "5m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox()}
+			RunsOn: "once", Before: "auto", Results: adewire.DefaultResults(), MaxReturns: 3, Timeout: "5m", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(), Settings: map[string]map[string]string{}}
 		out := saveOK(t, r, "standard.yaml", wf)
 		_, seg, _ := strings.Cut(out, "id: spec")
 		seg, _, _ = strings.Cut(seg, "- id:")
@@ -226,6 +227,51 @@ func TestSave_edits(t *testing.T) {
 			t.Fatalf("spec step:\n%s", seg)
 		}
 	})
+}
+
+func TestSave_settings(t *testing.T) {
+	r := newReader(t)
+	seed(t, r, "standard.yaml")
+	orig := read(t, r, "standard.yaml")
+	if strings.Contains(orig, "settings:") {
+		t.Fatal("sample already has settings")
+	}
+	base := load(t, r, "standard.yaml")
+	if out := saveOK(t, r, "standard.yaml", base); out != orig {
+		t.Fatalf("file without settings changed:\n%s", out)
+	}
+	set := func(v string) adewire.Workflow {
+		wf := load(t, r, "standard.yaml")
+		wf.Steps = slices.Clone(wf.Steps)
+		i := stepIndex(wf, "impl")
+		wf.Steps[i].Settings = map[string]map[string]string{"claude": {"auto_compact_window": v}}
+		if v == "" {
+			wf.Steps[i].Settings = map[string]map[string]string{}
+		}
+		return wf
+	}
+	if out := saveOK(t, r, "standard.yaml", set("200000")); !strings.Contains(out, "settings:\n      claude:\n        auto_compact_window: 200000\n") {
+		t.Fatalf("setting not written:\n%s", out)
+	}
+	if out := saveOK(t, r, "standard.yaml", set("300000")); !strings.Contains(out, "auto_compact_window: 300000") || strings.Contains(out, "200000") {
+		t.Fatalf("setting not changed:\n%s", out)
+	}
+	if out := saveOK(t, r, "standard.yaml", set("")); out != orig {
+		t.Fatalf("cleared settings left a trace:\n%s", out)
+	}
+	wf := set("200000")
+	saveOK(t, r, "standard.yaml", wf)
+	wf = load(t, r, "standard.yaml")
+	i := stepIndex(wf, "impl")
+	wf.Steps[i] = adewire.WorkflowStep{ID: "impl", Name: "Impl", Kind: adewire.KindScript, RunsOn: "once", Before: "auto", Results: adewire.DefaultResults(),
+		Timeout: "5m", Command: "make", AllowedTools: []string{}, Params: map[string][]string{}, Sandbox: adewire.DefaultSandbox(), Settings: map[string]map[string]string{},
+		MaxReturns: wf.Steps[i].MaxReturns}
+	if _, err := r.Save("standard.yaml", "", wf); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if out := read(t, r, "standard.yaml"); strings.Contains(out, "settings:") {
+		t.Fatalf("settings kept on a script step:\n%s", out)
+	}
 }
 
 func TestSave_refusals(t *testing.T) {

@@ -64,7 +64,7 @@ type fetched struct {
 // context detached from the caller, so a caller that gives up (a short artifact budget) leaves it
 // running and the next call finds its result in the cache.
 func (c *client) issue(ctx context.Context, ref issuetracker.Ref) (issuetracker.Issue, error) {
-	key := strings.ToLower(ref.Site) + "|" + ref.Key
+	key := cacheKey(ref)
 	if e, ok := c.cached(key); ok {
 		return e.issue, e.err
 	}
@@ -114,17 +114,35 @@ func (c *client) store(key string, iss issuetracker.Issue, err error) {
 	c.mu.Unlock()
 }
 
-func (c *client) fetch(ctx context.Context, ref issuetracker.Ref) (issuetracker.Issue, error) {
+// ready gates a read on the CLI being installed, signed in, and on the site ref names.
+func (c *client) ready(ctx context.Context, ref issuetracker.Ref) (issuetracker.Status, error) {
 	st := c.disc.status(ctx, false)
 	switch st.Kind {
 	case issuetracker.KindOK:
 	case issuetracker.KindUnauthenticated:
-		return issuetracker.Issue{}, issuetracker.ErrUnauthenticated
+		return st, issuetracker.ErrUnauthenticated
 	default:
-		return issuetracker.Issue{}, issuetracker.ErrUnavailable
+		return st, issuetracker.ErrUnavailable
 	}
 	if ref.Site != "" && st.Site != "" && !strings.EqualFold(ref.Site, st.Site) {
-		return issuetracker.Issue{}, fmt.Errorf("%w: %s is not %s", issuetracker.ErrOtherSite, ref.Site, st.Site)
+		return st, fmt.Errorf("%w: %s is not %s", issuetracker.ErrOtherSite, ref.Site, st.Site)
+	}
+	return st, nil
+}
+
+func cacheKey(ref issuetracker.Ref) string { return strings.ToLower(ref.Site) + "|" + ref.Key }
+
+// forget drops the cached result of key.
+func (c *client) forget(key string) {
+	c.mu.Lock()
+	delete(c.cache, key)
+	c.mu.Unlock()
+}
+
+func (c *client) fetch(ctx context.Context, ref issuetracker.Ref) (issuetracker.Issue, error) {
+	st, err := c.ready(ctx, ref)
+	if err != nil {
+		return issuetracker.Issue{}, err
 	}
 
 	info := c.devInfo(st.Site)
@@ -207,20 +225,25 @@ func (c *client) view(ctx context.Context, path, key, fields string) ([]byte, er
 	if err == nil {
 		return out, nil
 	}
+	return nil, classify(err, vctx, "workitem view")
+}
+
+// classify maps a failed acli run to a typed error; err itself when it matches none.
+func classify(err error, vctx context.Context, what string) error {
 	if vctx.Err() != nil {
-		return nil, fmt.Errorf("%w: acli workitem view", issuetracker.ErrTimeout)
+		return fmt.Errorf("%w: acli %s", issuetracker.ErrTimeout, what)
 	}
 	var exitErr *toolexec.ExecError
 	if errors.As(err, &exitErr) {
 		msg := strings.ToLower(exitErr.Stderr)
 		switch {
 		case containsAny(msg, "does not exist", "not exist", "not found", "404", "permission", "no issue"):
-			return nil, fmt.Errorf("%w: %s", issuetracker.ErrNotFound, exitErr.Stderr)
+			return fmt.Errorf("%w: %s", issuetracker.ErrNotFound, exitErr.Stderr)
 		case containsAny(msg, "unauthorized", "401", "not logged in", "authenticate", "log in"):
-			return nil, fmt.Errorf("%w: %s", issuetracker.ErrUnauthenticated, exitErr.Stderr)
+			return fmt.Errorf("%w: %s", issuetracker.ErrUnauthenticated, exitErr.Stderr)
 		}
 	}
-	return nil, err
+	return err
 }
 
 func containsAny(s string, subs ...string) bool {

@@ -3,7 +3,7 @@ import { control } from '../bridge/control';
 import type { SpaceOpRecord } from './opsDomain';
 
 // P415: the shared op-log store over Kira Space's persisted op log. Background reads arrive batched
-// and stay hidden until the toggle. The filter also matches repo, origin, module and subject.
+// and stay hidden until the toggle. The filter also matches repo, origin, module and subject; the facet dropdown filters by module.
 export const useOpsStore = createOpLogStore<SpaceOpRecord>({
   control: {
     recent: (limit) => control.opsRecent(limit),
@@ -12,5 +12,6 @@ export const useOpsStore = createOpLogStore<SpaceOpRecord>({
     cancel: (id) => control.opsCancel(id),
   },
   background: (r) => r.background,
+  facet: (r) => r.module,
   searchText: (r) => `${r.repoName} ${r.source} ${r.module} ${r.subject}`,
 });

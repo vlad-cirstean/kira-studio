@@ -51,7 +51,9 @@ export function useFileEdit(o: FileEditOptions) {
   });
 
   let editor: StandaloneEditor | null = null;
+  const NO_SUGGEST_ACTION = 'kira.noSuggest'; // doubles as the required label; never shown
   let contentSub: { dispose(): void } | null = null;
+  let noSuggestSub: { dispose(): void } | null = null;
   const errorMessage = ref('');
 
   const editing = computed(() => store.isEditing(o.tabId));
@@ -116,15 +118,20 @@ export function useFileEdit(o: FileEditOptions) {
   function attach(e: StandaloneEditor, mod: MonacoModule): void {
     editor = e;
     // Manual completion (Ctrl+Space, Cmd+I) would still open a "No suggestions" widget; a no-op
-    // command on the same chord shadows the built-in binding.
+    // action on the same chord shadows the built-in binding. `addAction` is disposable and editor
+    // scoped; `addCommand` is global and its handler would pin this closure forever.
     const { KeyMod, KeyCode } = mod;
-    for (const chord of [
-      KeyMod.CtrlCmd | KeyCode.Space,
-      KeyMod.WinCtrl | KeyCode.Space,
-      KeyMod.CtrlCmd | KeyCode.KeyI,
-    ]) {
-      e.addCommand(chord, () => {});
-    }
+    noSuggestSub?.dispose();
+    noSuggestSub = e.addAction({
+      id: NO_SUGGEST_ACTION,
+      label: NO_SUGGEST_ACTION,
+      keybindings: [
+        KeyMod.CtrlCmd | KeyCode.Space,
+        KeyMod.WinCtrl | KeyCode.Space,
+        KeyMod.CtrlCmd | KeyCode.KeyI,
+      ],
+      run: () => {},
+    });
     if (!store.isEditing(o.tabId)) return;
     enterOptions();
     void checkDisk();
@@ -133,6 +140,8 @@ export function useFileEdit(o: FileEditOptions) {
   function detach(): void {
     contentSub?.dispose();
     contentSub = null;
+    noSuggestSub?.dispose();
+    noSuggestSub = null;
     editor = null;
   }
 

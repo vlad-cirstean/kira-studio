@@ -5,7 +5,7 @@ import EnvironmentsTabView from '../api/EnvironmentsView.vue';
 import VariableSetTabView from '../api/VariableSetView.vue';
 import type { StudioTabKind } from '../state/tabDomain';
 import BrowseTabView from '../views/browse/BrowseView.vue';
-import ConsoleTabView from '../views/console/ConsoleView.vue';
+import ConsoleTabView from '../views/console/ConsoleTabView.vue';
 import DefinitionTabView from '../views/definition/DefinitionView.vue';
 import DocumentTabView from '../views/documents/DocumentView.vue';
 import DataTabView from '../views/grid/DataView.vue';

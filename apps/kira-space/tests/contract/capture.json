@@ -1,0 +1,85 @@
+{
+  "CaptureService.Confirm#later": {
+    "action": "later",
+    "taskId": "<masked>"
+  },
+  "CaptureService.Status#active": {
+    "accelerator": "CmdOrCtrl+Shift+K",
+    "state": "active"
+  },
+  "CaptureService.Status#failed": {
+    "accelerator": "CmdOrCtrl+Alt+J",
+    "reason": "failed to register global shortcut: held by another app",
+    "state": "failed"
+  },
+  "CaptureService.Status#off": {
+    "accelerator": "CmdOrCtrl+Alt+K",
+    "state": "off"
+  },
+  "CaptureService.Status#requested": {
+    "accelerator": "CmdOrCtrl+Shift+K",
+    "state": "requested"
+  },
+  "CaptureService.WindowItem#changeRequest": {
+    "actions": [
+      "openChangeRequest",
+      "later"
+    ],
+    "id": "<masked>",
+    "kind": "changeRequest",
+    "label": "PR #7 acme/api",
+    "text": "https://github.com/acme/api/pull/7",
+    "title": "https://github.com/acme/api/pull/7",
+    "truncated": false
+  },
+  "CaptureService.WindowItem#empty": {
+    "actions": [],
+    "id": "<masked>",
+    "kind": "empty",
+    "label": "",
+    "text": "",
+    "title": "",
+    "truncated": false
+  },
+  "CaptureService.WindowItem#issue": {
+    "actions": [
+      "openIssue",
+      "later"
+    ],
+    "id": "<masked>",
+    "kind": "issue",
+    "label": "Jira PROJ-12",
+    "text": "PROJ-12",
+    "title": "PROJ-12",
+    "truncated": false
+  },
+  "CaptureService.WindowItem#text": {
+    "actions": [
+      "later"
+    ],
+    "id": "<masked>",
+    "kind": "text",
+    "label": "",
+    "text": "Fix the export header\nsecond line with detail",
+    "title": "Fix the export header",
+    "truncated": false
+  },
+  "args:CaptureService.Confirm": {
+    "action": "openChangeRequest",
+    "itemId": "<masked>",
+    "title": "https://github.com/acme/api/pull/7",
+    "windowKey": "<masked>"
+  },
+  "event:kira:capture:item": {
+    "actions": [
+      "openChangeRequest",
+      "later"
+    ],
+    "id": "<masked>",
+    "kind": "changeRequest",
+    "label": "PR #7 acme/api",
+    "text": "https://github.com/acme/api/pull/7",
+    "title": "https://github.com/acme/api/pull/7",
+    "truncated": false
+  }
+}

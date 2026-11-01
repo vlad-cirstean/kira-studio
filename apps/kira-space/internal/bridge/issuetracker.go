@@ -55,7 +55,7 @@ func (s *IssueTrackerService) Tools(ctx context.Context, args ToolsArgs) (ToolsR
 		probes = append(probes, func() {
 			st := cs.CLIStatus(ctx, args.Refresh)
 			tools[i].Status = ToolStatus{
-				Kind: st.Kind, Path: st.Path, Version: st.Version, Account: st.Account, Reason: st.Reason, Probed: nonNil(st.Probed),
+				Kind: st.Kind, Path: st.Path, Version: st.Version, Account: st.Account, Site: st.Site, Reason: st.Reason, Probed: nonNil(st.Probed),
 			}
 		})
 	}

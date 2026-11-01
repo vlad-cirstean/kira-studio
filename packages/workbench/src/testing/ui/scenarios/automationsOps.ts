@@ -104,9 +104,9 @@ export function registerOpsScenarios(env: Env, options: Options): void {
     await expect(row).toHaveAttribute('data-status', 'error');
     await expect(row).toContainText('Automations');
     await expect(row).toContainText(failed.scriptName);
-    await ops(page).getByText('Errors', { exact: true }).click();
+    await ops(page).locator('[data-testid="ops-tab-error"]').click();
     await expect(row).toBeVisible();
-    await ops(page).getByText('Running', { exact: true }).click();
+    await ops(page).locator('[data-testid="ops-tab-running"]').click();
     await expect(row).toHaveCount(0);
   });
 

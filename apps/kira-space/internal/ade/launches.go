@@ -168,6 +168,9 @@ func (b *TaskBoard) takeOverLocked(ctx context.Context, tr *Tracker, rec *model.
 	}
 
 	pa := PrepareArgs{TaskID: rec.TaskID, BranchID: rec.BranchID, StepID: rec.StepID, Cwd: cwd}
+	if rec.StepID != "" {
+		pa.Settings = stepSettingsOf(tc, rec.StepID)
+	}
 	// Resume pins the recorded cwd, so a TUI record whose directory moved resumes by conversation id.
 	if rec.Mode == model.AdeSessionModeTUI && !moved {
 		pa.Resume = rec.ID
@@ -534,7 +537,7 @@ func (b *TaskBoard) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs)
 	if message == "" {
 		message = composeManualMessage(b.prompts(), step, taskTitle(tc.task, tc.branches), tc.task.JiraKey, tc.task.JiraURL, tc.task.Notes, lines, b.handoverFor(tc, step.ID))
 	}
-	pa := PrepareArgs{TaskID: tc.task.ID, StepID: step.ID, Cwd: cwd, Message: message}
+	pa := PrepareArgs{TaskID: tc.task.ID, StepID: step.ID, Cwd: cwd, Message: message, Settings: step.Settings}
 	if len(extra) > 0 {
 		pa.AddDirs = extra
 	}

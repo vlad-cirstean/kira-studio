@@ -193,7 +193,7 @@ func TestProofLimits(t *testing.T) {
 			"columns": []any{map[string]any{"name": "a"}}, "rows": []any{[]any{long}}}},
 		"short row": {"description": "d", "view": "table", "data": map[string]any{
 			"columns": []any{map[string]any{"name": "a"}, map[string]any{"name": "b"}}, "rows": []any{[]any{1}}}},
-		"unknown view": {"description": "d", "view": "chart", "data": map[string]any{}},
+		"unknown view": {"description": "d", "view": "heatmap", "data": map[string]any{}},
 	} {
 		args["draftId"] = d
 		if msg := f.fail(t, "proof_add_step", args); msg == "" {

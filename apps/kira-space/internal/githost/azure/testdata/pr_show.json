@@ -1,0 +1,15 @@
+{
+  "id": 12,
+  "title": "PROJ-7 Add login",
+  "status": "active",
+  "draft": false,
+  "src": "refs/heads/feature/login",
+  "dst": "refs/heads/main",
+  "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created": "2024-05-03T10:00:00Z",
+  "closed": null,
+  "author": "ann@example.com",
+  "forkRepo": null,
+  "forkProject": null,
+  "reviewers": [{ "vote": 10, "required": true }]
+}

@@ -19,6 +19,15 @@ func TestScriptSessionShapes(t *testing.T) {
 	}
 }
 
+func TestScriptStageSettings(t *testing.T) {
+	s := harness.HeadlessSpec{Bin: "claude", SessionID: "s-1", Config: harness.ConfigUser, AddDirs: []string{"/d"}, AllowedTools: []string{"Write"},
+		Stage: harness.StageValues{SettingAutoCompactWindow: "200000"}}
+	want := "exec claude -p --output-format stream-json --verbose --session-id 's-1' --autocompact '200000' --setting-sources 'user' --add-dir '/d' --allowedTools 'Write'"
+	if got := Script(s); got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+}
+
 func TestScriptSandboxWrap(t *testing.T) {
 	s := harness.HeadlessSpec{Bin: "claude", SessionID: "s-1", MCPConfigs: []string{"/c/run.mcp.json"}, Config: harness.ConfigUser,
 		Sandbox: &harness.SandboxExec{Profile: "/p/it's.sb", Unset: []string{"SSH_AUTH_SOCK"}, Env: []string{"TMPDIR=/s/tmp", "GOFLAGS=-modcacherw"}}}

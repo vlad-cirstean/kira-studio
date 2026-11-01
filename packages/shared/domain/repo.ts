@@ -35,14 +35,21 @@ export type FileListing = z.infer<typeof fileListingSchema>;
 // git-ipc/src/contract.ts) rather than inventing one, plus `missing` (a path git listed that no
 // longer exists on disk) and `language` (this app's own id — resolved from the extension
 // only, never sniffed; the binary check is the one place this phase *does* sniff bytes).
+export const fileStatSchema = /*#__PURE__*/ z.object({ size: z.number(), hash: z.string() });
+export type FileStat = z.infer<typeof fileStatSchema>;
+
 export const fileContentSchema = /*#__PURE__*/ z.object({
   kind: /*#__PURE__*/ z.enum(['found', 'binary', 'tooLarge', 'missing']),
   text: z.string(),
   bytes: z.number(),
   limitBytes: z.number(),
   language: z.string(),
+  stat: fileStatSchema.optional(),
 });
 export type FileContent = z.infer<typeof fileContentSchema>;
+
+/** A read made with `ifStat` that still matched: no text, the caller keeps what it has. */
+export type FileRead = FileContent | { kind: 'unchanged'; stat?: FileStat };
 
 // ReadFileForEdit: FileContent's classification plus the on-disk content hash a save must present,
 // and `notUtf8` for a found file whose bytes JSON cannot carry back unchanged.
@@ -106,6 +113,10 @@ export const diffSideSchema = /*#__PURE__*/ z.object({
   text: z.string(),
   bytes: z.number(),
   limitBytes: z.number(),
+  /** Worktree side only. */
+  stat: fileStatSchema.optional(),
+  /** HEAD side only: the blob id. */
+  oid: z.string().optional(),
 });
 export type DiffSide = z.infer<typeof diffSideSchema>;
 
@@ -118,6 +129,13 @@ export const diffContentSchema = /*#__PURE__*/ z.object({
   contentHash: z.string().optional(),
 });
 export type DiffContent = z.infer<typeof diffContentSchema>;
+
+/** A side the caller's `ifStat` or `ifHeadOid` still matched: no text. */
+export type DiffSideRead = DiffSide | { kind: 'unchanged'; stat?: FileStat; oid?: string };
+export type DiffRead = Omit<DiffContent, 'head' | 'worktree'> & {
+  head: DiffSideRead;
+  worktree: DiffSideRead;
+};
 
 // C7 §3.1: a repository-wide search request — Monaco's own find-widget vocabulary (case/whole-word/
 // regex), so the panel's own options read the same as the in-file find widget (D13).

@@ -33,6 +33,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filehandlers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/azure"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
 	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
@@ -58,6 +59,7 @@ type options struct {
 	clock           scriptruns.Clock
 	noGh            bool
 	issueTracker    *jira.Options
+	azure           *azure.Options
 	gitHosts        []githost.Provider
 	noClaude        bool
 	fileHandlers    filehandlers.Registry
@@ -69,6 +71,7 @@ type options struct {
 	embedSpec       *embed.Spec
 	provider        harness.Provider
 	crSync          gitsession.CRSyncConfig
+	wayland         bool
 }
 
 // Opt tweaks New.
@@ -85,7 +88,11 @@ func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
 // flow never reaches the host's real one. ChangeRequests is the harness's own.
 func WithIssueTracker(o jira.Options) Opt { return func(opts *options) { opts.issueTracker = &o } }
 
-// WithGitHost registers an extra code-host provider after GitHub.
+// WithAzure replaces the Azure Repos provider's az seams. Without it the harness finds no az, so a flow
+// never reaches the host's real one.
+func WithAzure(o azure.Options) Opt { return func(opts *options) { opts.azure = &o } }
+
+// WithGitHost registers an extra code-host provider after GitHub and Azure Repos.
 func WithGitHost(p githost.Provider) Opt {
 	return func(o *options) { o.gitHosts = append(o.gitHosts, p) }
 }
@@ -94,6 +101,10 @@ func WithGitHost(p githost.Provider) Opt {
 // timer, no run on a refs change, a 1 ns min gap and checks interval, and a short backoff, so a
 // test drives each run through branch.syncChangeRequests.
 func WithChangeRequestSync(c gitsession.CRSyncConfig) Opt { return func(o *options) { o.crSync = c } }
+
+// WithWayland makes the capture hotkey binding report a Wayland session (the portal decides the
+// trigger), whatever the process environment says.
+func WithWayland() Opt { return func(o *options) { o.wayland = true } }
 
 // WithoutClaude leaves claude off PATH entirely, system installs included.
 func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
@@ -139,6 +150,11 @@ type noGhLocator struct{}
 // noAcliLocator finds no acli anywhere.
 type noAcliLocator struct{}
 
+// noAzLocator finds no az anywhere.
+type noAzLocator struct{}
+
+func (noAzLocator) Locate() (string, []string, bool) { return "", []string{"az (on PATH)"}, false }
+
 func (noAcliLocator) Locate() (string, []string, bool) { return "", []string{"acli (on PATH)"}, false }
 
 func (noGhLocator) Locate() (string, []string, bool) { return "", []string{"gh (on PATH)"}, false }
@@ -158,6 +174,9 @@ type App struct {
 	Dialogs   *Dialogs
 	WindowMgr *WindowManager
 	KeepAwake *KeepAwakeDriver
+	// Clipboard and Shortcuts fake the capture hotkey's two OS seams.
+	Clipboard *Clipboard
+	Shortcuts *Shortcuts
 
 	db       *storage.DB
 	repos    *repos.Repos
@@ -196,7 +215,7 @@ func New(t *testing.T, opts ...Opt) *App {
 		MemoryHome: filepath.Join(root, "memory"), Work: filepath.Join(root, "work"),
 		BinDir: filepath.Join(root, "bin"), FakeDir: filepath.Join(root, "fake"),
 		Events: newEvents(), Browser: &Browser{}, Dialogs: &Dialogs{}, WindowMgr: newWindowManager(),
-		KeepAwake: &KeepAwakeDriver{},
+		KeepAwake: &KeepAwakeDriver{}, Clipboard: &Clipboard{}, Shortcuts: newShortcuts(),
 	}
 	for _, d := range []string{a.Home, a.Work, a.BinDir, a.FakeDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -331,13 +350,17 @@ func (a *App) build() {
 	if a.opts.provider != nil {
 		registry = providers.New(a.opts.provider)
 	}
+	az := azure.Options{Locator: noAzLocator{}}
+	if a.opts.azure != nil {
+		az = *a.opts.azure
+	}
 	tracker := jira.Options{Locator: noAcliLocator{}}
 	if a.opts.issueTracker != nil {
 		tracker = *a.opts.issueTracker
 	}
 	a.W = appwire.Build(appwire.Options{
 		Providers: registry, IssueTracker: tracker,
-		GitHosts: githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, BranchRequestWait: a.opts.branchWait, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
+		GitHosts: githostproviders.New(ghOptions, append([]githost.Provider{azure.New(az)}, a.opts.gitHosts...)...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, BranchRequestWait: a.opts.branchWait, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake, FileHandlers: a.opts.fileHandlers,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},
@@ -351,7 +374,10 @@ func (a *App) build() {
 			return n, nil
 		},
 	})
+	a.Shortcuts.reset()
 	a.W.BindShell(appwire.ShellHooks{
+		OpenPopup: a.WindowMgr.openPopup, Clipboard: a.Clipboard.Text, Shortcuts: a.Shortcuts,
+		Wayland:    func() bool { return a.opts.wayland },
 		OpenWindow: a.WindowMgr.OpenWindow, OpenNewWindow: a.WindowMgr.openNew, OpenNewWindowKeyed: a.WindowMgr.openKeyed,
 		CloseWindow: a.WindowMgr.CloseWindow, FocusWindow: a.WindowMgr.FocusWindow,
 		SetWindowTitle: a.WindowMgr.SetWindowTitle, AppFocused: a.WindowMgr.AppFocused,

@@ -17,6 +17,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 )
 
 // ErrInvalid marks a caller mistake: a bad file name, an invalid workflow, a YAML syntax error in
@@ -317,7 +318,7 @@ const (
 var (
 	topOrder    = []string{"id", "name", "steps"}
 	resultOrder = []string{"id", "ok", "description", "next"}
-	stepOrder   = []string{"id", "name", "kind", "status", "skip", "session", "runs_on", "before", "results", "max_returns", "timeout", "command", "smart_script", "params", "review", "sandbox", "prompt", "allowed_tools"}
+	stepOrder   = []string{"id", "name", "kind", "status", "skip", "session", "runs_on", "before", "results", "max_returns", "timeout", "command", "smart_script", "params", "review", "sandbox", "settings", "prompt", "allowed_tools"}
 )
 
 func find(m *yaml.Node, key string) (int, *yaml.Node) {
@@ -516,6 +517,11 @@ func applyStep(m *yaml.Node, s adewire.WorkflowStep) {
 		} else {
 			dropKeys(m, "prompt")
 		}
+		if s.Session {
+			applySettings(m, s.Settings)
+		} else {
+			dropKeys(m, "settings")
+		}
 		return
 	}
 	setScalar(m, "runs_on", kText, s.RunsOn, true, stepOrder)
@@ -527,9 +533,11 @@ func applyStep(m *yaml.Node, s adewire.WorkflowStep) {
 		setScalar(m, "command", kBlock, s.Command, true, stepOrder)
 	case adewire.KindReview:
 		applySandbox(m, s.Sandbox)
+		applySettings(m, s.Settings)
 		applyReview(m, defaultReview(s.Review))
 	default:
 		applySandbox(m, s.Sandbox)
+		applySettings(m, s.Settings)
 		if s.SmartScript == "" {
 			dropKeys(m, "smart_script", "params")
 			setScalar(m, "prompt", kBlock, s.Prompt, true, stepOrder)
@@ -579,6 +587,71 @@ func applySandbox(m *yaml.Node, sb adewire.StepSandbox) {
 	setScalar(sn, "network", kBool, fmt.Sprint(sb.Network), !sb.Network, order)
 	if sb.Network {
 		dropKeys(sn, "network")
+	}
+}
+
+// applySettings writes a step's settings block, or removes it when no catalog setting is set so a
+// file without one stays unchanged. Keys and agents leave in catalog order; ones no longer set are dropped.
+func applySettings(m *yaml.Node, settings map[string]map[string]string) {
+	if !anyStageSetting(settings) {
+		dropKeys(m, "settings")
+		return
+	}
+	_, sn := find(m, "settings")
+	if sn == nil || sn.Kind != yaml.MappingNode {
+		sn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		put(m, "settings", sn, stepOrder)
+	}
+	var agentOrder []string
+	for _, set := range stageCatalog {
+		agentOrder = append(agentOrder, set.ID)
+	}
+	for _, set := range stageCatalog {
+		applyProviderSettings(sn, set, settings[set.ID], agentOrder)
+	}
+}
+
+// anyStageSetting reports whether any catalog setting has a value.
+func anyStageSetting(settings map[string]map[string]string) bool {
+	for _, set := range stageCatalog {
+		for _, st := range set.Settings {
+			if settings[set.ID][st.Key] != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// applyProviderSettings writes one provider's block in sn, or drops it when none of its settings is set.
+func applyProviderSettings(sn *yaml.Node, set providers.StageSet, vals map[string]string, agentOrder []string) {
+	keyOrder := make([]string, 0, len(set.Settings))
+	for _, st := range set.Settings {
+		keyOrder = append(keyOrder, st.Key)
+	}
+	var pn *yaml.Node
+	for _, st := range set.Settings {
+		val := vals[st.Key]
+		if val == "" {
+			continue
+		}
+		if pn == nil {
+			_, pn = find(sn, set.ID)
+			if pn == nil || pn.Kind != yaml.MappingNode {
+				pn = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				put(sn, set.ID, pn, agentOrder)
+			}
+		}
+		setScalar(pn, st.Key, kInt, val, true, keyOrder)
+	}
+	if pn == nil {
+		dropKeys(sn, set.ID)
+		return
+	}
+	for _, st := range set.Settings {
+		if vals[st.Key] == "" {
+			dropKeys(pn, st.Key)
+		}
 	}
 }
 

@@ -12,7 +12,7 @@
 
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { MaskRulesChangedEvent } from '@shared/protocol/events';
-import { queryClient } from '@workbench/state/queryClient';
+import { KEEP_WHILE_OPEN, queryClient } from '@workbench/state/queryClient';
 import { control } from '../bridge/control';
 
 export function maskRulesQueryKey(connectionId: string): readonly ['maskRules', string] {
@@ -148,6 +148,10 @@ let unsubscribeConnectionsChanged: (() => void) | null = null;
  *  Privacy tab's list and the grid preview's tags all stayed stale until something unrelated
  *  happened to refetch them. */
 export function initMaskRulesSync(): void {
+  // One entry per connection plus one counts map; the connectionsChanged listener below removes a
+  // deleted connection's entry, so keeping them while unobserved stays bounded.
+  queryClient.setQueryDefaults(['maskRules'], { gcTime: KEEP_WHILE_OPEN });
+  queryClient.setQueryDefaults(maskRuleCountsQueryKey, { gcTime: KEEP_WHILE_OPEN });
   unsubscribeChanged?.();
   unsubscribeChanged = control.onMaskRulesChanged(applyRemote);
 

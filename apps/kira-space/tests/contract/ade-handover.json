@@ -221,6 +221,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",
@@ -246,6 +247,7 @@
                 "read": []
               },
               "session": true,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "in-progress",
@@ -286,6 +288,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",
@@ -311,6 +314,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",
@@ -474,6 +478,7 @@
             "read": []
           },
           "session": false,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "",
@@ -499,6 +504,7 @@
             "read": []
           },
           "session": true,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "in-progress",
@@ -539,6 +545,7 @@
             "read": []
           },
           "session": false,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "",
@@ -564,6 +571,7 @@
             "read": []
           },
           "session": false,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "",

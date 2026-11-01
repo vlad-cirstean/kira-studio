@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 28 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 31 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -27,6 +27,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/azure"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
+	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/issuetracker/jira"
@@ -77,7 +80,7 @@ type Options struct {
 	MobileDetect func() (lannet.Network, error)
 	MobileFind   func(lannet.Identity) (lannet.Network, error)
 	MobilePoll   time.Duration
-	// GitHosts are the registered code-host providers; nil means the real GitHub provider alone.
+	// GitHosts are the registered code-host providers; nil means GitHub and Azure Repos with their real CLIs.
 	GitHosts *githost.Registry
 	// IssueTracker seams the Jira provider's acli locator, runner and clock; the zero value is production's
 	// (a flow-test seam). Its ChangeRequests is set by the wiring.
@@ -119,6 +122,13 @@ type ShellHooks struct {
 	SetWindowTitle     func(key, title string)
 	// AppFocused reports whether any app window is key; nil defaults to the window registry.
 	AppFocused func() bool
+	// OpenPopup opens the capture popup window under key; Clipboard reads the system clipboard text;
+	// Shortcuts registers the capture hotkey. nil leaves capture inert.
+	OpenPopup func(key string)
+	Clipboard func() (string, bool)
+	Shortcuts shell.GlobalShortcuts
+	// Wayland overrides shell.IsWayland (a flow-test seam); nil uses the process environment.
+	Wayland func() bool
 }
 
 // Wired is the built object graph.
@@ -146,6 +156,8 @@ type Wired struct {
 
 	GitCredential   *bridge.GitCredentialService
 	GitHost         *bridge.GitHostService
+	HostView        *bridge.HostViewService
+	Capture         *bridge.CaptureService
 	IssueTracker    *bridge.IssueTrackerService
 	Link            *bridge.LinkService
 	Files           *bridge.FilesService
@@ -206,7 +218,11 @@ func Build(opts Options) *Wired {
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()
 	w.SetAppFocused(w.Windows.AnyFocused)
-	git := wireGit(repositories, opts.Locator, opts.GitHosts, opts.ChangeRequestSync)
+	hosts := opts.GitHosts
+	if hosts == nil {
+		hosts = githostproviders.New(github.Options{}, azure.New(azure.Options{}))
+	}
+	git := wireGit(repositories, opts.Locator, hosts, opts.ChangeRequestSync)
 	git.trackers = wireTrackers(repositories, git.registry.Hosts.Registry, git.opLog, opts.IssueTracker)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
@@ -256,6 +272,11 @@ func Build(opts Options) *Wired {
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
 	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
 	w.GitHost = &bridge.GitHostService{Deps: deps, Browser: opts.Browser}
+	w.HostView = &bridge.HostViewService{Deps: deps, Windows: repositories.Windows, Targets: &bridge.HostViewTargets{}, Trackers: git.trackers}
+	if opts.Clock != nil {
+		w.HostView.Now = opts.Clock.Now
+	}
+	w.Capture = &bridge.CaptureService{Deps: deps, HostView: w.HostView, Windows: repositories.Windows}
 	w.Link = &bridge.LinkService{Browser: opts.Browser}
 	w.Settings = &bridge.SettingsService{Deps: deps}
 	w.Layout = &bridge.LayoutService{Deps: deps}
@@ -318,7 +339,10 @@ func Build(opts Options) *Wired {
 		AgentCount: agentSessionCount(repositories, terminalRegistry),
 		Settings:   repositories.Settings.GetAll,
 	}
-	w.Settings.OnChanged = func(model.Settings) { bridge.KeepAwakeRecompute(w.KeepAwake) }
+	w.Settings.OnChanged = func(m model.Settings) {
+		bridge.KeepAwakeRecompute(w.KeepAwake)
+		bridge.CaptureApply(w.Capture, m.Capture)
+	}
 	// memory.db opens on the Memory module's first call.
 	embedSpec := embed.Default
 	if opts.EmbedSpec != nil {
@@ -342,6 +366,7 @@ func Build(opts Options) *Wired {
 	w.sched.Start()
 	w.IssueTracker = &bridge.IssueTrackerService{Engine: w.AdeBoard, Hosts: git.registry.Hosts.Registry, Providers: git.trackers}
 	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter, Hosts: git.registry.Hosts.Registry}
+	w.Capture.Tasks = w.AdeTask
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
 	// (P129 Part 1 §4.2 step 4).
@@ -418,8 +443,31 @@ func (w *Wired) BindShell(h ShellHooks) {
 	w.AdeTask.CloseWindow = closeWindow
 	w.AdeTask.FocusWindow = focusWindow
 	w.AdeTask.SetWindowTitle = setTitle
+	w.HostView.OpenWindow = h.OpenWindow
+	w.HostView.FocusWindow = focusWindow
+	w.HostView.SetWindowTitle = setTitle
 	w.WindowsSvc.OpenNewWindow = h.OpenNewWindow
 	w.OpenedFiles.OpenWindow = h.OpenNewWindowKeyed
+	w.bindCapture(h, closeWindow, focusWindow)
+}
+
+// bindCapture points the capture service at the shell and registers the hotkey from stored settings.
+func (w *Wired) bindCapture(h ShellHooks, closeWindow, focusWindow func(string) bool) {
+	if h.Shortcuts == nil {
+		return
+	}
+	w.Capture.OpenPopup = h.OpenPopup
+	w.Capture.Clipboard = h.Clipboard
+	w.Capture.FocusWindow = focusWindow
+	w.Capture.CloseWindow = closeWindow
+	w.Capture.Shortcuts = h.Shortcuts
+	w.Capture.Binding = shell.NewHotkeyBinding(h.Shortcuts, h.Wayland)
+	s, err := w.Repos.Settings.GetAll()
+	if err != nil {
+		slog.Warn("capture: read settings", "scope", "capture", "err", err)
+		return
+	}
+	bridge.CaptureApply(w.Capture, s.Capture)
 }
 
 // SetAppFocused swaps the any-window-focused probe; atomic because hook events read it concurrently.
@@ -437,11 +485,11 @@ func (w *Wired) reopenWindow() {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 26 bound services in registration order.
+// Bound returns the 31 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
-		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.IssueTracker), application.NewService(w.Link),
+		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.HostView), application.NewService(w.IssueTracker), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
@@ -449,7 +497,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.MemoryImport), application.NewService(w.MemoryDistill), application.NewService(w.WindowsSvc), application.NewService(w.Update),
 		application.NewService(w.AgentNotifySvc), application.NewService(w.AgentUsageSvc),
 		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc), application.NewService(w.OpenedFilesSvc),
-		application.NewService(w.FileHandlersSvc),
+		application.NewService(w.FileHandlersSvc), application.NewService(w.Capture),
 	}
 }
 

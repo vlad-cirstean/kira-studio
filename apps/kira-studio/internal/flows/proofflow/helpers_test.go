@@ -193,3 +193,84 @@ func sessionID(t *testing.T, app *flowharness.App, name string) string {
 	t.Fatalf("no session named %q in %+v", name, list)
 	return ""
 }
+
+func chartStep(desc, source string, data map[string]any) map[string]any {
+	return map[string]any{"description": desc, "view": "chart", "source": source, "data": data}
+}
+
+func lineChartStep() map[string]any {
+	step := chartStep("Errors per minute around the deploy", "elasticsearch", map[string]any{
+		"type": "line",
+		"x":    map[string]any{"type": "time", "name": "time"},
+		"y":    map[string]any{"name": "errors", "unit": "req"},
+		"series": []any{
+			map[string]any{"name": "before", "points": []any{
+				[]any{"2026-01-15T12:02:00Z", 4}, []any{"2026-01-15T12:00:00Z", 7}, []any{1768478460000, 5},
+			}},
+			map[string]any{"name": "after <b>fix</b>", "points": []any{
+				[]any{"2026-01-15T13:03:00+01:00", 1}, []any{"2026-01-15T12:04:00.500Z", nil}, []any{"2026-01-15T12:05:00Z", 0},
+			}},
+		},
+	})
+	step["language"] = "json"
+	step["query"] = `{"aggs":{"per_minute":{"date_histogram":{"field":"@timestamp","fixed_interval":"1m"}}}}`
+	return step
+}
+
+func stackedBarStep(fiveXXWeb int) map[string]any {
+	return chartStep("Responses by service", "elasticsearch", map[string]any{
+		"type": "bar", "stacked": true,
+		"x": map[string]any{"type": "category", "name": "service"},
+		"series": []any{
+			map[string]any{"name": "2xx", "points": []any{[]any{"api", 120}, []any{"web", 80}, []any{"worker", 30}}},
+			map[string]any{"name": "5xx", "points": []any{[]any{"web", fiveXXWeb}, []any{"api", 2}}},
+		},
+	})
+}
+
+func histogramStep() map[string]any {
+	return chartStep("Response time histogram", "elasticsearch", map[string]any{
+		"type": "bar",
+		"x":    map[string]any{"type": "value", "name": "ms"},
+		"series": []any{
+			map[string]any{"name": "requests", "points": []any{[]any{0, 12}, []any{50, 40}, []any{100, 22}, []any{150, 5}}},
+		},
+	})
+}
+
+func areaStep() map[string]any {
+	minute := func(i, v int) []any { return []any{1768478400000 + i*60000, v} }
+	return chartStep("Requests by region", "elasticsearch", map[string]any{
+		"type": "area", "stacked": true,
+		"x": map[string]any{"type": "time", "name": "time"},
+		"series": []any{
+			map[string]any{"name": "eu", "points": []any{minute(0, 10), minute(1, 14), minute(2, 9), minute(3, 12), minute(4, 11)}},
+			map[string]any{"name": "us", "points": []any{minute(0, 20), minute(1, 18), minute(2, 25), minute(3, 22), minute(4, 19)}},
+		},
+	})
+}
+
+func scatterStep() map[string]any {
+	return chartStep("Latency vs payload size", "elasticsearch", map[string]any{
+		"type": "scatter",
+		"x":    map[string]any{"type": "value", "name": "bytes"},
+		"y":    map[string]any{"name": "ms", "unit": "ms"},
+		"series": []any{
+			map[string]any{"name": "requests", "points": []any{
+				[]any{120, 8}, []any{340, 11}, []any{800, 15}, []any{1500, 22},
+				[]any{2400, 31}, []any{3900, 38}, []any{6100, 60}, []any{9000, 95},
+			}},
+		},
+	})
+}
+
+func pieStep() map[string]any {
+	return chartStep("Share of 5xx by endpoint", "elasticsearch", map[string]any{
+		"type": "pie", "unit": "req",
+		"slices": []any{
+			map[string]any{"name": "/checkout", "value": 5},
+			map[string]any{"name": "/login", "value": 2},
+			map[string]any{"name": "/search", "value": 1},
+		},
+	})
+}

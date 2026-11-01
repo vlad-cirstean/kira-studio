@@ -167,7 +167,9 @@ test('cancel shows only on a running cancellable row and sends its id', async ({
   await expect(rows).toHaveCount(2);
   const cancel = window.getByRole('button', { name: 'Cancel operation' });
   await expect(cancel).toHaveCount(1);
-  await expect(rows.filter({ hasText: 'push' }).getByRole('button')).toHaveCount(0);
+  await expect(
+    rows.filter({ hasText: 'push' }).getByRole('button', { name: 'Cancel operation' }),
+  ).toHaveCount(0);
 
   await cancel.click();
   await expect
@@ -220,13 +222,15 @@ test('background reads stay hidden until the toggle, and do not count as running
   const rows = window.locator('[data-testid="op-row"]');
   await expect(rows).toHaveCount(1);
 
+  const runningTab = window.locator('[data-testid="ops-tab-running"]');
   await emitWailsEvent(window, IPC.opBatch, [bare]);
   await expect(rows).toHaveCount(1);
-  await expect(window.getByText('Running: 0')).toBeVisible();
+  await expect(runningTab).toHaveText('Running');
+  await expect(window.locator('[data-testid="ops-background"]')).toContainText('Background 1');
 
   await window.locator('[data-testid="ops-background"]').click();
   await expect(rows).toHaveCount(2);
-  await expect(window.getByText('Running: 0')).toBeVisible();
+  await expect(runningTab).toHaveText('Running');
 });
 
 test('an expanded op lists its steps, with the stderr of a failed one', async ({ relaunch }) => {
@@ -253,8 +257,44 @@ test('an expanded op lists its steps, with the stderr of a failed one', async ({
   await window.locator('[data-testid="op-row"]').first().click();
   const lines = window.locator('[data-testid="op-detail-line"]');
   await expect(lines.first()).toContainText('git ');
-  await expect(lines.filter({ hasText: 'exit 1' })).toBeVisible();
-  await expect(lines.filter({ hasText: 'remote: denied' })).toBeVisible();
+  await expect(lines.filter({ hasText: 'Exit 1' })).toBeVisible();
+  await expect(window.locator('[data-testid="op-detail-stderr"]')).toHaveText('remote: denied');
+});
+
+test('an expanded failed op keeps the newlines of its error and stderr, and several rows stay open', async ({
+  relaunch,
+}) => {
+  const failing = opRecord({
+    id: 'op-multi',
+    kind: 'push',
+    status: 'error',
+    command: 'git push origin main',
+    error: 'fatal: nope\nsecond line',
+    steps: [
+      {
+        argv: 'git push origin main',
+        readOnly: false,
+        exitCode: 1,
+        durationMs: 9,
+        status: 'error',
+        stderr: 'remote: denied\nhint: check access',
+      },
+    ],
+  });
+  const { window } = await openDock(relaunch, [failing, opRecord({ id: 'op-other' })]);
+  await window.locator('[data-testid="op-row"][data-op-id="op-multi"]').click();
+  await window.locator('[data-op-id="op-other"]').click();
+  await expect(window.locator('[data-testid="op-detail"]')).toHaveCount(2);
+  await expect(window.locator('[data-testid="op-detail-error"]')).toHaveText(
+    'fatal: nope\nsecond line',
+    { useInnerText: true },
+  );
+  await expect(window.locator('[data-testid="op-detail-stderr"]')).toHaveText(
+    'remote: denied\nhint: check access',
+    { useInnerText: true },
+  );
+  await window.locator('[data-testid="op-row"][data-op-id="op-multi"]').click();
+  await expect(window.locator('[data-testid="op-detail"]')).toHaveCount(1);
 });
 
 test('Copy details and Copy error write the clipboard', async ({ relaunch }) => {
@@ -318,16 +358,89 @@ test('a running session op shows Cancel and sends its id', async ({ relaunch }) 
     .toEqual([{ channel: IPC.opsCancel, args: { opId: 'op-session' } }]);
 });
 
-test('a child op names the MCP tool that started it', async ({ relaunch }) => {
+test('contract: a child op renders under its MCP parent, indented', async ({ relaunch }) => {
   const parent = {
     ...contract<ContractJson>('space-ops-ade', 'record#mcp'),
     id: 'op-parent',
-    startedAt: NOW,
+    startedAt: '2026-01-01T00:00:00.000Z',
   };
+  const child = {
+    ...contract<ContractJson>('space-ops-ade', 'record#child'),
+    id: 'op-child',
+    parentId: 'op-parent',
+    startedAt: '2026-01-01T00:00:01.000Z',
+  };
+  const other = opRecord({ id: 'op-other', startedAt: '2025-12-31T00:00:00.000Z' });
+  const { window } = await openDock(relaunch, [child, parent, other]);
+  const rows = window.locator('[data-testid="op-row"]');
+  await expect(rows).toHaveCount(3);
+  const ids = () => rows.evaluateAll((els) => els.map((el) => el.getAttribute('data-op-id')));
+  expect(await ids()).toEqual(['op-parent', 'op-child', 'op-other']);
+  const childRow = window.locator('[data-op-id="op-child"]');
+  await expect(childRow).toHaveAttribute('data-depth', '1');
+  await expect(childRow).not.toContainText('Via');
+
+  await window.locator('[data-testid="ops-filter"]').fill('worktreeAdd');
+  await expect(rows).toHaveCount(1);
+  await expect(childRow).toHaveAttribute('data-depth', '0');
+  await expect(childRow).toContainText('Via request_branches');
+});
+
+test('status tabs, the module facet and Clear filters narrow and restore the list', async ({
+  relaunch,
+}) => {
   const { window } = await openDock(relaunch, [
-    opRecord({ id: 'op-child', kind: 'worktreeAdd', module: 'ade', parentId: 'op-parent' }),
-    parent,
+    opRecord({ id: 'op-git' }),
+    opRecord({ id: 'op-ade', module: 'ade', kind: 'worktreeAdd', source: 'Kira Space ade board' }),
+    opRecord({ id: 'op-bad', status: 'error', error: 'fatal: x', kind: 'push' }),
+    opRecord({ id: 'op-run', status: 'running', durationMs: null, kind: 'fetch' }),
   ]);
-  const child = window.locator('[data-op-id="op-child"]');
-  await expect(child).toContainText('Via request_branches');
+  const rows = window.locator('[data-testid="op-row"]');
+  await expect(rows).toHaveCount(4);
+  await expect(window.locator('[data-testid="ops-tab-running"]')).toContainText('1');
+
+  await window.locator('[data-testid="ops-tab-error"]').click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute('data-op-id', 'op-bad');
+  await window.locator('[data-testid="ops-tab-all"]').click();
+  await expect(rows).toHaveCount(4);
+
+  await window.locator('[data-testid="ops-facet"]').click();
+  await window.locator('[data-testid="ops-facet-ade"]').click();
+  await window.keyboard.press('Escape');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute('data-op-id', 'op-ade');
+  await expect(window.locator('[data-testid="ops-facet-count"]')).toHaveText('1');
+
+  await window.locator('[data-testid="ops-filter"]').fill('no such command');
+  await expect(window.locator('[data-testid="ops-no-match"]')).toBeVisible();
+  await window.locator('[data-testid="ops-clear-filters"]').click();
+  await expect(rows).toHaveCount(4);
+  await expect(window.locator('[data-testid="ops-filter"]')).toHaveValue('');
+});
+
+test('hovering a row shows Copy command, which writes the clipboard', async ({ relaunch }) => {
+  const { window } = await openDock(relaunch, [opRecord({ id: 'op-copy' })]);
+  await window.evaluate(() => {
+    const w = window as unknown as { __clipboard: string[] };
+    w.__clipboard = [];
+    navigator.clipboard.writeText = async (text: string) => {
+      w.__clipboard.push(text);
+    };
+  });
+  const row = window.locator('[data-testid="op-row"]').first();
+  await row.hover();
+  await row.locator('[data-testid="op-copy"]').click();
+  await expect
+    .poll(() => window.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard))
+    .toEqual(['git branch feat main']);
+});
+
+test('a narrow window drops low-priority columns and keeps the command', async ({ relaunch }) => {
+  const { window } = await openDock(relaunch, [opRecord({ id: 'op-narrow' })]);
+  await window.setViewportSize({ width: 820, height: 700 });
+  const dock = window.locator('[data-testid="operations-panel"]');
+  await expect(dock.getByText('Command', { exact: true })).toBeVisible();
+  await expect(dock.getByText('Kind', { exact: true })).toHaveCount(0);
+  await expect(window.locator('[data-testid="op-row"]')).toContainText('git branch feat main');
 });

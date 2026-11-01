@@ -74,6 +74,11 @@ duplicated here; this file only points at them.
   end, with fixes landing as follow-up commits. Commits still land incrementally as work completes,
   for legible history — only *when* the expensive verification happens changes, not whether the
   result must be correct or commits stay granular.
+- **One full run of an expensive suite per phase, then targeted reruns only.** Run the full
+  end-to-end/UI suite once, near phase end. After a fix, rerun only the failing specs and the specs
+  that share its code, never the whole suite again. A timeout under load gets a lone rerun of that
+  spec first. Rerun the full suite a second time only when a fix touched shared code (a package, a
+  fixture, a config) that targeted reruns cannot cover; say so in the Result.
 - **The loop per phase:** check for a plan, spawn an Opus subagent to write one if missing, spawn
   a Sonnet subagent (or several, only if genuinely parallelizable) to implement the whole phase, and
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
@@ -228,6 +233,12 @@ duplicated here; this file only points at them.
   at the package level *and* for the specific feature used, not just the headline badge (AG Grid
   Community's own license is fine; the context menu/range selection/clipboard features this app
   needed are Enterprise-only, so declined). Applies to every new dependency.
+- **Never touch a credential a driven CLI owns** (gh, az, acli, …): no token commands, no key or
+  token reads, no auth headers. Run the CLI, read its output. Reading non-secret config (host,
+  docker context `meta.json`) is fine. Key or token material may be read only by the CLI's own
+  library, never Kira code. Rule and facts in `docs/ARCHITECTURE.md` "CLI credentials: never
+  touched". Guard G5 enforces it under `githost/`, `issuetracker/` and `internal/docker`. Known violation, tracked
+  in ARCHITECTURE "Known open items" and v0.2.25 P443: `usermcp.go` (claude MCP headers).
 - **Measure when there's a real, concrete question at stake, not as a default ritual.** A
   real-hardware trace, CDP tracing, or a byte-for-byte bundle comparison earns its keep when a
   claimed fix, regression, or cost genuinely can't be checked another way. Don't extend that rigor

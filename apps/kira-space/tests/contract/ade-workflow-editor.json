@@ -44,6 +44,7 @@
             "read": []
           },
           "session": false,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "",
@@ -87,6 +88,7 @@
             "read": []
           },
           "session": false,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "",
@@ -127,6 +129,7 @@
             "read": []
           },
           "session": false,
+          "settings": {},
           "skip": false,
           "smartScript": "",
           "status": "",
@@ -149,6 +152,18 @@
       "enforced": false,
       "reason": "The sandbox is not enforced on this OS. It runs on macOS only. Claude permission rules still apply, but they do not stop shell commands."
     },
+    "stageSettings": [
+      {
+        "hint": "Tokens of context before Claude Code compacts the conversation, 100000 to 1000000. Empty uses Claude Code’s default.",
+        "key": "auto_compact_window",
+        "kind": "int",
+        "label": "Auto compact limit",
+        "max": 1000000,
+        "min": 100000,
+        "provider": "claude",
+        "providerLabel": "Claude"
+      }
+    ],
     "workflows": [
       {
         "error": null,
@@ -195,6 +210,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",
@@ -235,6 +251,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",
@@ -278,6 +295,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",
@@ -318,6 +336,7 @@
                 "read": []
               },
               "session": false,
+              "settings": {},
               "skip": false,
               "smartScript": "",
               "status": "",

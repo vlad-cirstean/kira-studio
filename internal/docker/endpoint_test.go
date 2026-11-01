@@ -11,7 +11,13 @@ type fixture struct {
 	t    *testing.T
 	home string
 	env  map[string]string
+	cur  string
 }
+
+type fixedContext struct{ v *string }
+
+func (c fixedContext) name() string { return *c.v }
+func (fixedContext) forget()        {}
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
@@ -19,7 +25,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) resolveEnv() resolveEnv {
-	return resolveEnv{Getenv: func(k string) string { return f.env[k] }, Home: f.home, Stat: os.Stat}
+	return resolveEnv{Getenv: func(k string) string { return f.env[k] }, Home: f.home, Stat: os.Stat, Current: fixedContext{&f.cur}}
 }
 
 func (f *fixture) write(path string, data []byte) {
@@ -42,7 +48,7 @@ func (f *fixture) context(name, host string, skipVerify bool) {
 }
 
 func (f *fixture) current(name string) {
-	f.write(filepath.Join(f.home, ".docker", "config.json"), []byte(`{"currentContext":"`+name+`"}`))
+	f.cur = name
 }
 
 func TestResolveEndpointPrecedence(t *testing.T) {
@@ -60,8 +66,8 @@ func TestResolveEndpointPrecedence(t *testing.T) {
 	}{
 		{"selected beats everything", map[string]string{"DOCKER_HOST": "unix:///env.sock", "DOCKER_CONTEXT": "colima"}, "other", "unix:///other.sock", sourceSelected},
 		{"DOCKER_HOST beats contexts", map[string]string{"DOCKER_HOST": "unix:///env.sock", "DOCKER_CONTEXT": "other"}, "", "unix:///env.sock", sourceEnv},
-		{"DOCKER_CONTEXT beats config", map[string]string{"DOCKER_CONTEXT": "other"}, "", "unix:///other.sock", sourceContext},
-		{"currentContext", nil, "", "unix:///colima.sock", sourceContext},
+		{"DOCKER_CONTEXT beats CLI context", map[string]string{"DOCKER_CONTEXT": "other"}, "", "unix:///other.sock", sourceContext},
+		{"CLI current context", nil, "", "unix:///colima.sock", sourceContext},
 		{"selected default skips currentContext", nil, defaultContext, defaultSocket, sourceSelected},
 	}
 	for _, tc := range tests {

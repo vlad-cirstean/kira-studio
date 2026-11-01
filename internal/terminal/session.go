@@ -211,8 +211,9 @@ func (s *Session) readLoop() {
 		s.onEnd(code, cause)
 	}
 	s.onExit(code, waitErr)
-	close(s.done)
+	// Unregister before done: closeFor returns on done, and callers then expect the session gone.
 	s.unregister()
+	close(s.done)
 }
 
 // waitExitCode calls cmd.Wait() exactly once (the session's waiter goroutine — see readLoop) and

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { FileStat } from '@shared/domain/repo';
 import EmptyState from '@theme/components/EmptyState.vue';
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
@@ -12,8 +13,8 @@ import type { RepoFileTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { attachDistillSelection } from './distillSelection';
-import { registerEditor, unmountEditor } from './editors';
-import { loadFileContent } from './fileContent';
+import { knownRead, registerEditor, rememberRead, unmountEditor } from './editors';
+import { FULL_COMMIT_ID, loadFileContent } from './fileContent';
 import { loadMonaco, peekModel, repoFileUri, repoRevisionFileUri } from './monaco';
 import RepoFileEditBar from './RepoFileEditBar.vue';
 import { consumeReveal } from './reveal';
@@ -82,6 +83,37 @@ let disposeCursorSub: (() => void) | null = null;
 let disposeDistill: (() => void) | null = null;
 const inlineBlame = useInlineBlame();
 
+type ResolvedText = { text: string; stat?: FileStat } | { state: ViewState; message?: string };
+
+// The tab's text: the model's draft mid-edit, the model itself for a fixed commit, otherwise a read
+// that the backend skips while the file still matches what the model holds.
+async function resolveText(
+  repoId: string,
+  rev: string | null,
+  cachedModel: ReturnType<typeof peekModel>,
+): Promise<ResolvedText> {
+  // Back from a tab switch mid-edit: the cached model holds the draft, so skip the read that would
+  // overwrite it with the disk text.
+  const draft = fileEdit.isEditing(props.tab.id) ? cachedModel : undefined;
+  if (draft) return { text: draft.getValue() };
+  fileEdit.end(props.tab.id);
+  // A commit's content never changes: the model from the last mount is current.
+  if (cachedModel && rev !== null && FULL_COMMIT_ID.test(rev))
+    return { text: cachedModel.getValue() };
+  const known = cachedModel ? knownRead(props.tab.id, [cachedModel.getVersionId()]) : null;
+  const result = await loadFileContent(
+    repoId,
+    props.tab.path,
+    rev,
+    cachedModel && known?.stat
+      ? { stat: known.stat, text: () => cachedModel.getValue() }
+      : undefined,
+  );
+  if (result.kind === 'error') return { state: 'error', message: result.message };
+  if (result.kind !== 'found') return { state: result.kind };
+  return { text: result.text, stat: result.stat };
+}
+
 async function mount(): Promise<void> {
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
@@ -91,42 +123,30 @@ async function mount(): Promise<void> {
   }
 
   const rev = props.tab.state.rev;
-  // Back from a tab switch mid-edit: the cached model holds the draft, so skip the read that would
-  // overwrite it with the disk text.
-  const draft = fileEdit.isEditing(props.tab.id)
-    ? peekModel(repoFileUri(await loadMonaco(), repoId, props.tab.path))
-    : undefined;
-  if (!draft) fileEdit.end(props.tab.id);
-  let text: string;
-  if (draft) {
-    text = draft.getValue();
-  } else {
-    const result = await loadFileContent(repoId, props.tab.path, rev);
-    if (result.kind === 'error') {
-      state.value = 'error';
-      errorMessage.value = result.message;
-      return;
-    }
-    if (result.kind !== 'found') {
-      state.value = result.kind;
-      return;
-    }
-    text = result.text;
-  }
-  // D11: held on a ref (not only handed to the model) so the reading view can render it too.
-  viewer.setText(text);
-
   const mod = await loadMonaco();
-  // Unmounted (tab closed/switched away) while the read/import above was in flight.
-  if (!container.value) return;
-
   const uri =
     rev === null
       ? repoFileUri(mod, repoId, props.tab.path)
       : repoRevisionFileUri(mod, repoId, props.tab.path, rev);
+  const cachedModel = peekModel(uri);
+  const loaded = await resolveText(repoId, rev, cachedModel);
+  if ('state' in loaded) {
+    state.value = loaded.state;
+    errorMessage.value = loaded.message ?? '';
+    return;
+  }
+  const { text, stat } = loaded;
+  // D11: held on a ref (not only handed to the model) so the reading view can render it too.
+  viewer.setText(text);
+
+  // Unmounted (tab closed/switched away) while the read/import above was in flight.
+  if (!container.value) return;
+
   const editor = viewer.createEditor(mod, uri, text);
   if (!editor) return;
-  registerEditor(props.tab.id, uri, editor);
+  const restored = registerEditor(props.tab.id, uri, editor);
+  const model = peekModel(uri);
+  if (model && stat) rememberRead(props.tab.id, { stat, versionIds: [model.getVersionId()] });
   edit.attach(editor, mod);
   disposeDistill = attachDistillSelection(editor, props.tab.path);
 
@@ -166,7 +186,7 @@ async function mount(): Promise<void> {
       editor.setSelection(range);
       editor.revealRangeInCenter(range);
     }
-  } else {
+  } else if (!restored) {
     const revealLine = props.tab.state.revealLine;
     if (revealLine !== null) {
       editor.revealLineInCenter(revealLine);

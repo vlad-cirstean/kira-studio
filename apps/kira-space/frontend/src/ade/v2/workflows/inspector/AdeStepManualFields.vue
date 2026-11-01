@@ -19,7 +19,7 @@ const id = (k: string): string => `ade-wf-step-${k}-${props.step.id}`;
       :id="id('session')"
       :model-value="step.session"
       data-testid="ade-wf-step-session"
-      @update:model-value="(v) => emit('patch', { session: v === true, prompt: v === true ? step.prompt : '' })"
+      @update:model-value="(v) => emit('patch', { session: v === true, prompt: v === true ? step.prompt : '', settings: v === true ? step.settings : {} })"
     />
     <Label :for="id('session')" class="text-kira-sm">{{
       t('space.ade.workflows.stepInspector.session.label')

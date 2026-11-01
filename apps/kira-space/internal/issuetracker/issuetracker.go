@@ -17,14 +17,15 @@ type Ref struct {
 	Site     string `json:"site"` // host of a pasted URL; '' for a bare key
 }
 
-// ChangeRequest is a pull or merge request associated with an issue.
+// ChangeRequest is a pull or merge request associated with an issue. It reaches the wire inside
+// IssueDetail, hence the json tags.
 type ChangeRequest struct {
-	Title    string
-	URL      string
-	Ref      string // display ref, e.g. #12
-	State    string // lower-cased code-host state: open | draft | merged | closed
-	Repo     string // owner/name
-	Provider string // code-host provider id
+	Title    string `json:"title"`
+	URL      string `json:"url"`
+	Ref      string `json:"ref"`      // display ref, e.g. #12
+	State    string `json:"state"`    // lower-cased code-host state: open | draft | merged | closed
+	Repo     string `json:"repo"`     // owner/name
+	Provider string `json:"provider"` // code-host provider id
 }
 
 // ChangeRequestSummary is the tracker's own count of associated change requests.

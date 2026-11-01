@@ -13,7 +13,15 @@ export default defineConfig({
     {
       name: 'perf',
       testDir: './tests/perf',
+      testIgnore: 'heap-tabs.spec.ts',
       use: { browserName: 'webkit', headless: !process.env.PERF_HEADED },
+    },
+    // P433: JS heap per tab kind needs CDP, so Chromium. `--project heap heap-tabs`.
+    {
+      name: 'heap',
+      testDir: './tests/perf',
+      testMatch: 'heap-tabs.spec.ts',
+      use: { browserName: 'chromium', headless: !process.env.PERF_HEADED },
     },
   ],
 });

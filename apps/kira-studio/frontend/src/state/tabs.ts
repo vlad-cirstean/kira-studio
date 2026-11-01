@@ -1,4 +1,6 @@
+import { kibanaConsoleStateSchema } from '@shared/domain/kibana';
 import type { AppMode } from '@shared/domain/mode';
+import { decodePath } from '@shared/domain/tree';
 import { createTabsStore } from '@workbench/state/createTabsStore';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -294,6 +296,27 @@ export const useTabsStore = createTabsStore({
       ).id;
     }
 
+    // Opens a kibana Discover tab: a console tab at the data view's path carrying `kibana` state.
+    // Reuses the tab for the same data view unless `newTab`; the root path ('') always opens fresh.
+    function openDiscoverTab(
+      connectionId: string,
+      path: string,
+      opts?: { newTab?: boolean; title?: string },
+    ): OpenTabResult | null {
+      if (!useConnectionsStore(pinia).connectionRecord(connectionId)) return null;
+      const dataViewId = decodePath(connectionId, path).segments[0]?.name ?? null;
+      return actions.openTab(
+        'console',
+        connectionId,
+        path,
+        () => ({
+          ...defaultConsoleTabState(),
+          kibana: kibanaConsoleStateSchema.parse({ dataViewId, dataViewName: opts?.title ?? null }),
+        }),
+        { reuse: !opts?.newTab && path !== '' },
+      );
+    }
+
     // Opens a 'document' tab, reusing an existing one for the same (connectionId, path) — mirrors
     // openDataTab's identity rule (§8.4); `newTab` opens a fresh one regardless.
     function openDocumentTab(
@@ -427,6 +450,7 @@ export const useTabsStore = createTabsStore({
       openDataTab,
       openDefinitionTab,
       openConsoleTab,
+      openDiscoverTab,
       openDocumentTab,
       openKeyValueTab,
       openStreamTab,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { EditorLanguageId } from '@shared/domain/editor';
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { colorMarkClass } from '@theme/connColor';
@@ -9,42 +10,61 @@ import { triggerLabel, useAutomationOps } from '@workbench/automations/runs/useA
 import { displayValue, formatElapsed } from '@workbench/behaviour/format';
 import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
-import { type OpLogColumn, opLogMenuItems } from '@workbench/lib/opLog';
+import {
+  type OpLogColumn,
+  type OpLogDetailLine,
+  type OpLogField,
+  opLogMenuItems,
+} from '@workbench/lib/opLog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
-import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useModeStore, workspaceKeyOf } from '../../state/mode';
 import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
+import { consoleLanguageFor } from '../../views/console/format';
 import { useConsoleViewStore } from '../../views/console/state';
 import { lexOptionsFor, sqlDialectFor } from '../../views/shared/sqlIdent';
 import { ensureConnectedOnce } from '../../views/shared/useConnectionGate';
 
-// P132 Part 1 (§2.3): rewritten onto the shared packages/workbench OpLogPanel.vue/createOpLogStore
-// — this file keeps only Studio's own seams: the connection/tab/rows columns, the Monaco detail
-// view, and Re-run/Reveal-originating-tab (opLogMenuItems supplies Copy command/Copy error/Cancel).
+// The shared OpLogPanel over Kira Studio's op log: this file keeps the connection, source and rows
+// columns, the detail fields and syntax language, the connection facet, and Reveal tab / Re-run.
 const opsStore = useOpsStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const modeStore = useModeStore();
 const consoleViewStore = useConsoleViewStore();
 const auto = useAutomationOps(opsStore);
-const records = computed(() => auto.merge(opsStore.visibleOps));
 const runningCount = computed(() => opsStore.runningCount + auto.runningCount.value);
 
 const columns = computed<OpLogColumn[]>(() => [
-  { id: 'time', label: t('common.field.time.label'), width: '90px' },
-  { id: 'connection', label: t('studio.common.nodeKind.connection.label'), width: '140px' },
-  { id: 'source', label: t('common.field.source.label'), width: '60px' },
-  { id: 'tab', label: t('common.key.tab.label'), width: '40px' },
-  { id: 'kind', label: t('common.field.kind.label'), width: '80px' },
-  { id: 'status', label: t('common.field.status.label'), width: '90px' },
-  { id: 'duration', label: t('common.field.duration.label'), width: '70px' },
-  { id: 'rows', label: t('studio.keyValue.rows.aria'), width: '60px' },
+  { id: 'status', label: t('common.field.status.label'), width: '44px' },
+  { id: 'time', label: t('common.field.time.label'), width: '84px', priority: 3 },
+  {
+    id: 'connection',
+    label: t('studio.common.nodeKind.connection.label'),
+    width: '150px',
+    priority: 1,
+  },
+  { id: 'source', label: t('common.field.source.label'), width: '56px', priority: 5 },
+  { id: 'kind', label: t('common.field.kind.label'), width: '80px', priority: 4 },
+  {
+    id: 'duration',
+    label: t('common.field.duration.label'),
+    width: '64px',
+    priority: 3,
+    align: 'end',
+  },
+  { id: 'rows', label: t('studio.keyValue.rows.aria'), width: '56px', priority: 2, align: 'end' },
   { id: 'command', label: t('common.field.command.label'), width: '1fr' },
 ]);
+
+const AUTOMATION_FACET = 'automation';
+const showAutomation = computed(() => opsStore.facetAllows(AUTOMATION_FACET));
+const records = computed(() =>
+  auto.merge(opsStore.visibleOps).filter((r) => showAutomation.value || !isAutomationOp(r)),
+);
 
 function connectionFor(record: OpRecord) {
   return connectionsStore.connectionRecord(record.connectionId);
@@ -113,10 +133,14 @@ function opSqlDialect(record: OpRecord) {
 async function onRerun(record: OpRecord): Promise<void> {
   if (!record.connectionId || !record.command || record.commandTruncated) return;
   const dialect = opSqlDialect(record);
-  const statements = splitSqlStatements(record.command, {
-    ...lexOptionsFor(dialect),
-    slashSlashComments: connectionFor(record)?.kind === 'mongodb',
-  }).map((s) => s.text);
+  // A Discover statement is one JSON request; splitting it on ';' would cut a query string.
+  const statements =
+    connectionFor(record)?.kind === 'kibana'
+      ? [record.command]
+      : splitSqlStatements(record.command, {
+          ...lexOptionsFor(dialect),
+          slashSlashComments: connectionFor(record)?.kind === 'mongodb',
+        }).map((s) => s.text);
   if (statements.length === 0) return;
   const tabId = tabsStore.openConsoleTab(record.connectionId, record.path ?? '');
   try {
@@ -128,13 +152,75 @@ async function onRerun(record: OpRecord): Promise<void> {
   }
 }
 
+const facet = computed(() => {
+  const ids = [...new Set(opsStore.records.map((r) => r.connectionId ?? ''))];
+  const options = ids.map((id) => ({
+    value: id,
+    label:
+      id === '' ? t('studio.operations.noConnection.label') : displayValue(connectionNameFor(id)),
+  }));
+  if (auto.merge([]).length > 0) {
+    options.push({ value: AUTOMATION_FACET, label: t('common.module.automations.label') });
+  }
+  return { label: t('studio.common.nodeKind.connection.label'), options };
+});
+
+function connectionNameFor(id: string): string | undefined {
+  return connectionsStore.connectionRecord(id)?.name;
+}
+
+function sourceText(record: OpRecord): string {
+  return record.source === 'mcp' ? t('common.mcp.label') : t('common.user.label');
+}
+
+function fieldsFor(record: OpRecord | AutomationOp): OpLogField[] {
+  if (isAutomationOp(record)) {
+    return [
+      { label: t('common.script.label'), value: record.run.scriptName },
+      { label: t('common.field.source.label'), value: triggerLabel(record.run) },
+    ];
+  }
+  const fields: OpLogField[] = [
+    {
+      label: t('studio.common.nodeKind.connection.label'),
+      value: connectionNameFor(record.connectionId ?? '') ?? '',
+    },
+    { label: t('studio.operations.field.path.label'), value: record.path ?? '', code: true },
+    { label: t('common.key.tab.label'), value: record.tabId ? tabTitleFor(record) : '' },
+    { label: t('common.field.source.label'), value: sourceText(record) },
+    {
+      label: t('studio.keyValue.rows.aria'),
+      value: record.rows === null ? '' : String(record.rows),
+    },
+  ];
+  return fields.filter((f) => f.value !== '');
+}
+
+function codeLanguage(record: OpRecord | AutomationOp): EditorLanguageId | null {
+  if (isAutomationOp(record) || record.kind === 'http' || record.kind === 'preconnect') return null;
+  return consoleLanguageFor(connectionFor(record)?.kind);
+}
+
+function detailsText(record: OpRecord): string {
+  return [
+    record.command,
+    record.error,
+    connectionNameFor(record.connectionId ?? ''),
+    record.path,
+    record.tabId ? tabTitleFor(record) : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
   if (isAutomationOp(record)) return auto.menuFor(record);
   const hasTab = record.tabId !== null && tabsStore.tabs.some((t) => t.id === record.tabId);
-  const canSql = !!record.connectionId && connectionsStore.states[record.connectionId]?.caps?.sql;
-  const [copyCommand, copyError, cancel] = opLogMenuItems(record, () =>
-    opsStore.cancelOp(record.id),
-  );
+  const canSql =
+    !!record.connectionId &&
+    connectionsStore.states[record.connectionId]?.caps?.sql &&
+    // Only execute() carries a Discover request; the other kibana op kinds log metadata calls.
+    (connectionFor(record)?.kind !== 'kibana' || record.kind === 'execute');
   return [
     {
       type: 'item',
@@ -143,8 +229,6 @@ function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
       disabled: !hasTab,
       run: () => revealTab(record),
     },
-    copyCommand,
-    copyError,
     {
       type: 'item',
       id: 're-run',
@@ -156,8 +240,22 @@ function menuFor(record: OpRecord | AutomationOp): MenuItem[] {
         !record.command || !canSql || record.commandTruncated || record.kind === 'preconnect',
       run: () => void onRerun(record),
     },
-    cancel,
+    { type: 'separator' },
+    ...opLogMenuItems(
+      record,
+      () => void opsStore.cancelOp(record.id),
+      true,
+      undefined,
+      detailsText(record),
+    ),
   ];
+}
+
+function detailLines(record: OpRecord | AutomationOp): OpLogDetailLine[] {
+  if (isAutomationOp(record)) return auto.detailLines(record);
+  return record.commandTruncated
+    ? [{ text: t('studio.operations.commandTruncated.status'), tone: 'error' }]
+    : [];
 }
 
 // Counts the preconnect delay down in the command cell; falls back to the command once it elapses.
@@ -176,8 +274,11 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
   <OpLogPanel
     v-model:filter-text="opsStore.filterText"
     v-model:status-filter="opsStore.statusFilter"
+    v-model:facet-values="opsStore.facetValues"
     :records="records"
     :running-count="runningCount"
+    :loading="!opsStore.hydrated"
+    :empty-hint="t('studio.operations.empty.hint')"
     :columns="columns"
     :clear-hint="t('studio.operations.clear.hint')"
     :menu-for="menuFor"
@@ -185,8 +286,12 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
     :can-cancel="(record) => (isAutomationOp(record) ? auto.canCancel(record) : true)"
     :kind-label="(record) => (isAutomationOp(record) ? auto.kindLabel() : record.kind)"
     :status-note="(record) => (isAutomationOp(record) ? auto.statusNote(record) : null)"
-    :detail-lines="(record) => (isAutomationOp(record) ? auto.detailLines(record) : [])"
+    :detail-lines="detailLines"
+    :fields-for="fieldsFor"
+    :code-language="codeLanguage"
+    :facet="facet"
     @clear="opsStore.clearOps"
+    @reset-filters="opsStore.resetFilters"
     @cancel="onCancel"
   >
     <template #cell="{ column, record }">
@@ -207,7 +312,7 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
             triggerLabel(record.run)
           }}</span
         >
-        <span v-else-if="column.id === 'tab' || column.id === 'rows'" />
+        <span v-else-if="column.id === 'rows'" />
       </template>
       <span v-else-if="column.id === 'connection'" class="flex items-center min-w-0 gap-1">
         <span
@@ -221,72 +326,12 @@ function preconnectNote(record: OpRecord | AutomationOp, now: number): string | 
         class="truncate min-w-0"
         data-testid="op-source-cell"
         >{{
-          record.source === 'mcp' ? t('common.mcp.label') : t('common.user.label')
+          sourceText(record)
         }}</span
       >
-      <span v-else-if="column.id === 'tab'" class="truncate min-w-0" data-testid="op-tab-cell">{{
-        tabTitleFor(record)
+      <span v-else-if="column.id === 'rows'" class="justify-self-end text-right tabular-nums">{{
+        displayValue(record.rows)
       }}</span>
-      <span v-else-if="column.id === 'rows'">{{ displayValue(record.rows) }}</span>
-    </template>
-    <template #detail="{ record, part }">
-      <div
-        v-if="isAutomationOp(record)"
-        class="px-2 truncate font-data"
-        data-testid="op-automation-detail"
-      >
-        {{
-          part === 'command' ? t('common.command.label', { value: record.command ?? '' }) : t('workbench.opLog.errorDetail.label', { value: record.error ?? '' })
-        }}
-      </div>
-      <div v-else class="ops-detail-cm h-full min-w-0">
-        <MonacoHost
-          v-if="part === 'command'"
-          :doc="
-            record.commandTruncated
-              ? t('studio.operations.commandTruncated.status', { command: record.command ?? '' })
-              : t('common.command.label', { value: record.command ?? '' })
-          "
-          :language="record.kind === 'http' || record.kind === 'preconnect' ? 'plain' : 'sql'"
-          :sql-dialect="opSqlDialect(record)"
-          readonly
-          :single-line="true"
-        />
-        <MonacoHost
-          v-else
-          :doc="`error: ${record.error}`"
-          language="plain"
-          readonly
-          :single-line="true"
-        />
-      </div>
     </template>
   </OpLogPanel>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P132 Part 1 (§2.3): moved from the pre-shared OperationsPanel.vue unchanged — the slot root
-   above (`.ops-detail-cm`) is rendered by this component, so it still carries this component's own
-   scope id, and these :deep() rules still match Monaco's internal DOM the same way they always
-   did. */
-.ops-detail-cm :deep(.monaco-editor) {
-  @apply h-4.5 text-kira-sm;
-}
-
-/* The detail row is a single fixed-height (20px) line — VirtualList (P2 §0 note 14) has no
-   notion of a variable-height row — so a long command can't wrap into view. Horizontal scroll
-   (trackpad/shift-wheel/drag, same as the tab strip) is what actually lets you read all of it,
-   rather than clipping it exactly like the collapsed row it replaces. `single-line` (above)
-   already turns wordWrap off and the gutter off; this only adds the left/right breathing room
-   `.cm-line`'s own padding used to give each row. */
-.ops-detail-cm :deep(.monaco-scrollable-element) {
-  @apply overflow-x-auto overflow-y-hidden;
-}
-
-.ops-detail-cm :deep(.view-line) {
-  /* P110 B37: padding: 0 var(--kira-s-4) (8px sides) -> px-2. */
-  @apply px-2;
-}
-</style>

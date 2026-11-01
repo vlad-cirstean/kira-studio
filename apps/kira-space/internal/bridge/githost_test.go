@@ -45,7 +45,7 @@ func (b *fakeBrowser) OpenURL(url string) error {
 func registryKnowing(hosts ...string) *gitsession.Registry {
 	p := github.New(github.Options{Locator: fakeGhLocator{}, Runner: fakeGhAuthRunner{}})
 	for _, h := range hosts {
-		p.Status(context.Background(), h)
+		p.Status(context.Background(), githost.Repo{Host: h})
 	}
 	return &gitsession.Registry{Hosts: githost.Selector{Registry: githost.NewRegistry(p)}}
 }

@@ -76,6 +76,10 @@ type CodeWorkspaceReorderArgs struct {
 type CodeWorkspaceReadFileArgs struct {
 	ID   string `json:"id"`
 	Path string `json:"path"`
+	// IfStat and IfHeadOid are optional: ReadFile and ReadDiff answer kind "unchanged", with no
+	// content, for a side that still matches them. ReadFileForEdit ignores both.
+	IfStat    *codeworkspace.FileStat `json:"ifStat,omitempty"`
+	IfHeadOid string                  `json:"ifHeadOid,omitempty"`
 }
 
 // gitPathSetting reads the current git.path setting fresh — the same "never cached, read on every
@@ -433,7 +437,7 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 	if err != nil {
 		return codeworkspace.FileContent{}, ipcerr.Contract("%s", err.Error())
 	}
-	return ipcerr.InternalResult(codeworkspace.ReadFile(absPath, args.Path))
+	return ipcerr.InternalResult(codeworkspace.ReadFileIf(absPath, args.Path, args.IfStat))
 }
 
 // CodeWorkspaceWriteFileArgs saves Text over Path when the file's current hash equals BaseHash
@@ -544,7 +548,7 @@ func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceR
 	if err != nil {
 		return codeworkspace.DiffContent{}, err
 	}
-	content, err := codeworkspace.ReadDiff(ctx, sess, args.Path)
+	content, err := codeworkspace.ReadDiffGated(ctx, sess, args.Path, codeworkspace.DiffGate{WorktreeStat: args.IfStat, HeadOid: args.IfHeadOid})
 	if err != nil {
 		// F4: the session s.session() just resolved was closed (CloseWorkspace/RemoveRepo, or a
 		// git.path edit through Registry.Open) by the time this reached readHeadSide — a clean

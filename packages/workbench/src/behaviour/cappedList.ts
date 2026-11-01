@@ -1,12 +1,16 @@
-import { computed, type MaybeRefOrGetter, ref, toValue } from 'vue';
+import { computed, type MaybeRefOrGetter, type Ref, ref, toValue } from 'vue';
 
 /**
  * A long list shown `step` rows at a time. `visible` is the capped slice, `hiddenCount` what the
  * "Show N more" button (`ShowMoreButton`) would reveal, `showMore` raises the cap by `step`, and
- * `reset` returns to the first page (a new filter, a new panel-open).
+ * `reset` returns to the first page (a new filter, a new panel-open). A caller whose list outlives
+ * its component passes the `cap` ref to keep.
  */
-export function useCappedList<T>(rows: MaybeRefOrGetter<readonly T[]>, step: number) {
-  const cap = ref(step);
+export function useCappedList<T>(
+  rows: MaybeRefOrGetter<readonly T[]>,
+  step: number,
+  cap: Ref<number> = ref(step),
+) {
   const visible = computed(() => toValue(rows).slice(0, cap.value));
   const hiddenCount = computed(() => Math.max(0, toValue(rows).length - cap.value));
   function showMore(): void {

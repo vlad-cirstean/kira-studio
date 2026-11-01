@@ -17,4 +17,6 @@ type InteractiveSpec struct {
 	AddDirs      []string
 	MCPConfig    string
 	AllowedTools []string
+	// Stage is the step's values for this provider; nil = defaults.
+	Stage StageValues
 }

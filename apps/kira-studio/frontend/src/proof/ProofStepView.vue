@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
-import type { ProofStepDetail } from '@shared/domain/proof';
+import {
+  type ProofChartPayload,
+  type ProofStepDetail,
+  proofChartPayloadSchema,
+} from '@shared/domain/proof';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Badge } from '@theme/components/ui/badge';
@@ -10,6 +14,7 @@ import QueryState from '@workbench/components/QueryState.vue';
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import ConsoleResultGrid from '../views/console/ConsoleResultGrid.vue';
+import ProofChart from './ProofChart.vue';
 import { buildProofPage, mountProofPage, proofPageKey, releaseProofPage } from './pages';
 import { useProofStep } from './queries';
 import { useProofWindowStore } from './state';
@@ -17,7 +22,7 @@ import { useStepViewState } from './useStepViewState';
 import { proofViewIcon } from './viewIcon';
 
 // One step: its description, the query that produced it (read-only), and the result in the same
-// grid the query console uses.
+// grid the query console uses, or a chart.
 const props = defineProps<{ sessionId: string; rev: number; ordinal: number }>();
 
 const store = useProofWindowStore();
@@ -44,17 +49,22 @@ const query = computed(() => step.data.value?.query ?? '');
 const language = computed(() => LANGUAGES[step.data.value?.language ?? 'text']);
 const queryHeight = ref(QUERY_MAX_HEIGHT);
 const queryReady = ref(false);
-const gridReady = ref(false);
+const resultReady = ref(false);
 
 const pageError = shallowRef<string | null>(null);
 const pageMounted = ref(false);
+const chartPayload = shallowRef<ProofChartPayload | null>(null);
 watch(
   () => step.data.value,
   (data) => {
-    if (!data || pageMounted.value) return;
+    if (!data || pageMounted.value || chartPayload.value) return;
     try {
-      mountProofPage(key, buildProofPage(data.view, data.data));
-      pageMounted.value = true;
+      if (data.view === 'chart') {
+        chartPayload.value = proofChartPayloadSchema.parse(data.data);
+      } else {
+        mountProofPage(key, buildProofPage(data.view, data.data));
+        pageMounted.value = true;
+      }
     } catch (err) {
       pageError.value = errorText(err);
       store.markReady(key);
@@ -64,7 +74,7 @@ watch(
 );
 
 watch(
-  () => (gridReady.value && (!query.value || queryReady.value) ? true : null),
+  () => (resultReady.value && (!query.value || queryReady.value) ? true : null),
   (ok) => {
     if (ok) store.markReady(key);
   },
@@ -82,7 +92,7 @@ watch(
 
 onBeforeUnmount(() => {
   store.unmarkReady(key);
-  releaseProofPage(key);
+  if (pageMounted.value) releaseProofPage(key);
 });
 </script>
 
@@ -155,7 +165,15 @@ onBeforeUnmount(() => {
               path=""
               :view-state="view.seed.value"
               @update:view-state="view.setResult"
-              @ready="gridReady = true"
+              @ready="resultReady = true"
+            />
+            <ProofChart
+              v-else-if="chartPayload && view.seed.value"
+              :payload="chartPayload"
+              :description="data.description"
+              :seed="view.seed.value.chart"
+              @update:chart="view.setChart"
+              @ready="resultReady = true"
             />
           </div>
         </template>

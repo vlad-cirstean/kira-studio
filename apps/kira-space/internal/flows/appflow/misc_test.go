@@ -61,11 +61,11 @@ func TestOpenLinks(t *testing.T) {
 		}
 	}
 
-	if p, err := app.W.AdeTask.HostProviders(ctx); err != nil || len(p.Providers) != 1 || p.Providers[0].ID != "github" {
-		t.Fatalf("HostProviders = %+v, %v, want github", p, err)
+	if p, err := app.W.AdeTask.HostProviders(ctx); err != nil || len(p.Providers) != 2 || p.Providers[0].ID != "github" || p.Providers[1].ID != "azure" {
+		t.Fatalf("HostProviders = %+v, %v, want github, azure", p, err)
 	}
-	if p := app.W.GitHost.Providers(); len(p.Providers) != 1 || p.Providers[0].ID != "github" {
-		t.Fatalf("Providers = %+v, want github", p)
+	if p := app.W.GitHost.Providers(); len(p.Providers) != 2 || p.Providers[0].ID != "github" || p.Providers[1].ID != "azure" {
+		t.Fatalf("Providers = %+v, want github, azure", p)
 	}
 
 	want := []string{"https://example.com/docs?q=1", "http://localhost:3000/", "https://github.com/acme/api/pull/12"}

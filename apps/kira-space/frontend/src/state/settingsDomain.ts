@@ -137,6 +137,13 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
   agentInput: z.boolean().default(false),
 });
 
+// P430: the clipboard capture hotkey. The Go side validates the chord (model.ValidCaptureHotkey).
+const DEFAULT_CAPTURE_HOTKEY = 'CmdOrCtrl+Shift+K';
+const captureSettingsSchema = /*#__PURE__*/ z.object({
+  enabled: z.boolean().default(true),
+  hotkey: z.string().default(DEFAULT_CAPTURE_HOTKEY),
+});
+
 // P314: the model alias per provider id for every memory call (gate, reconcile, import, distill).
 // A provider without an entry uses its default.
 const memorySettingsSchema = /*#__PURE__*/ z.object({
@@ -177,6 +184,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     port: 7790,
     agentInput: false,
   }),
+  capture: captureSettingsSchema.default({ enabled: true, hotkey: DEFAULT_CAPTURE_HOTKEY }),
   memory: memorySettingsSchema.default({ models: {} }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -187,6 +195,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   git: gitSettingsSchema.partial().optional(),
   ade: adeSettingsSchema.partial().optional(),
   mobile: mobileSettingsSchema.partial().optional(),
+  capture: captureSettingsSchema.partial().optional(),
   memory: memorySettingsSchema.partial().optional(),
   agent: appAgentSettingsSchema.partial().optional(),
 });
@@ -234,6 +243,10 @@ export const defaultSettings: Settings = {
     enabled: false,
     port: 7790,
     agentInput: false,
+  },
+  capture: {
+    enabled: true,
+    hotkey: DEFAULT_CAPTURE_HOTKEY,
   },
   memory: {
     models: {},

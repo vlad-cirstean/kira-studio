@@ -304,9 +304,14 @@ async function onBrowseDatabaseFile(): Promise<void> {
       </div>
       <template v-else>
         <Field class="flex-1">
-          <FieldLabel>{{ t('studio.project.connectionDialog.database.label') }}</FieldLabel>
+          <FieldLabel>{{
+            draft.kind === 'kibana'
+              ? t('studio.kibana.space.label')
+              : t('studio.project.connectionDialog.database.label')
+          }}</FieldLabel>
           <Input
             :model-value="draft.database ?? ''"
+            :placeholder="draft.kind === 'kibana' ? t('common.state.default.option') : undefined"
             v-bind="invalidAttrs('database')"
             class="font-data"
             data-testid="connection-database"

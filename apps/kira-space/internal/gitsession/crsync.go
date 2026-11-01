@@ -309,7 +309,7 @@ func (s *crSyncer) runOnce() {
 		s.holdUntil(e.host.breakerUntil())
 		return
 	}
-	if status := p.Status(ctx, repo.Host); !status.OK() {
+	if status := p.Status(ctx, repo); !status.OK() {
 		s.failed(status)
 		return
 	}
@@ -437,7 +437,7 @@ func (r *crRun) storeErr(err error) bool {
 // prepare loads the sync state and drops rows read as another account or an older layout.
 func (r *crRun) prepare() bool {
 	s := r.s
-	account := r.p.Account(r.ctx, r.repo.Host)
+	account := r.p.Account(r.ctx, r.repo)
 	st, have, err := s.store.SyncState(r.key)
 	if err != nil {
 		return r.storeErr(err)

@@ -152,6 +152,7 @@ export default defineConfig({
     {
       name: 'perf',
       testDir: './tests/perf',
+      testIgnore: 'heap-tabs.spec.ts',
       use: { browserName: 'webkit' },
       fullyParallel: false,
       workers: 1,

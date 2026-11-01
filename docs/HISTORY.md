@@ -7293,3 +7293,47 @@ Two review rounds, findings fixed. Round 1 (F1-F4): working review writes guarde
 ### v0.2.23 P422 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.23/` removed. PR opened to `main`.
 <!-- /chapter v0.2.23 -->
+
+<!-- chapter v0.2.24 -->
+## v0.2.24
+Source: docs/v0.2.24/ at 0f0c32eafdce. 13 phases.
+
+### v0.2.24 P423 (Done)
+Azure Repos host through the `az` CLI with GitHub parity: change requests, status, checks, branch links, discovery. Settings CLI section gains `az` install and login steps. Host abstraction stays provider-neutral. Gaps: Azure success-path JSON fixtures are hand-written, unchecked against a real org; `az` calls are not in the op log.
+
+### v0.2.24 P424 (Done)
+Discover-grade Kibana editor: hand-rolled Go KQL compiler, field, value and operator autocomplete, hits histogram (ECharts 6.1.0, vue-echarts 8.3.2). `/internal/search/es` is an internal Kibana API and may change between Kibana versions (Known open item). KQL value-lookup cancellation has no dedicated test.
+
+### v0.2.24 P425 (Done)
+Save and update Kibana queries: migration 0047, `queriesUpdateDiscover`, Cmd/Ctrl+S, saved menu, tab link, column selection. Flow test plus UI specs.
+
+### v0.2.24 P426 (Done)
+Proof tool `chart` view (line, bar, stacked bar, pie, scatter): migration 0048, Go validation, `ProofChart.vue`, 3 visual baselines, `TestProofChartThroughClaude`. Bar and scatter cap 1000 points (capture time). One `budgets.spec.ts` cached tree expand miss (53 ms vs 50 ms) under load; rechecked at close: p50 32 ms on an idle host.
+
+### v0.2.24 P427 (Done)
+One-PR view for GitHub and Azure Repos in a Space host-view window: description, comments (read), checks, common details. Provider-neutral `HostViewService`; Markdown rendered with escaping.
+
+### v0.2.24 P428 (Done)
+Jira issue viewer in the same host-view frame: fields, sidebar, comments. Hand-rolled ADF-to-Markdown converter (candidate libraries lacked escaping and link-scheme filtering).
+
+### v0.2.24 P429 (Done)
+Post comments and replies on PRs and issues with a Markdown composer. No attachments on any host (user decision): Kira never touches a CLI's credentials, and no driven CLI uploads a comment attachment. Narrows the spec lines on attachments and drag and drop; macOS drag and drop unverified. Live `acli` post unverified (Known open items). Part 2: Docker reads no credentials. `buildTLS` hands PEM paths to `go-connections/tlsconfig.Client`; current context comes from `docker context show` (cached until client rebuild), never `config.json`. G5 covers `internal/docker`. The Claude MCP header reads stay deferred to v0.2.25 P443.
+
+### v0.2.24 P430 (Done)
+Global capture hotkey opens a quick-capture popup; clipboard classified, action preselected (PR link, Jira key, else Later). Default chord `CmdOrCtrl+Shift+K`, customisable in Settings > Capture (`capture.enabled`, `capture.hotkey`), re-registered live with conflict status. Bridge types are TS interfaces, not zod. Windows and Linux work only while the app runs. Unverified on hardware: the real hotkey on macOS, Windows and Wayland.
+
+### v0.2.24 P431 (Done)
+Stage `settings` in workflow YAML, wire, editor (Advanced) and headless/TUI launches; Claude `auto_compact_window` maps to `--autocompact` (100k to 1M). A user-exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides the flag (Known open item).
+
+### v0.2.24 P432 (Done)
+Operations panel overhaul in both apps on the shared `OpLogPanel` shell: toolbar, facets, detail pane, tree of steps, narrow-width layout, copy actions. Memory-tool prompt fix; flaky UI waits hardened.
+
+### v0.2.24 P433 (Done)
+State kept across tabs in both apps (`KEEP_WHILE_OPEN`, Discover data view and histogram, keyvalue page, mask rules, Monaco view state). Saved-query and filter-history reads drop `staleTime: 0` via Go events. Space repo file and diff reads gated on stat (`unchanged` answer). Space `closed2 - closed` 2.8 to 0.3 MB: target met. Studio Discover heap growth per round about 3.7 to about 0.6 MB: target 0.5 missed, JIT code suspected (Known open item). Skipped Space local-file refetch: no OpenedFiles watcher, so a skipped read is unsafe. Named exceptions kept: Kibana data view picker (60 s) and `staleTime: 0` reads of data Kira does not own.
+
+### v0.2.24 P434 (Done)
+Two review rounds. Round 1 found 8, round 2 found 4; all fixed. Fixes included dropping the Discover data view `gcTime` override (default 5 min), so the retention spec stays under that.
+
+### v0.2.24 P435 (Done)
+Final verification: typecheck, `lint:all`, `go test ./...`, flows, Space UI 938 and Studio UI 682 pass. Fixed terminal unregister ordering (flaky `TestTwoWindowsIsolation`), the i18n catalog test for the stage settings catalog, and the Discover retention spec. Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.24/` removed. PR opened to `main`.
+<!-- /chapter v0.2.24 -->

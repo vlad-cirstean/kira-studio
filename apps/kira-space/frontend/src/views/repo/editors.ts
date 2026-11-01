@@ -14,9 +14,23 @@ import { disposeModel } from './monaco';
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type StandaloneDiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 
+type CodeViewState = import('monaco-editor').editor.ICodeEditorViewState;
+type DiffViewState = import('monaco-editor').editor.IDiffEditorViewState;
+
+/** What a mount read from disk and the model versions that held it afterwards. A later mount asks
+ *  the backend to skip a side that still matches, and only while the model is still unedited. */
+export interface KnownRead {
+  stat?: import('@shared/domain/repo').FileStat;
+  headOid?: string;
+  versionIds: number[];
+}
+
 interface RepoEditorEntry {
   uris: string[];
   editor: StandaloneEditor | StandaloneDiffEditor | null;
+  /** Scroll, cursor and folds captured on unmount, so a remount reopens where the user left off. */
+  viewState: CodeViewState | DiffViewState | null;
+  known: KnownRead | null;
 }
 
 const entries = new Map<string, RepoEditorEntry>();
@@ -59,11 +73,18 @@ function releaseRefs(tabId: string, uris: readonly string[]): string[] {
   return releasable;
 }
 
-/** Called on mount (and on every remount after a tab-switch-away) — replaces any previous entry. */
-export function registerEditor(tabId: string, uri: string, editor: StandaloneEditor): void {
+/** Called on mount (and on every remount after a tab-switch-away) — replaces any previous entry.
+ *  Returns true when a view state saved by the last unmount was restored, so the caller skips its
+ *  own persisted-line reveal. */
+export function registerEditor(tabId: string, uri: string, editor: StandaloneEditor): boolean {
+  const prior = entries.get(tabId);
+  const viewState = prior?.viewState ?? null;
   releaseUnusedPriorRefs(tabId, [uri]);
   addRefs(tabId, [uri]);
-  entries.set(tabId, { uris: [uri], editor });
+  entries.set(tabId, { uris: [uri], editor, viewState, known: prior?.known ?? null });
+  if (!viewState) return false;
+  editor.restoreViewState(viewState as CodeViewState);
+  return true;
 }
 
 /** repo-diff's own counterpart to registerEditor — two model uris (HEAD, worktree), one diff
@@ -73,9 +94,12 @@ export function registerDiffEditor(
   uris: string[],
   editor: StandaloneDiffEditor,
 ): void {
+  const prior = entries.get(tabId);
+  const viewState = prior?.viewState ?? null;
   releaseUnusedPriorRefs(tabId, uris);
   addRefs(tabId, uris);
-  entries.set(tabId, { uris, editor });
+  entries.set(tabId, { uris, editor, viewState, known: prior?.known ?? null });
+  if (viewState) editor.restoreViewState(viewState as DiffViewState);
 }
 
 // A remount always recomputes the identical uris for the same tab (they're a pure function of the
@@ -89,14 +113,35 @@ function releaseUnusedPriorRefs(tabId: string, nextUris: readonly string[]): voi
   for (const uri of releaseRefs(tabId, stale)) disposeModel(uri);
 }
 
+/** Records what the current mount read, once its editor is registered. */
+export function rememberRead(tabId: string, known: KnownRead): void {
+  const entry = entries.get(tabId);
+  if (entry) entry.known = known;
+}
+
+/** The last read, if every model that held it is still unedited. */
+export function knownRead(tabId: string, currentVersionIds: readonly number[]): KnownRead | null {
+  const known = entries.get(tabId)?.known;
+  if (!known || known.versionIds.length !== currentVersionIds.length) return null;
+  return known.versionIds.every((v, i) => v === currentVersionIds[i]) ? known : null;
+}
+
+/** Detaches models before dispose: a widget disposed with cached models still attached stays
+ *  reachable from them (view model, sash and theme listeners). */
+function releaseWidget(entry: RepoEditorEntry): void {
+  entry.editor?.setModel(null);
+  entry.editor?.dispose();
+  entry.editor = null;
+}
+
 /** Called on Vue unmount (a tab switch away, not a close) — disposes the widget, keeps the uris so
  *  dropResources can still find the model(s) to dispose later if the tab is closed while
  *  unmounted. Works for either a repo-file or a repo-diff entry. */
 export function unmountEditor(tabId: string): void {
   const entry = entries.get(tabId);
   if (!entry) return;
-  entry.editor?.dispose();
-  entry.editor = null;
+  entry.viewState = entry.editor?.saveViewState() ?? entry.viewState;
+  releaseWidget(entry);
 }
 
 /** state/tabKinds.ts's own `dropResources(tabId)` hook — the tab is actually closing. Disposes
@@ -105,7 +150,7 @@ export function unmountEditor(tabId: string): void {
 export function dropRepoFileTab(tabId: string): void {
   const entry = entries.get(tabId);
   if (!entry) return;
-  entry.editor?.dispose();
+  releaseWidget(entry);
   for (const uri of releaseRefs(tabId, entry.uris)) disposeModel(uri);
   entries.delete(tabId);
 }

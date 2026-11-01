@@ -1,7 +1,9 @@
+import type { ProofViewState } from '@shared/domain/proof';
 import { expect, test } from '../ui/fixtures';
 import { IPC } from '../ui/support/ipcChannels';
 import {
   bigTable,
+  chartControl,
   LONG_QUERY,
   openProofWindow,
   PENDING_ID,
@@ -99,4 +101,65 @@ test('proof window, compare mode with a pending edit (P420)', async ({ relaunch,
   await expect(page.locator('[data-testid="proof-compare"]')).toBeVisible();
   await ready(page);
   await expect(page.locator(WINDOW)).toHaveScreenshot('proof-compare-pending.png');
+});
+
+// P426: one baseline per chart family a reader sees; payloads come from the Go-written contract.
+test.describe('proof chart', () => {
+  test.use({ timezoneId: 'UTC' });
+
+  const chartShot = async (
+    relaunch: (o: Record<string, unknown>) => Promise<{ window: import('@playwright/test').Page }>,
+    url: string,
+    tab: number,
+    state: NonNullable<ProofViewState['chart']>,
+    name: string,
+  ) => {
+    const { window: page } = await relaunch({
+      control: chartControl([
+        {
+          channel: IPC.proofViewState,
+          response: [viewState(tab, { chart: state })],
+        },
+      ]),
+      timezoneId: 'UTC',
+    });
+    await openProofWindow(page, url);
+    await page
+      .locator('[data-testid="tab"]')
+      .nth(tab - 1)
+      .click();
+    await ready(page);
+    await expect(page.locator('[data-testid="proof-chart"]')).toBeVisible();
+    await expect(page.locator(WINDOW)).toHaveScreenshot(name);
+  };
+
+  test('line, zoomed with a hidden series (P426)', async ({ relaunch, uiServer }) => {
+    await chartShot(
+      relaunch,
+      uiServer.url,
+      1,
+      { hidden: ['after <b>fix</b>'], selected: null, zoom: { start: 25, end: 75 } },
+      'proof-chart-line.png',
+    );
+  });
+
+  test('stacked bar with a selected bar (P426)', async ({ relaunch, uiServer }) => {
+    await chartShot(
+      relaunch,
+      uiServer.url,
+      2,
+      { hidden: [], selected: { series: 0, index: 1 }, zoom: null },
+      'proof-chart-bar-stacked.png',
+    );
+  });
+
+  test('pie (P426)', async ({ relaunch, uiServer }) => {
+    await chartShot(
+      relaunch,
+      uiServer.url,
+      6,
+      { hidden: [], selected: null, zoom: null },
+      'proof-chart-pie.png',
+    );
+  });
 });

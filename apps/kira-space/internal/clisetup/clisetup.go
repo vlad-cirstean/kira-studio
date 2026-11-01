@@ -8,6 +8,8 @@ const (
 	PurposeLogin      = "login"
 	PurposeLoginToken = "loginToken"
 	PurposeCheck      = "check"
+	PurposeExtension  = "extension"
+	PurposeDefaults   = "defaults"
 )
 
 // Step is one command the user runs, shown verbatim and copyable.

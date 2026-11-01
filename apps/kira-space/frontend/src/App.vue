@@ -30,6 +30,10 @@ import AdeHandoverPrompt from './ade/v2/stage/AdeHandoverPrompt.vue';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { useAdeWorkflowsUiStore } from './ade/v2/state/adeWorkflowsUi';
 import { control } from './bridge/control';
+import CaptureWindow from './capture/CaptureWindow.vue';
+import { useCaptureWindowStore } from './capture/state';
+import HostViewWindow from './hostview/HostViewWindow.vue';
+import { useHostViewWindowStore } from './hostview/state';
 import { spacePaletteCommands } from './shortcuts/spaceCommands';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useKeepAwakeStore } from './state/keepAwake';
@@ -80,6 +84,8 @@ const promptKinds = {
   'branch-request': markRaw(AdeBranchRequestPrompt),
 };
 const reviewWindow = useAdeReviewWindowStore();
+const hostView = useHostViewWindowStore();
+const capture = useCaptureWindowStore();
 
 let unsubscribe: Array<() => void> = [];
 
@@ -92,11 +98,12 @@ onMounted(() => {
     // A review window has no project panel, and its secondary panel is the agent panel; the layout
     // is shared across windows, so toggling it from here would move the main window's panels.
     control.onToggleProjectPanel(() => {
-      if (!reviewWindow.target) layoutStore.toggleProjectPanel();
+      if (!reviewWindow.target && !hostView.target && !capture.item)
+        layoutStore.toggleProjectPanel();
     }),
     control.onToggleOperationsPanel(() => {
       if (reviewWindow.target) reviewWindow.toggleAgentPanel();
-      else layoutStore.toggleOperationsPanel();
+      else if (!hostView.target && !capture.item) layoutStore.toggleOperationsPanel();
     }),
     control.onTabNext(tabsStore.activateNextTab),
     control.onTabPrev(tabsStore.activatePrevTab),
@@ -130,7 +137,9 @@ function onToggleKeepAwake(): void {
 <template>
   <!-- P104 §6.1: disable-hoverable-content matches the app's pointer-events: none tooltip. -->
   <TooltipProvider>
-    <AdeReviewWindow v-if="reviewWindow.target" />
+    <CaptureWindow v-if="capture.item" />
+    <HostViewWindow v-else-if="hostView.target" />
+    <AdeReviewWindow v-else-if="reviewWindow.target" />
     <div v-else class="h-full flex flex-col">
       <WorkbenchTitleBar
         :order="MODE_ORDER"

@@ -120,11 +120,12 @@ let unregisterCommand: (() => void) | null = null;
 let unregisterFindCommand: (() => void) | null = null;
 
 // The browse preview pane keeps one constant viewKey while the resolved target path changes, so
-// loading follows the path (a tab fires once, immediately) instead of mount.
+// loading follows the path (a tab fires once, immediately) instead of mount. A remount whose held
+// page already shows the path keeps it, including the page index.
 watch(
   () => (needsReconnect.value ? undefined : host.value?.path),
   (path) => {
-    if (path === undefined) return;
+    if (path === undefined || keyValueViewStore.hasPageFor(props.viewKey, path)) return;
     void keyValueViewStore.load(props.viewKey);
   },
   { immediate: true },

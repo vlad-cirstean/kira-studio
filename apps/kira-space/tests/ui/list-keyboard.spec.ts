@@ -61,14 +61,24 @@ test('operations list — roving tab stop, arrows, Home/End, Enter, Shift+F10 an
   await expect(row(2)).toBeFocused();
   await page.keyboard.press('Home');
   await expect(row(0)).toBeFocused();
+  // Up from the first row returns to the filter field.
   await page.keyboard.press('ArrowUp');
-  await expect(row(0)).toBeFocused();
+  await expect(page.locator('[data-testid="ops-filter"]')).toBeFocused();
+  await row(0).focus();
 
-  // Enter opens the row, same as a click: the command detail row appears.
+  // Enter opens the row, same as a click: the detail appears under it, and Enter closes it.
+  const detail = page.locator('[data-testid="op-detail"]');
   await page.keyboard.press('Enter');
-  await expect(page.getByText(`command: git fetch ${ids[0]}`)).toBeVisible();
+  await expect(detail).toContainText(`git fetch ${ids[0]}`);
   await page.keyboard.press('Enter');
-  await expect(page.getByText(`command: git fetch ${ids[0]}`)).toHaveCount(0);
+  await expect(detail).toHaveCount(0);
+
+  // Right opens the detail, Left closes it; focus stays on the row.
+  await page.keyboard.press('ArrowRight');
+  await expect(detail).toHaveCount(1);
+  await page.keyboard.press('ArrowLeft');
+  await expect(detail).toHaveCount(0);
+  await expect(row(0)).toBeFocused();
 
   await page.keyboard.press('Shift+F10');
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();

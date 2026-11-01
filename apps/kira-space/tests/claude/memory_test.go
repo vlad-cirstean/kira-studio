@@ -148,8 +148,8 @@ func storeThroughClaude(t *testing.T, app *realApp, cfg string) {
 	}
 	tools := "mcp__" + memoryServer + "__store_memory,mcp__" + memoryServer + "__memory_context"
 	out, _ := app.claudeP(t, repo, nil,
-		"Call store_memory once with one item: fact \"The billing-api service listens on port 8080 in production.\", "+
-			"reason \"Stated in the deployment manifest.\", origin agent, scope project, and no project argument. "+
+		"Call store_memory once with exactly this argument: {\"items\":[{\"fact\":\"The billing-api service listens on port 8080 in production.\","+
+			"\"reason\":\"Stated in the deployment manifest.\",\"origin\":\"agent\",\"scope\":\"project\"}]} and no project argument. "+
 			"Then call memory_context with the fact id from the result. Reply with the word done.",
 		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools, "--session-id", sessionID,
 		"--output-format", "stream-json", "--verbose")
@@ -160,7 +160,7 @@ func storeThroughClaude(t *testing.T, app *realApp, cfg string) {
 			t.Fatalf("no %s tool use in the stream:\n%s", tool, tail(out, 1500))
 		}
 		if text, isErr, ok := toolResult(msgs, uses[0].ID); !ok || isErr {
-			t.Fatalf("%s result missing or an error (ok=%v, text=%q)", tool, ok, text)
+			t.Fatalf("%s result missing or an error (ok=%v, text=%q, input=%s)", tool, ok, text, uses[0].Input)
 		}
 	}
 	recent, err := app.W.Memory.Recent(ctx)

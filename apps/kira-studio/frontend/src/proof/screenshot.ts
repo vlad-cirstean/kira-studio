@@ -1,4 +1,5 @@
 import { domToCanvas } from 'modern-screenshot';
+import { TOOLTIP_CLASS } from './chartOption';
 
 const SEPARATOR_PX = 8;
 
@@ -20,6 +21,7 @@ export function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
     backgroundColor: getComputedStyle(el).backgroundColor,
     includeStyleProperties: paintedProperties(),
     features: { restoreScrollPosition: true },
+    filter: (node) => !(node instanceof Element && node.classList.contains(TOOLTIP_CLASS)),
   });
 }
 

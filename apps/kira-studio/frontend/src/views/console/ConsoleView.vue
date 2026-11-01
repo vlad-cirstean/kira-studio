@@ -14,6 +14,8 @@ import {
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
+import { useDebounceFn } from '@vueuse/core';
+import { TIMING } from '@workbench/behaviour/timing';
 import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -37,6 +39,7 @@ import { setNewResultSet, setText, useConsoleViewStore } from './state';
 import { useConsoleFormat } from './useConsoleFormat';
 import { useConsoleLanguage } from './useConsoleLanguage';
 import { useConsoleRun } from './useConsoleRun';
+import { useConsoleUiStore } from './viewState';
 
 const consoleViewStore = useConsoleViewStore();
 
@@ -72,7 +75,13 @@ const {
   hoverSource,
 } = useConsoleLanguage(tabRef);
 
-const cursorPos = ref(0);
+// Caret and scroll outlive the component: a tab switch unmounts it.
+const uiState = useConsoleUiStore().ui(props.tab.id);
+const restored = { cursor: uiState.cursor, scrollTop: uiState.scrollTop };
+const cursorPos = ref(restored.cursor);
+const saveScrollTop = useDebounceFn((top: number) => {
+  uiState.scrollTop = top;
+}, TIMING.scrollPersist);
 const savedMenuOpen = ref(false);
 const savedMenuTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 const canFormat = computed(() => canFormatConsole(connectionKind.value));
@@ -430,7 +439,13 @@ onUnmounted(() => {
             :hover-source="hoverSource"
             keep-selection-on-external-sync
             @update:doc="onDocChange"
-            @update:cursor="cursorPos = $event"
+            :cursor="restored.cursor"
+            :scroll-top="restored.scrollTop"
+            @update:cursor="
+              cursorPos = $event;
+              uiState.cursor = $event;
+            "
+            @update:scroll-top="saveScrollTop"
           />
         </div>
 

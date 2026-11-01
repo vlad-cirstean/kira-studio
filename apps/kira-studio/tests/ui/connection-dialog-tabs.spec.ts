@@ -340,7 +340,7 @@ test('typing in the engine search filters the tile grid without moving the dialo
   const reference = await dialogBox(page);
   expect(await dialogBodyFits(page)).toBe(true);
 
-  // Narrows the 10-tile/3-column grid from four rows to one. Each tile is a radio
+  // Narrows the 11-tile/3-column grid from four rows to one. Each tile is a radio
   // input (a role="radio" button).
   await page.fill('[data-testid="connection-engine-search"]', 'postgres');
   await expect(page.locator('[data-testid="connection-kind"] [role="radio"]')).toHaveCount(1);
@@ -348,7 +348,7 @@ test('typing in the engine search filters the tile grid without moving the dialo
   expect(await dialogBodyFits(page)).toBe(true);
 
   await page.fill('[data-testid="connection-engine-search"]', '');
-  await expect(page.locator('[data-testid="connection-kind"] [role="radio"]')).toHaveCount(10);
+  await expect(page.locator('[data-testid="connection-kind"] [role="radio"]')).toHaveCount(11);
   expect(await dialogBox(page)).toEqual(reference);
 });
 

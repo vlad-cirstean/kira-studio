@@ -88,5 +88,7 @@ func Images() []string {
 		ImageFor("mongo", MongoImage),
 		ImageFor("kafka", kafkaImage),
 		ImageFor("localstack", LocalStackImage),
+		ImageFor("elasticsearch", elasticsearchImage),
+		ImageFor("kibana", kibanaImage),
 	}
 }

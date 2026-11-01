@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/clickhouse"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kafka"
+	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/kibana"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mariadb"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mongo"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/mysql"

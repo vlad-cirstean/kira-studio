@@ -105,6 +105,8 @@ type WindowManager struct {
 	Focused    []string
 	Titles     map[string]string
 	NewWindows int
+	// OpenedPopups records the keys of capture popups opened.
+	OpenedPopups []string
 	// OpenedKeyed records the keys of windows opened for an external file open.
 	OpenedKeyed []string
 	// Known is the set of window keys Close and Focus report true for.
@@ -164,6 +166,14 @@ func (w *WindowManager) openKeyed(key string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.OpenedKeyed = append(w.OpenedKeyed, key)
+	w.Known[key] = true
+}
+
+// openPopup records a capture popup open and marks the key known.
+func (w *WindowManager) openPopup(key string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.OpenedPopups = append(w.OpenedPopups, key)
 	w.Known[key] = true
 }
 

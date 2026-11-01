@@ -38,21 +38,26 @@ type Forge struct {
 	authors  map[int]string
 	reviews  map[int][]githost.Review
 	comments map[int][]string
+	details  map[int]githost.ChangeRequestDetail
+	posted   map[int][]PostedComment
 }
 
 var (
 	_ githost.Provider          = (*Forge)(nil)
 	_ githost.ChangeRequestSync = (*Forge)(nil)
 
-	_ githost.ChangeRequestReviews = (*Forge)(nil)
-	_ githost.ChangeRequestSearch  = (*Forge)(nil)
-	_ githost.CLISetup             = (*Forge)(nil)
+	_ githost.ChangeRequestReviews  = (*Forge)(nil)
+	_ githost.ChangeRequestSearch   = (*Forge)(nil)
+	_ githost.ChangeRequestDetails  = (*Forge)(nil)
+	_ githost.ChangeRequestComments = (*Forge)(nil)
+	_ githost.CLISetup              = (*Forge)(nil)
 )
 
 // New returns an empty fake host.
 func New() *Forge {
 	return &Forge{
 		account: "forger", authors: map[int]string{}, reviews: map[int][]githost.Review{}, comments: map[int][]string{},
+		details: map[int]githost.ChangeRequestDetail{}, posted: map[int][]PostedComment{},
 	}
 }
 
@@ -176,11 +181,11 @@ func (f *Forge) ParseRemote(remoteURL string) (githost.Repo, bool) {
 
 func (f *Forge) Claims(_ context.Context, host string) bool { return host == Host }
 
-func (f *Forge) Status(context.Context, string) githost.Status {
+func (f *Forge) Status(context.Context, githost.Repo) githost.Status {
 	return githost.Status{Kind: githost.KindOK, Host: Host, Account: f.accountName()}
 }
 
-func (f *Forge) Account(context.Context, string) string { return f.accountName() }
+func (f *Forge) Account(context.Context, githost.Repo) string { return f.accountName() }
 
 func (f *Forge) accountName() string {
 	f.mu.Lock()
@@ -426,6 +431,53 @@ func (f *Forge) SearchChangeRequests(_ context.Context, text string, limit int) 
 	return out, st
 }
 
+var detailLinkPattern = regexp.MustCompile(`^https://forge\.test/([\w.-]+)/([\w.-]+)/-/merge_requests/(\d+)/?(?:[?#].*)?$`)
+
+// ParseChangeRequestLink reads a merge request link; issue links miss. It has no BranchLinks role, so
+// the branch link text other flows assert stays unchanged.
+func (f *Forge) ParseChangeRequestLink(_ context.Context, raw string) (githost.Repo, int, bool) {
+	m := detailLinkPattern.FindStringSubmatch(strings.TrimSpace(raw))
+	if m == nil {
+		return githost.Repo{}, 0, false
+	}
+	n, err := strconv.Atoi(m[3])
+	if err != nil || n <= 0 {
+		return githost.Repo{}, 0, false
+	}
+	return githost.Repo{Host: Host, Owner: m[1], Name: m[2]}, n, true
+}
+
+// SetDetail stores the detail ChangeRequestDetail answers for number. The merge request row and the
+// author set with SetAuthor override the stored ChangeRequest and Author.
+func (f *Forge) SetDetail(number int, d githost.ChangeRequestDetail) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.details[number] = d
+}
+
+func (f *Forge) ChangeRequestDetail(_ context.Context, _ githost.Repo, number int) (githost.ChangeRequestDetail, githost.Status) {
+	f.record("detail:" + strconv.Itoa(number))
+	if st, limited := f.rateLimit(); limited {
+		return githost.ChangeRequestDetail{}, st
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.offline {
+		return githost.ChangeRequestDetail{}, githost.Status{Kind: githost.KindUnauthenticated, Host: Host, Reason: "offline"}
+	}
+	cr, ok := f.find(number)
+	if !ok {
+		return githost.ChangeRequestDetail{}, f.goneStatus()
+	}
+	d := f.details[number]
+	d.ChangeRequest = cr
+	if login, set := f.authors[number]; set {
+		d.Author = githost.Person{Login: login}
+	}
+	d.Normalize()
+	return d, githost.Status{Kind: githost.KindOK, Host: Host}
+}
+
 func (f *Forge) Setup() clisetup.Setup {
 	return clisetup.Setup{
 		DocsURL: "https://forge.test/cli",
@@ -437,4 +489,63 @@ func (f *Forge) Setup() clisetup.Setup {
 	}
 }
 
-func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status { return f.Status(ctx, Host) }
+func (f *Forge) CLIStatus(ctx context.Context, _ bool) githost.Status {
+	return f.Status(ctx, githost.Repo{Host: Host})
+}
+
+// PostedComment is one comment posted through the comment role.
+type PostedComment struct {
+	Body    string
+	ReplyTo string
+}
+
+// Posted returns the comments posted on merge request number, in order.
+func (f *Forge) Posted(number int) []PostedComment {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.posted[number])
+}
+
+func (f *Forge) ReplyKinds(githost.Repo) []string {
+	return []string{githost.ThreadComment, githost.ThreadReview, githost.ThreadCode}
+}
+
+// PostChangeRequestComment records the comment and appends it to the detail overlay, so a refetch shows it.
+func (f *Forge) PostChangeRequestComment(_ context.Context, _ githost.Repo, number int, c githost.NewComment) githost.Status {
+	f.record("post:" + strconv.Itoa(number))
+	if st, limited := f.rateLimit(); limited {
+		return st
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.offline {
+		return githost.Status{Kind: githost.KindUnauthenticated, Host: Host, Reason: "offline"}
+	}
+	if _, ok := f.find(number); !ok {
+		return f.goneStatus()
+	}
+	d := f.details[number]
+	threadAt := -1
+	if c.ReplyTo != "" {
+		for i, t := range d.Threads {
+			if t.ID == c.ReplyTo {
+				threadAt = i
+			}
+		}
+		if threadAt < 0 {
+			return githost.Status{Kind: githost.KindForbidden, Host: Host, Reason: "no such thread"}
+		}
+	}
+	pc := PostedComment{Body: c.Body, ReplyTo: c.ReplyTo}
+	f.posted[number] = append(f.posted[number], pc)
+	id := "posted-" + strconv.Itoa(len(f.posted[number]))
+	comment := githost.Comment{ID: id, Author: githost.Person{Login: f.account}, Body: c.Body, CreatedAt: time.Now().UnixMilli()}
+	d.Threads = slices.Clone(d.Threads)
+	if threadAt >= 0 {
+		d.Threads[threadAt].Comments = append(slices.Clone(d.Threads[threadAt].Comments), comment)
+	} else {
+		d.Threads = append(d.Threads, githost.Thread{ID: id, Kind: githost.ThreadComment, Comments: []githost.Comment{comment}})
+	}
+	f.details[number] = d
+	return githost.Status{Kind: githost.KindOK, Host: Host}
+}

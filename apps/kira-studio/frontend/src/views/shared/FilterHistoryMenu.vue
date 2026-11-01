@@ -38,7 +38,6 @@ const listQuery = useQuery(() => ({
     return { saved, history };
   },
   enabled: props.connectionId !== null,
-  staleTime: 0,
 }));
 
 // Both lists share one literal union so the generic SavedListMenu infers a single Entry type.

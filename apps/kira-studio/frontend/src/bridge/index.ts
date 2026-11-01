@@ -7,6 +7,7 @@ import * as DbMcpService from '@bindings/dbmcpservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
+import * as KibanaService from '@bindings/kibanaservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
@@ -39,6 +40,17 @@ import type {
   DbMcpStatus,
 } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
+import {
+  type KibanaDataView,
+  type KibanaDiscoverBody,
+  type KibanaDiscoverRequest,
+  type KibanaHistogram,
+  type KibanaInterval,
+  type KibanaSuggestions,
+  kibanaDataViewSchema,
+  kibanaHistogramSchema,
+  kibanaSuggestionsSchema,
+} from '@shared/domain/kibana';
 import type { Layout } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { AppMode } from '@shared/domain/mode';
@@ -55,14 +67,16 @@ import type {
   ProofViewStateEntry,
   ProofWindowTarget,
 } from '@shared/domain/proof';
-import type {
-  ConsoleBody,
-  FilterBody,
-  FilterHistoryEntry,
-  SavedConsoleQuery,
-  SavedFilterQuery,
-  SavedQuery,
-  SortSpec,
+import {
+  type ConsoleBody,
+  type FilterBody,
+  type FilterHistoryEntry,
+  type SavedConsoleQuery,
+  type SavedDiscoverQuery,
+  type SavedFilterQuery,
+  type SavedQuery,
+  type SortSpec,
+  savedDiscoverQuerySchema,
 } from '@shared/domain/queries';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type {
@@ -85,9 +99,15 @@ import type {
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/treeFilter';
-import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
+import {
+  CHANNEL,
+  type FilterHistoryChangedEvent,
+  type MaskRulesChangedEvent,
+  type SavedQueriesChangedEvent,
+} from '@shared/protocol/events';
 import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
+import { logWarn } from '@workbench/bridge/log';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
@@ -209,6 +229,10 @@ const studioControl = {
   // window's own query cache instead of staying stale until something else happens to refetch it.
   onMaskRulesChanged: (cb: (event: MaskRulesChangedEvent) => void): (() => void) =>
     on(CHANNEL.maskRulesChanged, cb),
+  onSavedQueriesChanged: (cb: (event: SavedQueriesChangedEvent) => void): (() => void) =>
+    on(CHANNEL.savedQueriesChanged, cb),
+  onFilterHistoryChanged: (cb: (event: FilterHistoryChangedEvent) => void): (() => void) =>
+    on(CHANNEL.filterHistoryChanged, cb),
   onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
     on(CHANNEL.connectionState, cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>
@@ -392,6 +416,26 @@ const studioControl = {
     pinned: boolean;
   }): Promise<SavedConsoleQuery> =>
     unwrap(QueriesService.SaveConsole(args)).then((r) => trust<SavedConsoleQuery>(r)),
+  queriesListDiscover: (connectionId: string): Promise<SavedDiscoverQuery[]> =>
+    unwrap(QueriesService.ListDiscover({ connectionId })).then((rows) =>
+      trust<unknown[]>(rows ?? []).flatMap((row) => {
+        const parsed = savedDiscoverQuerySchema.safeParse(row);
+        if (parsed.success) return [parsed.data];
+        logWarn('queries', 'dropping saved Discover query that does not parse', parsed.error);
+        return [];
+      }),
+    ),
+  queriesSaveDiscover: (args: {
+    connectionId: string;
+    name: string;
+    body: KibanaDiscoverBody;
+    pinned: boolean;
+  }): Promise<SavedDiscoverQuery> =>
+    unwrap(QueriesService.SaveDiscover(args)).then((r) => savedDiscoverQuerySchema.parse(r)),
+  queriesUpdateDiscover: (id: string, body: KibanaDiscoverBody): Promise<SavedDiscoverQuery> =>
+    unwrap(QueriesService.UpdateDiscover({ id, body })).then((r) =>
+      savedDiscoverQuerySchema.parse(r),
+    ),
   queriesUpdate: (id: string, patch: { name?: string; pinned?: boolean }): Promise<SavedQuery> =>
     unwrap(
       QueriesService.Update({ id, name: patch.name ?? null, pinned: patch.pinned ?? null }),
@@ -419,6 +463,33 @@ const studioControl = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
+
+  // P424: Discover reads beyond execute(). The wire shapes are zod-parsed, not trusted.
+  kibanaDataViews: (connectionId: string, opId: string): Promise<KibanaDataView[]> =>
+    unwrap(KibanaService.DataViews({ connectionId, opId })).then((r) =>
+      kibanaDataViewSchema.array().parse(r ?? []),
+    ),
+  kibanaDataView: (connectionId: string, opId: string, id: string): Promise<KibanaDataView> =>
+    unwrap(KibanaService.DataView({ connectionId, opId, id })).then((r) =>
+      kibanaDataViewSchema.parse(r),
+    ),
+  kibanaHistogram: (args: {
+    connectionId: string;
+    opId: string;
+    tabId: string;
+    request: KibanaDiscoverRequest;
+    interval: KibanaInterval;
+  }): Promise<KibanaHistogram> =>
+    unwrap(KibanaService.Histogram(args)).then((r) => kibanaHistogramSchema.parse(r)),
+  kibanaSuggest: (args: {
+    connectionId: string;
+    opId: string;
+    tabId: string;
+    request: KibanaDiscoverRequest;
+    field: string;
+    prefix: string;
+  }): Promise<KibanaSuggestions> =>
+    unwrap(KibanaService.Suggest(args)).then((r) => kibanaSuggestionsSchema.parse(r)),
 
   // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
   // state/customScripts.ts, the one store that wraps these.

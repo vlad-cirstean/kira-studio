@@ -7,7 +7,19 @@
 export const IPC = {
   gitHostOpenChangeRequestUrl: 'kira:githost:openChangeRequestUrl',
   gitHostProviders: 'kira:githost:providers',
+  hostViewOpen: 'kira:hostview:open',
+  hostViewWindowTarget: 'kira:hostview:windowTarget',
+  hostViewChangeRequest: 'kira:hostview:changeRequest',
+  hostViewIssue: 'kira:hostview:issue',
+  hostViewPostComment: 'kira:hostview:postComment',
   linkOpenExternal: 'kira:link:openExternal',
+
+  captureWindowItem: 'kira:capture:windowItem',
+  captureConfirm: 'kira:capture:confirm',
+  captureDismiss: 'kira:capture:dismiss',
+  captureStatus: 'kira:capture:getStatus',
+  captureStatusChanged: 'kira:capture:status',
+  captureItem: 'kira:capture:item',
 
   settingsGetAll: 'kira:settings:getAll',
   settingsSet: 'kira:settings:set',

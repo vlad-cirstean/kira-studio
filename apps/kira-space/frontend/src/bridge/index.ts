@@ -2,12 +2,14 @@ import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as AgentNotifyService from '@bindings/agentnotifyservice.js';
 import * as AgentService from '@bindings/agentservice.js';
 import * as AgentUsageService from '@bindings/agentusageservice.js';
+import * as CaptureService from '@bindings/captureservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FileHandlersService from '@bindings/filehandlersservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHostService from '@bindings/githostservice.js';
+import * as HostViewService from '@bindings/hostviewservice.js';
 import * as IssueTrackerService from '@bindings/issuetrackerservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
@@ -39,11 +41,14 @@ import type {
 import type {
   CodeSearchEvent,
   DiffContent,
+  DiffRead,
   EditContent,
   FileContent,
   FileHandlersSetResult,
   FileHandlersStatus,
   FileListing,
+  FileRead,
+  FileStat,
   OpenedFileTarget,
   RepoSummary,
   SearchRequest,
@@ -72,6 +77,15 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
+import type { CaptureItem, CaptureResult, HotkeyState } from '../capture/wire';
+import { CHANNEL_CAPTURE_ITEM, CHANNEL_CAPTURE_STATUS } from '../capture/wire';
+import type {
+  HostViewChangeRequest,
+  HostViewIssue,
+  HostViewOpen,
+  HostViewPosted,
+  HostViewTarget,
+} from '../hostview/wire';
 import type { CliToolsResult, IssueTrackers } from '../state/cliToolsDomain';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
@@ -191,6 +205,36 @@ const spaceControl = {
 
   gitHostOpenChangeRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHostService.OpenChangeRequestURL({ url })),
+  captureWindowItem: (args: { windowKey: string }): Promise<CaptureItem | null> =>
+    unwrap(CaptureService.WindowItem(args)).then((r) => trust<CaptureItem | null>(r)),
+  captureConfirm: (args: {
+    windowKey: string;
+    itemId: string;
+    action: string;
+    title: string;
+  }): Promise<CaptureResult> =>
+    unwrap(CaptureService.Confirm(args)).then((r) => trust<CaptureResult>(r)),
+  captureDismiss: (windowKey: string): Promise<void> =>
+    unwrap(CaptureService.Dismiss({ windowKey })),
+  captureStatus: (): Promise<HotkeyState> =>
+    unwrap(CaptureService.Status()).then((r) => trust<HotkeyState>(r)),
+  onCaptureItem: (cb: (item: CaptureItem) => void): (() => void) => on(CHANNEL_CAPTURE_ITEM, cb),
+  onCaptureStatus: (cb: (state: HotkeyState) => void): (() => void) =>
+    on(CHANNEL_CAPTURE_STATUS, cb),
+  hostViewOpen: (url: string): Promise<HostViewOpen> =>
+    unwrap(HostViewService.Open({ url })).then((r) => trust<HostViewOpen>(r)),
+  hostViewWindowTarget: (args: { windowKey: string }): Promise<HostViewTarget | null> =>
+    unwrap(HostViewService.WindowTarget(args)).then((r) => trust<HostViewTarget | null>(r)),
+  hostViewChangeRequest: (args: { url: string }): Promise<HostViewChangeRequest> =>
+    unwrap(HostViewService.ChangeRequest(args)).then((r) => trust<HostViewChangeRequest>(r)),
+  hostViewIssue: (args: { ref: string }): Promise<HostViewIssue> =>
+    unwrap(HostViewService.Issue(args)).then((r) => trust<HostViewIssue>(r)),
+  hostViewPostComment: (args: {
+    windowKey: string;
+    body: string;
+    replyTo: string;
+  }): Promise<HostViewPosted> =>
+    unwrap(HostViewService.PostComment(args)).then((r) => trust<HostViewPosted>(r)),
   gitHostProviders: (): Promise<V2.HostProviders> =>
     unwrap(GitHostService.Providers()).then((r) => trust<V2.HostProviders>(r)),
 
@@ -276,8 +320,8 @@ const spaceControl = {
     unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.ListFiles>>>(
       CodeWorkspaceService.ListFiles({ id }),
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
-  codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
-    unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+  codeWorkspaceReadFile: (id: string, path: string, ifStat?: FileStat): Promise<FileRead> =>
+    unwrap(CodeWorkspaceService.ReadFile({ id, path, ifStat })).then((r) => trust<FileRead>(r)),
   codeWorkspaceReadFileForEdit: (id: string, path: string): Promise<EditContent> =>
     unwrap(CodeWorkspaceService.ReadFileForEdit({ id, path })).then((r) => trust<EditContent>(r)),
   codeWorkspaceWriteFile: (
@@ -313,8 +357,12 @@ const spaceControl = {
     unwrap(CodeWorkspaceService.OpenWorkspace({ id })),
   codeWorkspaceCloseWorkspace: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.CloseWorkspace({ id })),
-  codeWorkspaceReadDiff: (id: string, path: string): Promise<DiffContent> =>
-    unwrap(CodeWorkspaceService.ReadDiff({ id, path })).then((r) => trust<DiffContent>(r)),
+  codeWorkspaceReadDiff: (
+    id: string,
+    path: string,
+    gate?: { ifStat?: FileStat; ifHeadOid?: string },
+  ): Promise<DiffRead> =>
+    unwrap(CodeWorkspaceService.ReadDiff({ id, path, ...gate })).then((r) => trust<DiffRead>(r)),
 
   // C7 §5/D7: StartSearch returns as soon as the background scan starts — its own searchId is how
   // the renderer matches a later onCodeSearch event to the run that's waiting on it.

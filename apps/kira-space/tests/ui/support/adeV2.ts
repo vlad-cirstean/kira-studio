@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import type { ContractJson } from '@workbench/testing/ui/contract';
 import type { KiraApp, RelaunchOptions } from '../fixtures';
 import { contract } from './contract';
+import { calls } from './ipcCalls';
 import { IPC } from './ipcChannels';
 import { emitWailsEvent } from './mockRuntime';
 import type { ControlSnapshot } from './types';
@@ -340,4 +341,21 @@ export async function openTask(page: Page, id: string): Promise<void> {
     .locator(`[data-testid="ade-card"][data-task-id="${id}"] [data-testid="ade-card-head"]`)
     .click();
   await page.locator('[data-testid="ade-task-tab"]').waitFor();
+}
+
+/** Opens the inspector's collapsed Advanced section. */
+export const openAdvanced = async (page: Page): Promise<void> => {
+  const toggle = page.locator('[data-testid="ade-wf-step-advanced"]');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+};
+
+/** Clicks Save and returns the args of the nth SaveWorkflow call. */
+export async function saved<T>(
+  page: Page,
+  control: Parameters<typeof calls>[0],
+  n: number,
+): Promise<T> {
+  await page.locator('[data-testid="ade-wf-save"]').click();
+  await expect.poll(() => calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(n);
+  return calls(control, IPC.adeTaskSaveWorkflow)[n - 1]?.args as T;
 }

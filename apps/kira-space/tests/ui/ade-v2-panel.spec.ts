@@ -543,3 +543,24 @@ test('agent-made branches carry a sparkle', async ({ relaunch }) => {
     .click();
   await expect(page.locator('[data-testid="ade-panel-agent"]')).toBeVisible();
 });
+
+test('a change request link opens the in-app PR view', async ({ relaunch }) => {
+  const url = 'https://github.com/acme/web-app/pull/7';
+  const board = adeBoard((b) => {
+    const task = b.tasks.find((x) => x.id === 'T_bill');
+    Object.assign(task ?? {}, {
+      hostUrl: url,
+      hostLink: { provider: 'github', kind: 'changeRequest', ref: 'acme/web-app#7' },
+    });
+  });
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskBoard, response: board },
+    { channel: IPC.hostViewOpen, response: { key: 'hostview-1', opened: true } },
+  ]);
+  await openTask(page, 'T_bill');
+  await page.locator('[data-testid="ade-task-host-view"]').click();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.hostViewOpen))
+    .toHaveLength(1);
+  expect(control.log().find((e) => e.channel === IPC.hostViewOpen)?.args).toEqual({ url });
+});

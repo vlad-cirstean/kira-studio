@@ -77,6 +77,12 @@ const (
 	// saved requests, variables, environments) Emits it with the scopes that mutation touched, so
 	// every window's TanStack Query cache invalidates exactly those keys (apidata.go).
 	ChannelApiDataChanged = "kira:api:dataChanged"
+	// ChannelSavedQueriesChanged is P433's broadcast — QueriesService Emits it after every saved
+	// query write (save, update, delete, touch) so every window's saved menus refetch only then.
+	ChannelSavedQueriesChanged = "kira:savedQueries:changed"
+	// ChannelFilterHistoryChanged is P433's broadcast — QueriesService.HistoryRecord Emits it so
+	// every window's filter history menu refetches only then.
+	ChannelFilterHistoryChanged = "kira:filterHistory:changed"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

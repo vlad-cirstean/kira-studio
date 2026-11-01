@@ -40,6 +40,7 @@ describe('createOpLogStore hydrateOps subscribe/snapshot race (F7)', () => {
     });
 
     const hydrating = opsStore.hydrateOps();
+    expect(opsStore.hydrated).toBe(false);
 
     // The snapshot itself is still in flight (recent() not yet resolved) — this is the exact gap
     // the old code had no subscription open for yet. Deliver a start, then a finish, for an op the
@@ -51,6 +52,7 @@ describe('createOpLogStore hydrateOps subscribe/snapshot race (F7)', () => {
     // started.
     snapshotGate.resolve([record({ id: 'seed', status: 'ok', durationMs: 1 })]);
     await hydrating;
+    expect(opsStore.hydrated).toBe(true);
 
     const stored = opsStore.records.find((r) => r.id === 'op-race');
     expect(stored?.status).toBe('ok');
@@ -99,6 +101,7 @@ describe('createOpLogStore hydrateOps subscribe/snapshot race (F7)', () => {
     deliver(record({ id: 'op-buffered', status: 'running' }));
     snapshotGate.reject(new Error('bridge down'));
     await expect(hydrating).rejects.toThrow('bridge down');
+    expect(opsStore.hydrated).toBe(true);
 
     expect(opsStore.records.map((r) => r.id)).toEqual(['op-buffered']);
     deliver(record({ id: 'op-buffered', status: 'ok', durationMs: 3 }));

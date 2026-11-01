@@ -103,6 +103,19 @@ export interface WorkflowStep {
   review: ReviewStepConfig | null;
   /** Agent policy; the default (write, network on) when the step has no block. */
   sandbox: StepSandbox;
+  /** Per provider id, setting key to value; `{}` = provider defaults. */
+  settings: Record<string, Record<string, string>>;
+}
+/** One setting the editor offers, from the provider catalog. */
+export interface StageSettingSpec {
+  provider: string;
+  providerLabel: string;
+  key: string;
+  kind: 'int';
+  min: number;
+  max: number;
+  label: string;
+  hint: string;
 }
 export type SandboxAccess = 'write' | 'read' | 'off';
 export interface StepSandbox {
@@ -139,6 +152,7 @@ export interface WorkflowsResult {
   dir: string;
   workflows: WorkflowEntry[];
   sandbox: SandboxSupport;
+  stageSettings: StageSettingSpec[];
 }
 export interface WorkflowYaml {
   fileName: string;

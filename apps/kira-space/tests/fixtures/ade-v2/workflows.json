@@ -31,7 +31,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "plan",
@@ -71,7 +72,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "impl",
@@ -111,7 +113,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "tests",
@@ -151,7 +154,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "ci",
@@ -191,7 +195,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "pr",
@@ -231,7 +236,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "review",
@@ -256,7 +262,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "release",
@@ -296,7 +303,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           }
         ]
       },
@@ -334,7 +342,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "repro",
@@ -374,7 +383,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "fix",
@@ -414,7 +424,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "ci",
@@ -454,7 +465,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "pr",
@@ -494,7 +506,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "release",
@@ -534,7 +547,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           }
         ]
       },
@@ -587,7 +601,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "ci",
@@ -627,7 +642,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           },
           {
             "id": "release",
@@ -667,7 +683,8 @@
               "read": [],
               "allow": [],
               "network": true
-            }
+            },
+            "settings": {}
           }
         ]
       },
@@ -690,5 +707,17 @@
   "sandbox": {
     "enforced": true,
     "reason": ""
-  }
+  },
+  "stageSettings": [
+    {
+      "hint": "Tokens of context before Claude Code compacts the conversation, 100000 to 1000000. Empty uses Claude Code\u2019s default.",
+      "key": "auto_compact_window",
+      "kind": "int",
+      "label": "Auto compact limit",
+      "max": 1000000,
+      "min": 100000,
+      "provider": "claude",
+      "providerLabel": "Claude"
+    }
+  ]
 }

@@ -86,6 +86,9 @@ export const IPC = {
   queriesSave: 'kira:queries:save',
   queriesListConsole: 'kira:queries:listConsole',
   queriesSaveConsole: 'kira:queries:saveConsole',
+  queriesListDiscover: 'kira:queries:listDiscover',
+  queriesSaveDiscover: 'kira:queries:saveDiscover',
+  queriesUpdateDiscover: 'kira:queries:updateDiscover',
   queriesUpdate: 'kira:queries:update',
   queriesDelete: 'kira:queries:delete',
   queriesTouch: 'kira:queries:touch',
@@ -94,6 +97,11 @@ export const IPC = {
 
   schemaGet: 'kira:schema:get',
   schemaSet: 'kira:schema:set',
+
+  kibanaDataViews: 'kira:kibana:dataViews',
+  kibanaDataView: 'kira:kibana:dataView',
+  kibanaHistogram: 'kira:kibana:histogram',
+  kibanaSuggest: 'kira:kibana:suggest',
 
   collectionsList: 'kira:collections:list',
   collectionsGetRequest: 'kira:collections:getRequest',
@@ -284,4 +292,7 @@ export const IPC = {
   // P112: every API-client mutation broadcasts the scopes it touched, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape, driven by emitWailsEvent(page, IPC.apiDataChanged, …).
   apiDataChanged: 'kira:api:dataChanged',
+  // P433 F4: saved-query writes and recorded filters, Emit'd app-wide — driven by emitWailsEvent.
+  savedQueriesChanged: 'kira:savedQueries:changed',
+  filterHistoryChanged: 'kira:filterHistory:changed',
 } as const;

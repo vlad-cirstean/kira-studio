@@ -54,6 +54,7 @@ function kindDefaults(kind: StepKind): Omit<WorkflowStep, 'id' | 'name'> {
     params: {},
     review: null,
     sandbox: defaultSandbox(),
+    settings: {},
   };
   if (kind === 'manual') return base;
   const automatic = { ...base, runsOn: 'each repo' as const, before: 'auto' as const };
@@ -81,7 +82,7 @@ export function newStep(kind: StepKind, taken: readonly string[]): WorkflowStep 
 }
 
 /** The step turned into `kind`: id, name, status, skip and `runs_on` (when the kind has one) stay,
- *  everything else goes back to the kind's defaults. */
+ *  everything else goes back to the kind's defaults, except the stage settings an agent or review keeps. */
 export function withKind(step: WorkflowStep, kind: StepKind): WorkflowStep {
   if (step.kind === kind) return step;
   const fresh = kindDefaults(kind);
@@ -92,6 +93,7 @@ export function withKind(step: WorkflowStep, kind: StepKind): WorkflowStep {
     skip: step.skip,
     status: step.status,
     runsOn: fresh.runsOn === '' ? '' : step.runsOn || fresh.runsOn,
+    settings: kind === 'agent' || kind === 'review' ? step.settings : {},
   };
 }
 

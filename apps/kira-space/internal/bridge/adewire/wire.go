@@ -124,6 +124,20 @@ type WorkflowStep struct {
 	Review *ReviewStepConfig `json:"review"`
 	// Sandbox is what the step's agent may do on the machine; always set, the default when absent.
 	Sandbox StepSandbox `json:"sandbox"`
+	// Settings are the stage settings per agent provider id, key to value; empty means every provider's defaults.
+	Settings map[string]map[string]string `json:"settings"`
+}
+
+// StageSettingSpec is one setting the editor offers, from the provider catalog.
+type StageSettingSpec struct {
+	Provider      string `json:"provider"`
+	ProviderLabel string `json:"providerLabel"`
+	Key           string `json:"key"`
+	Kind          string `json:"kind"` // "int"
+	Min           int    `json:"min"`
+	Max           int    `json:"max"`
+	Label         string `json:"label"`
+	Hint          string `json:"hint"`
 }
 
 // Sandbox access levels.
@@ -206,6 +220,8 @@ type WorkflowsResult struct {
 	Workflows []WorkflowEntry `json:"workflows"`
 	// Sandbox says whether step sandboxes are enforced on this OS.
 	Sandbox SandboxSupport `json:"sandbox"`
+	// StageSettings is every stage setting the registered providers take, in provider then catalog order.
+	StageSettings []StageSettingSpec `json:"stageSettings"`
 }
 
 type WorkflowYaml struct {

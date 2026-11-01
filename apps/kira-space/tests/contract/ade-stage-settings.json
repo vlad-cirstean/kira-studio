@@ -1,0 +1,229 @@
+{
+  "AdeTaskService.LaunchStep#stage-settings": {
+    "command": "<masked>",
+    "cwd": "<masked>",
+    "sessionId": "<masked>",
+    "terminalId": "<masked>"
+  },
+  "AdeTaskService.SaveWorkflow#stage-settings-range": "{\"code\":\"E_BAD_REQUEST\",\"message\":\"step 2: settings.claude.auto_compact_window must be a whole number from 100000 to 1000000 (line 20)\"}",
+  "AdeTaskService.Workflows#stage-settings": {
+    "dir": "<space>/workflows",
+    "sandbox": {
+      "enforced": false,
+      "reason": "The sandbox is not enforced on this OS. It runs on macOS only. Claude permission rules still apply, but they do not stop shell commands."
+    },
+    "stageSettings": [
+      {
+        "hint": "Tokens of context before Claude Code compacts the conversation, 100000 to 1000000. Empty uses Claude Code’s default.",
+        "key": "auto_compact_window",
+        "kind": "int",
+        "label": "Auto compact limit",
+        "max": 1000000,
+        "min": 100000,
+        "provider": "claude",
+        "providerLabel": "Claude"
+      }
+    ],
+    "workflows": [
+      {
+        "error": null,
+        "fileName": "flow.yaml",
+        "hash": "ce1b6914a2508d19b5edf405787ade89272b8df618f2899f3add12757767ae47",
+        "path": "<space>/workflows/flow.yaml",
+        "usedBy": 0,
+        "workflow": {
+          "id": "flow",
+          "name": "Flow",
+          "steps": [
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "command": "",
+              "id": "tuned",
+              "kind": "agent",
+              "maxReturns": 3,
+              "name": "tuned",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "done",
+                  "loop": false,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "",
+                  "id": "failed",
+                  "loop": false,
+                  "next": "stop",
+                  "ok": false
+                }
+              ],
+              "review": null,
+              "runsOn": "each repo",
+              "sandbox": {
+                "access": "write",
+                "allow": [],
+                "network": true,
+                "read": []
+              },
+              "session": false,
+              "settings": {
+                "claude": {
+                  "auto_compact_window": "200000"
+                }
+              },
+              "skip": false,
+              "smartScript": "",
+              "status": "",
+              "timeout": "1m"
+            },
+            {
+              "allowedTools": [],
+              "before": "auto",
+              "command": "",
+              "id": "plain",
+              "kind": "agent",
+              "maxReturns": 3,
+              "name": "plain",
+              "params": {},
+              "prompt": "work on {branch} in {repo}",
+              "results": [
+                {
+                  "description": "",
+                  "id": "done",
+                  "loop": false,
+                  "next": "next",
+                  "ok": true
+                },
+                {
+                  "description": "",
+                  "id": "failed",
+                  "loop": false,
+                  "next": "stop",
+                  "ok": false
+                }
+              ],
+              "review": null,
+              "runsOn": "each repo",
+              "sandbox": {
+                "access": "write",
+                "allow": [],
+                "network": true,
+                "read": []
+              },
+              "session": false,
+              "settings": {},
+              "skip": false,
+              "smartScript": "",
+              "status": "",
+              "timeout": "1m"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "args:AdeTaskService.SaveWorkflow#stage-settings": {
+    "baseHash": "<masked>",
+    "fileName": "flow.yaml",
+    "workflow": {
+      "id": "flow",
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "tuned",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "tuned",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "settings": {
+            "claude": {
+              "auto_compact_window": "200000"
+            }
+          },
+          "skip": false,
+          "smartScript": "",
+          "status": "",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "plain",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "plain",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "settings": {
+            "claude": {
+              "auto_compact_window": "300000"
+            }
+          },
+          "skip": false,
+          "smartScript": "",
+          "status": "",
+          "timeout": "1m"
+        }
+      ]
+    }
+  }
+}

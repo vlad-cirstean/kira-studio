@@ -11,7 +11,7 @@
 // still owns; registering either once per expanded multi-diff section would mean the last section
 // mounted wins, silently shadowing the others'.
 
-import type { DiffSide } from '@shared/domain/repo';
+import type { DiffSide, DiffSideRead } from '@shared/domain/repo';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { logWarn } from '@workbench/bridge/log';
@@ -24,13 +24,15 @@ import { gitTransportFor } from '../../repo/git/transport';
 import { openRepoFileTab } from '../../state/repoTabs';
 import { useSettingsStore } from '../../state/settings';
 import { useDiffLayout } from './diffLayout';
-import { registerDiffEditor, unmountEditor } from './editors';
+import { knownRead, registerDiffEditor, rememberRead, unmountEditor } from './editors';
+import { FULL_COMMIT_ID } from './fileContent';
 import { monacoLanguageFor } from './language';
 import {
   getOrCreateModel,
   KIRA_EDITOR_THEME,
   loadMonaco,
   overflowWidgetsContainer,
+  peekModel,
   repoDiffUris,
   repoRevisionDiffUris,
 } from './monaco';
@@ -57,6 +59,28 @@ interface DiffSidesLoaded {
   gitRepoId: string | undefined;
 }
 
+type TextModel = import('monaco-editor').editor.ITextModel;
+
+/** The models a previous mount left behind, for this diff's two sides. */
+interface PriorModels {
+  head: TextModel;
+  worktree: TextModel;
+}
+
+function sideFromModel(model: TextModel, extra: Partial<DiffSide>): DiffSide {
+  return { kind: 'found', text: model.getValue(), bytes: 0, limitBytes: 0, ...extra };
+}
+
+/** A side as read, or the prior model's text when the backend said it had not changed. */
+function settleSide(
+  side: DiffSideRead,
+  model: TextModel | undefined,
+  extra: Partial<DiffSide>,
+): DiffSide | null {
+  if (side.kind !== 'unchanged') return side;
+  return model ? sideFromModel(model, extra) : null;
+}
+
 // mount()'s own two-branch content read (worktree HEAD-vs-worktree vs a
 // revision-pinned commit diff), each with its own try/catch/error-message plumbing — lifted out
 // so mount() itself only branches on the result. `error` is a string, not thrown: mount()'s own
@@ -68,6 +92,8 @@ async function loadDiffSides(
   right: string | null,
   reviewBranch: string | undefined,
   workingBranchId: string | undefined,
+  prior: PriorModels | undefined,
+  editorKey: string,
 ): Promise<DiffSidesLoaded | { error: string }> {
   if (workingBranchId !== undefined) {
     try {
@@ -79,8 +105,16 @@ async function loadDiffSides(
   }
   if (left === null) {
     try {
-      const diff = await control.codeWorkspaceReadDiff(repoId, path);
-      return { diff, gitRepoId: undefined };
+      const known = prior
+        ? knownRead(editorKey, [prior.head.getVersionId(), prior.worktree.getVersionId()])
+        : null;
+      const gate = known?.stat ? { ifStat: known.stat, ifHeadOid: known.headOid } : undefined;
+      const diff = await control.codeWorkspaceReadDiff(repoId, path, gate);
+      const head = settleSide(diff.head, prior?.head, { oid: known?.headOid });
+      const worktree = settleSide(diff.worktree, prior?.worktree, { stat: known?.stat });
+      // The gate is only sent with prior models, so an unchanged side always has one to reuse.
+      if (!head || !worktree) return { error: t('space.repo.view.repoNotOpen.error') };
+      return { diff: { ...diff, head, worktree }, gitRepoId: undefined };
     } catch (err) {
       return { error: errorText(err) };
     }
@@ -89,6 +123,18 @@ async function loadDiffSides(
   const gitRepoId = gitRepoIdFor(repoId);
   if (!gitRepoId || right === null) {
     return { error: t('space.repo.view.repoNotOpen.error') };
+  }
+  // Both sides are commits, which never change: the models from the last mount are current.
+  if (
+    prior &&
+    reviewBranch === undefined &&
+    FULL_COMMIT_ID.test(left) &&
+    FULL_COMMIT_ID.test(right)
+  ) {
+    return {
+      diff: { head: sideFromModel(prior.head, {}), worktree: sideFromModel(prior.worktree, {}) },
+      gitRepoId,
+    };
   }
   // 7d (P68 review): this lease is only ever used for the two requests below, so it is released
   // as soon as they settle rather than left to leak for the rest of the mount.
@@ -216,7 +262,33 @@ export function useDiffEditor(
   async function mount(): Promise<void> {
     const settingsStore = useSettingsStore();
     const { editorKey, repoId, path, left, right, review, reviewBranch, workingBranchId } = params;
-    const loaded = await loadDiffSides(repoId, path, left, right, reviewBranch, workingBranchId);
+    const mod = await loadMonaco();
+    let headUri: import('monaco-editor').Uri;
+    let worktreeUri: import('monaco-editor').Uri;
+    if (left === null) {
+      ({ head: headUri, worktree: worktreeUri } = repoDiffUris(mod, repoId, path));
+    } else {
+      ({ left: headUri, right: worktreeUri } = repoRevisionDiffUris(
+        mod,
+        repoId,
+        path,
+        left,
+        // biome-ignore lint/style/noNonNullAssertion: checked alongside left above — both null or both set.
+        right!,
+      ));
+    }
+    const priorHead = peekModel(headUri.toString());
+    const priorWorktree = peekModel(worktreeUri.toString());
+    const loaded = await loadDiffSides(
+      repoId,
+      path,
+      left,
+      right,
+      reviewBranch,
+      workingBranchId,
+      priorHead && priorWorktree ? { head: priorHead, worktree: priorWorktree } : undefined,
+      editorKey,
+    );
     if ('error' in loaded) {
       state.value = 'error';
       errorMessage.value = loaded.error;
@@ -238,25 +310,10 @@ export function useDiffEditor(
     }
 
     const layout = useDiffLayout();
-    const mod = await loadMonaco();
     // Unmounted (tab closed/switched away, or the section collapsed) while the read/import above
     // was in flight.
     if (!container.value || params.isCurrent?.() === false) return;
 
-    let headUri: import('monaco-editor').Uri;
-    let worktreeUri: import('monaco-editor').Uri;
-    if (left === null) {
-      ({ head: headUri, worktree: worktreeUri } = repoDiffUris(mod, repoId, path));
-    } else {
-      ({ left: headUri, right: worktreeUri } = repoRevisionDiffUris(
-        mod,
-        repoId,
-        path,
-        left,
-        // biome-ignore lint/style/noNonNullAssertion: checked alongside left above — both null or both set.
-        right!,
-      ));
-    }
     const language = monacoLanguageFor(path);
     const original = getOrCreateModel(mod, headUri.toString(), diff.head.text, language);
     const modified = getOrCreateModel(mod, worktreeUri.toString(), diff.worktree.text, language);
@@ -299,6 +356,13 @@ export function useDiffEditor(
     });
     created.setModel({ original, modified });
     registerDiffEditor(editorKey, [headUri.toString(), worktreeUri.toString()], created);
+    if (left === null && diff.worktree.stat) {
+      rememberRead(editorKey, {
+        stat: diff.worktree.stat,
+        headOid: diff.head.oid,
+        versionIds: [original.getVersionId(), modified.getVersionId()],
+      });
+    }
     editor.value = created;
 
     // C7 D13/§6: the modified (worktree) pane, never the HEAD pane — it's the side whose content

@@ -1335,12 +1335,12 @@ var (
 // DbmcpToolRunQuery describes the run_query tool.
 var DbmcpToolRunQuery = define(Entry{
 	ID: "dbmcp.tool.run_query", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "run_query",
-	Default: "Run one statement per call, not a script, through the app's SQL console path. Connects the connection if not connected. Reading stops at maxRows: rowCount is rows fetched, a lower bound on result size when truncated is true; the database may still run the statement to completion. Read/write/DDL permission is checked first: a denied class is refused; a class set to prompt waits up to two minutes for user approval. With auto-explain on (owner setting), an explainable SELECT/WITH is planned first; a plan over the owner's expensive-query threshold pauses the query for approval, as a prompt permission does.",
+	Default: "Run one statement per call, not a script, through the app's SQL console path. Connects the connection if not connected. Reading stops at maxRows: rowCount is rows fetched, a lower bound on result size when truncated is true; the database may still run the statement to completion. Read/write/DDL permission is checked first: a denied class is refused; a class set to prompt waits up to two minutes for user approval. With auto-explain on (owner setting), an explainable SELECT/WITH is planned first; a plan over the owner's expensive-query threshold pauses the query for approval, as a prompt permission does. On a kibana connection, `sql` is one Discover request as a JSON object (see the `sql` argument), read-only.",
 }, NoVars{})
 
 var (
 	_ = arg(DbmcpToolRunQuery.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
-	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement; not a script.`, NoVars{})
+	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement; not a script. On kibana: a JSON object with exactly the keys dataView (data view id from list_children), query (KQL or Lucene text), language ("kuery" or "lucene"), timeRange ({"from","to"} ISO-8601 or date math such as "now-15m", or null), filters (array of {"field","operator","values","disabled"}; operator is, is_not, is_one_of, is_not_one_of, exists, does_not_exist or between), sort (array of {"field","order"}), size (hits to return) and timeZone (IANA name).`, NoVars{})
 	_ = arg(DbmcpToolRunQuery.id, "path", studioApp, NextCall, `Encoded database path from list_children. Required on postgres, mysql, mariadb and mongodb; pass "" on other engines.`, NoVars{})
 	_ = arg(DbmcpToolRunQuery.id, "maxRows", studioApp, NextCall, `Rows to return, 1-{{.Max}}. Default {{.Default}}. Reading stops at this many rows; rowCount is then a lower bound.`, LimitVars{Default: 200, Max: 2000})
 )
@@ -1348,7 +1348,7 @@ var (
 // DbmcpToolExplainQuery describes the explain_query tool.
 var DbmcpToolExplainQuery = define(Entry{
 	ID: "dbmcp.tool.explain_query", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "explain_query",
-	Default: "Plan one SELECT or WITH statement without running it. Returns the normalized plan: node tree, each node's estimated rows and native cost, and structural issues the app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
+	Default: "Plan one SELECT or WITH statement without running it. Returns the normalized plan: node tree, each node's estimated rows and native cost, and structural issues the app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3, sqs or kibana. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
 }, NoVars{})
 
 var (
@@ -1383,7 +1383,7 @@ var (
 // DbmcpToolProofAddStep describes the proof_add_step tool.
 var DbmcpToolProofAddStep = define(Entry{
 	ID: "dbmcp.tool.proof_add_step", Kind: KindTool, Apps: studioApp, Applies: NextCall, Name: "proof_add_step",
-	Default: "Add the next step to a draft. Steps show in the order added; the call returns the step's ordinal. The data can come from any tool you used: pick the view that shows it best. Every value is validated and rejected with the field and limit when it does not fit.",
+	Default: "Add the next step to a draft. Steps show in the order added; the call returns the step's ordinal. The data can come from any tool you used: pick the view that shows it best. table, document and keyvalue show values; chart plots numbers (a count over time, a before/after comparison, a share of a total) and shows no table, so add a table step too when exact values matter. Every value is validated and rejected with the field and limit when it does not fit.",
 }, NoVars{})
 
 var (
@@ -1392,8 +1392,8 @@ var (
 	_ = arg(DbmcpToolProofAddStep.id, "query", studioApp, NextCall, `The query or command you ran, up to 64 KiB. Shown above the data.`, NoVars{})
 	_ = arg(DbmcpToolProofAddStep.id, "language", studioApp, NextCall, `Highlighting for query: sql, json, shell or text. Default text.`, NoVars{})
 	_ = arg(DbmcpToolProofAddStep.id, "source", studioApp, NextCall, `Short label of the tool that produced the data, such as elasticsearch. Up to 64 characters.`, NoVars{})
-	_ = arg(DbmcpToolProofAddStep.id, "view", studioApp, NextCall, `table, document or keyvalue. Required unless keepOrdinal is set.`, NoVars{})
-	_ = arg(DbmcpToolProofAddStep.id, "data", studioApp, NextCall, `table: {columns:[{name,type?}],rows:[[cell,...]]} with type number, text, boolean, temporal, json or other (inferred when omitted). document: {documents:[{id?,body:{...}}]}. keyvalue: {entries:[{field,value}]}. Limits: 10000 rows or documents, 64 KiB per cell, 4 MiB per step. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "view", studioApp, NextCall, `table, document, keyvalue or chart. Required unless keepOrdinal is set.`, NoVars{})
+	_ = arg(DbmcpToolProofAddStep.id, "data", studioApp, NextCall, `table: {columns:[{name,type?}],rows:[[cell,...]]} with type number, text, boolean, temporal, json or other (inferred when omitted). document: {documents:[{id?,body:{...}}]}. keyvalue: {entries:[{field,value}]}. chart, type bar, line, area or scatter: {type,x:{type,name?},y?:{name?,unit?},stacked?,horizontal?,series:[{name,points:[[x,y],...]}]}. x.type is category (x a string label), time (ISO-8601 or epoch milliseconds) or value (number). y is a number, or null for a gap. stacked: bar and area only; horizontal: bar only. Histogram: bar, one point per bucket. Time series: line or area, x.type time. Up to 20 series, 1000 categories, 20000 points (bar and scatter 1000). chart, type pie: {type,unit?,slices:[{name,value}]}, up to 50 slices, values 0 or more. Limits: 10000 rows or documents, 64 KiB per cell, 4 MiB per step. Required unless keepOrdinal is set.`, NoVars{})
 	_ = arg(DbmcpToolProofAddStep.id, "keepOrdinal", studioApp, NextCall, `Edit drafts only: reuse the old step with this ordinal unchanged. Pass no other step field.`, NoVars{})
 	_ = arg(DbmcpToolProofAddStep.id, "replacesOrdinal", studioApp, NextCall, `Edit drafts only: this step is a changed version of the old step with this ordinal.`, NoVars{})
 )

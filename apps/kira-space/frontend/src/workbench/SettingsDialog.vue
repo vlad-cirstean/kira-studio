@@ -13,6 +13,7 @@ import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AgentPane from './settings/AgentPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
+import CapturePane from './settings/CapturePane.vue';
 import CliToolsPane from './settings/CliToolsPane.vue';
 import FileTypesPane from './settings/FileTypesPane.vue';
 import GitPane from './settings/GitPane.vue';
@@ -38,6 +39,7 @@ const sectionLabels = computed<Record<Section, string>>(() => ({
   Git: t('common.module.git.label'),
   'CLI tools': t('space.settings.nav.cliTools.label'),
   'File types': t('space.settings.nav.fileTypes.label'),
+  Capture: t('space.settings.nav.capture.label'),
   'Mobile access': t('space.settings.nav.mobileAccess.label'),
   Agent: agentInfo.value.productLabel,
   Memory: t('common.module.memory.label'),
@@ -65,6 +67,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       git: defaultSettings.git,
       agent: defaultSettings.agent,
       memory: defaultSettings.memory,
+      capture: defaultSettings.capture,
       ade: {
         headlessSettingSources: defaultSettings.ade.headlessSettingSources,
       },
@@ -75,6 +78,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       git: settingsStore.git,
       agent: settingsStore.agent,
       memory: settingsStore.memory,
+      capture: settingsStore.capture,
       ade: {
         headlessSettingSources: settingsStore.ade.headlessSettingSources,
       },
@@ -107,6 +111,13 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <FileTypesPane
         :active="s.activeSection === 'File types'"
+        :draft="s.draft"
+        :is-at-default="s.isAtDefault"
+        :reset-leaf="s.resetLeaf"
+        :register-field-error="s.registerFieldError"
+      />
+      <CapturePane
+        :active="s.activeSection === 'Capture'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

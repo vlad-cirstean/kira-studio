@@ -172,6 +172,9 @@ func (m *Manager) resetLocked() {
 		m.cli = nil
 		m.containerd = nil
 	}
+	if m.env.Current != nil {
+		m.env.Current.forget()
+	}
 }
 
 // dropFallbackClient drops the cached client when it came from the default or probe fallback, so the

@@ -174,12 +174,12 @@ func TestSecondGitHostRegistered(t *testing.T) {
 	r := newRig(t, forge)
 
 	list := call[githost.Providers](t, r.gs, "gitHost.providers", struct{}{})
-	if len(list.Providers) != 2 || list.Providers[0].ID != "github" || list.Providers[1].ID != "forge" ||
-		list.Providers[1].ChangeRequestShort != "MR" {
-		t.Fatalf("gitHost.providers = %+v, want github then forge", list)
+	if len(list.Providers) != 3 || list.Providers[0].ID != "github" || list.Providers[1].ID != "azure" ||
+		list.Providers[2].ID != "forge" || list.Providers[2].ChangeRequestShort != "MR" {
+		t.Fatalf("gitHost.providers = %+v, want github, azure, forge", list)
 	}
-	if got := r.app.W.GitHost.Providers(); len(got.Providers) != 2 {
-		t.Fatalf("GitHostService.Providers = %+v, want 2", got)
+	if got := r.app.W.GitHost.Providers(); len(got.Providers) != 3 {
+		t.Fatalf("GitHostService.Providers = %+v, want 3", got)
 	}
 
 	if info := r.hostInfo(); info == nil || info.ID != "forge" || info.Label != "Forge" || info.ChangeRequestNoun != "merge request" {
@@ -245,7 +245,7 @@ func TestSecondGitHostRegistered(t *testing.T) {
 	}
 	for _, bad := range []string{"https://example.com/acme/r/-/merge_requests/7", "https://forge.test/acme/r/pull/7"} {
 		_, err := r.app.W.AdeTask.UpdateTask(ctx, adewire.UpdateTaskArgs{TaskID: task, Patch: adewire.TaskPatch{HostURL: &bad}})
-		if err == nil || !strings.Contains(err.Error(), "Not a GitHub PR or issue link or Forge MR or issue link.") {
+		if err == nil || !strings.Contains(err.Error(), "Not a GitHub PR or issue link or Azure Repos PR or issue link or Forge MR or issue link.") {
 			t.Fatalf("UpdateTask hostUrl %q = %v, want the not-a-link error naming both hosts", bad, err)
 		}
 	}

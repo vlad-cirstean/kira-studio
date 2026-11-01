@@ -149,6 +149,14 @@ rather than hand-written. This section is only about running it here.
   `apps/kira-studio/tests/ipc/`. Capturing a fresh shape for a new `tests/ui/` fixture needs that
   mode written first.
 
+## Kibana and Elasticsearch — testing in this environment (P424)
+
+- Fixture starts Elasticsearch plus Kibana (`kibana:9.5.3`, `elasticsearch:9.5.3`, plain Hub names; `bun run test:images` pulls both) on one Docker network. Needs about 1.5 GB of memory. Cold start takes 1 to 3 minutes; seeding adds seconds. Never run two heavy jobs beside it: a concurrent `vue-tsc` run OOM-killed Kibana (exit 137) on a 16 GB box.
+- Run from `apps/kira-studio`: `CGO_ENABLED=1 go test ./internal/adapters/kibana/ -count=1 -timeout 40m` (conformance, search, KQL, interval). Complete suite: `KIRA_TEST_MATRIX=1 ... -run TestKibana_AuthMatrix`. Flow test: `go test ./internal/flows/dbflow -run TestKibanaDiscoverJourney`; `KIRA_CONTRACT=write` regenerates `tests/contract/kibana-discover.json`.
+- Compat overrides: `KIRA_COMPAT_IMAGE_KIBANA` and `KIRA_COMPAT_IMAGE_ELASTICSEARCH`. Keep both on the same version.
+- Elasticsearch runs with `cluster.routing.allocation.disk.threshold_enabled=false`. On a near-full disk the watermark otherwise leaves every shard unassigned and Kibana hangs on startup.
+- A low-privilege Kibana user on 9.x gets no version from `/api/status`; tests do not assert one for that user.
+
 ## ClickHouse — testing in this environment (P36, its workaround resolved P58f)
 
 See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design facts.
@@ -449,7 +457,18 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 
 - `apps/kira-space/internal/issuetracker/jira/testdata/*.json` are hand-written from acli's documented output. Running a downloaded `acli` binary was refused in the sandbox, so no real output was captured.
 - Refresh by hand against a real site: `acli jira workitem view KEY --json --fields '*all,-comment,-attachment,-worklog,-description'`, then redact. Keep both Development field forms (string and object).
+- P428 adds `issue-detail.json`, `issue-detail-plain.json` and `comment-list.json`. Refresh with `acli jira workitem view KEY --json --fields <jira.DetailFields>` and `acli jira workitem comment list --key KEY --json --limit 50 --order -created`, then redact.
+- P429: no `comment create` fixture exists. `fakeacli` records the call and reads the `--body-file` ADF. Check by hand: `acli jira workitem comment create --key KEY --body-file body.json` with an ADF document.
 - Flow tests use `flowharness/fakeacli`; no test needs `acli` installed.
+
+## `az` fixtures (P423)
+
+- Install for captures: `python3 -m venv /tmp/azenv && /tmp/azenv/bin/pip install azure-cli && AZURE_CONFIG_DIR=/tmp/azcfg /tmp/azenv/bin/az extension add --name azure-devops`. Keep `AZURE_CONFIG_DIR` in scratch.
+- `githost/azure/testdata`: version, configure-list and stderr files are captured from real `az`. PR, policy, query and thread JSON are hand-written from the documented shape and await confirmation against a real org (`testdata/README`). No org was reachable in the sandbox.
+- P427 detail fixtures (`pr_detail.json`, `policy_detail.json`, `threads_get.json`) are hand-written too. Check the invoke GET projection with `az devops invoke --area git --resource pullRequestThreads --route-parameters project=<p> repositoryId=<r> pullRequestId=<n> --http-method GET --query "<ThreadsQuery>" --org https://dev.azure.com/<org> --detect false -o json` (`--query` is a global argument; `--help` lists it).
+- GitHub `githost/github/testdata/pr_detail.json` is hand-written from the GraphQL schema. Optional check: `gh api graphql -f query=@<detailQuery text> -f owner=<o> -f name=<r> -F number=<n>` against a real PR.
+- Refresh PR JSON: `az repos pr list --org https://dev.azure.com/<org> --project <p> --repository <r> --detect false -o json`, then redact.
+- Flow tests use `flowharness/fakeaz`; no test needs `az` installed.
 
 ## Kira Space flow suites (P231)
 
@@ -459,7 +478,7 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
 - Fake `claude`/`gh`: the test binary or `fakeclaude` symlinked as `claude`/`gh`. Scenario JSON
   path in `KIRA_FAKE_SCEN`, call records (`.args`, `.cwd`, `.prompt`) in `KIRA_FAKE_DIR`.
 - Second code host: `flowharness.WithGitHost(fakehost.New())` registers an in-process `forge.test` host
-  (merge requests) after GitHub. No CLI, no PATH. Use `WithoutGh()` to prove no step reaches `gh`. It records reviews and comments (`SetAuthor`, `Reviews`, `Comments`) and refuses approving your own merge request.
+  (merge requests) after GitHub. No CLI, no PATH. Azure registers in every harness through an in-process `fakeaz`; `WithAzure` seeds PRs and auth state, and the default harness has no az. Use `WithoutGh()` to prove no step reaches `gh`. It records reviews and comments (`SetAuthor`, `Reviews`, `Comments`) and refuses approving your own merge request.
   Flow: `flows/githostflow`; UI half
   `tests/ui/git-host-provider.spec.ts`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
@@ -886,6 +905,11 @@ Report-only probes: print `PERF ...` lines, assert nothing. Run `bun run perf:pr
 Helper: `packages/workbench/src/testing/ui/perfProbe.ts` (RSS sampler, rAF frame stats, momentum
 flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LADDER`.
 
+- Tab heap probe (P433): `bunx playwright test --config=apps/kira-studio/playwright.perf.config.ts
+  --project=heap` (same for `apps/kira-space`). Chromium only (CDP), report-only, prints `HEAP ...`
+  lines: heap per open tab, reads per switch round, reads after six fake minutes away, heap after
+  close-all. Helper: `packages/workbench/src/testing/ui/heapProbe.ts`. Build first
+  (`bun run build:test:studio` or `build:test:space`). `KIRA_HEAP_FILE_LINES` sizes the Space file.
 - Engine is Playwright WebKit. Linux runs the WPE port: software rendering, no GPU process.
 - fps = 1000 / frame ms. Compare views to each other, not to 16 ms.
 - RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant

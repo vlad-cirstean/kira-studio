@@ -493,8 +493,18 @@ func (e *RepoEntry) historicalOrUnavailable(ctx context.Context, rev, path strin
 	case "tooLarge":
 		return GoToTarget{Kind: "unavailable", Reason: "tooLarge"}, nil
 	default: // "found"
-		return GoToTarget{Kind: "historical", Rev: rev, Path: path}, nil
+		return GoToTarget{Kind: "historical", Rev: e.commitOID(ctx, rev), Path: path}, nil
 	}
+}
+
+// commitOID pins rev to the full commit id it names now, so a tab opened on a branch or tag keeps
+// that commit's bytes; rev itself when it does not peel to a commit.
+func (e *RepoEntry) commitOID(ctx context.Context, rev string) string {
+	raw, err := e.runOne(ctx, []string{"rev-parse", "--verify", "-q", "--end-of-options", rev + "^{commit}"})
+	if oid := strings.TrimSpace(string(raw)); err == nil && oid != "" {
+		return oid
+	}
+	return rev
 }
 
 // worktreeDiff is the drift re-map's own spawn — deliberately uncached (the answer

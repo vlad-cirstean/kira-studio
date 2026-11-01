@@ -112,7 +112,7 @@ func (e *RepoEntry) ChangeRequestReviewState(ctx context.Context, branch string,
 	if err != nil {
 		local = ""
 	}
-	viewer := p.Account(ctx, repo.Host)
+	viewer := p.Account(ctx, repo)
 	return ChangeRequestReviewState{
 		Kind: "ok", Host: githost.Describe(p), Number: number, Title: title, State: t.State,
 		HeadSha: t.HeadSha, LocalHeadSha: local, Author: t.Author, Viewer: viewer,
