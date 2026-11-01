@@ -14,7 +14,6 @@ func TestCLIContextCache(t *testing.T) {
 		want string
 	}{
 		{"name", "colima\n", nil, "colima"},
-		{"failure", "", errors.New("exit 1"), ""},
 		{"multi-line", "a\nb\n", nil, ""},
 	}
 	for _, tc := range tests {
@@ -38,5 +37,36 @@ func TestCLIContextCache(t *testing.T) {
 				t.Fatalf("run calls after forget = %d, want 2", calls)
 			}
 		})
+	}
+}
+
+func TestCLIContextFallbackAndTransient(t *testing.T) {
+	var calls [][]string
+	fail := true
+	c := &cliContext{lookPath: func(string) (string, error) { return "/x/docker", nil }, run: func(_ context.Context, _ string, args []string) ([]byte, error) {
+		calls = append(calls, args)
+		if fail {
+			return nil, errors.New("timeout")
+		}
+		if args[1] == "show" {
+			return nil, errors.New("usage")
+		}
+		return []byte("remote\n"), nil
+	}}
+	if got := c.name(); got != "" {
+		t.Fatalf("name = %q, want empty", got)
+	}
+	c.name()
+	if len(calls) != 4 {
+		t.Fatalf("transient failure was cached: %d runs, want 4", len(calls))
+	}
+	fail = false
+	if got := c.name(); got != "remote" {
+		t.Fatalf("ls fallback name = %q, want remote", got)
+	}
+	n := len(calls)
+	c.name()
+	if len(calls) != n {
+		t.Fatal("definite answer not cached")
 	}
 }

@@ -30,7 +30,11 @@ func (c *cliContext) name() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.known {
-		c.value, c.known = c.query(), true
+		v, definite := c.query()
+		if !definite {
+			return v
+		}
+		c.value, c.known = v, true
 	}
 	return c.value
 }
@@ -41,14 +45,16 @@ func (c *cliContext) forget() {
 	c.mu.Unlock()
 }
 
-func (c *cliContext) query() string {
+// query returns the current context name and whether the answer is definite. A spawn error or timeout is
+// not definite, so the next call asks again.
+func (c *cliContext) query() (string, bool) {
 	look := c.lookPath
 	if look == nil {
 		look = exec.LookPath
 	}
 	path, _, found := toolexec.Locate(look, os.Stat, "docker", c.candidates())
 	if !found {
-		return ""
+		return "", true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), contextShowTimeout)
 	defer cancel()
@@ -58,15 +64,19 @@ func (c *cliContext) query() string {
 			return toolexec.RunIO(ctx, path, args, "", os.Environ(), nil)
 		}
 	}
+	// `context show` needs docker CLI 23.0; older CLIs fall back to `context ls`.
 	out, err := run(ctx, path, []string{"context", "show"})
 	if err != nil {
-		return ""
+		out, err = run(ctx, path, []string{"context", "ls", "--format", "{{if .Current}}{{.Name}}{{end}}"})
+		if err != nil {
+			return "", false
+		}
 	}
-	v := strings.TrimSpace(string(out))
-	if strings.Contains(v, "\n") {
-		return ""
+	lines := strings.Fields(string(out))
+	if len(lines) != 1 {
+		return "", true
 	}
-	return v
+	return lines[0], true
 }
 
 func (c *cliContext) candidates() []string {
