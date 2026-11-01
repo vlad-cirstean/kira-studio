@@ -96,6 +96,7 @@ func scan(t *testing.T, root, rel string) []finding {
 	inHTTPClient := strings.HasSuffix(filepath.ToSlash(filepath.Dir(rel)), "internal/httpclient")
 	dir := filepath.ToSlash(filepath.Dir(rel))
 	inHostAdapters := strings.HasPrefix(dir, "apps/kira-space/internal/githost") || strings.HasPrefix(dir, "apps/kira-space/internal/issuetracker")
+	inDocker := dir == "internal/docker"
 	isCodes := filepath.ToSlash(rel) == "internal/ipcerr/codes.go"
 	var out []finding
 	add := func(rule string, pos token.Pos, msg string) {
@@ -122,6 +123,11 @@ func scan(t *testing.T, root, rel string) []finding {
 			if x.Kind == token.STRING && isErrorCodeLiteral(x.Value) && !declared[x.Pos()] {
 				add("G2", x.Pos(), "error code literal "+x.Value+"; use the ipcerr constant")
 			}
+			if x.Kind == token.STRING && inDocker {
+				if v, err := strconv.Unquote(x.Value); err == nil && strings.Contains(v, "config.json") {
+					add("G5", x.Pos(), "literal \"config.json\" (docker config can hold auths)"+g5Rule)
+				}
+			}
 			if x.Kind == token.STRING && inHostAdapters {
 				if v, err := strconv.Unquote(x.Value); err == nil {
 					if why := credentialLiteral(v); why != "" {
@@ -135,6 +141,11 @@ func scan(t *testing.T, root, rel string) []finding {
 			}
 		case *ast.CallExpr:
 			checkCall(x, inAdapters, inHTTPClient, add)
+			if inDocker {
+				if why := dockerCredential(x); why != "" {
+					add("G5", x.Pos(), why+g5Rule)
+				}
+			}
 			if inHostAdapters {
 				if why := credentialCall(x); why != "" {
 					add("G5", x.Pos(), why+g5Rule)
@@ -185,6 +196,20 @@ func credentialCall(x *ast.CallExpr) string {
 		case "Getenv", "LookupEnv", "UserHomeDir", "UserConfigDir":
 			return "os." + sel.Sel.Name
 		}
+	}
+	return ""
+}
+
+// dockerCredential flags TLS key/cert loading in Kira code; go-connections must open the PEMs.
+// credentialCall is not used here: docker endpoint resolution legitimately reads DOCKER_* env and the home dir.
+func dockerCredential(x *ast.CallExpr) string {
+	sel, ok := x.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	switch sel.Sel.Name {
+	case "LoadX509KeyPair", "X509KeyPair", "AppendCertsFromPEM":
+		return sel.Sel.Name
 	}
 	return ""
 }

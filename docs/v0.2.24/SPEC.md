@@ -72,6 +72,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 **Result:** Post comments and replies on PRs and issues with a Markdown composer. No attachments on any host (user decision, iter2): Kira never touches a CLI's credentials, and no driven CLI uploads a comment attachment. Narrows the spec lines on attachments and drag and drop. Live acli post unverified (Known open items).
 
+**Part 2: Docker no credential reads.** Plan `plans/P429-part2-docker-no-credential-reads.md`. `buildTLS` hands PEM paths to `go-connections/tlsconfig.Client`; current context comes from `docker context show` (cached until client rebuild), never `config.json`. G5 covers `internal/docker`. Moves the Docker half of v0.2.25 P443 here. `go test -race ./internal/docker/...` and dockerflow pass.
+
 ### P430 Clipboard capture hotkey: link or text into Kira Space
 
 - Generic capture from any app: copy, press a global hotkey, Kira Space opens a quick-capture popup and reads the clipboard. No Accessibility permission; no selection reading.

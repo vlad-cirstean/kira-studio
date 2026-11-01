@@ -230,3 +230,12 @@ stream E's tip, re-reading each file first (line numbers below are at `d1fd65a81
 - `internal/harness/claude/usermcp.go` MCP headers (stays v0.2.25 P443).
 - Context listing through the CLI (`docker context ls`): `meta.json` is non-secret; no change.
 - Flow harness `resolveDockerHost`: already CLI-driven.
+
+## Result
+
+- Commit `fix(docker): TLS material and current context via owning tools, no credential reads` (steps 1-4 in one commit; hook full-run because go.mod changed). New `internal/docker/clicontext.go` and `clicontext_test.go` (cache rules only).
+- G5 extended: `dockerCredential` flags `LoadX509KeyPair`, `X509KeyPair`, `AppendCertsFromPEM` selectors and `config.json` literals in `internal/docker`. Proved: temporary `tls.LoadX509KeyPair` in `buildTLS` failed `TestGoConventions` with G5; removed.
+- Greps empty: key/cert/PEM loaders and `config.json` under `internal/docker`. `tlsconfig.Client` present once; `go-connections` direct in `go.mod`.
+- `go test -race ./internal/docker/...`, `./internal/conventiontest/...`, `./apps/kira-studio/internal/flows/dockerflow/...` pass (dockerd up).
+- Not verified: optional real-CLI `context use` check (step 6) skipped.
+- Stream E follow-up done: SPEC, ARCHITECTURE (open item removed, credentials section, resolution order), v0.2.25 P443 narrowed to claude MCP headers, CLAUDE.md rule line.
