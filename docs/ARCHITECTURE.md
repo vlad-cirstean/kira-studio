@@ -2351,6 +2351,7 @@ and `docs/HISTORY.md (v2.0)`.
 - CloseSession (P436) ends a running session and keeps its history. Interactive: Tracker.Stop then CloseTerminal, so the row is stopped at once and resumable by Take over. Headless: StopRun.
 - RestartSession of a headless step run stops it and queues the next attempt resuming the same conversation (note "restarted by you"). Rebase and review runs refuse; their panels own retry.
 - The session tab menu offers Restart and Close without a confirm.
+- The Sessions dropdown (P437) lists every session in scope, Running then Finished or stopped. Enter or click selects a running tab or takes over a stopped session. The filter shows from 6 rows. The row menu comes from useSessionMenu: Take over or Resume, log toggle, Close and Restart for a running session, Copy session ID. The strip scrolls the selected tab into view.
 - The agent-hooks Stop event ends a dialog turn; the renderer's turnWatch then calls RecordMerge (merge dialog) or ArchiveTask (send-then-archive), and that pending state lives in the renderer.
 
 ### Agent sandbox (P287)
