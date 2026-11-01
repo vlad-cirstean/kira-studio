@@ -13,6 +13,8 @@ import { adeReaderKey } from './ade/v2/reader';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { controlAdeReader } from './bridge/adeReader';
 import { control } from './bridge/control';
+import { captureItemKey } from './capture/queries';
+import { useCaptureWindowStore } from './capture/state';
 import { hostViewTargetKey } from './hostview/queries';
 import { useHostViewWindowStore } from './hostview/state';
 import { useAdeLayoutStore } from './state/adeLayout';
@@ -72,6 +74,7 @@ async function mountShell(): Promise<void> {
   const workspaceStore = useWorkspaceStore(pinia);
   const reviewWindowStore = useAdeReviewWindowStore(pinia);
   const hostViewStore = useHostViewWindowStore(pinia);
+  const captureStore = useCaptureWindowStore(pinia);
 
   // Right after the stores are built, before mount() below, so no push (`kira:adetask:*`
   // channels/agent `Stop`) is missed between mount and this window's first
@@ -126,6 +129,13 @@ async function mountShell(): Promise<void> {
     }
   }
 
+  // A capture popup (ephemeral, one clipboard item) answers with its item; any other gets null.
+  const captureItem = await queryClient.fetchQuery({
+    queryKey: captureItemKey(windowKey),
+    queryFn: () => control.captureWindowItem({ windowKey }),
+  });
+  if (captureItem) captureStore.item = captureItem;
+
   // A host view window (ephemeral, one change request) answers with its target; any other gets null.
   const hostViewTarget = await queryClient.fetchQuery({
     queryKey: hostViewTargetKey(windowKey),
@@ -147,7 +157,7 @@ async function mountShell(): Promise<void> {
   // themselves — ensureWorkspaceShell's own doc comment calls for running it once per restored repo
   // right here, after hydrateTabs, since hydrateTabs itself never calls back into it (avoiding a
   // third link in that module pair's existing two-way call graph).
-  const workbenchWindow = !reviewTarget && !hostViewTarget;
+  const workbenchWindow = !reviewTarget && !hostViewTarget && !captureItem;
   if (workbenchWindow) for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
   // Falls forward onto the last active repo (persisted per window), else the first restored one,
   // so a relaunch with open repositories skips the empty GitStart screen. `activateWorkspace`

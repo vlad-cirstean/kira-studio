@@ -126,6 +126,7 @@ U91 packages/git-ui/src/components/UncommittedChangesStrip.vue # tooltip text di
 U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
 U34 packages/docker-ui/src/components/OriginGlyph.vue # compose brand mark colour
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
+U41 apps/kira-space/frontend/src/capture/chord.ts # chord recorder reads modifier flags to build an accelerator string, not a shortcut
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
 U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
 U46 packages/git-ui/src/graph/layoutClient.ts # main-thread worker fallback defers each request with its own zero-delay timer; debounce drops concurrent ones

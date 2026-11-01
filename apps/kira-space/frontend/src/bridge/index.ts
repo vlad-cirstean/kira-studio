@@ -2,6 +2,7 @@ import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as AgentNotifyService from '@bindings/agentnotifyservice.js';
 import * as AgentService from '@bindings/agentservice.js';
 import * as AgentUsageService from '@bindings/agentusageservice.js';
+import * as CaptureService from '@bindings/captureservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FileHandlersService from '@bindings/filehandlersservice.js';
@@ -73,6 +74,8 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
+import type { CaptureItem, CaptureResult, HotkeyState } from '../capture/wire';
+import { CHANNEL_CAPTURE_ITEM, CHANNEL_CAPTURE_STATUS } from '../capture/wire';
 import type {
   HostViewChangeRequest,
   HostViewIssue,
@@ -200,6 +203,22 @@ const spaceControl = {
 
   gitHostOpenChangeRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHostService.OpenChangeRequestURL({ url })),
+  captureWindowItem: (args: { windowKey: string }): Promise<CaptureItem | null> =>
+    unwrap(CaptureService.WindowItem(args)).then((r) => trust<CaptureItem | null>(r)),
+  captureConfirm: (args: {
+    windowKey: string;
+    itemId: string;
+    action: string;
+    title: string;
+  }): Promise<CaptureResult> =>
+    unwrap(CaptureService.Confirm(args)).then((r) => trust<CaptureResult>(r)),
+  captureDismiss: (windowKey: string): Promise<void> =>
+    unwrap(CaptureService.Dismiss({ windowKey })),
+  captureStatus: (): Promise<HotkeyState> =>
+    unwrap(CaptureService.Status()).then((r) => trust<HotkeyState>(r)),
+  onCaptureItem: (cb: (item: CaptureItem) => void): (() => void) => on(CHANNEL_CAPTURE_ITEM, cb),
+  onCaptureStatus: (cb: (state: HotkeyState) => void): (() => void) =>
+    on(CHANNEL_CAPTURE_STATUS, cb),
   hostViewOpen: (url: string): Promise<HostViewOpen> =>
     unwrap(HostViewService.Open({ url })).then((r) => trust<HostViewOpen>(r)),
   hostViewWindowTarget: (args: { windowKey: string }): Promise<HostViewTarget | null> =>

@@ -12,6 +12,7 @@ export const sections = [
   'Git',
   'CLI tools',
   'File types',
+  'Capture',
   'Mobile access',
   'Agent',
   'Memory',

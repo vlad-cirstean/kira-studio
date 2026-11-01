@@ -9329,6 +9329,39 @@
         }
       }
     },
+    "capture": {
+      "action": {
+        "later": {
+          "label": "Save for later"
+        },
+        "openChangeRequest": {
+          "label": "Open PR view"
+        },
+        "openIssue": {
+          "label": "Open issue view"
+        }
+      },
+      "actions": {
+        "label": "Actions"
+      },
+      "empty": {
+        "body": "The clipboard has no text."
+      },
+      "hint": {
+        "confirm": {
+          "label": "Confirm"
+        }
+      },
+      "title": {
+        "label": "Task title"
+      },
+      "truncated": {
+        "body": "Only the first part of the text is kept."
+      },
+      "window": {
+        "label": "Quick capture"
+      }
+    },
     "common": {
       "archive": {
         "label": "Archive"
@@ -10108,6 +10141,34 @@
           "description": "Long lines wrap instead of scrolling, in the file viewer."
         }
       },
+      "capture": {
+        "enabled": {
+          "description": "Copy a link or text in any app, then press the shortcut to open a quick-capture popup.",
+          "label": "Clipboard capture shortcut"
+        },
+        "hotkey": {
+          "description": "Click the field, then press the keys. Backspace clears it. Esc cancels.",
+          "label": "Shortcut",
+          "placeholder": "Press the keys",
+          "required": {
+            "error": "Choose a shortcut."
+          }
+        },
+        "status": {
+          "active": {
+            "body": "The shortcut {accelerator} is active."
+          },
+          "failed": {
+            "body": "The shortcut {accelerator} couldn’t be registered: {reason}."
+          },
+          "off": {
+            "body": "The shortcut is off."
+          },
+          "requested": {
+            "body": "Your desktop asks to confirm the shortcut {accelerator}. Change it in the desktop’s keyboard settings."
+          }
+        }
+      },
       "cliTools": {
         "description": "Kira runs local command line tools for pull requests and issues. The tools keep your credentials; Kira never sees them. Install and sign in with the commands below.",
         "docs": {
@@ -10310,6 +10371,9 @@
         }
       },
       "nav": {
+        "capture": {
+          "label": "Capture"
+        },
         "cliTools": {
           "label": "CLI tools"
         },
