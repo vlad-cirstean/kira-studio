@@ -18,6 +18,7 @@ import (
 // KubeReader is dbmcp's consumer-declared view of *kubernetes.Service.
 type KubeReader interface {
 	Clusters(context.Context) (kubernetes.ClustersResult, error)
+	Cluster(ctx context.Context, id string) (kubernetes.Cluster, bool, error)
 	Namespaces(context.Context, kubernetes.ClusterArgs) (kubernetes.NamespacesResult, error)
 	Kinds(context.Context, kubernetes.ClusterArgs) (kubernetes.KindsResult, error)
 	ListCapped(context.Context, kubernetes.ListArgs, int) (kubernetes.ListResult, error)
@@ -137,16 +138,11 @@ func kubeExposed(m kubernetes.McpSettings) bool {
 
 // resolveCluster finds an exposed cluster by id; found is false for an unknown or fully denied one.
 func (s *Server) resolveCluster(ctx context.Context, id string) (c kubernetes.Cluster, found bool, err error) {
-	res, err := s.cfg.Kube.Clusters(ctx)
-	if err != nil {
+	c, found, err = s.cfg.Kube.Cluster(ctx, id)
+	if err != nil || !found || !kubeExposed(c.Mcp) {
 		return kubernetes.Cluster{}, false, err
 	}
-	for _, c := range res.Clusters {
-		if c.ID == id && kubeExposed(c.Mcp) {
-			return c, true, nil
-		}
-	}
-	return kubernetes.Cluster{}, false, nil
+	return c, true, nil
 }
 
 func noClusterResult(id string) (*mcp.CallToolResult, any, error) {

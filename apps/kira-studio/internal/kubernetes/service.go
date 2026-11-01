@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,6 +44,10 @@ type Service struct {
 	clients map[string]*clusterClient
 	cache   clientCache
 	logs    *logRegistry
+
+	cfgMu     sync.Mutex
+	cfgKey    string
+	cfgLoaded loadedConfig
 }
 
 // Option tweaks NewService.
@@ -91,12 +97,62 @@ func (s *Service) target(id string) (loadedConfig, string, *clientcmdapi.Context
 	if !ok {
 		return loadedConfig{}, "", nil, unknownCluster()
 	}
-	ld := loadConfig(s.env())
+	ld := s.load()
 	ctx := ld.cfg.Contexts[rec.Context]
 	if ctx == nil || serverOf(ld.cfg, ctx) != rec.Server {
 		return loadedConfig{}, "", nil, unknownCluster()
 	}
 	return ld, rec.Context, ctx, nil
+}
+
+// Cluster returns one stored cluster that the current kubeconfig still has; found is false otherwise.
+func (s *Service) Cluster(_ context.Context, id string) (Cluster, bool, error) {
+	rec, ok, err := s.store.Get(id)
+	if err != nil {
+		return Cluster{}, false, ipcerr.Internal(err.Error())
+	}
+	if !ok {
+		return Cluster{}, false, nil
+	}
+	ld := s.load()
+	c := ld.cfg.Contexts[rec.Context]
+	if c == nil || serverOf(ld.cfg, c) != rec.Server {
+		return Cluster{}, false, nil
+	}
+	return clusterOf(ld, rec, rec.Context, c), true, nil
+}
+
+func clusterOf(ld loadedConfig, rec ClusterRecord, name string, c *clientcmdapi.Context) Cluster {
+	return Cluster{
+		ID: rec.ID, Context: name, Cluster: c.Cluster, Server: serverOf(ld.cfg, c), User: c.AuthInfo,
+		Namespace: c.Namespace, Current: name == ld.cfg.CurrentContext, Source: c.LocationOfOrigin, Mcp: rec.Mcp,
+	}
+}
+
+// load returns the merged kubeconfig, re-parsed only when a file's size or mtime changed.
+func (s *Service) load() loadedConfig {
+	env := s.env()
+	key := configFingerprint(kubeconfigPaths(env))
+	s.cfgMu.Lock()
+	defer s.cfgMu.Unlock()
+	if s.cfgKey != key {
+		s.cfgLoaded, s.cfgKey = loadConfig(env), key
+	}
+	return s.cfgLoaded
+}
+
+func configFingerprint(paths []string) string {
+	var b strings.Builder
+	for _, p := range paths {
+		b.WriteString(p)
+		if fi, err := os.Stat(p); err == nil {
+			fmt.Fprintf(&b, "|%d|%d", fi.Size(), fi.ModTime().UnixNano())
+		} else {
+			b.WriteString("|-")
+		}
+		b.WriteByte('\n')
+	}
+	return b.String() + "."
 }
 
 func serverOf(cfg *clientcmdapi.Config, ctx *clientcmdapi.Context) string {
@@ -149,7 +205,7 @@ func (s *Service) drop(id string) {
 
 // Clusters lists the kubeconfig contexts, current first, then by name.
 func (s *Service) Clusters(context.Context) (ClustersResult, error) {
-	ld := loadConfig(s.env())
+	ld := s.load()
 	res := ClustersResult{Config: ld.info, Clusters: []Cluster{}}
 	now := s.now()
 	for name, c := range ld.cfg.Contexts {
@@ -158,10 +214,7 @@ func (s *Service) Clusters(context.Context) (ClustersResult, error) {
 		if err != nil {
 			return ClustersResult{}, ipcerr.Internal(err.Error())
 		}
-		res.Clusters = append(res.Clusters, Cluster{
-			ID: rec.ID, Context: name, Cluster: c.Cluster, Server: server, User: c.AuthInfo,
-			Namespace: c.Namespace, Current: name == ld.cfg.CurrentContext, Source: c.LocationOfOrigin, Mcp: rec.Mcp,
-		})
+		res.Clusters = append(res.Clusters, clusterOf(ld, rec, name, c))
 	}
 	sort.Slice(res.Clusters, func(i, j int) bool {
 		a, b := res.Clusters[i], res.Clusters[j]
