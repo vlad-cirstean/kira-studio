@@ -1,8 +1,12 @@
 package claude
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,15 +17,15 @@ import (
 )
 
 // smartRun creates a smart script with the given tools, runs it and waits for it to leave running.
-func smartRun(t *testing.T, app *realApp, prompt string, tools []string) scriptruns.Run {
+func smartRun(t *testing.T, app *realApp, prompt string, tools []string, mcp ...scripts.MCPChoice) scriptruns.Run {
 	t.Helper()
 	// The harness puts a fake claude first on PATH; drop it so the login shell finds the real one.
-	if err := os.Remove(filepath.Join(app.BinDir, "claude")); err != nil {
+	if err := os.Remove(filepath.Join(app.BinDir, "claude")); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal(err)
 	}
 	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
 		Name: "real", Kind: scripts.KindSmart, Command: prompt, Color: "blue",
-		Smart: &scripts.Smart{Model: "haiku", MaxBudgetUSD: 0.05, Timeout: "3m", Tools: tools},
+		Smart: &scripts.Smart{Model: "haiku", MaxBudgetUSD: 0.05, Timeout: "3m", Tools: tools, MCP: mcp},
 	}})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -53,6 +57,63 @@ func TestSmartScriptRun(t *testing.T) {
 			t.Fatalf("run = %s, outcome = %+v, want done, reported, cost > 0", run.State, o)
 		}
 		t.Logf("PASS reports done: cost %.4f USD", *o.CostUSD)
+	})
+
+	t.Run("user MCP server loads through claude", func(t *testing.T) {
+		app := newRealApp(t)
+		if err := os.Remove(filepath.Join(app.BinDir, "claude")); err != nil {
+			t.Fatal(err)
+		}
+		fakeMCP := filepath.Join(app.BinDir, "fake-mcp")
+		cfg := fmt.Sprintf(`{"mcpServers":{"fake":{"command":%q,"env":{"TOKEN":"SENTINEL-ENV"}},"other":{"command":%q}}}`, fakeMCP, fakeMCP)
+		if err := os.WriteFile(filepath.Join(app.Home, ".claude.json"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		servers, err := app.W.ScriptRuns.McpServers()
+		if err != nil {
+			t.Fatalf("McpServers: %v", err)
+		}
+		listed := ""
+		for _, s := range servers {
+			if s.Name == "fake" {
+				listed = s.Status
+			}
+		}
+		if listed != "connected" {
+			t.Fatalf("claude mcp list reports fake as %q, want connected: %+v", listed, servers)
+		}
+		run := smartRun(t, app, "Call the tool mcp__fake__echo with text zeta-7421. Then finish, with the text the tool returned as the summary.",
+			[]string{"Read"}, scripts.MCPChoice{Server: "fake", Tools: []string{"echo"}})
+		o := run.Outcome
+		if run.State != "done" || o == nil || !o.Reported || o.CostUSD == nil {
+			t.Fatalf("run = %s, outcome = %+v, want done and reported", run.State, o)
+		}
+		page, err := app.W.ScriptRuns.ReadLog(scriptruns.ReadLogArgs{ID: run.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var log strings.Builder
+		for _, c := range page.Chunks {
+			log.WriteString(c.Text + "\n")
+		}
+		if !strings.Contains(log.String(), "▸ mcp__fake__echo") {
+			t.Errorf("log has no mcp__fake__echo tool call:\n%s", tail(log.String(), 1500))
+		}
+		if strings.Contains(log.String(), "mcp__other__") {
+			t.Errorf("an unticked user server was loaded:\n%s", tail(log.String(), 1500))
+		}
+		if !strings.Contains(o.Summary, "zeta-7421") {
+			t.Errorf("summary %q lacks the echoed text", o.Summary)
+		}
+		_ = filepath.WalkDir(app.KiraHome, func(path string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				if data, _ := os.ReadFile(path); strings.Contains(string(data), "SENTINEL-ENV") {
+					t.Errorf("%s holds a user server credential", path)
+				}
+			}
+			return nil
+		})
+		t.Logf("PASS user MCP server: cost %.4f USD", *o.CostUSD)
 	})
 
 	t.Run("a tool outside the allowlist does not run", func(t *testing.T) {
