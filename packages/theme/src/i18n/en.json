@@ -7832,6 +7832,9 @@
         },
         "remove": {
           "tooltip": "Remove {label} link"
+        },
+        "view": {
+          "tooltip": "View {label} in Kira"
         }
       },
       "needs": {

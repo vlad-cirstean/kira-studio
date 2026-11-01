@@ -23,8 +23,10 @@ const props = defineProps<{
   url: string;
   placeholder: string;
   error: string;
+  /** Offers the in-app view of the link (a change request). */
+  viewable?: boolean;
 }>();
-const emit = defineEmits<{ save: [raw: string]; clear: [] }>();
+const emit = defineEmits<{ save: [raw: string]; clear: []; view: [] }>();
 
 const draft = ref('');
 const { copy, copied } = useCopy();
@@ -59,6 +61,14 @@ function openLink(e: MouseEvent): void {
         >
         <span v-else class="shrink-0 text-kira-md" :data-testid="`${id}-link`">{{ text }}</span>
         <span class="min-w-0 flex-1" />
+        <TooltipIconButton
+          v-if="viewable"
+          icon="eye"
+          :label="t('space.ade.link.view.tooltip', { label: chip || label })"
+          class="shrink-0"
+          :data-testid="`${id}-view`"
+          @click="emit('view')"
+        />
         <TooltipIconButton
           :icon="copied ? 'check' : 'copy'"
           :label="t('space.ade.link.copy.tooltip', { label })"

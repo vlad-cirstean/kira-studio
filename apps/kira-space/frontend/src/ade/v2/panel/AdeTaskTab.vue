@@ -6,8 +6,10 @@ import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import ProjectPicker from '@workbench/components/pickers/ProjectPicker.vue';
 import { computed, ref } from 'vue';
+import { useOpenHostView } from '../../../hostview/queries';
 import { useProjectOptions } from '../../../repo/state/projectOptions';
 import AdeChip from '../AdeChip.vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
@@ -79,6 +81,7 @@ const links = useLinkFields(
 );
 const hostLink = computed(() => task.value.hostLink);
 const hostLabels = useHostLabels();
+const openView = useOpenHostView();
 
 // ---- estimate
 async function saveEst(value: string): Promise<void> {
@@ -158,6 +161,8 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
             shorts: hostLabels.shorts.value,
           })"
         :error="links.hostError.value"
+        :viewable="hostLink?.kind === 'changeRequest' && !!task.hostUrl"
+        @view="fireAndForget(openView.mutateAsync(task.hostUrl), 'hostView.open')"
         @save="links.saveHost"
         @clear="links.clearHost"
       />

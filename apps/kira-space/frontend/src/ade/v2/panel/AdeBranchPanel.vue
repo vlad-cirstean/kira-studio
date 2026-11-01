@@ -15,6 +15,7 @@ import Identifier from '@workbench/components/Identifier.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
 import { control } from '../../../bridge/control';
+import { useOpenHostView } from '../../../hostview/queries';
 import { useRepos } from '../../../repo/state/reposQueries';
 import AdeChip from '../AdeChip.vue';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
@@ -55,6 +56,7 @@ const contextMenu = useContextMenuStore();
 const setupError = ref('');
 const forcePush = ref(false);
 const { copy, copied } = useCopy();
+const openView = useOpenHostView();
 const copiedKey = ref('');
 
 const branch = computed(() => props.row.branch);
@@ -394,6 +396,13 @@ function deployNote(d: Deployment): string {
               >#{{ changeRequest.number }}</a
             >
             <span class="min-w-0 flex-1 truncate text-kira-md">{{ changeRequest.title }}</span>
+            <TooltipIconButton
+              icon="eye"
+              :label="t('space.ade.link.view.tooltip', { label: words.changeRequestShort })"
+              class="shrink-0"
+              data-testid="ade-pr-view"
+              @click="fireAndForget(openView.mutateAsync(changeRequest.url), 'hostView.open')"
+            />
             <TooltipIconButton
               :icon="copied && copiedKey === 'pr' ? 'check' : 'copy'"
               :label="t('space.ade.link.copy.tooltip', { label: words.changeRequestShort })"

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/vue-query';
+import { useMutation, useQuery } from '@tanstack/vue-query';
 import type { MaybeRefOrGetter } from 'vue';
 import { toValue } from 'vue';
 import { control } from '../bridge/control';
@@ -16,4 +16,9 @@ export function useChangeRequestDetail(url: MaybeRefOrGetter<string>) {
     queryKey: changeRequestKey(toValue(url)),
     queryFn: () => control.hostViewChangeRequest({ url: toValue(url) }),
   }));
+}
+
+/** Opens (or focuses) the PR view window for a change request URL. */
+export function useOpenHostView() {
+  return useMutation({ mutationFn: (url: string) => control.hostViewOpen(url) });
 }
