@@ -153,6 +153,9 @@ func (h *Handle) spacePrefix() string {
 	return "/s/" + url.PathEscape(h.Space)
 }
 
+// maxResponseBytes bounds one reply body to the 64 MiB adapter host data frame.
+const maxResponseBytes = 64 << 20
+
 // request sends one call. internal routes need the version and origin headers Kibana demands of
 // them; the space prefix applies to every route but the space lookup itself.
 func (h *Handle) request(ctx context.Context, method, path string, internal, spaced bool, body, out any) error {
@@ -186,9 +189,12 @@ func (h *Handle) request(ctx context.Context, method, path string, internal, spa
 		return mapTransport(err)
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return mapTransport(err)
+	}
+	if len(raw) > maxResponseBytes {
+		return adapters.T(adapters.CodeQuery, "backend.studio.adapter.kibanaResponseTooLarge.body", nil, nil)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return mapStatus(resp.StatusCode, raw)

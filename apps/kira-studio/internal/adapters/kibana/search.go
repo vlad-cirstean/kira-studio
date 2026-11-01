@@ -417,7 +417,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	}
 	total, _ := res.total()
 	windowEnd := from+want >= maxResultWindow && total > int64(maxResultWindow)
-	builder, _, err := pushHits(hits, runtimeNames(dv), page.ResultCap{})
+	builder, capped, err := pushHits(hits, runtimeNames(dv), adapters.DefaultConsoleCap)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +425,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	offset := from
 	return builder.Finish(page.PagePosition{
 		Offset: &offset, PageSize: req.PageSize, HasMore: more && !windowEnd,
-		Strategy: "offset", Truncated: windowEnd && builder.RowCount() == want,
+		Strategy: "offset", Truncated: capped || windowEnd && builder.RowCount() == want,
 	}), nil
 }
 

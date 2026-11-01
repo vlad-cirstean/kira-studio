@@ -1665,6 +1665,9 @@
         "kibanaOneStatement": {
           "body": "Discover runs exactly one request per run."
         },
+        "kibanaResponseTooLarge": {
+          "body": "Kibana reply is too large. Lower the sample size or add filters."
+        },
         "kibanaSortOrder": {
           "body": "Sort order {order} is invalid. Use asc or desc."
         },
