@@ -23,7 +23,7 @@ function token(name: string): string {
 }
 
 /** Chart colours from the app's CSS tokens, read now; recompute after a theme change. */
-export function chartTheme(): ChartTheme {
+function chartTheme(): ChartTheme {
   return {
     text: token('--kira-fg'),
     mutedText: token('--kira-fg-muted'),

@@ -26,7 +26,7 @@ function withUnit(value: number, unit: string): string {
 }
 
 /** Category labels in order of first appearance across the series. */
-export function categoriesOf(payload: ProofChartPayload): string[] {
+function categoriesOf(payload: ProofChartPayload): string[] {
   if (payload.type === 'pie' || payload.x.type !== 'category') return [];
   const seen = new Set<string>();
   for (const s of payload.series) for (const p of s.points) seen.add(String(p[0]));

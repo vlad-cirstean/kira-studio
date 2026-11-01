@@ -17,7 +17,7 @@ import { createKqlCompletion } from './kqlCompletion';
 import { discoverBody, discoverDirty, kibanaStateFromBody, savedLink } from './savedDiscover';
 import { browserTimeZone, resolveTime } from './time';
 
-export const dataViewQueryKey = (connectionId: string, id: string) =>
+const dataViewQueryKey = (connectionId: string, id: string) =>
   ['kibana', 'dataView', connectionId, id] as const;
 
 const SAMPLE_SIZES = [100, 500, 1000, 5000, 10000] as const;

@@ -2,7 +2,7 @@
 // before the cursor and never throws on an unfinished query. Token rules mirror the Go lexer
 // (internal/adapters/kibana/kql/lexer.go).
 
-export interface Range {
+interface Range {
   from: number;
   to: number;
 }

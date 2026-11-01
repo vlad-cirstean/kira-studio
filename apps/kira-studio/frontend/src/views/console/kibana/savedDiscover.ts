@@ -32,7 +32,7 @@ function canonical(body: KibanaDiscoverBody): string {
   return JSON.stringify(kibanaDiscoverBodySchema.parse({ ...body, dataViewName: null }));
 }
 
-export function sameDiscoverBody(a: KibanaDiscoverBody, b: KibanaDiscoverBody): boolean {
+function sameDiscoverBody(a: KibanaDiscoverBody, b: KibanaDiscoverBody): boolean {
   return canonical(a) === canonical(b);
 }
 
@@ -67,7 +67,7 @@ export function savedLink(entry: SavedDiscoverQuery): KibanaSavedLink {
   return { id: entry.id, name: entry.name, body: entry.body };
 }
 
-export function linkedTabs(id: string): ConsoleTabRecord[] {
+function linkedTabs(id: string): ConsoleTabRecord[] {
   return useTabsStore().tabs.flatMap((tab) =>
     tab.kind === 'console' && tab.state.kibana?.saved?.id === id ? [tab] : [],
   );

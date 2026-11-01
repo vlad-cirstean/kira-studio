@@ -39,7 +39,7 @@ export interface EditorCompletionResult {
   incomplete?: boolean;
 }
 
-export interface EditorCompletionContext {
+interface EditorCompletionContext {
   doc: string;
   offset: number;
   explicit: boolean;
