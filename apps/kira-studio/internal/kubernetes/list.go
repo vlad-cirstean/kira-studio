@@ -49,6 +49,10 @@ func cellString(v any) string {
 
 // List returns a kubectl-style table of one kind, paged server side and capped at the row limit.
 func (s *Service) List(ctx context.Context, args ListArgs) (ListResult, error) {
+	return s.list(ctx, args, s.listMax)
+}
+
+func (s *Service) list(ctx context.Context, args ListArgs, max int) (ListResult, error) {
 	if args.LabelSelector != "" {
 		if _, err := labels.Parse(args.LabelSelector); err != nil {
 			return ListResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.kubernetes.badSelector.error", map[string]string{"message": err.Error()})
@@ -82,7 +86,7 @@ func (s *Service) List(ctx context.Context, args ListArgs) (ListResult, error) {
 			}
 		}
 		for _, r := range page.Rows {
-			if len(res.Rows) == s.listMax {
+			if len(res.Rows) == max {
 				res.Truncated = true
 				return res, nil
 			}
@@ -92,7 +96,7 @@ func (s *Service) List(ctx context.Context, args ListArgs) (ListResult, error) {
 		if cont == "" {
 			return res, nil
 		}
-		if len(res.Rows) >= s.listMax {
+		if len(res.Rows) >= max {
 			res.Truncated = true
 			return res, nil
 		}
