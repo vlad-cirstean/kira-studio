@@ -323,6 +323,8 @@ export function chartOption(
       type: 'scroll',
       top: 0,
       textStyle: { color: theme.text },
+      inactiveColor: theme.mutedText,
+      inactiveBorderColor: theme.mutedText,
       pageIconColor: theme.text,
       pageTextStyle: { color: theme.mutedText },
       selected: Object.fromEntries(names.map((n) => [n, !hidden.has(n)])),
