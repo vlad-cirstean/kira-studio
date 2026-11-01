@@ -13,7 +13,8 @@ export const PENDING_ID = 'session-2';
 // biome-ignore lint/suspicious/noExplicitAny: Go-written fixtures have no static shape
 type Json = Record<string, any>;
 
-const fixture = (name: 'proof' | 'proof-pending', key: string): Json => contract(name, key) as Json;
+const fixture = (name: 'proof' | 'proof-pending' | 'proof-chart', key: string): Json =>
+  contract(name, key) as Json;
 
 export const CLOSED_AT = Date.UTC(2026, 0, 2, 3, 4, 5);
 
@@ -65,6 +66,59 @@ export function stepSnapshot(
     args: { sessionId, rev, ordinal },
     response: { ...fixture('proof', `ProofService.Step#${base}`), ordinal, ...patch },
   };
+}
+
+export const chartSession = (): Json => ({
+  ...fixture('proof-chart', 'ProofService.Session'),
+  id: SESSION_ID,
+  closedAt: CLOSED_AT,
+});
+export const chartPendingSession = (): Json => ({
+  ...fixture('proof-chart', 'ProofService.Session#pending'),
+  id: PENDING_ID,
+  closedAt: CLOSED_AT,
+});
+export const chartViewStates = (): ProofViewStateEntry[] =>
+  fixture('proof-chart', 'ProofService.ViewState#chart') as unknown as ProofViewStateEntry[];
+
+export type ChartKey = 'line' | 'bar' | 'histogram' | 'area' | 'scatter' | 'pie' | 'bar-new';
+
+/** A chart step from the Go-written contract; `patch` overrides any field of the step. */
+export function chartStep(
+  sessionId: string,
+  rev: number,
+  ordinal: number,
+  key: ChartKey,
+  patch: Json = {},
+): ControlSnapshot {
+  return {
+    channel: IPC.proofStep,
+    args: { sessionId, rev, ordinal },
+    response: { ...fixture('proof-chart', `ProofService.Step#${key}`), ordinal, ...patch },
+  };
+}
+
+export const CHART_KEYS: ChartKey[] = ['line', 'bar', 'histogram', 'area', 'scatter', 'pie'];
+
+/** Boot snapshots for the chart session; steps 1-6 in the contract's order. */
+export function chartControl(
+  extra: ControlSnapshot[] = [],
+  patches: Record<number, Json> = {},
+): ControlSnapshot[] {
+  return [
+    { channel: IPC.proofWindowTarget, response: { sessionId: SESSION_ID } },
+    {
+      channel: IPC.proofSessions,
+      response: (fixture('proof-chart', 'ProofService.Sessions') as unknown as Json[]).map((x) => ({
+        ...x,
+        id: SESSION_ID,
+        closedAt: CLOSED_AT,
+      })),
+    },
+    { channel: IPC.proofSession, response: chartSession() },
+    ...CHART_KEYS.map((key, i) => chartStep(SESSION_ID, 1, i + 1, key, patches[i + 1])),
+    ...extra,
+  ];
 }
 
 export function proofControl(extra: ControlSnapshot[] = []): ControlSnapshot[] {
