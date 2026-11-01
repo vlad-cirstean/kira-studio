@@ -6,16 +6,16 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 
 | Phase | Title | Status |
 |---|---|---|
-| P423 | Azure Repos support via `az` CLI, same capabilities as GitHub | Todo |
-| P424 | Kibana: Discover-grade query editor with autocomplete | Todo |
-| P425 | Kibana: save and update queries | Todo |
-| P426 | Validation proof MCP tool: visualisation support | Todo |
+| P423 | Azure Repos support via `az` CLI, same capabilities as GitHub | Done |
+| P424 | Kibana: Discover-grade query editor with autocomplete | Done |
+| P425 | Kibana: save and update queries | Done |
+| P426 | Validation proof MCP tool: visualisation support | Done |
 | P427 | Pull request view for GitHub and Azure Repos | Todo |
 | P428 | Jira issue viewer | Todo |
 | P429 | PR and issue comments: post, attachments, drag and drop | Todo |
 | P430 | Clipboard capture hotkey: link or text into Kira Space | Todo |
-| P431 | Stage settings injection in the workflow editor (auto compact limit) | Todo |
-| P432 | Operations panel overhaul: looks and interactions | Todo |
+| P431 | Stage settings injection in the workflow editor (auto compact limit) | Done |
+| P432 | Operations panel overhaul: looks and interactions | Done |
 | P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Todo |
 | P434 | Code review (2 rounds) | Todo |
 | P435 | Close chapter v0.2.24 | Todo |
@@ -29,18 +29,26 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Settings CLI section (from v0.2.23 P417) gains `az` install and login steps.
 - Host abstraction stays provider-neutral.
 
+**Result:** Azure Repos host through `az` with GitHub parity (change requests, status, checks, branch links, discovery); Settings CLI section gains `az` install and login steps. Azure success-path JSON fixtures are hand-written, unchecked against a real org; `az` calls are not in the op log.
+
 ### P424 Kibana: Discover-grade query editor with autocomplete
 
 - Kibana support with the query capabilities of the Discover tab.
 - Autocomplete suggestions as Discover offers (fields, values, operators, syntax).
 
+**Result:** Discover-grade Kibana editor: hand-rolled Go KQL compiler, field/value/operator autocomplete, hits histogram (ECharts 6.1.0, vue-echarts 8.3.2). `/internal/search/es` is an internal Kibana API (Known open item).
+
 ### P425 Kibana: save and update queries
 
 - Save a query for later use; update a saved query. Very important.
 
+**Result:** Save and update Kibana queries (migration 0047, `queriesUpdateDiscover`, Cmd/Ctrl+S, saved menu, tab link, column selection). Flow test plus UI specs.
+
 ### P426 Validation proof MCP tool: visualisation support
 
 - Elastic brings visualisations. Extend the v0.2.23 P420 validation proof tool so the agent can present data as a visualisation, not only plain data views.
+
+**Result:** Proof tool `chart` view (line, bar, stacked bar, pie, scatter): migration 0048, Go validation, `ProofChart.vue`, 3 visual baselines, `TestProofChartThroughClaude`. Bar and scatter cap 1000 points (capture time). `budgets.spec.ts` cached tree expand missed 53 ms vs 50 ms once under load; recheck on idle host.
 
 ### P427 Pull request view for GitHub and Azure Repos
 
@@ -72,9 +80,13 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 - Provider-neutral: Claude is the only provider today, more come. Settings are a provider-keyed catalog (each provider declares which stage settings it supports, their types, ranges and how they map onto its launch config/env/flags); the editor renders from the catalog.
 - Applied when the stage's agent session launches; absent means provider default.
 
+**Result:** Stage `settings` in workflow YAML, wire, editor (Advanced) and headless/TUI launches; Claude `auto_compact_window` maps to `--autocompact` (100k to 1M). A user-exported `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides the flag (Known open item).
+
 ### P432 Operations panel overhaul: looks and interactions
 
 - Panel works but looks and interactions feel off and clunky. Redesign both.
+
+**Result:** Operations panel overhaul in both apps on the shared `OpLogPanel` shell: toolbar, facets, detail pane, tree of steps, narrow-width layout, copy actions. Memory-tool prompt fix; flaky UI waits hardened.
 
 ### P433 Frontend data and memory sweep: keep state across tabs, minimal RAM
 
