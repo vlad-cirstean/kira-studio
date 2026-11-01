@@ -830,7 +830,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - A script row click selects, double-click or Enter opens Edit; the play button, menu Run and Run now are the only starts.
 - A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/agentmcp (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
 - Smart script defaults are model sonnet, 1 USD budget (--max-budget-usd) and 15 min timeout; bounds in internal/scripts/smart.go are 20 params, 20000-char prompt, budget 0.05-25 USD, timeout 1 min-2 h.
-- Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server plus the MCP servers the script ticked, and --permission-prompts none denies instead of asking.
+- Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server, and --permission-prompts none denies instead of asking. Exception (`HeadlessSpec.UserMCP`, P444): a script that ticks a user MCP server runs with --setting-sources user and no --strict-mcp-config; --settings `{"disableAllHooks":true,"allowedMcpServers":[...]}` limits the loaded servers to the report server plus the ticked ones, and claude loads those from its own config. A ticked server grants all its tools (`mcp__<server>`) or named tools.
 - A smart script's --tools and --allowedTools come from its tool allowlist (built-ins Read, Grep, Glob, Edit, Write, NotebookEdit, Bash; default Read, Grep, Glob).
 - A smart run's final report must go through finish_step; a run without it fails with the shared "no report" text.
 - Smart script params are text, select or multiselect (a text param may be secret); names are lowercase and must not use the reserved ADE built-ins task, jira, repo, branch, base, worktree; {name} in the prompt is substituted before launch.
@@ -1334,7 +1334,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - New timestamp columns are INTEGER unix ms named *_at; older TEXT ISO columns stay as legacy, and N7 refuses new ones.
 - Migrations are named NNNN_<phase>_<slug>.sql.
 - Files a person or another program reads must be written with renameio.WriteFile; exempt are test tooling and temp snapshots (G4).
-- G5: no CLI credential access under githost/ and issuetracker/ (see CLI credentials: never touched).
+- G5: no CLI credential access under githost/, issuetracker/, internal/docker and internal/harness/claude (see CLI credentials: never touched).
 - File naming: .vue files PascalCase; .ts files camelCase with role suffixes .worker, .check; colocated tests are <module>.spec.ts, never .test.ts (N1, N2).
 - Name helper folders lib/, never util, utils or helpers (N3).
 - Stores live in state/ and workbench composables in behaviour/; a Pinia id is the export name without use/create and Store, camelCase (N4).
@@ -3084,11 +3084,11 @@ Kira drives gh, az and acli but never touches their credentials. It runs the CLI
 - gh: runner passes os.Environ through plus hygiene vars; never reads GH_TOKEN or GITHUB_TOKEN. `gh auth status --hostname` is parsed for the account name only.
 - az: env passthrough. `az account show --query user.name` only.
 - acli: env passthrough. `jira auth status` parsed for site and account only. Comment body goes through a 0600 temp file.
+- claude: the MCP picker runs `claude mcp list` and keeps name, transport, host or command name and health status only. A run that ticks a user server lets claude load it (`--setting-sources user`, `--settings` with `allowedMcpServers` and `disableAllHooks`). Kira never opens `~/.claude.json` and never runs `claude mcp get`, which prints stored headers and env.
 - Setup steps are copy-only commands the user runs in their own terminal.
 - Consequence: comments carry no attachments (no driven CLI uploads one; Azure would need a bearer token).
-- Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/, and `LoadX509KeyPair`, `X509KeyPair`, `AppendCertsFromPEM` and `config.json` literals under internal/docker.
+- Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/, `LoadX509KeyPair`, `X509KeyPair`, `AppendCertsFromPEM` and `config.json` literals under internal/docker, and under internal/harness/claude a `.claude.json` literal, a `json:"headers"` struct tag, a `claude mcp get` argv, `Header.Set`/`Header.Add` calls and `RoundTrip` methods. `sandbox.go` is exempt: it names `~/.claude.json` as a sandbox write path and never opens it.
 - Non-secret reads are allowed: docker context `meta.json` (name, host, SkipTLSVerify) and stat of PEM paths. Never a CLI config file that can hold credentials (`~/.docker/config.json`): ask the CLI (`docker context show`). Key material is opened only by the owning library (`go-connections/tlsconfig`).
-- Known violation, outside G5 until fixed: `usermcp.go`. See Known open items; planned v0.2.25 P443.
 
 ## Renderer security surface
 
@@ -3342,7 +3342,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Azure threads beyond the newest 200 are not read (P427).**
 - **Comments carry no attachments (P429).** Kira never touches a CLI's credentials, and none of gh, az, acli uploads a comment attachment. Add files on the host.
 - **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input is not seen live; the Azure reply assumes the first comment id is 1.
-- **Kira reads and forwards Claude MCP server headers (CLI credentials rule violation).** `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers, including `Authorization`, when listing tools, and copies the raw entries (headers and env) into the run's 0600 `--mcp-config` file. Planned v0.2.25 P443.
+- **A smart run that ticks a user MCP server loads the user's Claude settings (P444).** Claude loads user MCP servers only with the `user` setting source, so the user's permission allow rules, env and plugins apply; hooks are off and only ticked servers plus `kira-ade` load. `allowManagedPermissionRulesOnly` in `--settings` does not drop the user rules (CLI 2.1.316). The picker cannot show tool names or descriptions, because Kira no longer connects to user servers; it lists what `claude mcp list` reports and health-checks every server on each call (cached 30 s). Delete once a run gets ticked servers without the user settings file.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.

@@ -34,6 +34,8 @@ A smart script sets:
 - A model, a budget in dollars and a timeout. The budget must be above 0.
 - A list of tools and MCP servers the script may use. Bash commands take patterns such as `git status:*`.
 
+The MCP list shows the servers `claude mcp list` reports for your user config, with Claude's own health status. Opening the list starts each server briefly to check it. Tick a server to allow all its tools, or untick **All tools** and type tool names. A run that uses one of your servers loads your Claude settings file, so your permission rules, environment and plugins apply. Hooks stay off, and only the servers you ticked load.
+
 The run history lists denied tools.
 
 Kira adds a closing instruction to the prompt so the run reports through `finish_step`. See [Prompts](../../reference/prompts/).

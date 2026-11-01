@@ -237,8 +237,7 @@ duplicated here; this file only points at them.
   token reads, no auth headers. Run the CLI, read its output. Reading non-secret config (host,
   docker context `meta.json`) is fine. Key or token material may be read only by the CLI's own
   library, never Kira code. Rule and facts in `docs/ARCHITECTURE.md` "CLI credentials: never
-  touched". Guard G5 enforces it under `githost/`, `issuetracker/` and `internal/docker`. Known violation, tracked
-  in ARCHITECTURE "Known open items" and v0.2.25 P443: `usermcp.go` (claude MCP headers).
+  touched". Guard G5 enforces it under `githost/`, `issuetracker/`, `internal/docker` and `internal/harness/claude`.
 - **Measure when there's a real, concrete question at stake, not as a default ritual.** A
   real-hardware trace, CDP tracing, or a byte-for-byte bundle comparison earns its keep when a
   claimed fix, regression, or cost genuinely can't be checked another way. Don't extend that rigor
