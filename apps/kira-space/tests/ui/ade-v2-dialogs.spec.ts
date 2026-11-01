@@ -151,6 +151,8 @@ test('Details lists Merge and Re-merge buttons and the stale tip invites a right
   await page.locator(row('b_auth')).click();
   const develop = page.locator('[data-testid="ade-branch-into"][data-target="develop"]');
   await expect(develop.locator(t('ade-branch-merge'))).toHaveText('Re-merge');
+  // reka tooltips open on pointermove; a pointer already resting on the target dispatches none.
+  await page.mouse.move(0, 0);
   await page.locator(row('b_auth')).getByText('dev ⚠').hover();
   await expect(page.getByText('Right-click to re-merge.').first()).toBeVisible();
   await develop.locator(t('ade-branch-merge')).click();
