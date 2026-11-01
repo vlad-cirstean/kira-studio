@@ -313,3 +313,20 @@ before/after numbers.
 2. P438 keeps the internal mode key `automations` while streams run; a rename needs the user's call and runs after C.
 3. P438's tab icon for Runs stays `run-all`; B does not edit Studio `modes.ts`.
 4. P441 and P442 run alone after all streams.
+
+## Tail override (user request): P441 and P443 run in parallel
+
+User: run code review and dependency update in parallel. Supersedes "P441 alone, then P442, then P443" above. Order
+after A, B, C land on the chapter branch:
+
+- Stream D: P441. Own worktree. Owns every `go.mod`, `go.sum`, `package.json`, `bun.lock`, Wails bindings and
+  generated output, build and tool-version config, plus code edits forced by an API break in a bumped dependency.
+- Stream E: P443 (2 review rounds; Opus review, findings file, Sonnet fixer, repeat). Own worktree. Owns all other
+  source. Reviewer ignores dependency churn and lockfiles. A fixer never edits manifests, lockfiles, bindings or
+  build config; a finding needing that goes to D as a note in its plan file.
+- Both start from the same base commit (chapter tip after A, B, C). Landing: rebase D, then E, onto the chapter
+  branch. A real conflict outside forced API-break edits means the boundary was wrong.
+- P442 (slow test audit) runs after D and E land: needs the final dependency set and edits specs.
+- P444 closes after P442.
+- Stream D's full-suite run covers pre-review code; E's fixers re-run the suites they touch. A final full run
+  happens in P442.
