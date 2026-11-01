@@ -367,7 +367,7 @@ export interface DockerRecreateResult {
 
 type DockerRestoreStatus = 'restorable' | 'waiting' | 'back' | 'gone';
 
-export interface DockerRestoreItem {
+interface DockerRestoreItem {
   id: string;
   name: string;
   image: string;
