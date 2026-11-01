@@ -975,7 +975,7 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_USER_STATUSLINE` | The user's own statusline command the hook shim chains to | `harness/claude/hooks` shim |
 | `KIRA_ASKPASS_SOCK`, `KIRA_ASKPASS_TOKEN`, `KIRA_ASKPASS_OPID`, `KIRA_ASKPASS_TIMEOUT_MS` | Git askpass helper reaches the prompt broker; per-op id and timeout | `gitaskpass` broker. `loginshell` strips the first two |
 | `KIRA_PREPARE`, `KIRA_WORKTREE_PATH`, `KIRA_WORKTREE_BRANCH`, `KIRA_REPO_ROOT`, `KIRA_REPO_COMMON_DIR` | Worktree prepare script context. `KIRA_WORKTREE_BRANCH` is omitted on a detached head | `gitprepare` |
-| `KIRA_TASK`, `KIRA_REPO`, `KIRA_BRANCH`, `KIRA_BASE`, `KIRA_<NAME>` | Built-in vars of an automation script (`scripts.BuiltinEnv`) | `adeflow` automations |
+| `KIRA_TASK`, `KIRA_REPO`, `KIRA_BRANCH`, `KIRA_BASE`, `KIRA_<NAME>` | Built-in vars of a script (`scripts.BuiltinEnv`) | `adeflow` script runs |
 | `KIRA_PARAM_<NAME>` | Smart-script parameter value; a multiselect is newline-joined | `scripts` smart runs |
 | `KIRA_IPC_FIXTURES` | `write` regenerates IPC fixtures | you |
 | `KIRA_GIT_FIXTURES` | `write` regenerates the porcelain golden corpus | you |

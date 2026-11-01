@@ -502,7 +502,7 @@ script_runs(id, script_id, script_name, color, kind, trigger_kind, state, termin
             tools_json, task_id, task_title, branch_id, branch_label)
                                                        -- P242 (Studio 0034 / Space 0026, extended by
                                                        -- 0035-0037 / 0028-0030); one row per
-                                                       -- Automations run, newest 500 kept (finished
+                                                       -- Script run, newest 500 kept (finished
                                                        -- rows only are purged). state waiting|running|
                                                        -- done|failed|cancelled|blocked|skipped;
                                                        -- outcome_json is a runoutcome.Outcome.
@@ -787,9 +787,9 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Kira Space's ade mode (P128 placeholder) is the app's first full-layout module, which is what the ModeDef union exists for.
 - packages/workbench/src/components/ModeSwitcher.vue, generic over M, is the shared title-bar mode switcher with markup byte-identical to Kira Studio's pre-P128 inline one; Kira Space's TitleBar.vue renders it for the first time.
 
-- The Automations entry in both apps' MODES points at one shared module, packages/workbench/src/automations/module.ts, not two hand-kept-identical copies (renamed from Terminal in P242).
+- The Runs entry in both apps' MODES points at one shared module, packages/workbench/src/automations/module.ts, not two hand-kept-identical copies (renamed from Terminal in P242).
 - Each app's App.vue builds one AutomationsModuleContext object (in its own workbench/automationsModule.ts) and provide()s it once at the root, above WorkbenchShell.vue.
-- The mode key, windows.mode and the module's tab workspace_id are all automations; real terminals in packages/workbench/src/terminal/ stay terminals, only the launching module was renamed.
+- The mode key, windows.mode and the module's tab workspace_id are all automations; real terminals in packages/workbench/src/terminal/ stay terminals, only the launching module was renamed. The module shows as Runs (P438); mode key, i18n keys, code names, test IDs and the `<app home>/automations` folder keep `automations`.
 - Script logic lives in repo-root internal/scripts (custom_scripts repo, validation, service); each app's bound bridge.CustomScriptsService keeps its own binding name and delegates to it. List answers and every mutation broadcast one Snapshot{collections, scripts}.
 - Script dirMode kira (default) runs in <app home>/automations/<script id>, created 0700 on demand; a symlink or non-directory at any level is refused with "<path> is not a real folder: remove it".
 - Script dirMode fixed is the chosen absolute folder and must exist.
@@ -813,12 +813,12 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - AutomationsPanel.vue, AutomationsStart.vue, AutomationsNewTab.vue, ScriptDialog.vue, TerminalTabView.vue and TerminalHostView.vue are the same six files in both apps, imported lazily via defineAsyncComponent so a git-only session never pays for the terminal launch chunk.
 
 - internal/runoutcome is the single run-result type shared by both stores: Outcome{status done|failed|blocked|cancelled, reason, source agent|exit|timeout|start|user|restart, reported, exitCode, lastError, summary}.
-- runoutcome.ForProcess is the only wording table for run outcomes, so ADE step runs (ade_runs.outcome_json, Space only) and Automations runs use the same wording.
+- runoutcome.ForProcess is the only wording table for run outcomes, so ADE step runs (ade_runs.outcome_json, Space only) and script runs use the same wording.
 - internal/scriptruns owns the script_runs table and the kira:scriptRuns:changed push (which carries the whole changed run), and it implements terminal.ScriptLauncher.
 - ScriptLauncher.Begin records a running run when a script terminal opens; a blocked folder records a failed run with source start and refuses the open.
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
-- The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list. The Automations panel (RunsSection.vue) lists only running and waiting runs; finished runs live in the Operations panel.
+- The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Runs list. The Runs panel (RunsSection.vue) lists only running and waiting runs; finished runs live in the Operations panel.
 - `runoutcome.Outcome.outputTail` holds the last 40 sanitized lines (8 KiB cap) of a failed terminal or headless script run. A `termtext.Tail` on the script session tap (`ScriptLauncher.Output`) feeds terminal runs; the headless log sink feeds the rest. It lives in `outcome_json`, so it survives tab close and restart. Copy for agent falls back to it once the terminal tab is gone.
 - `internal/termtext` is the one ANSI stripper and line sanitizer (gitprepare and scriptruns).
 - A script keeps one tab per key {scriptId, taskId, branchId} ('' when none), stored in terminal (launchKind script) and script-run tab state; packages/workbench/src/automations/scriptTabs.ts holds the rule.
@@ -848,10 +848,11 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - A workflow step may name smart_script plus params instead of a prompt (planSmartStep, smartOutcome, supervised by superviseAgent).
 - agentnotify.HandleScriptRun posts for smart runs only: failed under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never.
 - Kira Studio MODE_ORDER is studio, api, automations, docker; Kira Space order is ade, automations, memory, git. Space opens new windows in git (WindowModes.Default), now the last tab. ModeDef.tabStrip: false hides the tab strip for modules without tabs (Docker and Space's Memory).
+- ModeSwitcher tabs are icon-only (P438): the module label is the tab's aria-label and its tooltip; no mode shortcut exists.
 - WorkbenchShell takes mainFramed (default keeps the main-panel frame); ade passes it off so each pane carries its own single frame.
-- Kira Space repo terminals and the Automations module's terminals both render through the shared TerminalTabView.vue/TerminalHostView.vue, not two parallel implementations.
+- Kira Space repo terminals and the Runs module's terminals both render through the shared TerminalTabView.vue/TerminalHostView.vue, not two parallel implementations.
 - P128 deleted views/repo/RepoTerminalView.vue, which had been a hand-kept-identical second copy of the terminal tab body for repo-scoped terminals.
-- A repo terminal differs from an Automations terminal only in the workspaceId/codeRepoId the opener stamps on the tab record: openRepoTerminalTab (repo-scoped) versus Automations' openTerminalTab (workspace-scoped, visibleWorkspace()'s id).
+- A repo terminal differs from a Runs terminal only in the workspaceId/codeRepoId the opener stamps on the tab record: openRepoTerminalTab (repo-scoped) versus Runs' openTerminalTab (workspace-scoped, visibleWorkspace()'s id).
 - TerminalTabView.vue/TerminalHostView.vue read neither workspaceId nor codeRepoId; the tab prop is typed against TerminalHostView's own prop shape, not either app's tab-record type.
 - Shift+Enter in every terminal sends `ESC CR` (meta-Enter) via one custom key handler in `terminalRenderer.ts`; a newline in Claude Code and zsh. Cmd+Enter has no binding (xterm sends `CR`).
 - Terminal links come from `@xterm/addon-web-links` (plain `http(s)` text) and xterm `linkHandler` (OSC 8, `http(s)` only). Desktop opens on Cmd-click (mac) or Ctrl-click through `LinkService.OpenExternal`, with a hover hint; plain click never opens. `window.open` does nothing in the Wails webview, hence the bridge. Phone (`linkActivation: 'tap'`) opens on tap via `window.open` with `noopener,noreferrer`. No file-path links.
@@ -868,10 +869,10 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - OpLogPanel.vue shows a live elapsed clock (op-elapsed, m:ss) for every running row, ticked by one shared VueUse interval paused while runningCount is 0; finished rows show the formatted durationMs.
 - opLogMenuItems supplies copy-command, copy-error, optional copy-details, a separator, then cancel; consumers find items by `id`.
 - toggleOperationsPanel/setOperationsHeight moved from Kira Studio's state/layout.ts into the shared createLayoutStore.ts core, used by both apps.
-- Automation runs show in both apps' Operations panel as a projection of `script_runs` (`automationOp`, id `run:<id>`), never rows in `op_log`. Panel retention for them is `script_runs`: newest 500 finished kept, newest 200 loaded.
+- Script runs show in both apps' Operations panel as a projection of `script_runs` (`automationOp`, id `run:<id>`), never rows in `op_log`. Panel retention for them is `script_runs`: newest 500 finished kept, newest 200 loaded.
 - `useAutomationOps` merges them into each app's panel list. Cancel maps to Stop (running) or Decline (waiting); the menu adds Copy for agent, Open run, Resume and Run again. A waiting run shows its state in the command cell, not the status cell, so Cancel stays reachable.
-- `opLogMatches` is the one filter predicate for op rows and automation rows. Clear sets `clearedAt`; automation runs started before it stay hidden in that window.
-- `AutomationsModuleContext.showOperations` opens the Operations dock; the Automations panel's empty state links to it.
+- `opLogMatches` is the one filter predicate for op rows and script run rows. Clear sets `clearedAt`; script runs started before it stay hidden in that window.
+- `AutomationsModuleContext.showOperations` opens the Operations dock; the Runs panel's empty state links to it.
 - No Kira-Studio import (MonacoHost, a connections store, kira-studio) may reach the shared package; this was verified by a closing-audit grep in P132 Part 1 §7.
 
 - WorkbenchShell.vue (shared) always mounts #dock; hasDock is removed, opsVisible/opsHeight are required props, and the status bar is always mt-1.
@@ -927,7 +928,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - TabStrip reads the narrow TabStripHost seam (host.ts): an optional host prop, falling back to the injected WorkbenchHost, which extends it. Optional capabilities (close*, duplicate, promote, preview, moveTab) hide their affordance when absent.
 - TabStrip has a #tab-leading slot that renders before the title, and the kind flag pinnedTitle makes a pinned chip labelled rather than icon-only.
 - Tab reorder uses vue-draggable-plus useDraggable in forceFallback mode on the scrolling row only (pinned chips sit outside it), bound to an id mirror so the library reverts its own DOM move; onUpdate commits once per drop via moveTab.
-- The reorder binding is useSortableReorder (packages/workbench/src/behaviour/sortableReorder.ts), shared with Studio's column, environment and variable lists, the Automations panel (SortableList.vue) and Space's Git panel repo list. Its keyboardHandle option limits Alt+Arrow moves to an item's own row.
+- The reorder binding is useSortableReorder (packages/workbench/src/behaviour/sortableReorder.ts), shared with Studio's column, environment and variable lists, the Runs panel (SortableList.vue) and Space's Git panel repo list. Its keyboardHandle option limits Alt+Arrow moves to an item's own row.
 - Studio's project tree and the collections tree are virtualized, so their pointer drags share workbench/behaviour/treePointerDrag.ts (VueUse pointer hit-testing, press tolerance, edge auto-scroll, Escape and pointercancel, click swallow); the caller supplies what a press may grab, where a drop resolves and what it does. Connection reorder is project/connectionReorder.ts on it (drop line). Alt+Up/Down go through the connection menu's Move up/down items.
 - Adding a tab kind takes one registry entry each in state/tabKinds.ts and workbench/tabViews.ts, not editing a dispatch chain in three files.
 - 'http-request' is the first Api-mode tab kind: TAB_KIND_MODE['http-request'] is 'api' and every other entry is 'studio'.
@@ -1628,7 +1629,7 @@ packaged app does not), where the identical application code runs unchanged over
 - As of P100 the git module (all internal/git* Go packages, internal/ghclient, internal/codeworkspace, and the consumers of packages/git-ui, git-core, git-ipc) moved from apps/kira-studio into apps/kira-space, a separate standalone macOS app.
 - Kira Space has its own binary, its own ~/.kira-space/ home (KIRA_SPACE_HOME), and its own kira.db and review.db.
 - From P100 through P127 Kira Space's window had no title-bar mode switcher; the repo workspace was the whole app, mounted directly rather than behind a 'git' AppMode.
-- P128 gave Kira Space its own module system with modules git, automations (the same shared Automations module Kira Studio uses) and ade (the app's task-planner surface).
+- P128 gave Kira Space its own module system with modules git, automations (the same shared Runs module Kira Studio uses) and ade (the app's task-planner surface).
 - In Kira Space, state/workspace.ts's visibleWorkspace() is the one function reading both the mode store and the git-only workspace store: it returns the active repo (or none) while git is active, otherwise the active module's id. host.ts's activeWorkspace and state/tabs.ts's tab-stepping actions use it.
 - Opening a repository (openRepoWorkspace) forces Kira Space's mode back to git; the boot-time fall-forward onto the last active repo (persisted per window as kira.space.lastRepo.<window>) or first restored one does not, so a relaunch into a persisted automations/ade mode stays there.
 - P116 gave Kira Space generic window chrome using shared primitives (internal/keepawake, internal/metrics, packages/workbench TitleBarWindowActions and AppMetricsItem): a native menu, keep-awake toggle, New window button, and CPU/memory status-bar item.
@@ -2368,7 +2369,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Sandboxed agents always read the macOS keychain; the CLI signs in from it. Keychain writes stay denied (P341).
 - A step without a sandbox block defaults to access write with network on.
 - The sandbox covers headless agents from superviseAgent (steps, review rounds, rebase runs with every stack worktree writable) and scriptruns smart runs in dir mode worktree.
-- The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode automations, or memory claude calls.
+- The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode scripts, or memory claude calls.
 - The Enforcer interface has Support, Prepare and Watch; System() is real only on darwin, elsewhere Support is Enforced:false with Reason NotEnforcedKey and Prepare still builds profile, flags and env but no wrapper.
 - sandboxtest.Fake stands in for flow tests; the flow harness defaults to a not-enforced fake so contracts do not depend on the host OS.
 - With agentmcp.Spec.Sandbox, Script emits exec /usr/bin/env -u … K=V /usr/bin/sandbox-exec -f <profile> claude … after the login shell sources the user profile.
@@ -3243,7 +3244,7 @@ repo's CI runs.
 - A worker-scoped flowServers fixture spawns apps/kira-studio/bin/flowservers (built once under the shared build lock), so e2e-real and the Go flow tier share one server implementation; the serverEnv option adds environment to it.
 
 - tests/visual/ (bun run test:visual:studio) is a bounded pixel-diff tier of eight specs and 13 snapshots, reusing tests/ui/'s fixtures and mocked wire planes.
-- Seven visual specs (workbench shell, data grid, SQL console, connection dialog, Schema (DDL) editor, HTTP request view, Automations script dialog) have one at-rest screenshot each; settings.spec.ts contributes 6, one per Settings pane.
+- Seven visual specs (workbench shell, data grid, SQL console, connection dialog, Schema (DDL) editor, HTTP request view, Runs script dialog) have one at-rest screenshot each; settings.spec.ts contributes 6, one per Settings pane.
 - The visual tier is its own Playwright project, not folded into ui, mirroring ui-timing, because a different measurement contract earns a different project.
 - Capture or update visual baselines only from the ui CI job's ubuntu-latest environment, never a local macOS run, because WKWebView and WebKitGTK glyph rendering differ regardless of font choice.
 - Playwright's animations: 'disabled' default freezes the app's state-gated infinite CSS animations before visual capture.

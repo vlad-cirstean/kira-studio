@@ -69,7 +69,7 @@ export const APPS: readonly AppContent[] = [
       },
       {
         icon: 'sparkle',
-        title: 'Automations',
+        title: 'Runs',
         body: 'Scripts and smart scripts run by headless Claude Code.',
       },
       {
@@ -134,7 +134,7 @@ export const APPS: readonly AppContent[] = [
       {
         icon: 'robot',
         title: 'Agents',
-        body: 'Task planner with workflows, runs and interactive Claude Code sessions.',
+        body: 'Task planner with workflows, agent runs and interactive Claude Code sessions.',
       },
       {
         icon: 'lightbulb',
@@ -143,7 +143,7 @@ export const APPS: readonly AppContent[] = [
       },
       {
         icon: 'terminal',
-        title: 'Terminal and automations',
+        title: 'Runs and terminal',
         body: 'Scripts with run history and cron schedules.',
       },
       {

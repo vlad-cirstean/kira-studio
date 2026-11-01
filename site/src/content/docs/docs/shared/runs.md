@@ -1,5 +1,5 @@
 ---
-title: Automations and smart scripts
+title: Runs and smart scripts
 description: Run scripts and Claude Code prompts from collections, on demand or on a schedule.
 sources:
   - README.md
@@ -12,12 +12,12 @@ sidebar:
   order: 1
 ---
 
-Automations exist in both apps. Scripts group in collections. Each script runs in its own folder and keeps a run history with status, exit code and result.
+Runs exist in both apps. Scripts group in collections. Each script runs in its own folder and keeps a run history with status, exit code and result.
 
 ## Scripts
 
 - Create a script with **New script**.
-- Choose the run folder: the automations folder under the app home (**Use automations folder**), or **Choose folder…**.
+- Choose the run folder: the Kira scripts folder under the app home (**Use Kira scripts folder**), or **Choose folder…**.
 - Add parameters. A parameter reaches the command as a variable.
 - Open terminals beside the run history.
 - Start a script with its play button. Click a row to select it; double-click to edit.

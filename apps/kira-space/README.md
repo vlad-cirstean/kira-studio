@@ -5,7 +5,7 @@
 A native macOS git client and code workspace: a commit graph, branch review and remote operations
 over a VS Code-adjacent workspace (file tree, Monaco viewer, diffs, search), with coding agents, a
 memory store, a terminal and a phone view on your home network — built on Wails (Go)
-and Vue 3. Its modules are Agents, Automations, Memory and Git.
+and Vue 3. Its modules are Agents, Runs, Memory and Git.
 
 [Presentation page](https://vlad-cirstean.github.io/kira-studio/) and
 [screenshots](../../README.md#screenshots).
@@ -55,7 +55,7 @@ and Vue 3. Its modules are Agents, Automations, Memory and Git.
 - **Memory** — an MCP server for Claude Code with keyword and semantic search. Semantic search needs
   an optional local model of about 35 MB, downloaded when you click the button in Settings > Memory.
   Add memories by hand, or import files or folders in bulk.
-- **Automations** — scripts grouped in collections, each run in its own folder with a status and result,
+- **Runs** — scripts grouped in collections, each run in its own folder with a status and result,
   plus terminals. A smart script is a prompt run by headless Claude Code with typed parameters and a tool
   allowlist; run it on a task or branch from Agents (in the task worktree if you choose), as a workflow
   step, or on a cron schedule that asks you to confirm each due run.
