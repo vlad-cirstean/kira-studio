@@ -16,6 +16,7 @@ import { useClusterProbes, useClusters, useRefreshCluster } from '../queries';
 import { useKubernetesUiStore } from '../state';
 import type { KindCategory, KubeCluster, KubeKind } from '../wire';
 import ClusterIcon from './ClusterIcon.vue';
+import ClusterMcpDialog from './ClusterMcpDialog.vue';
 
 type DotState = 'unknown' | 'probing' | 'ok' | 'error';
 
@@ -57,6 +58,13 @@ const active = computed(() => {
 const probes = useClusterProbes(() => list.value.map((c) => c.id), active);
 
 const closedCategories = ref<string[]>([]);
+const mcpClusterId = ref('');
+const mcpOpen = computed({
+  get: () => mcpClusterId.value !== '',
+  set: (v) => {
+    if (!v) mcpClusterId.value = '';
+  },
+});
 
 function dotOf(index: number): DotState {
   const status = probes.statuses.value[index];
@@ -143,6 +151,15 @@ function menuFor(row: Row): MenuItem[] {
       label: t('common.action.refresh.label'),
       icon: 'refresh',
       run: () => void refresh.run(row.cluster.id),
+    },
+    {
+      type: 'item',
+      id: 'kube-cluster-mcp',
+      label: t('kubernetes.mcp.menu.label'),
+      icon: 'settings-gear',
+      run: () => {
+        mcpClusterId.value = row.cluster.id;
+      },
     },
   ];
 }
@@ -280,5 +297,6 @@ const rowClass = (selected: boolean) =>
         </div>
       </template>
     </div>
+    <ClusterMcpDialog v-if="mcpClusterId" v-model:open="mcpOpen" :cluster-id="mcpClusterId" />
   </QueryState>
 </template>

@@ -8,6 +8,7 @@ import {
   type KubeList,
   type KubeLogsEvent,
   type KubeLogsOpen,
+  type KubeMcpSettings,
   type KubeNamespaces,
   type KubeStatus,
 } from './wire';
@@ -16,6 +17,8 @@ export const kubeControl = {
   clusters: () => unwrap(KubernetesService.Clusters()).then((r) => trust<KubeClusters>(r)),
   status: (clusterId: string, refresh: boolean) =>
     unwrap(KubernetesService.Status({ clusterId, refresh })).then((r) => trust<KubeStatus>(r)),
+  setMcp: (clusterId: string, mcp: KubeMcpSettings) =>
+    unwrap(KubernetesService.SetMcp({ clusterId, mcp })).then((r) => trust<KubeMcpSettings>(r)),
   namespaces: (clusterId: string) =>
     unwrap(KubernetesService.Namespaces({ clusterId })).then((r) => trust<KubeNamespaces>(r)),
   kinds: (clusterId: string) =>

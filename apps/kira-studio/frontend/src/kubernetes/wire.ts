@@ -1,4 +1,5 @@
 // Field-for-field mirrors of internal/kubernetes' wire types.
+import type { McpPermissionMode } from '@shared/domain/connection';
 
 export const KUBE_CHANNEL = { logs: 'kira:kubernetes:logs' } as const;
 
@@ -19,7 +20,19 @@ export interface KubeCluster {
   namespace: string;
   current: boolean;
   source: string;
+  mcp: KubeMcpSettings;
 }
+
+/** internal/kubernetes McpSettings: the AI description and one permission per operation group. */
+export interface KubeMcpSettings {
+  description: string;
+  discover: McpPermissionMode;
+  list: McpPermissionMode;
+  describe: McpPermissionMode;
+  logs: McpPermissionMode;
+}
+
+export type KubeMcpGroup = 'discover' | 'list' | 'describe' | 'logs';
 
 export interface KubeClusters {
   config: KubeConfigInfo;

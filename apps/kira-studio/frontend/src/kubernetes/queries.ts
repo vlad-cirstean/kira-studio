@@ -1,10 +1,10 @@
-import { useQueries, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { useDocumentVisibility } from '@vueuse/core';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { kubeControl } from './control';
-import type { KubeStatus } from './wire';
+import type { KubeClusters, KubeMcpSettings, KubeStatus } from './wire';
 
 const LIST_POLL = TIMING.pollFast * 2;
 
@@ -138,5 +138,26 @@ export function useRefreshCluster() {
     const status = await kubeControl.status(id, true);
     await qc.invalidateQueries({ queryKey: kubeKeys.cluster(id) });
     qc.setQueryData<KubeStatus>(kubeKeys.status(id), status);
+  });
+}
+
+/** Saves one cluster's MCP settings and patches the clusters cache with what the backend stored. */
+export function useSetClusterMcp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['kubernetes', 'setMcp'],
+    mutationFn: (v: { clusterId: string; mcp: KubeMcpSettings }) =>
+      kubeControl.setMcp(v.clusterId, v.mcp),
+    onSuccess: (mcp, v) => {
+      qc.setQueryData<KubeClusters>(kubeKeys.clusters, (old) =>
+        old
+          ? {
+              ...old,
+              clusters: old.clusters.map((c) => (c.id === v.clusterId ? { ...c, mcp } : c)),
+            }
+          : old,
+      );
+      void qc.invalidateQueries({ queryKey: kubeKeys.clusters });
+    },
   });
 }

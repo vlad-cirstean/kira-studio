@@ -5790,6 +5790,36 @@
         "status": "{shown} of {total} lines"
       }
     },
+    "mcp": {
+      "describeNote": {
+        "label": "Whole objects with events and manifest; secret values stay hidden"
+      },
+      "descriptionNote": {
+        "label": "What this cluster is for, read verbatim by MCP clients"
+      },
+      "dialog": {
+        "description": "Choose what AI clients may read from this cluster through the database MCP server.",
+        "title": "MCP access · {cluster}"
+      },
+      "discover": {
+        "label": "Discovery"
+      },
+      "discoverNote": {
+        "label": "Namespaces and resource kinds"
+      },
+      "list": {
+        "label": "List"
+      },
+      "listNote": {
+        "label": "Object names, labels and status columns"
+      },
+      "logsNote": {
+        "label": "Container log output"
+      },
+      "menu": {
+        "label": "MCP settings…"
+      }
+    },
     "namespace": {
       "all": {
         "option": "All namespaces"
@@ -11907,6 +11937,23 @@
         "heavy": {
           "body": "{connection} ({kind}) wants to run a query estimated to read {count} row, over your threshold of {threshold}. | {connection} ({kind}) wants to run a query estimated to read {count} rows, over your threshold of {threshold}."
         },
+        "kube": {
+          "describe": {
+            "body": "An MCP client wants to describe an object in {cluster} through the database MCP server."
+          },
+          "discover": {
+            "body": "An MCP client wants to list namespaces and resource kinds in {cluster} through the database MCP server."
+          },
+          "list": {
+            "body": "An MCP client wants to list resources in {cluster} through the database MCP server."
+          },
+          "logs": {
+            "body": "An MCP client wants to read pod logs in {cluster} through the database MCP server."
+          },
+          "target": {
+            "aria": "Target cluster"
+          }
+        },
         "other": {
           "body": "{connection} ({kind}) wants to run a statement through the database MCP server."
         },
@@ -14417,6 +14464,20 @@
         "focus": {
           "description": "When a query or result waits for approval, show the window and switch to its desktop.",
           "label": "Bring Kira Studio forward for approvals"
+        },
+        "kube": {
+          "empty": {
+            "empty": "No kubeconfig clusters found"
+          },
+          "intro": {
+            "description": "Clusters from your kubeconfig. Every operation asks first until you change it."
+          },
+          "legend": {
+            "label": "Kubernetes clusters"
+          },
+          "modes": {
+            "status": "Discover {discover} · list {list} · describe {describe} · logs {logs}"
+          }
         },
         "masked": {
           "status": "{count} masked column | {count} masked columns"

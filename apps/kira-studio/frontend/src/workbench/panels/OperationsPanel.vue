@@ -197,7 +197,13 @@ function fieldsFor(record: OpRecord | AutomationOp): OpLogField[] {
 }
 
 function codeLanguage(record: OpRecord | AutomationOp): EditorLanguageId | null {
-  if (isAutomationOp(record) || record.kind === 'http' || record.kind === 'preconnect') return null;
+  if (
+    isAutomationOp(record) ||
+    record.kind === 'http' ||
+    record.kind === 'preconnect' ||
+    record.kind === 'kubernetes'
+  )
+    return null;
   return consoleLanguageFor(connectionFor(record)?.kind);
 }
 
