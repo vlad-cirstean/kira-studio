@@ -35,7 +35,7 @@ export type FileListing = z.infer<typeof fileListingSchema>;
 // git-ipc/src/contract.ts) rather than inventing one, plus `missing` (a path git listed that no
 // longer exists on disk) and `language` (this app's own id — resolved from the extension
 // only, never sniffed; the binary check is the one place this phase *does* sniff bytes).
-export const fileStatSchema = /*#__PURE__*/ z.object({ size: z.number(), mtimeNs: z.number() });
+export const fileStatSchema = /*#__PURE__*/ z.object({ size: z.number(), hash: z.string() });
 export type FileStat = z.infer<typeof fileStatSchema>;
 
 export const fileContentSchema = /*#__PURE__*/ z.object({

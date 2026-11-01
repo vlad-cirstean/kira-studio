@@ -62,7 +62,7 @@
       "kind": "found",
       "limitBytes": 8388608,
       "stat": {
-        "mtimeNs": 0,
+        "hash": "42b196c1d1d0818254320eab692b321fd014a0453e5c6f3534bcaf01178859fb",
         "size": 23
       },
       "text": "keep.txt\nunstaged edit\n"

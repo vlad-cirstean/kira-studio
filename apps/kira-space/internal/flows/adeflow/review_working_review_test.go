@@ -51,7 +51,7 @@ func TestReviewWorkingReview(t *testing.T) {
 	if err != nil || shown.ContentHash == "" {
 		t.Fatalf("diff = %+v, %v, want a content hash", shown, err)
 	}
-	app.Contract(t, contract, "AdeTaskService.ReviewWorkingDiff", shown, flowharness.Mask("mtimeNs", "oid"))
+	app.Contract(t, contract, "AdeTaskService.ReviewWorkingDiff", shown, flowharness.Mask("oid"))
 	staleArgs := adewire.ReviewWorkingMarkArgs{
 		BranchID: br.ID, Paths: []string{"base.txt"}, Reviewed: true, Ranges: []gitreview.LineRange{{Start: 3, End: 3}},
 		ContentHashes: map[string]string{"base.txt": "stale"},

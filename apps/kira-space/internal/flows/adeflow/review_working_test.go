@@ -69,7 +69,7 @@ func TestReviewWorking(t *testing.T) {
 	if d.Head.Kind != "found" || d.Head.Text != "keep.txt\n" || d.Worktree.Text != "keep.txt\nunstaged edit\n" {
 		t.Fatalf("keep.txt diff = %+v", d)
 	}
-	app.Contract(t, "ade-review-working", "AdeTaskService.ReviewWorkingDiff", d, flowharness.Mask("mtimeNs", "oid"))
+	app.Contract(t, "ade-review-working", "AdeTaskService.ReviewWorkingDiff", d, flowharness.Mask("oid"))
 	if d, err = app.W.AdeTask.ReviewWorkingDiff(ctx, adewire.ReviewWorkingDiffArgs{BranchID: br.ID, Path: "gone.txt"}); err != nil || d.Worktree.Kind != "missing" || d.Head.Kind != "found" {
 		t.Fatalf("gone.txt diff = %+v, %v, want a missing worktree side", d, err)
 	}

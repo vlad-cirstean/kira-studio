@@ -16,8 +16,10 @@ const REPO = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 const LIMIT = 8 * 1024 * 1024;
-const A_STAT = { size: 22, mtimeNs: 111 };
-const C_STAT = { size: 20, mtimeNs: 222 };
+const A_STAT = { size: 22, hash: 'hash-a' };
+const C_STAT = { size: 20, hash: 'hash-c' };
+const D_STAT = { size: 20, hash: 'hash-d1' };
+const D_STAT_NEW = { size: 20, hash: 'hash-d2' };
 
 const LONG = Array.from({ length: 400 }, (_, i) => `export const row${i} = ${i};\n`).join('');
 
@@ -38,7 +40,7 @@ const CONTROL: ControlSnapshot[] = [
     channel: IPC.codeWorkspaceListFiles,
     args: { id: REPO.id },
     response: {
-      paths: ['a.ts', 'b.ts', 'c.ts', 'long.ts'],
+      paths: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'long.ts'],
       status: { 'c.ts': 'M' },
       truncated: false,
     },
@@ -69,6 +71,31 @@ const CONTROL: ControlSnapshot[] = [
       bytes: 20,
       limitBytes: LIMIT,
       language: 'typescript',
+    },
+  },
+  {
+    channel: IPC.codeWorkspaceReadFile,
+    args: { id: REPO.id, path: 'd.ts' },
+    response: {
+      kind: 'found',
+      text: 'export const d = 1;\n',
+      bytes: 20,
+      limitBytes: LIMIT,
+      language: 'typescript',
+      stat: D_STAT,
+    },
+  },
+  {
+    // Same size, new content: the hash differs although a size or mtime gate would match.
+    channel: IPC.codeWorkspaceReadFile,
+    args: { id: REPO.id, path: 'd.ts', ifStat: D_STAT },
+    response: {
+      kind: 'found',
+      text: 'export const d = 2;\n',
+      bytes: 20,
+      limitBytes: LIMIT,
+      language: 'typescript',
+      stat: D_STAT_NEW,
     },
   },
   {
@@ -165,4 +192,24 @@ test('a file tab reopens at the scroll position it was left at', async ({ relaun
 
   await expect(lines).not.toContainText('row0 ');
   await expect(lines.locator('.view-line').first()).toHaveText(visible);
+});
+
+test('a same-size edit answered found replaces the text on tab return', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await repoRowById(page, REPO.id).click();
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+
+  await treeRow(page, 'd.ts').dblclick();
+  const editor = page.locator('[data-testid="repo-file-editor"] .view-lines');
+  await expect(editor).toContainText('export const d = 1;');
+  await treeRow(page, 'b.ts').dblclick();
+  await expect(editor).toContainText('export const b = 2;');
+
+  await repoTab(page, 'repo-file').first().click();
+  await expect(editor).toContainText('export const d = 2;');
+  const readD = calls(control, IPC.codeWorkspaceReadFile).filter(
+    (c) => (c.args as { path: string }).path === 'd.ts',
+  );
+  expect(readD).toHaveLength(2);
+  expect((readD[1].args as { ifStat?: unknown }).ifStat).toEqual(D_STAT);
 });

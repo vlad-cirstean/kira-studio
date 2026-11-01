@@ -116,19 +116,16 @@ type FileContent struct {
 	Bytes      int    `json:"bytes"`
 	LimitBytes int    `json:"limitBytes"`
 	Language   string `json:"language"`
-	// Stat identifies the file as stat saw it before the read; a caller passes it back as ifStat.
+	// Stat identifies the bytes read; a caller passes it back as ifStat.
 	Stat *FileStat `json:"stat,omitempty"`
 }
 
-// FileStat is the cheap identity a caller keeps to skip re-reading an unchanged file. It is taken
-// before the read, so a write landing mid-read only costs the next call one extra read.
+// FileStat is the identity a caller keeps to skip resending an unchanged file: size plus the
+// SHA-256 of the bytes read. Content is the only exact signal; mtime misses a same-size write inside
+// the timestamp granularity and any tool that restores it.
 type FileStat struct {
-	Size    int64 `json:"size"`
-	MtimeNs int64 `json:"mtimeNs"`
-}
-
-func statOf(info os.FileInfo) *FileStat {
-	return &FileStat{Size: info.Size(), MtimeNs: info.ModTime().UnixNano()}
+	Size int64  `json:"size"`
+	Hash string `json:"hash"`
 }
 
 // ReadFile reads relPath (already validated by ValidateRelPath) and classifies it per §8.1: a NUL
@@ -154,7 +151,7 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 }
 
 // ReadFileIf is ReadFile that answers kind "unchanged", with no content, when ifStat still matches
-// the file on disk.
+// the file on disk. It still reads and hashes the file: the gate saves the payload, not the read.
 func ReadFileIf(absPath, relPath string, ifStat *FileStat) (FileContent, error) {
 	limit := FileContent{LimitBytes: MaxReadBytes, Language: languageFor(relPath)}
 
@@ -170,11 +167,6 @@ func ReadFileIf(absPath, relPath string, ifStat *FileStat) (FileContent, error) 
 		// A FIFO, device, socket, or anything else ListFiles' own git enumeration would never have
 		// reported as a worktree file — treated the same as "gone", never opened.
 		limit.Kind = "missing"
-		return limit, nil
-	}
-	limit.Stat = statOf(info)
-	if ifStat != nil && *ifStat == *limit.Stat {
-		limit.Kind = "unchanged"
 		return limit, nil
 	}
 	if info.Size() > MaxReadBytes {
@@ -216,6 +208,11 @@ func ReadFileIf(absPath, relPath string, ifStat *FileStat) (FileContent, error) 
 		return limit, nil
 	}
 
+	limit.Stat = &FileStat{Size: int64(len(data)), Hash: hashBytes(data)}
+	if ifStat != nil && *ifStat == *limit.Stat {
+		limit.Kind = "unchanged"
+		return limit, nil
+	}
 	limit.Kind = "found"
 	limit.Bytes = len(data)
 	limit.Text = string(data)

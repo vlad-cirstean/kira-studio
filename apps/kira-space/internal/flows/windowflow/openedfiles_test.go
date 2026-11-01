@@ -64,7 +64,7 @@ func TestOpenedFilesNewWindow(t *testing.T) {
 		if err != nil || got.Kind != "found" || got.Language != "json" || got.Text != "{\"k\": 1}\n" {
 			t.Fatalf("Read = %+v, %v, want found json", got, err)
 		}
-		app.Contract(t, "opened-files", "OpenedFilesService.Read", got, flowharness.Mask("mtimeNs"))
+		app.Contract(t, "opened-files", "OpenedFilesService.Read", got)
 		for _, bad := range []string{"notes/b.json", txt} {
 			if _, err := app.W.OpenedFilesSvc.Read(bridge.OpenedFilesReadArgs{Path: bad}); err == nil {
 				t.Fatalf("Read(%q) succeeded, want refusal", bad)

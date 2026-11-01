@@ -29,8 +29,8 @@ const LARGE_TEXT = Array.from(
 ).join('');
 const LOCAL = { path: '/tmp/outside/b.json', relPath: '', repoId: '' };
 
-const A_STAT = { size: LARGE_TEXT.length, mtimeNs: 1 };
-const C_STAT = { size: 20, mtimeNs: 2 };
+const A_STAT = { size: LARGE_TEXT.length, hash: 'hash-a' };
+const C_STAT = { size: 20, hash: 'hash-c' };
 const LIMIT = 8 * 1024 * 1024;
 
 const CONTROL: ControlSnapshot[] = [

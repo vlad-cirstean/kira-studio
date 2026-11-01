@@ -17,7 +17,7 @@
     "language": "json",
     "limitBytes": 8388608,
     "stat": {
-      "mtimeNs": 0,
+      "hash": "fbf7612302afd65c06009618d5144fcb3957387bd75bd9b9d232a27293d9c072",
       "size": 9
     },
     "text": "{\"k\": 1}\n"
