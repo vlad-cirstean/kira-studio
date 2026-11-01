@@ -103,7 +103,7 @@
     "dedup:go": "git ls-files '*.go' | grep -v -e /page/wire/ -e /gitwire/ | go tool dupl -files -t 100"
   },
   "devDependencies": {
-    "@babel/parser": "7.29.8",
+    "@babel/parser": "8.0.10",
     "@biomejs/biome": "2.6.4",
     "@intlify/message-compiler": "11.4.17",
     "@playwright/test": "1.64.1",
