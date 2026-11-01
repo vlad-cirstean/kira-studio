@@ -160,6 +160,9 @@ func (a *Acli) view(ctx context.Context, args []string, gate chan struct{}) ([]b
 		if large && fields == jira.DetailFields {
 			return nil, toolexec.ErrOutputTooLarge
 		}
+		if fields == jira.DetailFieldsNoComments {
+			return dropComments(detail), nil
+		}
 		return []byte(detail), nil
 	}
 	if !ok {
@@ -202,4 +205,19 @@ func IssueJSON(key, title, status, category string, prs int) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+// dropComments removes fields.comment, as acli does when it is not asked for.
+func dropComments(raw string) []byte {
+	var all, fields map[string]json.RawMessage
+	if json.Unmarshal([]byte(raw), &all) != nil || json.Unmarshal(all["fields"], &fields) != nil {
+		return []byte(raw)
+	}
+	delete(fields, "comment")
+	all["fields"], _ = json.Marshal(fields)
+	out, err := json.Marshal(all)
+	if err != nil {
+		return []byte(raw)
+	}
+	return out
 }
