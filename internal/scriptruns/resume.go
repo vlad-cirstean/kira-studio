@@ -38,7 +38,7 @@ func (s *Service) resume(id, hash string, checkHash bool) (Started, error) {
 		return Started{}, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	args, names := resumeArgs(run, *rec)
-	p, err := s.plan(args, planOpts{provider: prov.ID()})
+	p, err := s.plan(s.lifeCtx(), args, planOpts{provider: prov.ID()})
 	if err != nil {
 		return Started{}, err
 	}

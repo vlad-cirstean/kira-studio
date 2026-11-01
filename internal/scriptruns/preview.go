@@ -120,6 +120,9 @@ type planned struct {
 // check skips it; headless says the run is unattended, so a normal script also needs the branch free.
 type planOpts struct {
 	claimed, headless bool
+	// informational marks a plan that only reports (a preview, the restore offer): the MCP presence
+	// check never waits on a cold `claude mcp list`. Start re-checks without this.
+	informational bool
 	// provider pins a resumed smart run to the provider of its conversation; empty means the active one.
 	provider string
 }
@@ -132,7 +135,7 @@ func (s *Service) getenv(k string) string {
 }
 
 // plan resolves a run the one way Preview shows it and Start executes it.
-func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
+func (s *Service) plan(ctx context.Context, args RunArgs, o planOpts) (*planned, error) {
 	rec, err := s.Scripts.Get(args.ScriptID)
 	if err != nil {
 		return nil, ipcerr.InternalErr(err)
@@ -204,7 +207,7 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 	}
 	p.mcp = pv.MCP
 	if pv.Blocker == "" {
-		pv.Blocker = s.smartBlocker(agent, pv.MCP, p.dir.Path)
+		pv.Blocker = s.smartBlocker(ctx, agent, pv.MCP, p.dir.Path, o.informational)
 	}
 	p.preview = finishPreview(pv, p)
 	return p, nil
@@ -251,7 +254,7 @@ func containsVarName(text, name string) bool {
 
 // smartBlocker answers why a smart run cannot start now: the run cap, or a user MCP server that is
 // gone. The check lists servers from dir, the folder the run starts in, since claude resolves a name there.
-func (s *Service) smartBlocker(agent harness.Provider, mcp []string, dir string) string {
+func (s *Service) smartBlocker(ctx context.Context, agent harness.Provider, mcp []string, dir string, informational bool) string {
 	s.mu.Lock()
 	running := len(s.smart)
 	s.mu.Unlock()
@@ -262,9 +265,12 @@ func (s *Service) smartBlocker(agent harness.Provider, mcp []string, dir string)
 		return ""
 	}
 	dir = existingDir(dir, s.Home)
-	have, err := agent.UserMCPServers(context.Background(), dir)
+	have, known, err := agent.UserMCPPresence(ctx, dir, !informational)
 	if err != nil {
 		return err.Error()
+	}
+	if !known {
+		return ""
 	}
 	for _, name := range mcp {
 		found := false
@@ -317,7 +323,7 @@ func hashOf(pv Preview, p *planned) string {
 
 // Preview resolves a run without starting anything.
 func (s *Service) Preview(args RunArgs) (Preview, error) {
-	p, err := s.plan(args, planOpts{})
+	p, err := s.plan(s.lifeCtx(), args, planOpts{informational: true})
 	if err != nil {
 		return Preview{}, err
 	}
@@ -328,7 +334,7 @@ func (s *Service) Preview(args RunArgs) (Preview, error) {
 func (s *Service) Start(args StartArgs) (Started, error) {
 	s.startMu.Lock()
 	defer s.startMu.Unlock()
-	p, err := s.plan(args.RunArgs, planOpts{})
+	p, err := s.plan(s.lifeCtx(), args.RunArgs, planOpts{})
 	if err != nil {
 		return Started{}, err
 	}
@@ -364,11 +370,11 @@ func (s *Service) claimWorktree(p *planned, keep bool) (*planned, error) {
 	}
 	if !keep {
 		release()
-		return s.plan(p.args, p.opts)
+		return s.plan(s.lifeCtx(), p.args, p.opts)
 	}
 	o := p.opts
 	o.claimed = true
-	np, err := s.plan(p.args, o)
+	np, err := s.plan(s.lifeCtx(), p.args, o)
 	if err != nil {
 		release()
 		return nil, err

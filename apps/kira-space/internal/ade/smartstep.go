@@ -102,7 +102,7 @@ func (s *smartStep) checkMCP(ctx context.Context, agent harness.Provider, dir st
 	if len(names) == 0 {
 		return nil
 	}
-	have, err := agent.UserMCPServers(ctx, dir)
+	have, _, err := agent.UserMCPPresence(ctx, dir, true)
 	if err != nil {
 		return err
 	}

@@ -186,7 +186,7 @@ func (s *Service) restoreItem(run Run) (RestoreItem, error) {
 		return item, nil
 	}
 	args, secrets := resumeArgs(run, *rec)
-	p, err := s.plan(args, restorePlanOpts(run))
+	p, err := s.plan(s.lifeCtx(), args, restorePlanOpts(run))
 	if err != nil {
 		var ie *ipcerr.Error
 		switch {
@@ -230,9 +230,9 @@ func (s *Service) restoreItem(run Run) (RestoreItem, error) {
 // restorePlanOpts pins a continued smart run to its conversation's provider, as Resume does.
 func restorePlanOpts(run Run) planOpts {
 	if run.Kind == KindSmart && run.Resumable {
-		return planOpts{provider: run.Provider}
+		return planOpts{provider: run.Provider, informational: true}
 	}
-	return planOpts{}
+	return planOpts{informational: true}
 }
 
 func excerpt(text string, limit int) string {

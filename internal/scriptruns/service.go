@@ -1,6 +1,7 @@
 package scriptruns
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -61,6 +62,8 @@ type Service struct {
 	startMu   sync.Mutex
 	mu        sync.Mutex
 	closed    bool
+	life      context.Context
+	endLife   context.CancelFunc
 	smart     map[string]*bgRun
 	bg        map[string]*bgRun
 	finishes  map[string]agentmcp.Finish
@@ -298,3 +301,16 @@ func (s *Service) Recover() error {
 
 // IsCallerError reports whether err is the caller's fault.
 func IsCallerError(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+
+// lifeCtx lives until Close; planning waits on it, so a quit cancels a slow `claude mcp list`.
+func (s *Service) lifeCtx() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.life == nil {
+		s.life, s.endLife = context.WithCancel(context.Background())
+		if s.closed {
+			s.endLife()
+		}
+	}
+	return s.life
+}

@@ -239,7 +239,7 @@ func (s *Scheduler) fireScript(scriptID string, due time.Time) {
 		svc.skip(*rec, due, overlapText(*rec, *active))
 		return
 	}
-	p, err := svc.plan(scheduleArgs(*rec, nil), planOpts{headless: true})
+	p, err := svc.plan(svc.lifeCtx(), scheduleArgs(*rec, nil), planOpts{headless: true})
 	if err != nil {
 		svc.skip(*rec, due, errText(err))
 		return

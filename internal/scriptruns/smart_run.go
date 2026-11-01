@@ -238,6 +238,9 @@ func (s *Service) Live() int {
 func (s *Service) Close() {
 	s.mu.Lock()
 	s.closed = true
+	if s.endLife != nil {
+		s.endLife()
+	}
 	runs := make([]*bgRun, 0, len(s.smart)+len(s.bg))
 	for _, r := range s.smart {
 		runs = append(runs, r)

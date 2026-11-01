@@ -22,14 +22,19 @@ import (
 
 const mcpListTimeout = 30 * time.Second
 
-var mcpListTTL = 30 * time.Second
+var (
+	mcpListTTL = 30 * time.Second
+	// mcpPresenceTTL is how long the presence check reuses a list: names change rarely, while the
+	// picker wants fresh health status.
+	mcpPresenceTTL = 5 * time.Minute
+)
 
-// SetMCPListTTL replaces how long a `claude mcp list` result is reused and returns the restore func
-// (a flow test passes 0 to see a config change at once).
+// SetMCPListTTL replaces how long a `claude mcp list` result is reused, for the picker and the
+// presence check alike, and returns the restore func (a flow test passes 0 to see a config change at once).
 func SetMCPListTTL(d time.Duration) (restore func()) {
-	prev := mcpListTTL
-	mcpListTTL = d
-	return func() { mcpListTTL = prev }
+	prevList, prevPresence := mcpListTTL, mcpPresenceTTL
+	mcpListTTL, mcpPresenceTTL = d, d
+	return func() { mcpListTTL, mcpPresenceTTL = prevList, prevPresence }
 }
 
 // mcpListArgs is the argv after claude: the only way Kira learns the user's servers.
@@ -101,9 +106,37 @@ type listEntry struct {
 // health-checks every server on each call, so the result is cached per dir for a short while; a failed
 // listing falls back to the last good one for that dir.
 func (p *Provider) UserMCPServers(ctx context.Context, dir string) ([]harness.UserServer, error) {
+	return p.userServers(ctx, dir, mcpListTTL)
+}
+
+// UserMCPPresence is the list for the presence check, reused for longer than the picker's. With wait
+// false it never blocks on a cold or expired cache: it refreshes in the background and returns the
+// stale list, or known=false when there is none.
+func (p *Provider) UserMCPPresence(ctx context.Context, dir string, wait bool) (servers []harness.UserServer, known bool, err error) {
 	c := &p.mcpList
 	c.mu.Lock()
-	if e, ok := c.entries[dir]; ok && time.Since(e.at) < mcpListTTL {
+	e, have := c.entries[dir]
+	c.mu.Unlock()
+	if have && time.Since(e.at) < mcpPresenceTTL {
+		return append([]harness.UserServer{}, e.servers...), true, nil
+	}
+	if wait || mcpPresenceTTL <= 0 {
+		servers, err = p.userServers(ctx, dir, mcpPresenceTTL)
+		return servers, err == nil, err
+	}
+	go func() {
+		_, _ = p.userServers(context.Background(), dir, 0)
+	}()
+	if have {
+		return append([]harness.UserServer{}, e.servers...), true, nil
+	}
+	return nil, false, nil
+}
+
+func (p *Provider) userServers(ctx context.Context, dir string, ttl time.Duration) ([]harness.UserServer, error) {
+	c := &p.mcpList
+	c.mu.Lock()
+	if e, ok := c.entries[dir]; ok && time.Since(e.at) < ttl {
 		c.mu.Unlock()
 		return append([]harness.UserServer{}, e.servers...), nil
 	}

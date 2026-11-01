@@ -14,6 +14,9 @@ type MCPHost interface {
 	ToolArgs(p ToolPolicy) (tools, allowed []string)
 	// UserMCPServers lists the MCP servers the agent's own CLI reports for dir, without secrets.
 	UserMCPServers(ctx context.Context, dir string) ([]UserServer, error)
+	// UserMCPPresence is UserMCPServers for a presence check: reused for longer, and with wait false
+	// it never blocks on a cold cache (known is false then).
+	UserMCPPresence(ctx context.Context, dir string, wait bool) (servers []UserServer, known bool, err error)
 	// MCPInstaller registers MCP servers with the agent's own CLI.
 	MCPInstaller() MCPInstaller
 }
