@@ -57,6 +57,7 @@ type HostViewService struct {
 	Deps           appcore.Deps
 	Windows        hostViewWindowRows
 	Targets        *HostViewTargets
+	Attachments    *HostViewAttachments
 	Trackers       *issuetracker.Registry
 	Now            func() time.Time
 	OpenWindow     func(shell.WindowRecord)
@@ -107,6 +108,8 @@ type HostViewIssue struct {
 	Kind   string                    `json:"kind"`
 	Detail *issuetracker.IssueDetail `json:"detail,omitempty"`
 	Reason string                    `json:"reason,omitempty"`
+	// Compose is what the composer may do; nil when the tracker cannot post.
+	Compose *HostViewCompose `json:"compose,omitempty"`
 }
 
 // HostViewChangeRequestArgs is ChangeRequest's request.
@@ -119,6 +122,8 @@ type HostViewChangeRequest struct {
 	Kind   string                       `json:"kind"`
 	Detail *githost.ChangeRequestDetail `json:"detail,omitempty"`
 	Status githost.Status               `json:"status"`
+	// Compose is what the composer may do; nil when the provider cannot post.
+	Compose *HostViewCompose `json:"compose,omitempty"`
 }
 
 func (s *HostViewService) hosts() *githost.Registry {
@@ -304,7 +309,11 @@ func (s *HostViewService) Issue(ctx context.Context, args HostViewIssueArgs) (Ho
 	d, err := p.(issuetracker.IssueDetails).IssueDetail(ctx, ref)
 	switch {
 	case err == nil:
-		return HostViewIssue{Kind: HostViewOK, Detail: &d}, nil
+		out := HostViewIssue{Kind: HostViewOK, Detail: &d}
+		if w, ok := p.(issuetracker.IssueComments); ok {
+			out.Compose = issueCompose(w.CommentCapabilities())
+		}
+		return out, nil
 	case errors.Is(err, issuetracker.ErrNotFound):
 		return HostViewIssue{Kind: HostViewGone, Reason: issuetracker.ReasonNotFound}, nil
 	case ctx.Err() != nil:
@@ -340,7 +349,11 @@ func (s *HostViewService) ChangeRequest(ctx context.Context, args HostViewChange
 	case ctx.Err() != nil:
 		return HostViewChangeRequest{Kind: HostViewUnavailable, Status: githost.Status{Kind: githost.KindNotFound, Reason: "cancelled"}}, nil
 	case st.OK():
-		return HostViewChangeRequest{Kind: HostViewOK, Detail: &d, Status: st}, nil
+		out := HostViewChangeRequest{Kind: HostViewOK, Detail: &d, Status: st}
+		if w, ok := l.p.(githost.ChangeRequestComments); ok {
+			out.Compose = changeRequestCompose(w.CommentCapabilities(l.repo))
+		}
+		return out, nil
 	case st.Gone:
 		return HostViewChangeRequest{Kind: HostViewGone, Status: st}, nil
 	case st.RateLimited:

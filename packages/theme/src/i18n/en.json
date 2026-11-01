@@ -1368,6 +1368,58 @@
           "body": "Git doesn’t support {method}."
         }
       },
+      "hostView": {
+        "compose": {
+          "badReply": {
+            "body": "That reply target isn’t valid."
+          },
+          "badText": {
+            "body": "The comment has characters that can’t be posted."
+          },
+          "duplicateAttachment": {
+            "body": "The same file is attached twice."
+          },
+          "empty": {
+            "body": "Write a comment or attach a file first."
+          },
+          "fileContent": {
+            "body": "This file’s content doesn’t match its .{ext} type."
+          },
+          "fileEmpty": {
+            "body": "This file is empty."
+          },
+          "fileName": {
+            "body": "This file name can’t be used."
+          },
+          "fileTooLarge": {
+            "body": "A file can be at most {max}."
+          },
+          "fileType": {
+            "body": "Files of type .{ext} can’t be attached."
+          },
+          "limitCount": {
+            "body": "A comment can carry at most {max} files."
+          },
+          "limitTotal": {
+            "body": "A comment’s files can total at most {max}."
+          },
+          "noWindow": {
+            "body": "This window can’t post comments."
+          },
+          "posting": {
+            "body": "A comment is already being posted."
+          },
+          "replyUnsupported": {
+            "body": "Issues have no replies."
+          },
+          "tooLong": {
+            "body": "A comment can be at most {max}."
+          },
+          "unknownAttachment": {
+            "body": "An attached file is no longer available. Add it again."
+          }
+        }
+      },
       "issueTracker": {
         "comment": {
           "attachmentsUnsupported": {
