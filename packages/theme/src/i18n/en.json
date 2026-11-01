@@ -9370,6 +9370,9 @@
         "resolved": {
           "status": "Resolved"
         },
+        "toggle": {
+          "aria": "Show or hide this thread"
+        },
         "truncated": {
           "hint": "Older threads are not shown. Open on the host for the rest."
         }

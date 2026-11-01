@@ -1,6 +1,12 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Badge } from '@theme/components/ui/badge';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@theme/components/ui/collapsible';
 import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { formatRelative } from '@workbench/behaviour/format';
@@ -29,15 +35,17 @@ function reviewLabel(state: ReviewerState | undefined): string {
     <FieldDescription v-if="threads.length === 0" data-testid="host-view-no-threads">{{
       t('space.hostView.conversation.empty.empty')
     }}</FieldDescription>
-    <article
+    <Collapsible
       v-for="thread in threads"
       :key="thread.id"
+      as="article"
+      :default-open="!thread.resolved"
       class="rounded-kira-md border border-border"
       :data-kind="thread.kind"
       data-testid="host-view-thread"
     >
       <header
-        v-if="thread.kind !== 'comment'"
+        v-if="thread.kind !== 'comment' || thread.resolved"
         class="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-kira-sm"
       >
         <Badge
@@ -57,28 +65,40 @@ function reviewLabel(state: ReviewerState | undefined): string {
         <Badge v-if="thread.outdated" variant="warn">{{
           t('space.hostView.conversation.outdated.status')
         }}</Badge>
+        <CollapsibleTrigger
+          v-if="thread.resolved"
+          class="ml-auto"
+          :aria-label="t('space.hostView.conversation.toggle.aria')"
+          data-testid="host-view-thread-toggle"
+        >
+          <CodiconIcon name="chevron-down" :size="13" />
+        </CollapsibleTrigger>
       </header>
-      <FieldDescription
-        v-if="thread.commentsTruncated"
-        class="border-b border-border px-3 py-1.5"
-        data-testid="host-view-comments-truncated"
-        >{{
-          t('space.hostView.conversation.commentsTruncated.hint')
-        }}</FieldDescription
-      >
-      <div
-        v-for="comment in thread.comments"
-        :key="comment.id"
-        class="border-b border-border px-3 py-2 last:border-b-0"
-        data-testid="host-view-comment"
-      >
-        <div class="m-0 mb-1 text-kira-sm text-muted-foreground">
-          <span class="font-medium text-fg">{{ comment.author.name || comment.author.login }}</span>
-          · {{ formatRelative(comment.createdAt) }}
+      <CollapsibleContent>
+        <FieldDescription
+          v-if="thread.commentsTruncated"
+          class="border-b border-border px-3 py-1.5"
+          data-testid="host-view-comments-truncated"
+          >{{
+            t('space.hostView.conversation.commentsTruncated.hint')
+          }}</FieldDescription
+        >
+        <div
+          v-for="comment in thread.comments"
+          :key="comment.id"
+          class="border-b border-border px-3 py-2 last:border-b-0"
+          data-testid="host-view-comment"
+        >
+          <div class="m-0 mb-1 text-kira-sm text-muted-foreground">
+            <span class="font-medium text-fg">{{
+              comment.author.name || comment.author.login
+            }}</span>
+            · {{ formatRelative(comment.createdAt) }}
+          </div>
+          <MarkdownBody :source="comment.body" />
         </div>
-        <MarkdownBody :source="comment.body" />
-      </div>
-    </article>
+      </CollapsibleContent>
+    </Collapsible>
     <FieldDescription v-if="truncated" data-testid="host-view-threads-truncated">{{
       t('space.hostView.conversation.truncated.hint')
     }}</FieldDescription>

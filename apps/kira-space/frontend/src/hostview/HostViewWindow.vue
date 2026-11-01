@@ -64,7 +64,7 @@ function refresh(): void {
   void query.refetch();
 }
 function openOnHost(): void {
-  fireAndForget(control.openExternal(target.value.url), 'hostView.window');
+  fireAndForget(control.gitHostOpenChangeRequestUrl(target.value.url), 'hostView.window');
 }
 function copyLink(): void {
   void copy(target.value.url);
