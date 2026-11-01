@@ -37,8 +37,11 @@ const copiedImageCount = (page: Page) =>
 
 const tabTitles = (page: Page) =>
   page.locator('[data-testid="proof-tabs"] [data-testid="tab"]').allInnerTexts();
+// The first render waits on the bundle load and the bridge round-trip; WebKit is slow on a busy runner.
 const stepsReady = (page: Page) =>
-  expect(page.locator('[data-testid="proof-step"][data-ready="true"]').first()).toBeVisible();
+  expect(page.locator('[data-testid="proof-step"][data-ready="true"]').first()).toBeVisible({
+    timeout: 20_000,
+  });
 const setViewStates = (log: { channel: string; args: unknown }[]) =>
   log.filter((c) => c.channel === IPC.proofSetViewState).map((c) => c.args as Json);
 
