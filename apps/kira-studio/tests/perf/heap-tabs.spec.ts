@@ -48,12 +48,13 @@ async function pinClock(page: Page): Promise<void> {
   await page.clock.setFixedTime(NOW);
 }
 
-async function run(app: KiraApp, tabs: HeapTab[], away = false): Promise<void> {
+async function run(app: KiraApp, tabs: HeapTab[], away = false, rounds?: number): Promise<void> {
   const { window: page, control, stream } = app;
   await pinClock(page);
   await runHeapScenario({
     page,
     tabs,
+    rounds,
     closeAll: () => closeAllTabs(page),
     away: away
       ? {
@@ -217,6 +218,7 @@ test('heap: kibana discover', async ({ relaunch }) => {
       },
     ],
     true,
+    5,
   );
 });
 

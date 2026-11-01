@@ -138,6 +138,7 @@ test('heap: repo graph, repo file, diff', async ({ relaunch }) => {
   await runHeapScenario({
     page,
     tabs,
+    rounds: 5,
     closeAll: () => closeAllTabs(page, 1) /* the graph tab is pinned */,
     reads: async () => [
       ...(control?.log() ?? []).map((e) => e.channel).filter(isReadChannel),
