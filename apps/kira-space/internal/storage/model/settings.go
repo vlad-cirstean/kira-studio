@@ -108,9 +108,9 @@ type MobileSettings struct {
 	AgentInput bool `json:"agentInput"`
 }
 
-// DefaultCaptureHotkey is the clipboard capture chord: four keys, rare enough to grab globally
+// DefaultCaptureHotkey is the clipboard capture chord: three keys, rare enough to grab globally
 // without stealing one another app uses.
-const DefaultCaptureHotkey = "CmdOrCtrl+Alt+Shift+K"
+const DefaultCaptureHotkey = "CmdOrCtrl+Shift+K"
 
 // CaptureSettings is P430's clipboard capture hotkey.
 type CaptureSettings struct {

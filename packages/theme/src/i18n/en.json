@@ -1259,6 +1259,11 @@
           "body": "The workflow file is too large."
         }
       },
+      "capture": {
+        "partial": {
+          "body": "The task “{title}” was added, but its details were not saved: {error}."
+        }
+      },
       "codeWorkspace": {
         "alreadyImported": {
           "body": "That repository is already imported."

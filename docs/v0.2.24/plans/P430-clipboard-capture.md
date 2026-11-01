@@ -68,8 +68,9 @@ One sequential Sonnet implementer.
 
 ### 1. Settings (`capture.enabled`, `capture.hotkey`)
 
-- Go `model.CaptureSettings{Enabled bool; Hotkey string}`, default `{true, "CmdOrCtrl+Alt+Shift+K"}`. Four keys: rare
-  enough to grab globally by default without stealing a chord another app uses.
+- Go `model.CaptureSettings{Enabled bool; Hotkey string}`, default `{true, "CmdOrCtrl+Shift+K"}`. Three keys (user change):
+  uncommon enough to grab globally by default. The chord is user-customisable in the settings pane: persisted as
+  `capture.hotkey`, re-registered live on change, conflict and failure status shown.
 - `CapturePatch{Enabled *bool; Hotkey *string}`; `validateCaptureSection` parses the hotkey with
   `shell.ParseChord` (below) and refuses one that equals any `shell.Shortcuts` chord (the app's own menu accelerators,
   which a global grab would steal from itself).
@@ -232,7 +233,7 @@ Coverage gate: every bound `CaptureService` method is called.
 - Popup per fixture kind: label/preview, preselected action, Enter sends `captureConfirm` with the fixture args;
   ArrowDown to Later, edit title, Enter sends `later` with the title; Esc and window blur send `captureDismiss`;
   `empty` state; a pushed `kira:capture:item` replaces the content; a confirm error renders and keeps the popup.
-- Settings pane: toggle writes `capture.enabled`; recorder turns Cmd/Ctrl+Alt+Shift+J into the accelerator string and
+- Settings pane: toggle writes `capture.enabled`; recorder turns Cmd/Ctrl+Shift+J into the accelerator string and
   saves it; a backend refusal shows inline; each status fixture renders its line (failed reason, Wayland note).
 - Support: `support/capture.ts` (control builder from the fixture), channels in `ipcChannels.ts`, `mockRuntime.ts`
   event push for both channels.
@@ -311,7 +312,7 @@ commit 5, `bun run typecheck` and `bun run lint`.
   slow on hardware, a hidden reusable popup is a follow-up, not this phase.
 - **ErrorHandler prefix match** depends on Wails error strings; a Wails bump that rewords them silently drops the
   `failed` state. The comment names the source; P434 review can recheck.
-- **Default chord grab.** Enabled by default with a four-key chord. If the orchestrator prefers off by default, flip
+- **Default chord grab.** Enabled by default with a three-key chord. If the orchestrator prefers off by default, flip
   `Enabled` default in Go and TS; nothing else changes.
 - **Later is two calls** (`CaptureTask` + `UpdateTask`) because `adewire` is out of Stream B's ownership. A failed
   patch leaves a title-only task; the popup reports it.
@@ -339,5 +340,5 @@ All paths Stream B's per `streams.md`:
 - Scope reading: "Wayland uses a portal or the desktop's shortcut settings" is met by the portal, whose trigger the
   user sets in the desktop's shortcut settings. A desktop shortcut that runs a CLI flag into the running instance would
   need argv forwarding (close to the out-of-scope URL scheme); not planned.
-- Default enabled with `CmdOrCtrl+Alt+Shift+K`: confirm or flip (see Risks).
+- Default enabled with `CmdOrCtrl+Shift+K`: confirm or flip (see Risks).
 - No new shadcn-vue primitive, so no cross-stream duplicate check needed.

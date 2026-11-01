@@ -138,7 +138,7 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
 });
 
 // P430: the clipboard capture hotkey. The Go side validates the chord (model.ValidCaptureHotkey).
-export const DEFAULT_CAPTURE_HOTKEY = 'CmdOrCtrl+Alt+Shift+K';
+export const DEFAULT_CAPTURE_HOTKEY = 'CmdOrCtrl+Shift+K';
 const captureSettingsSchema = /*#__PURE__*/ z.object({
   enabled: z.boolean().default(true),
   hotkey: z.string().default(DEFAULT_CAPTURE_HOTKEY),

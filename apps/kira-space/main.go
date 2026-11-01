@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ var mobileAssets embed.FS
 
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout ->
 // logging.Init/Sweep -> storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry,
-// ADE tracker with the Claude Code hooks, task board, keep-awake, the 30 bound services) ->
+// ADE tracker with the Claude Code hooks, task board, keep-awake, the 31 bound services) ->
 // application.New (the bound services plus the git stream registration) -> the menu -> the
 // startup window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP:
 // not this app's module.
@@ -121,6 +122,11 @@ func main() {
 		ErrorHandler: func(err error) {
 			fatalErr, ok := err.(*application.FatalError)
 			if !ok {
+				// Wails reports a deferred or portal global shortcut failure only here; match its own
+				// message prefixes (wails v3 beta.28 global_shortcut_manager.go, ..._linux_portal.go).
+				if msg := err.Error(); strings.HasPrefix(msg, "failed to register global shortcut") || strings.HasPrefix(msg, "global shortcuts:") {
+					bridge.CaptureReportShortcutError(wired.Capture, err)
+				}
 				return
 			}
 			platformErrorOnce.Do(func() {
@@ -156,14 +162,15 @@ func main() {
 		Terminal: wired.Terminal.Registry, Repo: repositories.Windows,
 		Cfg: shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
 		Ephemeral: func(key string) bool {
-			if bridge.IsHostViewKey(key) {
+			if bridge.IsHostViewKey(key) || bridge.IsCaptureKey(key) {
 				return true
 			}
 			ok, _ := repositories.AdeReview.IsReviewKey(key)
 			return ok
 		},
 	}
-	winDeps.OnWindowClosing = append(winDeps.OnWindowClosing, wired.OpenedFiles.Forget, wired.HostView.Targets.Forget, wired.HostView.Attachments.Forget)
+	winDeps.OnWindowClosing = append(winDeps.OnWindowClosing, wired.OpenedFiles.Forget, wired.HostView.Targets.Forget, wired.HostView.Attachments.Forget,
+		func(key string) { bridge.CaptureForget(wired.Capture, key) })
 	openNew := func() { shell.OpenNewWindow(winDeps) }
 	// OpenNewWindow is the title bar's "New window" button (P116 G6) — the same action the ⇧⌘N
 	// menu command below ties to.
@@ -174,6 +181,9 @@ func main() {
 		},
 		OpenNewWindow:      openNew,
 		OpenNewWindowKeyed: func(key string) { shell.OpenNewWindowKeyed(winDeps, key) },
+		OpenPopup:          func(key string) { shell.OpenPopup(winDeps, key, shell.PopupSpec{Width: 560, Height: 320}) },
+		Clipboard:          app.Clipboard.Text,
+		Shortcuts:          app.GlobalShortcut,
 	})
 	// Finder opens (Open With, a default-app double-click) arrive as one event per file, on cold
 	// start as well as while running; the coalescer turns a multi-file open into one window.
@@ -194,6 +204,7 @@ func main() {
 
 	purgeReviewWindows(repositories)
 	purgeHostViewWindows(repositories)
+	purgeCaptureWindows(repositories)
 	records, err := repositories.Windows.List()
 	if err != nil {
 		reporter.Fatal(startupfail.StepWindowList, err)
@@ -245,6 +256,23 @@ func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
 func purgeReviewWindows(repositories *repos.Repos) {
 	if err := repositories.AdeReview.PurgeAll(); err != nil {
 		slog.Warn("ade: purge review windows", "scope", "ade", "err", err)
+	}
+}
+
+// purgeCaptureWindows drops capture popup rows a previous run left behind: they are never restored.
+func purgeCaptureWindows(repositories *repos.Repos) {
+	records, err := repositories.Windows.List()
+	if err != nil {
+		slog.Warn("capture: list windows to purge", "scope", "capture", "err", err)
+		return
+	}
+	for _, r := range records {
+		if !bridge.IsCaptureKey(r.Key) {
+			continue
+		}
+		if err := repositories.Windows.Delete(r.Key); err != nil {
+			slog.Warn("capture: purge window", "scope", "capture", "key", r.Key, "err", err)
+		}
 	}
 }
 
