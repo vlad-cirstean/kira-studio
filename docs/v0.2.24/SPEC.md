@@ -18,7 +18,7 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P432 | Operations panel overhaul: looks and interactions | Done |
 | P433 | Frontend data and memory sweep: keep state across tabs, minimal RAM | Done |
 | P434 | Code review (2 rounds) | Done |
-| P435 | Close chapter v0.2.24 | Todo |
+| P435 | Close chapter v0.2.24 | Done |
 
 ## Rows
 
@@ -116,3 +116,5 @@ Two rounds. Each round: one Opus review over the full diff since `main`, finding
 ### P435 Close chapter v0.2.24
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
+
+**Result:** Final verification on the integrated tree: typecheck, `lint:all`, `go test ./...`, flows, Space UI 938 and Studio UI 682 pass; `budgets.spec.ts` cached tree expand p50 32 ms on an idle host (budget 50 ms). Fixed on the way: terminal unregisters before signalling done (flaky `TestTwoWindowsIsolation`), i18n catalog test exempts the stage settings catalog, Discover retention spec stays under the data view `gcTime`. Chapter folded by hand into `docs/HISTORY.md`; `docs/v0.2.24/` removed; PR opened to `main`.
