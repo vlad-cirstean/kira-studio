@@ -1,0 +1,147 @@
+{
+  "DbMcpService.PendingApprovals": {
+    "pending": {
+      "class": "read",
+      "cluster": {
+        "context": "kind-dev",
+        "namespace": "default",
+        "operation": "list",
+        "server": "<kube>"
+      },
+      "connectionId": "<masked>",
+      "connectionName": "kind-dev",
+      "expiresAtMs": 0,
+      "kind": "kubernetes",
+      "plan": null,
+      "reason": "permission",
+      "requestId": "<masked>",
+      "response": null,
+      "stage": "query",
+      "statement": "kubectl get pods -n default --context kind-dev",
+      "target": {
+        "color": "",
+        "database": "",
+        "host": "",
+        "path": [],
+        "readOnly": false
+      }
+    },
+    "queued": 0
+  },
+  "KubernetesService.Clusters": {
+    "clusters": [
+      {
+        "cluster": "kind-dev",
+        "context": "kind-dev",
+        "current": true,
+        "id": "<masked>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
+        "namespace": "default",
+        "server": "<kube>",
+        "source": "<kubeconfig>",
+        "user": "dev-user"
+      },
+      {
+        "cluster": "kind-dev",
+        "context": "bad-token",
+        "current": false,
+        "id": "<masked>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
+        "namespace": "",
+        "server": "<kube>",
+        "source": "<kubeconfig>",
+        "user": "bad-user"
+      },
+      {
+        "cluster": "down",
+        "context": "down",
+        "current": false,
+        "id": "<masked>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
+        "namespace": "",
+        "server": "<down>",
+        "source": "<kubeconfig>",
+        "user": "dev-user"
+      },
+      {
+        "cluster": "kind-dev",
+        "context": "plugin-ctx",
+        "current": false,
+        "id": "<masked>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
+        "namespace": "",
+        "server": "<kube>",
+        "source": "<kubeconfig>",
+        "user": "plugin-user"
+      }
+    ],
+    "config": {
+      "message": "",
+      "paths": [
+        "<kubeconfig>"
+      ],
+      "state": "ok"
+    }
+  },
+  "KubernetesService.SetMcp": {
+    "describe": "deny",
+    "description": "dev cluster, safe to read",
+    "discover": "allow",
+    "list": "prompt",
+    "logs": "allow"
+  },
+  "OpsService.Recent": [
+    {
+      "command": "kubectl get pods -n default --context kind-dev",
+      "commandTruncated": false,
+      "connectionId": null,
+      "durationMs": 0,
+      "error": null,
+      "id": "<masked>",
+      "kind": "kubernetes",
+      "path": null,
+      "rows": 3,
+      "source": "mcp",
+      "startedAt": "<masked>",
+      "status": "ok",
+      "tabId": null
+    }
+  ],
+  "args:DbMcpService.ApproveQuery": {
+    "requestId": "<masked>"
+  },
+  "args:KubernetesService.SetMcp": {
+    "clusterId": "<masked>",
+    "mcp": {
+      "describe": "deny",
+      "description": "dev cluster, safe to read",
+      "discover": "allow",
+      "list": "prompt",
+      "logs": "allow"
+    }
+  }
+}

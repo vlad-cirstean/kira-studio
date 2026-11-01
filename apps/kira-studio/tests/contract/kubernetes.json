@@ -6,6 +6,13 @@
         "context": "kind-dev",
         "current": true,
         "id": "<id:1>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
         "namespace": "default",
         "server": "<kube>",
         "source": "<kubeconfig>",
@@ -16,6 +23,13 @@
         "context": "bad-token",
         "current": false,
         "id": "<id:2>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
         "namespace": "",
         "server": "<kube>",
         "source": "<kubeconfig>",
@@ -26,6 +40,13 @@
         "context": "down",
         "current": false,
         "id": "<id:3>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
         "namespace": "",
         "server": "<down>",
         "source": "<kubeconfig>",
@@ -36,6 +57,13 @@
         "context": "plugin-ctx",
         "current": false,
         "id": "<id:4>",
+        "mcp": {
+          "describe": "prompt",
+          "description": "",
+          "discover": "prompt",
+          "list": "prompt",
+          "logs": "prompt"
+        },
         "namespace": "",
         "server": "<kube>",
         "source": "<kubeconfig>",

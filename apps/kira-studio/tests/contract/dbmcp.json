@@ -2,6 +2,7 @@
   "DbMcpService.PendingApprovals": {
     "pending": {
       "class": "write",
+      "cluster": null,
       "connectionId": "<id:1>",
       "connectionName": "notes db",
       "expiresAtMs": 0,
