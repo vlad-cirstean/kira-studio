@@ -7,6 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/shell"
 )
 
 // Kira Space's own trimmed Settings model. Data/Cache/Api/DbMcp are dropped
@@ -107,6 +108,27 @@ type MobileSettings struct {
 	AgentInput bool `json:"agentInput"`
 }
 
+// DefaultCaptureHotkey is the clipboard capture chord: four keys, rare enough to grab globally
+// without stealing one another app uses.
+const DefaultCaptureHotkey = "CmdOrCtrl+Alt+Shift+K"
+
+// CaptureSettings is P430's clipboard capture hotkey.
+type CaptureSettings struct {
+	Enabled bool   `json:"enabled"`
+	Hotkey  string `json:"hotkey"`
+}
+
+// DefaultCaptureSettings mirrors settingsDomain.ts's captureSettingsSchema defaults.
+func DefaultCaptureSettings() CaptureSettings {
+	return CaptureSettings{Enabled: true, Hotkey: DefaultCaptureHotkey}
+}
+
+// ValidCaptureHotkey reports whether s is a canonical global chord that no app menu accelerator uses.
+func ValidCaptureHotkey(s string) bool {
+	c, err := shell.ParseChord(s)
+	return err == nil && c.Accelerator() == s && !c.ConflictsWithMenu()
+}
+
 // MemorySettings is P314's memory-feature leaf: Models maps a provider id to the model alias its
 // memory calls use (gate, reconcile, import, distill). A provider with no entry uses its catalog
 // default.
@@ -120,6 +142,7 @@ type Settings struct {
 	Git        GitSettings      `json:"git"`
 	Ade        AdeSettings      `json:"ade"`
 	Mobile     MobileSettings   `json:"mobile"`
+	Capture    CaptureSettings  `json:"capture"`
 	Memory     MemorySettings   `json:"memory"`
 	Agent      AgentSettings    `json:"agent"`
 }
@@ -166,6 +189,7 @@ func DefaultSettings() Settings {
 		Git:      DefaultGitSettings(),
 		Ade:      DefaultAdeSettings(),
 		Mobile:   DefaultMobileSettings(),
+		Capture:  DefaultCaptureSettings(),
 		Memory:   MemorySettings{Models: map[string]string{}},
 		Agent:    DefaultAgentSettings(),
 	}
@@ -229,6 +253,12 @@ type MobilePatch struct {
 	AgentInput *bool `json:"agentInput,omitempty"`
 }
 
+// CapturePatch mirrors CaptureSettings' own `.partial()` shape.
+type CapturePatch struct {
+	Enabled *bool   `json:"enabled,omitempty"`
+	Hotkey  *string `json:"hotkey,omitempty"`
+}
+
 // MemoryPatch mirrors MemorySettings' own `.partial()` shape.
 type MemoryPatch struct {
 	// Models replaces the whole map.
@@ -241,6 +271,7 @@ type SettingsPatch struct {
 	Git        *GitPatch        `json:"git,omitempty"`
 	Ade        *AdePatch        `json:"ade,omitempty"`
 	Mobile     *MobilePatch     `json:"mobile,omitempty"`
+	Capture    *CapturePatch    `json:"capture,omitempty"`
 	Memory     *MemoryPatch     `json:"memory,omitempty"`
 	Agent      *AgentPatch      `json:"agent,omitempty"`
 }
@@ -363,6 +394,16 @@ func validateMobileSection(m *MobilePatch) error {
 	return nil
 }
 
+func validateCaptureSection(c *CapturePatch) error {
+	if c == nil || c.Hotkey == nil {
+		return nil
+	}
+	if !ValidCaptureHotkey(*c.Hotkey) {
+		return fmt.Errorf("model: capture.hotkey: invalid or reserved chord %q", *c.Hotkey)
+	}
+	return nil
+}
+
 // validMemoryModel reports whether alias is in provider's catalog. A provider that is not
 // registered passes: its entry is kept and ignored until the provider returns.
 func validMemoryModel(reg *harness.Registry, provider, alias string) bool {
@@ -426,6 +467,9 @@ func (p SettingsPatch) Validate() error {
 		return err
 	}
 	if err := validateMobileSection(p.Mobile); err != nil {
+		return err
+	}
+	if err := validateCaptureSection(p.Capture); err != nil {
 		return err
 	}
 	if err := validateMemorySection(p.Memory); err != nil {

@@ -58,6 +58,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Git = readGit(stored)
 	result.Ade = readAde(stored)
 	result.Mobile = readMobile(stored)
+	result.Capture = readCapture(stored)
 	readAgent(stored, &result.Agent)
 	appsettings.Leaf(stored, "memory.models", &result.Memory.Models)
 	result.Memory.Models = model.CleanMemoryModels(r.agents(), result.Memory.Models)
@@ -116,6 +117,24 @@ func upsertMemory(tx *sql.Tx, m *model.MemoryPatch) error {
 		return nil
 	}
 	return appsettings.UpsertOptional(tx, "memory.models", m.Models)
+}
+
+// readCapture reads the capture.* leaves on top of model.DefaultCaptureSettings().
+func readCapture(stored map[string]json.RawMessage) model.CaptureSettings {
+	result := model.DefaultCaptureSettings()
+	appsettings.Leaf(stored, "capture.enabled", &result.Enabled)
+	appsettings.LeafValid(stored, "capture.hotkey", &result.Hotkey, model.ValidCaptureHotkey)
+	return result
+}
+
+func upsertCapture(tx *sql.Tx, c *model.CapturePatch) error {
+	if c == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "capture.enabled", c.Enabled); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "capture.hotkey", c.Hotkey)
 }
 
 func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
@@ -221,6 +240,9 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 			return err
 		}
 		if err := upsertMobile(tx, patch.Mobile); err != nil {
+			return err
+		}
+		if err := upsertCapture(tx, patch.Capture); err != nil {
 			return err
 		}
 		if err := upsertMemory(tx, patch.Memory); err != nil {
