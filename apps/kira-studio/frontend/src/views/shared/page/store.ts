@@ -1,10 +1,7 @@
 import { reactive } from 'vue';
 
-// One factory behind all five page modules. grid/page.ts and console/resultPages.ts each grew the
-// same two things separately — a two-level decode cache (row -> subKey -> text) and visible-window
-// pruning — while documents/keyvalue/stream never got either. Both are folded in here: the three
-// views that never call setVisibleWindow never prune, which is today's behaviour for them
-// unchanged.
+// One factory behind all five page modules: a two-level decode cache (row -> subKey -> text) and
+// visible-window pruning. A module that never calls setVisibleWindow never prunes.
 interface Entry<P> {
   page: P;
   decodeCache: Map<number, Map<string, string>>;

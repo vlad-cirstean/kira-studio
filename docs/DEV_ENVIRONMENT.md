@@ -906,6 +906,11 @@ Report-only probes: print `PERF ...` lines, assert nothing. Run `bun run perf:pr
 Helper: `packages/workbench/src/testing/ui/perfProbe.ts` (RSS sampler, rAF frame stats, momentum
 flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LADDER`.
 
+- Tab heap probe (P433): `bunx playwright test --config=apps/kira-studio/playwright.perf.config.ts
+  --project=heap` (same for `apps/kira-space`). Chromium only (CDP), report-only, prints `HEAP ...`
+  lines: heap per open tab, reads per switch round, reads after six fake minutes away, heap after
+  close-all. Helper: `packages/workbench/src/testing/ui/heapProbe.ts`. Build first
+  (`bun run build:test:studio` or `build:test:space`). `KIRA_HEAP_FILE_LINES` sizes the Space file.
 - Engine is Playwright WebKit. Linux runs the WPE port: software rendering, no GPU process.
 - fps = 1000 / frame ms. Compare views to each other, not to 16 ms.
 - RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant

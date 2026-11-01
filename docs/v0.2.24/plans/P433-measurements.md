@@ -157,3 +157,37 @@ pages are tens of rows, Space file is 40 000 lines, ~2 MB).
   file 14.7 MB), not steady state.
 - Stream D worlds not covered: Kafka stream (SQS stands in), Space commit diff, repo-graph per-commit data
   (graph is 300 fixture rows).
+
+## After
+
+Tree: `chapter/v0.2.24-stream-d` at the step 9 commit. Same probe, same fixtures, with two changes to the
+fixtures: the Studio api world gained a `grpcHistoryList` snapshot after the before run, so the before
+`grpcHistory:list` reads are partly a fixture artifact; the Space world gained `stat`/`oid` and gated
+`unchanged` snapshots, because a mock that never answers `unchanged` cannot show the gate. Numbers are
+single runs, noise about 0.3 MB.
+
+| world | Q1 reads per round before -> after | Q2 reads after 6 min before -> after | Q5 heap round1 -> round3 before -> after | Q6 closed vs baseline before -> after |
+|---|---|---|---|---|
+| postgres grid, definition, console | 0 -> 0 | maskRules list+counts -> 0 | 26.8 -> 27.7 -> 27.0 -> 27.9 | 12.8 -> 13.0 |
+| mongo document | 0 -> 0 | 0 -> 0 | 23.7 -> 24.1 -> 23.7 -> 24.1 | 9.0 -> 9.0 |
+| redis browse + keyvalue | `keyTypes` + 2 `data:read` -> `keyTypes` only | 3 reads -> `keyTypes` only | 21.9 -> 22.5 -> 21.8 -> 22.4 | 2.1 -> 2.0 |
+| sqs stream | 0 -> 0 | 0 -> 0 | 14.6 -> 14.9 -> 14.6 -> 14.9 | 2.2 -> 2.2 |
+| kibana discover | 0 -> 0 | dataView + dataViews + histogram -> dataViews only | 34.7 -> 42.3 -> 34.4 -> 41.9 | 33.7 -> 33.4 |
+| api grpc + http | `grpcHistory:list` -> 0 | `grpcHistory:list` + `grpc:describe` -> 0 | 24.9 -> 25.7 -> 24.9 -> 25.7 | 3.3 -> 3.2 |
+| space repo graph, file, diff | 4 calls -> 4 calls, `readFile`/`readDiff` payload now empty | 4 -> 4 | 32.5 -> 38.9 -> 30.4 -> 32.8 | 27.1 -> 18.7 |
+| space local file | 3 -> 3 | 3 -> 3 | 20.7 -> 21.4 -> 20.7 -> 21.5 | 2.8 -> 2.9 |
+
+What the numbers say:
+
+- Fixed: redis keyvalue no longer re-reads the key (S1); gRPC schema and history survive six minutes (S2);
+  Discover keeps its data view and histogram (S3; the picker list `dataViews` stays on its 60 s
+  `staleTime` as a named external-data exception); mask rules and counts survive (S4).
+- Space file and diff: the calls remain (a stat check is still a call) but carry no content when nothing
+  changed. Heap growth across three rounds drops from 6.4 MB to 2.4 MB and heap after close-all from
+  27.1 to 18.7 MB over baseline. `git:blame.line` and `branch.syncChangeRequests` still fire per switch;
+  neither is in this phase's findings.
+- Not fixed: Space local file (P3). No watcher event exists for a Finder-opened file, so the read cannot be
+  made safe to skip, and retaining the text with `staleTime: 0` would only add memory. Studio Discover
+  still grows about 4 MB per round and ends 33 MB over baseline, and Space still grows about 0.7 MB per
+  round and 2.8 MB per open/close cycle. The cause is not query-cache retention (the query fixes did not
+  move it). Recorded in `docs/ARCHITECTURE.md` Known open items.

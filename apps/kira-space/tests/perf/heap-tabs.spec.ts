@@ -29,6 +29,10 @@ const LARGE_TEXT = Array.from(
 ).join('');
 const LOCAL = { path: '/tmp/outside/b.json', relPath: '', repoId: '' };
 
+const A_STAT = { size: LARGE_TEXT.length, mtimeNs: 1 };
+const C_STAT = { size: 20, mtimeNs: 2 };
+const LIMIT = 8 * 1024 * 1024;
+
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.codeWorkspaceListRepos, response: [PORT_REPO] },
   {
@@ -45,6 +49,23 @@ const CONTROL: ControlSnapshot[] = [
       bytes: LARGE_TEXT.length,
       limitBytes: 8 * 1024 * 1024,
       language: 'typescript',
+      stat: A_STAT,
+    },
+  },
+  // The backend answers a matching ifStat with no content.
+  {
+    channel: IPC.codeWorkspaceReadFile,
+    args: { id: PORT_REPO.id, path: 'a.ts', ifStat: A_STAT },
+    response: { kind: 'unchanged', text: '', bytes: 0, limitBytes: LIMIT, stat: A_STAT },
+  },
+  {
+    channel: IPC.codeWorkspaceReadDiff,
+    args: { id: PORT_REPO.id, path: 'c.ts', ifStat: C_STAT, ifHeadOid: 'h1' },
+    response: {
+      path: 'c.ts',
+      language: 'typescript',
+      head: { kind: 'unchanged', text: '', bytes: 0, limitBytes: LIMIT, oid: 'h1' },
+      worktree: { kind: 'unchanged', text: '', bytes: 0, limitBytes: LIMIT, stat: C_STAT },
     },
   },
   {
@@ -58,12 +79,14 @@ const CONTROL: ControlSnapshot[] = [
         text: 'export const c = 1;\n',
         bytes: 20,
         limitBytes: 8 * 1024 * 1024,
+        oid: 'h1',
       },
       worktree: {
         kind: 'found',
         text: 'export const c = 2;\n',
         bytes: 20,
         limitBytes: 8 * 1024 * 1024,
+        stat: C_STAT,
       },
     },
   },
