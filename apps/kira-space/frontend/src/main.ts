@@ -13,6 +13,8 @@ import { adeReaderKey } from './ade/v2/reader';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { controlAdeReader } from './bridge/adeReader';
 import { control } from './bridge/control';
+import { hostViewTargetKey } from './hostview/queries';
+import { useHostViewWindowStore } from './hostview/state';
 import { useAdeLayoutStore } from './state/adeLayout';
 import { installAgentNotifyFocus } from './state/agentNotify';
 import { useAppMetricsStore } from './state/appMetrics';
@@ -69,6 +71,7 @@ async function mountShell(): Promise<void> {
   const terminalsStore = useTerminalsStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
   const reviewWindowStore = useAdeReviewWindowStore(pinia);
+  const hostViewStore = useHostViewWindowStore(pinia);
 
   // Right after the stores are built, before mount() below, so no push (`kira:adetask:*`
   // channels/agent `Stop`) is missed between mount and this window's first
@@ -123,6 +126,13 @@ async function mountShell(): Promise<void> {
     }
   }
 
+  // A host view window (ephemeral, one change request) answers with its target; any other gets null.
+  const hostViewTarget = await queryClient.fetchQuery({
+    queryKey: hostViewTargetKey(windowKey),
+    queryFn: () => control.hostViewWindowTarget({ windowKey }),
+  });
+  if (hostViewTarget) hostViewStore.target = hostViewTarget;
+
   // A review window (ephemeral, one branch) answers with its target; any other window gets null.
   const reviewTarget = await queryClient.fetchQuery({
     queryKey: reviewTargetKey(windowKey),
@@ -137,12 +147,13 @@ async function mountShell(): Promise<void> {
   // themselves — ensureWorkspaceShell's own doc comment calls for running it once per restored repo
   // right here, after hydrateTabs, since hydrateTabs itself never calls back into it (avoiding a
   // third link in that module pair's existing two-way call graph).
-  if (!reviewTarget) for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
+  const workbenchWindow = !reviewTarget && !hostViewTarget;
+  if (workbenchWindow) for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
   // Falls forward onto the last active repo (persisted per window), else the first restored one,
   // so a relaunch with open repositories skips the empty GitStart screen. `activateWorkspace`
   // never forces the mode back to `git`, so the mode `windowsEnsure` restored stays.
   if (
-    !reviewTarget &&
+    workbenchWindow &&
     workspaceStore.active === GENERAL_WORKSPACE &&
     workspaceStore.openRepos.length > 0
   ) {
@@ -155,7 +166,7 @@ async function mountShell(): Promise<void> {
   }
 
   // Files Finder opened into this window; after the fall-forward so the last one wins focus.
-  if (!reviewTarget) await openPendingFiles();
+  if (workbenchWindow) await openPendingFiles();
 
   const app = createApp(App);
   app.use(i18n);
@@ -165,7 +176,7 @@ async function mountShell(): Promise<void> {
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');
   // Review windows show no agent sessions, so only a normal window reports focus.
-  if (!reviewTarget) installAgentNotifyFocus();
+  if (workbenchWindow) installAgentNotifyFocus();
   // Off the boot critical path — Kira Studio's own main.ts precedent (an update check gains
   // nothing from blocking first paint, and Go's own cache floor decides what actually fetches).
   useAppUpdateStore().initAppUpdate();

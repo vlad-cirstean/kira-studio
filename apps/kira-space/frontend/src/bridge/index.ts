@@ -8,6 +8,7 @@ import * as FileHandlersService from '@bindings/filehandlersservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHostService from '@bindings/githostservice.js';
+import * as HostViewService from '@bindings/hostviewservice.js';
 import * as IssueTrackerService from '@bindings/issuetrackerservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
@@ -72,6 +73,7 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { createOpenExternal } from '@workbench/bridge/openExternal';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
+import type { HostViewChangeRequest, HostViewOpen, HostViewTarget } from '../hostview/wire';
 import type { CliToolsResult, IssueTrackers } from '../state/cliToolsDomain';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
@@ -191,6 +193,12 @@ const spaceControl = {
 
   gitHostOpenChangeRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHostService.OpenChangeRequestURL({ url })),
+  hostViewOpen: (url: string): Promise<HostViewOpen> =>
+    unwrap(HostViewService.Open({ url })).then((r) => trust<HostViewOpen>(r)),
+  hostViewWindowTarget: (args: { windowKey: string }): Promise<HostViewTarget | null> =>
+    unwrap(HostViewService.WindowTarget(args)).then((r) => trust<HostViewTarget | null>(r)),
+  hostViewChangeRequest: (args: { url: string }): Promise<HostViewChangeRequest> =>
+    unwrap(HostViewService.ChangeRequest(args)).then((r) => trust<HostViewChangeRequest>(r)),
   gitHostProviders: (): Promise<V2.HostProviders> =>
     unwrap(GitHostService.Providers()).then((r) => trust<V2.HostProviders>(r)),
 

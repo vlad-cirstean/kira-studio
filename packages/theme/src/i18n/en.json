@@ -9323,6 +9323,120 @@
         "title": "Git credentials"
       }
     },
+    "hostView": {
+      "assignees": {
+        "empty": {
+          "empty": "No assignees"
+        },
+        "heading": {
+          "title": "Assignees"
+        }
+      },
+      "check": {
+        "error": {
+          "status": "Errored"
+        },
+        "neutral": {
+          "status": "Neutral"
+        },
+        "success": {
+          "status": "Passed"
+        }
+      },
+      "checks": {
+        "empty": {
+          "empty": "No checks"
+        },
+        "heading": {
+          "title": "Checks"
+        },
+        "truncated": {
+          "hint": "Some checks are not shown."
+        }
+      },
+      "conversation": {
+        "commentsTruncated": {
+          "hint": "Older comments in this thread are not shown."
+        },
+        "empty": {
+          "empty": "No comments yet"
+        },
+        "heading": {
+          "title": "Conversation"
+        },
+        "outdated": {
+          "status": "Outdated"
+        },
+        "resolved": {
+          "status": "Resolved"
+        },
+        "truncated": {
+          "hint": "Older threads are not shown. Open on the host for the rest."
+        }
+      },
+      "description": {
+        "empty": {
+          "empty": "No description"
+        }
+      },
+      "gone": {
+        "body": "This pull request is not available."
+      },
+      "header": {
+        "branches": {
+          "label": "{head} into {base}"
+        },
+        "opened": {
+          "label": "{author} opened {when}"
+        }
+      },
+      "labels": {
+        "empty": {
+          "empty": "No labels"
+        },
+        "heading": {
+          "title": "Applied labels"
+        }
+      },
+      "mergeable": {
+        "clean": {
+          "status": "No conflicts"
+        },
+        "conflicting": {
+          "status": "Has conflicts"
+        }
+      },
+      "review": {
+        "approved": {
+          "status": "Approved"
+        },
+        "changesRequested": {
+          "status": "Changes requested"
+        },
+        "commented": {
+          "status": "Commented"
+        },
+        "pending": {
+          "status": "Awaiting review"
+        },
+        "rejected": {
+          "status": "Rejected"
+        }
+      },
+      "reviewers": {
+        "empty": {
+          "empty": "No reviewers"
+        },
+        "heading": {
+          "title": "Reviewers"
+        }
+      },
+      "stats": {
+        "summary": {
+          "label": "{commits} commits, {files} files, +{additions} -{deletions}"
+        }
+      }
+    },
     "mobilePairing": {
       "dialog": {
         "title": "Phone wants to view the agents board"
