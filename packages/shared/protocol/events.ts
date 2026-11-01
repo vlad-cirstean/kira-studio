@@ -75,6 +75,10 @@ export const CHANNEL = {
   // schemaChanged's own per-connection shape (Emit, not EmitTo), so a second window's Privacy tab,
   // grid header menu and grid preview all stay in sync rather than reading a stale rule list.
   maskRulesChanged: 'kira:maskRules:changed',
+  // P433 F4: a saved query was written (Save/Update/Delete/Touch), Emit'd app-wide, {connectionId, kind}.
+  savedQueriesChanged: 'kira:savedQueries:changed',
+  // P433 F4: one filter-history row was recorded (Emit, app-wide), {connectionId, path}.
+  filterHistoryChanged: 'kira:filterHistory:changed',
   // P86 §11: every live Claude Code session across every window, Emit'd (not EmitTo) whenever
   // terminal.Registry.OnChange fires — customScriptsChanged's own shape, app-wide by definition.
   agentSessions: 'kira:agent:sessions',
@@ -156,6 +160,18 @@ export interface TerminalEvent {
   exited: boolean;
   exitCode?: number;
   error?: string;
+}
+
+/** `kira:savedQueries:changed`'s payload (internal/bridge/queries.go's SavedQueriesChangedEvent). */
+export interface SavedQueriesChangedEvent {
+  connectionId: string;
+  kind: string;
+}
+
+/** `kira:filterHistory:changed`'s payload (internal/bridge/queries.go's FilterHistoryChangedEvent). */
+export interface FilterHistoryChangedEvent {
+  connectionId: string;
+  path: string;
 }
 
 /** `kira:maskRules:changed`'s own payload (internal/bridge/maskrules.go's MaskRulesChangedEvent,

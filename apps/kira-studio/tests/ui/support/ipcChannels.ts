@@ -292,4 +292,7 @@ export const IPC = {
   // P112: every API-client mutation broadcasts the scopes it touched, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape, driven by emitWailsEvent(page, IPC.apiDataChanged, …).
   apiDataChanged: 'kira:api:dataChanged',
+  // P433 F4: saved-query writes and recorded filters, Emit'd app-wide — driven by emitWailsEvent.
+  savedQueriesChanged: 'kira:savedQueries:changed',
+  filterHistoryChanged: 'kira:filterHistory:changed',
 } as const;

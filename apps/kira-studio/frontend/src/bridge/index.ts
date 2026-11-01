@@ -99,7 +99,12 @@ import type {
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/treeFilter';
-import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
+import {
+  CHANNEL,
+  type FilterHistoryChangedEvent,
+  type MaskRulesChangedEvent,
+  type SavedQueriesChangedEvent,
+} from '@shared/protocol/events';
 import { scriptsSnapshotOf } from '@workbench/automations/createCustomScriptsStore';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { logWarn } from '@workbench/bridge/log';
@@ -224,6 +229,10 @@ const studioControl = {
   // window's own query cache instead of staying stale until something else happens to refetch it.
   onMaskRulesChanged: (cb: (event: MaskRulesChangedEvent) => void): (() => void) =>
     on(CHANNEL.maskRulesChanged, cb),
+  onSavedQueriesChanged: (cb: (event: SavedQueriesChangedEvent) => void): (() => void) =>
+    on(CHANNEL.savedQueriesChanged, cb),
+  onFilterHistoryChanged: (cb: (event: FilterHistoryChangedEvent) => void): (() => void) =>
+    on(CHANNEL.filterHistoryChanged, cb),
   onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
     on(CHANNEL.connectionState, cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>

@@ -34,7 +34,6 @@ const savedQuery = useQuery(() => ({
   queryKey: ['kibanaSaved', props.connectionId] as const,
   queryFn: () => control.queriesListDiscover(props.connectionId),
   enabled: !!props.connectionId,
-  staleTime: 0,
 }));
 const saved = computed<SavedDiscoverQuery[]>(() => savedQuery.data.value ?? []);
 

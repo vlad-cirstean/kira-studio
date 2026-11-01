@@ -165,6 +165,9 @@ func (r *SavedQueriesRepo) insert(connectionID, path, name, kind string, body []
 	return r.mustGet(newID)
 }
 
+// Get returns one saved query, ErrSavedQueryNotFound when it does not exist.
+func (r *SavedQueriesRepo) Get(queryID string) (model.SavedQuery, error) { return r.mustGet(queryID) }
+
 func (r *SavedQueriesRepo) mustGet(queryID string) (model.SavedQuery, error) {
 	row := r.DB.QueryRow(`SELECT `+savedQuerySelectColumns+` FROM saved_queries WHERE id = ?`, queryID)
 	q, err := scanSavedQueryRow(row)

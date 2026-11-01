@@ -143,8 +143,28 @@ func (j *journey) browse(connID string) string {
 	return tablePath
 }
 
+// savedEvents returns the saved-queries change events emitted since mark.
+func (j *journey) savedEvents(mark int) []bridge.SavedQueriesChangedEvent {
+	var out []bridge.SavedQueriesChangedEvent
+	for _, ev := range j.app.Events.Since(mark, bridge.ChannelSavedQueriesChanged) {
+		var d bridge.SavedQueriesChangedEvent
+		ev.Decode(j.t, &d)
+		out = append(out, d)
+	}
+	return out
+}
+
+func (j *journey) wantSavedEvent(mark int, connID, kind, after string) {
+	j.t.Helper()
+	got := j.savedEvents(mark)
+	if len(got) != 1 || got[0].ConnectionID != connID || got[0].Kind != kind {
+		j.t.Fatalf("saved-queries events after %s = %+v, want one {%s %s}", after, got, connID, kind)
+	}
+}
+
 func (j *journey) savedQueries(connID, tablePath string) {
 	t, app := j.t, j.app
+	mark := app.Events.Mark()
 	where := "id > 1"
 	saved, err := app.W.Queries.Save(bridge.QueriesSaveArgs{
 		ConnectionID: connID, Path: tablePath, Name: "recent", Body: model.FilterBody{Where: &where},
@@ -152,19 +172,26 @@ func (j *journey) savedQueries(connID, tablePath string) {
 	if err != nil {
 		t.Fatalf("Queries.Save: %v", err)
 	}
+	j.wantSavedEvent(mark, connID, saved.Kind, "Save")
+	mark = app.Events.Mark()
 	console, err := app.W.Queries.SaveConsole(bridge.QueriesSaveConsoleArgs{
 		ConnectionID: connID, Path: "", Name: "scratch", Body: model.ConsoleBody{Text: j.readSQL},
 	})
 	if err != nil {
 		t.Fatalf("Queries.SaveConsole: %v", err)
 	}
+	j.wantSavedEvent(mark, connID, console.Kind, "SaveConsole")
+	mark = app.Events.Mark()
 	renamed, err := app.W.Queries.Update(bridge.QueriesUpdateArgs{ID: saved.ID, Name: ptr("recent two"), Pinned: ptr(true)})
 	if err != nil || renamed.Name != "recent two" || !renamed.Pinned {
 		t.Fatalf("Queries.Update = %+v (%v)", renamed, err)
 	}
+	j.wantSavedEvent(mark, connID, saved.Kind, "Update")
+	mark = app.Events.Mark()
 	if err := app.W.Queries.Touch(bridge.QueriesIDArgs{ID: saved.ID}); err != nil {
 		t.Fatalf("Queries.Touch: %v", err)
 	}
+	j.wantSavedEvent(mark, connID, saved.Kind, "Touch")
 	filters, err := app.W.Queries.List(bridge.QueriesListArgs{ConnectionID: connID, Path: tablePath})
 	if err != nil || len(filters) != 1 || filters[0].ID != saved.ID {
 		t.Fatalf("Queries.List = %+v (%v), want the one filter", filters, err)
@@ -180,18 +207,30 @@ func (j *journey) savedQueries(connID, tablePath string) {
 	if err != nil {
 		t.Fatalf("Queries.Save doomed: %v", err)
 	}
+	mark = app.Events.Mark()
 	if err := app.W.Queries.Delete(bridge.QueriesIDArgs{ID: doomed.ID}); err != nil {
 		t.Fatalf("Queries.Delete: %v", err)
 	}
+	j.wantSavedEvent(mark, connID, doomed.Kind, "Delete")
 	filters, err = app.W.Queries.List(bridge.QueriesListArgs{ConnectionID: connID, Path: tablePath})
 	if err != nil || len(filters) != 1 || filters[0].ID != saved.ID {
 		t.Fatalf("Queries.List after Delete = %+v (%v), want the one filter", filters, err)
 	}
 
+	mark = app.Events.Mark()
 	for _, w := range []string{"id = 1", "id = 2", "id = 1"} {
 		if err := app.W.Queries.HistoryRecord(bridge.QueriesHistoryRecordArgs{ConnectionID: connID, Path: tablePath, Where: &w}); err != nil {
 			t.Fatalf("HistoryRecord %q: %v", w, err)
 		}
+	}
+	var recorded []bridge.FilterHistoryChangedEvent
+	for _, ev := range app.Events.Since(mark, bridge.ChannelFilterHistoryChanged) {
+		var d bridge.FilterHistoryChangedEvent
+		ev.Decode(t, &d)
+		recorded = append(recorded, d)
+	}
+	if len(recorded) != 3 || recorded[0].ConnectionID != connID || recorded[0].Path != tablePath {
+		t.Fatalf("filter-history events = %+v, want 3 for %s %s", recorded, connID, tablePath)
 	}
 	hist, err := app.W.Queries.HistoryList(bridge.QueriesHistoryListArgs{ConnectionID: connID, Path: tablePath, Limit: 10})
 	if err != nil || len(hist) != 2 {

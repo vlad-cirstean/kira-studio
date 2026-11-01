@@ -35,7 +35,6 @@ const savedQuery = useQuery(() => {
     queryFn: () =>
       control.queriesListConsole(current?.connectionId as string, current?.path as string),
     enabled: !!current?.connectionId,
-    staleTime: 0,
   };
 });
 const saved = computed<SavedConsoleQuery[]>(() => savedQuery.data.value ?? []);

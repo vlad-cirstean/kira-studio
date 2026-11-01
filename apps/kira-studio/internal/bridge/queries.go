@@ -16,6 +16,26 @@ import (
 // SavedQueriesRepo.insert/Update via model.ValidSavedQueryName.
 type QueriesService struct{ Deps appcore.Deps }
 
+// SavedQueriesChangedEvent is ChannelSavedQueriesChanged's payload: whose list changed and which
+// kind ("filter", "console" or "discover").
+type SavedQueriesChangedEvent struct {
+	ConnectionID string `json:"connectionId"`
+	Kind         string `json:"kind"`
+}
+
+// FilterHistoryChangedEvent is ChannelFilterHistoryChanged's payload.
+type FilterHistoryChangedEvent struct {
+	ConnectionID string `json:"connectionId"`
+	Path         string `json:"path"`
+}
+
+// notifySaved broadcasts a successful write; a failed one changed nothing.
+func (s *QueriesService) notifySaved(q model.SavedQuery, err error) {
+	if err == nil {
+		s.Deps.Events.Emit(ChannelSavedQueriesChanged, SavedQueriesChangedEvent{ConnectionID: q.ConnectionID, Kind: q.Kind})
+	}
+}
+
 type QueriesListArgs struct {
 	ConnectionID string `json:"connectionId"`
 	Path         string `json:"path"`
@@ -47,7 +67,9 @@ func (s *QueriesService) Save(args QueriesSaveArgs) (model.SavedQuery, error) {
 	if args.ConnectionID == "" {
 		return model.SavedQuery{}, ipcerr.Required("connectionId")
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.SaveFilter(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned))
+	q, err := s.Deps.Repos.SavedQueries.SaveFilter(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned)
+	s.notifySaved(q, err)
+	return ipcerr.InternalResult(q, err)
 }
 
 type QueriesSaveConsoleArgs struct {
@@ -62,7 +84,9 @@ func (s *QueriesService) SaveConsole(args QueriesSaveConsoleArgs) (model.SavedQu
 	if args.ConnectionID == "" {
 		return model.SavedQuery{}, ipcerr.Required("connectionId")
 	}
-	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.SaveConsole(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned))
+	q, err := s.Deps.Repos.SavedQueries.SaveConsole(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned)
+	s.notifySaved(q, err)
+	return ipcerr.InternalResult(q, err)
 }
 
 type QueriesUpdateArgs struct {
@@ -80,6 +104,7 @@ func (s *QueriesService) Update(args QueriesUpdateArgs) (model.SavedQuery, error
 		name = strings.TrimSpace(*args.Name)
 	}
 	q, err := s.Deps.Repos.SavedQueries.Update(args.ID, model.SavedQueryPatch{Name: args.Name, Pinned: args.Pinned})
+	s.notifySaved(q, err)
 	return queryResult(q, err, name)
 }
 
@@ -123,6 +148,7 @@ func (s *QueriesService) SaveDiscover(args QueriesSaveDiscoverArgs) (model.Saved
 		return model.SavedQuery{}, ipcerr.Required("connectionId")
 	}
 	q, err := s.Deps.Repos.SavedQueries.SaveDiscover(args.ConnectionID, args.Name, args.Body, args.Pinned)
+	s.notifySaved(q, err)
 	return queryResult(q, err, strings.TrimSpace(args.Name))
 }
 
@@ -137,6 +163,7 @@ func (s *QueriesService) UpdateDiscover(args QueriesUpdateDiscoverArgs) (model.S
 		return model.SavedQuery{}, ipcerr.Required("id")
 	}
 	q, err := s.Deps.Repos.SavedQueries.UpdateDiscover(args.ID, args.Body)
+	s.notifySaved(q, err)
 	return queryResult(q, err, "")
 }
 
@@ -148,14 +175,25 @@ func (s *QueriesService) Delete(args QueriesIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.Required("id")
 	}
-	return ipcerr.InternalErr(s.Deps.Repos.SavedQueries.Delete(args.ID))
+	// Read first: the row is gone after the delete, and the event names its connection and kind.
+	q, getErr := s.Deps.Repos.SavedQueries.Get(args.ID)
+	if err := s.Deps.Repos.SavedQueries.Delete(args.ID); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	s.notifySaved(q, getErr)
+	return nil
 }
 
 func (s *QueriesService) Touch(args QueriesIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.Required("id")
 	}
-	return ipcerr.InternalErr(s.Deps.Repos.SavedQueries.Touch(args.ID))
+	if err := s.Deps.Repos.SavedQueries.Touch(args.ID); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	q, err := s.Deps.Repos.SavedQueries.Get(args.ID)
+	s.notifySaved(q, err)
+	return nil
 }
 
 type QueriesHistoryListArgs struct {
@@ -185,5 +223,9 @@ func (s *QueriesService) HistoryRecord(args QueriesHistoryRecordArgs) error {
 	if args.ConnectionID == "" {
 		return ipcerr.Required("connectionId")
 	}
-	return ipcerr.InternalErr(s.Deps.Repos.FilterHistory.Record(args.ConnectionID, args.Path, args.Where, args.OrderBy))
+	if err := s.Deps.Repos.FilterHistory.Record(args.ConnectionID, args.Path, args.Where, args.OrderBy); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	s.Deps.Events.Emit(ChannelFilterHistoryChanged, FilterHistoryChangedEvent{ConnectionID: args.ConnectionID, Path: args.Path})
+	return nil
 }
