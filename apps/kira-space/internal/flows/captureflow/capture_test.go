@@ -353,13 +353,13 @@ func TestSettingsReRegister(t *testing.T) {
 		t.Fatalf("a refused write changed the registration: %v", got)
 	}
 
-	// The OS refuses a chord: failed with its reason, and nothing stays registered.
+	// The OS refuses a chord: failed with its reason, and the working chord stays registered.
 	sc.FailNext(errors.New("failed to register global shortcut: held by another app"))
 	if err := r.setCapture(model.CapturePatch{Hotkey: str("CmdOrCtrl+Alt+J")}); err != nil {
 		t.Fatal(err)
 	}
 	failed := r.status(t)
-	if failed.State != shell.HotkeyFailed || !strings.Contains(failed.Reason, "held by another app") || len(sc.Registered()) != 0 {
+	if failed.State != shell.HotkeyFailed || !strings.Contains(failed.Reason, "held by another app") || !slices.Equal(sc.Registered(), []string{"CmdOrCtrl+Alt+K"}) {
 		t.Fatalf("Status = %+v, registered %v", failed, sc.Registered())
 	}
 	r.app.Contract(t, scenario, "CaptureService.Status#failed", failed)
