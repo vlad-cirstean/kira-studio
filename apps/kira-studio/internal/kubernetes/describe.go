@@ -101,8 +101,9 @@ func redactSecret(obj *unstructured.Unstructured) {
 }
 
 func owners(obj *unstructured.Unstructured) []Owner {
-	out := []Owner{}
-	for _, o := range obj.GetOwnerReferences() {
+	refs := obj.GetOwnerReferences()
+	out := make([]Owner, 0, len(refs))
+	for _, o := range refs {
 		out = append(out, Owner{Kind: o.Kind, Name: o.Name})
 	}
 	return out
