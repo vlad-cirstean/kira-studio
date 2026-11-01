@@ -1369,6 +1369,11 @@
         }
       },
       "issueTracker": {
+        "comment": {
+          "attachmentsUnsupported": {
+            "body": "{label} attachments can’t be added from Kira: {cli} has no upload command. Add files in {label}."
+          }
+        },
         "view": {
           "notIssue": {
             "body": "This view opens a {issues} only."
