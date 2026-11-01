@@ -74,6 +74,11 @@ duplicated here; this file only points at them.
   end, with fixes landing as follow-up commits. Commits still land incrementally as work completes,
   for legible history — only *when* the expensive verification happens changes, not whether the
   result must be correct or commits stay granular.
+- **One full run of an expensive suite per phase, then targeted reruns only.** Run the full
+  end-to-end/UI suite once, near phase end. After a fix, rerun only the failing specs and the specs
+  that share its code, never the whole suite again. A timeout under load gets a lone rerun of that
+  spec first. Rerun the full suite a second time only when a fix touched shared code (a package, a
+  fixture, a config) that targeted reruns cannot cover; say so in the Result.
 - **The loop per phase:** check for a plan, spawn an Opus subagent to write one if missing, spawn
   a Sonnet subagent (or several, only if genuinely parallelizable) to implement the whole phase, and
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
