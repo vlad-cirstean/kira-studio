@@ -28,13 +28,13 @@ type LogsReadArgs struct {
 	Tail       int
 }
 
-// LogsReadResult holds the framed lines; Truncated means the byte limit cut the read short.
+// LogsReadResult holds the framed lines; Truncated means the byte limit dropped the oldest lines.
 type LogsReadResult struct {
 	Lines     []LogLine `json:"lines"`
 	Truncated bool      `json:"truncated"`
 }
 
-// ReadLogs reads the last Tail lines of one container, up to mcpLogBytes.
+// ReadLogs reads the last Tail lines of one container, keeping the newest mcpLogBytes of them.
 func (s *Service) ReadLogs(ctx context.Context, args LogsReadArgs) (LogsReadResult, error) {
 	switch {
 	case args.ClusterID == "":
@@ -52,31 +52,51 @@ func (s *Service) ReadLogs(ctx context.Context, args LogsReadArgs) (LogsReadResu
 	}
 	cctx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	tail, limit := int64(args.Tail), int64(mcpLogBytes)
+	tail := int64(args.Tail)
 	body, err := cs.core.Pods(args.Namespace).GetLogs(args.Pod, &corev1.PodLogOptions{
-		Container: args.Container, Previous: args.Previous, Timestamps: args.Timestamps,
-		TailLines: &tail, LimitBytes: &limit,
+		Container: args.Container, Previous: args.Previous, Timestamps: args.Timestamps, TailLines: &tail,
 	}).Stream(cctx)
 	if err != nil {
 		return LogsReadResult{}, mapErr(err)
 	}
 	defer body.Close()
-	raw, err := io.ReadAll(io.LimitReader(body, int64(mcpLogBytes)+1))
+	raw, truncated, err := readTail(body, mcpLogBytes)
 	if err != nil {
 		return LogsReadResult{}, mapErr(err)
-	}
-	truncated := len(raw) > mcpLogBytes
-	if truncated {
-		// A server ignoring LimitBytes sent more; cut to the last whole line.
-		raw = raw[:mcpLogBytes]
-		if i := bytes.LastIndexByte(raw, '\n'); i >= 0 {
-			raw = raw[:i+1]
-		}
 	}
 	framer := newLineFramer(args.Timestamps)
 	lines := append(framer.write(raw), framer.flush()...)
 	if lines == nil {
 		lines = []LogLine{}
 	}
-	return LogsReadResult{Lines: lines, Truncated: truncated || len(raw) >= mcpLogBytes}, nil
+	return LogsReadResult{Lines: lines, Truncated: truncated}, nil
+}
+
+// readTail reads r to its end and keeps the last max bytes, starting at a whole line. The API server's
+// LimitBytes would keep the oldest bytes instead, so the cap is applied here.
+func readTail(r io.Reader, max int) (kept []byte, dropped bool, err error) {
+	buf := make([]byte, 0, max)
+	chunk := make([]byte, 32<<10)
+	for {
+		n, rerr := r.Read(chunk)
+		buf = append(buf, chunk[:n]...)
+		if len(buf) > 2*max {
+			buf, dropped = append(buf[:0], buf[len(buf)-max:]...), true
+		}
+		if rerr == io.EOF {
+			break
+		}
+		if rerr != nil {
+			return nil, false, rerr
+		}
+	}
+	if len(buf) > max {
+		buf, dropped = buf[len(buf)-max:], true
+	}
+	if dropped {
+		if i := bytes.IndexByte(buf, '\n'); i >= 0 {
+			buf = buf[i+1:]
+		}
+	}
+	return buf, dropped, nil
 }
