@@ -272,7 +272,7 @@ func TestSmartScript(t *testing.T) {
 		if err := os.WriteFile(budget, []byte(`{"type":"result","subtype":"error_max_budget_usd","is_error":true,"total_cost_usd":0.5,"num_turns":3}`+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(denied, []byte(`{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"permission_denials":[{"tool_name":"Write"},{"tool_name":"Bash"},{"tool_name":"Bash"}],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}`+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(denied, []byte(`{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"permission_denials":[{"tool_name":"Write"},{"tool_name":"Bash"},{"tool_name":"Bash"}]}`+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		exit0 := 0
