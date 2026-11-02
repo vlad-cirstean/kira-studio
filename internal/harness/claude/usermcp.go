@@ -130,7 +130,7 @@ func (p *Provider) UserMCPPresence(ctx context.Context, dir string, want []strin
 	if have && ((complete && age < mcpPresenceTTL) || age < mcpListTTL) {
 		return append([]harness.UserServer{}, e.servers...), true, nil
 	}
-	if wait {
+	if wait || mcpPresenceTTL <= 0 {
 		servers, _, err = p.userServers(ctx, dir, mcpListTTL)
 		return servers, err == nil, err
 	}
