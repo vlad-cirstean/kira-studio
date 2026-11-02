@@ -140,3 +140,25 @@ Severity count: High 0, Medium 2, Low 6.
   `palette.Valid` script colour, DB default `'none'`.
 - `informational` is set on exactly Preview, SchedulePreview and the restore offer; Start, claim re-plan,
   resume, ConfirmAccept, RunScheduleNow and scheduled fires wait. Blocker stays out of the hash.
+
+## Result
+
+All eight fixed; none wrong on re-read, none deferred. R2-1, R2-3, R2-5, R2-6, R2-7, R2-8 share one
+module and landed in `30cf7530c`.
+
+- R2-1 fixed `30cf7530c`. Flight body runs on `context.WithoutCancel`; callers use `DoChan` and select on
+  their own `ctx.Done()`. `Close` now frees a waiting `Start`. Test `TestUserServersFlightSurvivesCallerCancel`.
+- R2-2 fixed `376e45207`. Stray keys removed from the `denied.jsonl` result line.
+- R2-3 fixed `30cf7530c`. `UserMCPPresence` takes the wanted names. Complete cached list: reused 5 min.
+  Miss: sync re-list when `wait`, unless the list is under the picker TTL; background refresh and
+  `known=false` otherwise.
+- R2-4 fixed `29c01a466`. `LimitBytes` dropped; `readTail` streams the body and keeps the newest
+  `mcpLogBytes`, cut at a line start; `Truncated` means oldest lines dropped.
+- R2-5 fixed `30cf7530c`. Check lists from the app home (`s.Home`; ADE `ScriptsHome`), the picker's
+  folder. Local-scope servers are not checked; the picker never offers them, so no tick depends on one.
+  `existingDir` removed. ARCHITECTURE.md updated.
+- R2-6 fixed `30cf7530c`. A stale fallback resets statuses to `unknown` in `UserMCPServers`; the presence
+  path ignores status.
+- R2-7 fixed `30cf7530c`. Key is constant (home), so no per-worktree entry and no cold list per task.
+  The one cold or expired list still runs under `startMu`, once per 5 min.
+- R2-8 fixed `30cf7530c`. `checkMCP` runs before `prepareSandbox`.
