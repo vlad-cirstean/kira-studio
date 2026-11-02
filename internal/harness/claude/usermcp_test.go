@@ -1,9 +1,13 @@
 package claude
 
 import (
+	"context"
+	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/internal/harness"
 )
@@ -41,5 +45,41 @@ func TestParseMCPList(t *testing.T) {
 	}
 	if j := strings.Join([]string{got[0].Target, got[1].Target}, ""); strings.Contains(j, "srv") {
 		t.Errorf("target kept path: %s", j)
+	}
+}
+
+// A caller whose context ends must not fail the shared flight the others wait on.
+func TestUserServersFlightSurvivesCallerCancel(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\nsleep 1\necho 'alpha: /usr/bin/alpha - ✓ Connected'\n"
+	// The shell stands in for the login shell, so a profile cannot put a real claude first on PATH.
+	for _, name := range []string{"claude", "shell"} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("SHELL", filepath.Join(bin, "shell"))
+	p := &Provider{}
+	dir := t.TempDir()
+	first, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := p.userServers(first, dir, 0)
+		done <- err
+	}()
+	res := make(chan []harness.UserServer, 1)
+	go func() {
+		s, _, _ := p.userServers(context.Background(), dir, 0)
+		res <- s
+	}()
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Errorf("cancelled caller = %v, want context.Canceled", err)
+	}
+	s := <-res
+	if len(s) != 1 || s[0].Name != "alpha" {
+		t.Errorf("other caller = %+v, want alpha", s)
 	}
 }

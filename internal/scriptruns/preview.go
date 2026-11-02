@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -207,7 +206,7 @@ func (s *Service) plan(ctx context.Context, args RunArgs, o planOpts) (*planned,
 	}
 	p.mcp = pv.MCP
 	if pv.Blocker == "" {
-		pv.Blocker = s.smartBlocker(ctx, agent, pv.MCP, p.dir.Path, o.informational)
+		pv.Blocker = s.smartBlocker(ctx, agent, pv.MCP, o.informational)
 	}
 	p.preview = finishPreview(pv, p)
 	return p, nil
@@ -253,8 +252,9 @@ func containsVarName(text, name string) bool {
 }
 
 // smartBlocker answers why a smart run cannot start now: the run cap, or a user MCP server that is
-// gone. The check lists servers from dir, the folder the run starts in, since claude resolves a name there.
-func (s *Service) smartBlocker(ctx context.Context, agent harness.Provider, mcp []string, dir string, informational bool) string {
+// gone. The check lists servers from the app home, like the picker: runs never load a folder's project
+// `.mcp.json` servers, so a name only that file defines does not count.
+func (s *Service) smartBlocker(ctx context.Context, agent harness.Provider, mcp []string, informational bool) string {
 	s.mu.Lock()
 	running := len(s.smart)
 	s.mu.Unlock()
@@ -264,8 +264,7 @@ func (s *Service) smartBlocker(ctx context.Context, agent harness.Provider, mcp 
 	if len(mcp) == 0 {
 		return ""
 	}
-	dir = existingDir(dir, s.Home)
-	have, known, err := agent.UserMCPPresence(ctx, dir, !informational)
+	have, known, err := agent.UserMCPPresence(ctx, s.Home, mcp, !informational)
 	if err != nil {
 		return err.Error()
 	}
@@ -282,17 +281,6 @@ func (s *Service) smartBlocker(ctx context.Context, agent harness.Provider, mcp 
 		}
 	}
 	return ""
-}
-
-// existingDir is dir, or its nearest existing ancestor when the run folder is not created yet, or
-// fallback when none is found.
-func existingDir(dir, fallback string) string {
-	for d := dir; d != "" && d != filepath.Dir(d); d = filepath.Dir(d) {
-		if info, err := os.Stat(d); err == nil && info.IsDir() {
-			return d
-		}
-	}
-	return fallback
 }
 
 func finishPreview(pv Preview, p *planned) Preview {

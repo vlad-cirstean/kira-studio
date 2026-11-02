@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -103,53 +104,80 @@ type listEntry struct {
 
 // UserMCPServers asks `claude mcp list` from dir for the MCP servers claude loads there. Kira never
 // opens claude's config files or runs `claude mcp get`, which prints stored headers and env. Claude
-// health-checks every server on each call, so the result is cached per dir for a short while; a failed
-// listing falls back to the last good one for that dir.
+// health-checks every server on each call, so the result is cached per dir for a short while. A failed
+// listing falls back to the last good one for that dir, with every status reset to unknown.
 func (p *Provider) UserMCPServers(ctx context.Context, dir string) ([]harness.UserServer, error) {
-	return p.userServers(ctx, dir, mcpListTTL)
+	servers, stale, err := p.userServers(ctx, dir, mcpListTTL)
+	if stale {
+		for i := range servers {
+			servers[i].Status = "unknown"
+		}
+	}
+	return servers, err
 }
 
-// UserMCPPresence is the list for the presence check, reused for longer than the picker's. With wait
-// false it never blocks on a cold or expired cache: it refreshes in the background and returns the
-// stale list, or known=false when there is none.
-func (p *Provider) UserMCPPresence(ctx context.Context, dir string, wait bool) (servers []harness.UserServer, known bool, err error) {
+// UserMCPPresence is the list for the presence check of the want names. A cached list younger than
+// mcpPresenceTTL answers when it has every name; a miss is a reason to re-list, not a verdict, unless
+// the list is younger than the picker's TTL. With wait false it never blocks: it refreshes in the
+// background and returns the cached list only when that list has every name, else known=false.
+func (p *Provider) UserMCPPresence(ctx context.Context, dir string, want []string, wait bool) (servers []harness.UserServer, known bool, err error) {
 	c := &p.mcpList
 	c.mu.Lock()
 	e, have := c.entries[dir]
 	c.mu.Unlock()
-	if have && time.Since(e.at) < mcpPresenceTTL {
+	age := time.Since(e.at)
+	complete := have && hasAll(e.servers, want)
+	if have && ((complete && age < mcpPresenceTTL) || age < mcpListTTL) {
 		return append([]harness.UserServer{}, e.servers...), true, nil
 	}
-	if wait || mcpPresenceTTL <= 0 {
-		servers, err = p.userServers(ctx, dir, mcpPresenceTTL)
+	if wait {
+		servers, _, err = p.userServers(ctx, dir, mcpListTTL)
 		return servers, err == nil, err
 	}
 	go func() {
-		_, _ = p.userServers(context.Background(), dir, 0)
+		_, _, _ = p.userServers(context.Background(), dir, 0)
 	}()
-	if have {
+	if complete {
 		return append([]harness.UserServer{}, e.servers...), true, nil
 	}
 	return nil, false, nil
 }
 
-func (p *Provider) userServers(ctx context.Context, dir string, ttl time.Duration) ([]harness.UserServer, error) {
+func hasAll(servers []harness.UserServer, want []string) bool {
+	for _, name := range want {
+		if !slices.ContainsFunc(servers, func(u harness.UserServer) bool { return u.Name == name }) {
+			return false
+		}
+	}
+	return true
+}
+
+type listResult struct {
+	servers []harness.UserServer
+	stale   bool
+}
+
+// userServers lists dir, reusing a result younger than ttl. stale is true when a failed listing fell
+// back to the last good one. The shared flight runs on a context detached from the first caller, so
+// one caller stopping never fails the others; each caller waits under its own ctx.
+func (p *Provider) userServers(ctx context.Context, dir string, ttl time.Duration) (servers []harness.UserServer, stale bool, err error) {
 	c := &p.mcpList
 	c.mu.Lock()
 	if e, ok := c.entries[dir]; ok && time.Since(e.at) < ttl {
 		c.mu.Unlock()
-		return append([]harness.UserServer{}, e.servers...), nil
+		return append([]harness.UserServer{}, e.servers...), false, nil
 	}
 	c.mu.Unlock()
-	v, err, _ := c.flight.Do(dir, func() (any, error) {
-		servers, err := p.runMCPList(ctx, dir)
+	flightCtx := context.WithoutCancel(ctx)
+	ch := c.flight.DoChan(dir, func() (any, error) {
+		servers, err := p.runMCPList(flightCtx, dir)
 		if err != nil {
 			// A slow or hung server must not block runs: reuse the last good list.
 			c.mu.Lock()
-			stale, ok := c.entries[dir]
+			old, ok := c.entries[dir]
 			c.mu.Unlock()
 			if ok {
-				return stale.servers, nil
+				return listResult{old.servers, true}, nil
 			}
 			return nil, err
 		}
@@ -159,12 +187,18 @@ func (p *Provider) userServers(ctx context.Context, dir string, ttl time.Duratio
 		}
 		c.entries[dir] = listEntry{servers, time.Now()}
 		c.mu.Unlock()
-		return servers, nil
+		return listResult{servers, false}, nil
 	})
-	if err != nil {
-		return nil, err
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	case r := <-ch:
+		if r.Err != nil {
+			return nil, false, r.Err
+		}
+		res := r.Val.(listResult)
+		return append([]harness.UserServer{}, res.servers...), res.stale, nil
 	}
-	return append([]harness.UserServer{}, v.([]harness.UserServer)...), nil
 }
 
 func (p *Provider) runMCPList(ctx context.Context, dir string) ([]harness.UserServer, error) {
