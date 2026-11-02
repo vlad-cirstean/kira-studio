@@ -78,10 +78,12 @@ type Param struct {
 	Secret bool `json:"secret"`
 }
 
-// MCPChoice is one user MCP server and the tools of it the script may call.
+// MCPChoice is one user MCP server and the tools of it the script may call: all of them, or the
+// named Tools.
 type MCPChoice struct {
-	Server string   `json:"server"`
-	Tools  []string `json:"tools"`
+	Server   string   `json:"server"`
+	AllTools bool     `json:"allTools"`
+	Tools    []string `json:"tools"`
 }
 
 // Smart is the headless Claude setup of a smart script.
@@ -330,6 +332,10 @@ func validMCP(choices []MCPChoice) ([]MCPChoice, error) {
 			return nil, invalid("scripts: MCP server %s is listed twice", c.Server)
 		}
 		seen[c.Server] = true
+		if c.AllTools {
+			out = append(out, MCPChoice{Server: c.Server, AllTools: true, Tools: []string{}})
+			continue
+		}
 		if len(c.Tools) == 0 {
 			return nil, invalid("scripts: tick at least one tool of %s or turn it off", c.Server)
 		}
@@ -490,7 +496,7 @@ func resolveParam(p Param, vs []string) ([]string, error) {
 func (s Smart) ToolPolicy(extra []string) harness.ToolPolicy {
 	pol := harness.ToolPolicy{Builtins: s.Tools, BashPatterns: s.BashPatterns, Extra: extra}
 	for _, c := range s.MCP {
-		pol.MCP = append(pol.MCP, harness.MCPTools{Server: c.Server, Tools: c.Tools})
+		pol.MCP = append(pol.MCP, harness.MCPTools{Server: c.Server, AllTools: c.AllTools, Tools: c.Tools})
 	}
 	return pol
 }

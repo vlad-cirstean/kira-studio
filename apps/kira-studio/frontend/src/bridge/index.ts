@@ -85,6 +85,9 @@ import type {
   ScriptRunLogChunk,
   ScriptRunLogPage,
   ScriptRunPreview,
+  ScriptRunRestoreChoice,
+  ScriptRunRestoreResult,
+  ScriptRunRestoreState,
   ScriptRunStarted,
 } from '@shared/domain/scriptRuns';
 import type {
@@ -93,7 +96,6 @@ import type {
   ScriptCollection,
   ScriptDir,
   ScriptMcpServer,
-  ScriptMcpTool,
   ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -537,6 +539,11 @@ const studioControl = {
     ),
   scriptRunsResume: (id: string): Promise<ScriptRunStarted> =>
     unwrap(ScriptRunsService.Resume({ id })).then((r) => trust<ScriptRunStarted>(r)),
+  scriptRunsRestoreState: (): Promise<ScriptRunRestoreState> =>
+    unwrap(ScriptRunsService.RestoreState()).then((r) => trust<ScriptRunRestoreState>(r)),
+  scriptRunsRestore: (items: ScriptRunRestoreChoice[]): Promise<ScriptRunRestoreResult> =>
+    unwrap(ScriptRunsService.Restore({ items })).then((r) => trust<ScriptRunRestoreResult>(r)),
+  scriptRunsRestoreDismiss: (): Promise<void> => unwrap(ScriptRunsService.RestoreDismiss()),
   scriptRunsResumeCommand: (runId: string): Promise<string> =>
     unwrap(ScriptRunsService.ResumeCommand({ runId })),
   scriptRunsReadLog: (id: string, afterSeq: number): Promise<ScriptRunLogPage> =>
@@ -579,8 +586,6 @@ const studioControl = {
     unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
-  scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
-    unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 };
 
 // One exported object, composed from the methods shared with Kira Space

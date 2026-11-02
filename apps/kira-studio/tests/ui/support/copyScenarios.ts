@@ -12,7 +12,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './tree';
+import { connectionRow, expandRow, findRow, openRowMenu, settleFrames } from './tree';
 
 // Shared by copy-wording.spec.ts and copy-coverage.spec.ts: one connected Postgres connection with
 // app.composite_pk's three rows, so both specs reach the same grid and menus.
@@ -60,9 +60,10 @@ export async function openContextMenu(target: Locator): Promise<Locator> {
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       await target.scrollIntoViewIfNeeded();
+      await settleFrames(page);
       await target.click({ button: 'right' });
       await expect(menu).toBeVisible();
-      await page.waitForTimeout(300);
+      await settleFrames(page);
       if (await menu.isVisible()) return menu;
     } catch (error) {
       if (attempt === 3) throw error;

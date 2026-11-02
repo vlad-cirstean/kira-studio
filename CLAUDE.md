@@ -173,7 +173,7 @@ duplicated here; this file only points at them.
   `Source: docs/<ch>/ at <commit>. N phases.` with the true row count, then one `### <ch> <id> (Done)`
   heading per `SPEC.md` row in table order, distilled from each row's Result. Fix links to the chapter
   by hand. Commit. Then `git rm -r docs/<ch>/` (and `docs/history-runs/` if it exists) and commit.
-  Push, then open the PR from `chapter/v<version>` to `main` (command in `docs/DEV_ENVIRONMENT.md`). It auto-merges once CI passes. Opening the PR is part of closing, unless changes are still pending (uncommitted, unpushed or unfinished work) — then report them and hold the PR.
+  Push, then open the PR from `chapter/v<version>` to `main` (command in `docs/DEV_ENVIRONMENT.md`). It auto-merges once CI passes. Opening the PR is part of closing, unless changes are still pending (uncommitted, unpushed or unfinished work) — then report them and hold the PR. After opening it, subscribe to it (`subscribe_pr_activity`) and watch it: when a check fails, reproduce the failure, fix it on the chapter branch, rerun that check, push. Repeat until CI is green and the PR merges. Never skip, disable or quarantine a test to get green.
   Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
   (intro: first `P` is highest plus one, branch `chapter/v<new>`) and `plans/`.
   Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.
@@ -237,8 +237,7 @@ duplicated here; this file only points at them.
   token reads, no auth headers. Run the CLI, read its output. Reading non-secret config (host,
   docker context `meta.json`) is fine. Key or token material may be read only by the CLI's own
   library, never Kira code. Rule and facts in `docs/ARCHITECTURE.md` "CLI credentials: never
-  touched". Guard G5 enforces it under `githost/`, `issuetracker/` and `internal/docker`. Known violation, tracked
-  in ARCHITECTURE "Known open items" and v0.2.25 P443: `usermcp.go` (claude MCP headers).
+  touched". Guard G5 enforces it under `githost/`, `issuetracker/`, `internal/docker` and `internal/harness/claude`.
 - **Measure when there's a real, concrete question at stake, not as a default ritual.** A
   real-hardware trace, CDP tracing, or a byte-for-byte bundle comparison earns its keep when a
   claimed fix, regression, or cost genuinely can't be checked another way. Don't extend that rigor

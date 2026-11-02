@@ -1128,6 +1128,14 @@ func (s *AdeTaskService) RestartSession(ctx context.Context, args adewire.Restar
 	return l, adeTaskError(err)
 }
 
+func (s *AdeTaskService) CloseSession(ctx context.Context, args adewire.CloseSessionArgs) error {
+	ctx = adeUserCtx(ctx)
+	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.CloseSession(ctx, args))
+}
+
 func (s *AdeTaskService) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs) (adewire.Launch, error) {
 	ctx = adeUserCtx(ctx)
 	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {

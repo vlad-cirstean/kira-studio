@@ -406,7 +406,12 @@ function onForcePush(row: BranchRowModel): void {
       tone="primary"
       :pending="dayOffRun.busy.value"
       :error="dayOffRun.error.value ?? ''"
-      :testids="{ root: 'ade-confirm-dialog', cancel: 'ade-confirm-no', confirm: 'ade-confirm-yes', error: 'ade-confirm-error' }"
+      :testids="{
+        root: 'ade-confirm-dialog',
+        cancel: 'ade-confirm-no',
+        confirm: 'ade-confirm-yes',
+        error: 'ade-confirm-error',
+      }"
       @confirm="dayOffRun.confirm"
       @cancel="dayOff = null"
     />

@@ -166,6 +166,7 @@ test('a launch behind a running prepare script shows its progress and waits', as
   await page.locator(t('ade-dialog-cancel')).click();
   await expect(page.locator(t('ade-dialog'))).toBeHidden();
   const sent = calls(control, IPC.adeTaskLaunchStep).length;
+  // Absence of further launch polls: spans more than one poll interval of real time.
   await page.waitForTimeout(2600);
   expect(calls(control, IPC.adeTaskLaunchStep)).toHaveLength(sent);
 });

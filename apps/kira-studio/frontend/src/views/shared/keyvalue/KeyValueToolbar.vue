@@ -130,9 +130,7 @@ defineExpose({
         :model-value="String(host?.pageSize ?? 100)"
         :items="PAGE_SIZE_ITEMS"
         data-testid="keyvalue-page-size-picker"
-        @update:model-value="
-          (v) => keyValueViewStore.setPageSize(viewKey, Number(v) as PageSize)
-        "
+        @update:model-value="(v) => keyValueViewStore.setPageSize(viewKey, Number(v) as PageSize)"
       />
     </template>
 

@@ -29,12 +29,8 @@ func TestSmartScriptSpace(t *testing.T) {
 	}
 
 	servers, err := app.W.ScriptRuns.McpServers()
-	if err != nil || len(servers) != 1 || servers[0].Name != "fake" {
+	if err != nil || len(servers) != 1 || servers[0].Name != "fake" || servers[0].Target != "fake-mcp" || servers[0].Status != "connected" {
 		t.Fatalf("McpServers = %+v, %v", servers, err)
-	}
-	tools, err := app.W.ScriptRuns.McpTools(scriptruns.McpToolsArgs{Server: "fake"})
-	if err != nil || len(tools) != 2 {
-		t.Fatalf("McpTools = %+v, %v", tools, err)
 	}
 
 	rec, err := app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
@@ -66,6 +62,10 @@ func TestSmartScriptSpace(t *testing.T) {
 		run, _ = app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: started.RunID})
 		return run.State == "done"
 	})
+	if raw, err := os.ReadFile(filepath.Join(app.FakeDir, "automations-1.settings")); err != nil ||
+		string(raw) != `{"disableAllHooks":true,"allowedMcpServers":[{"serverName":"kira-ade"},{"serverName":"fake"}],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}` {
+		t.Fatalf("--settings = %s, %v", raw, err)
+	}
 	app.Contract(t, "smart", "ScriptRunsService.Get#done", run, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "costUsd"))
 	if o := run.Outcome; o == nil || !o.Reported || o.Source != "agent" {
 		t.Fatalf("outcome = %+v", o)

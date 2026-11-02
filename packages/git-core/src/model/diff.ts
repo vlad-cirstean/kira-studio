@@ -66,7 +66,7 @@ function otherSide(side: DiffSide): DiffSide {
 }
 
 function clamp1(n: number): number {
-  return n < 1 ? 1 : n;
+  return Math.max(n, 1);
 }
 
 /**

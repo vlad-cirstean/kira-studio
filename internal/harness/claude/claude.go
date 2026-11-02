@@ -20,6 +20,8 @@ type Provider struct {
 	// lookPath and stat are test seams for the CLI lookup; nil means exec.LookPath and os.Stat.
 	lookPath func(string) (string, error)
 	stat     func(string) (os.FileInfo, error)
+
+	mcpList listCache
 }
 
 // New returns the Claude Code provider.

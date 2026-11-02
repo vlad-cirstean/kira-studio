@@ -56,7 +56,13 @@ function eventsFor(id: string) {
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center gap-1">
             <Badge
-              :variant="selected.origin === 'user' ? 'info' : selected.origin === 'external' ? 'warn' : 'default'"
+              :variant="
+                selected.origin === 'user'
+                  ? 'info'
+                  : selected.origin === 'external'
+                    ? 'warn'
+                    : 'default'
+              "
               data-testid="memory-detail-origin"
               >{{
                 originText(selected.origin, selected.sourceTag)

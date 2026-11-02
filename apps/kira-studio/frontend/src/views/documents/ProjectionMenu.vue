@@ -122,7 +122,11 @@ onUnmounted(() => {
       data-testid="document-projection-menu-footer"
     >
       {{
-        t(caps?.projection ? 'studio.documents.projection.footerServer.hint' : 'studio.documents.projection.footerClient.hint')
+        t(
+          caps?.projection
+            ? 'studio.documents.projection.footerServer.hint'
+            : 'studio.documents.projection.footerClient.hint',
+        )
       }}
     </div>
   </div>

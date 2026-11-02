@@ -11,9 +11,11 @@ const props = defineProps<{
 <template>
   <Input
     data-slot="input-group-control"
-    :class="cn(
-      'rounded-none border-0 bg-transparent shadow-none outline-none disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent flex-1',
-      props.class,
-    )"
+    :class="
+      cn(
+        'rounded-none border-0 bg-transparent shadow-none outline-none disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent flex-1',
+        props.class,
+      )
+    "
   />
 </template>

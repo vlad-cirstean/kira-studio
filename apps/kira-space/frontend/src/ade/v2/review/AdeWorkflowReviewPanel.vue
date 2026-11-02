@@ -216,7 +216,10 @@ const stateLabel = (c: ReviewComment): string =>
             data-testid="ade-review-comment-state"
             @click="
               act(() =>
-                setState.mutateAsync({ id: c.id, state: c.state === 'addressed' ? 'open' : 'addressed' }),
+                setState.mutateAsync({
+                  id: c.id,
+                  state: c.state === 'addressed' ? 'open' : 'addressed',
+                }),
               )
             "
           >
@@ -381,7 +384,11 @@ const stateLabel = (c: ReviewComment): string =>
       :message="t('space.ade.reviewStep.finishOpen.body', { count: openCount })"
       :confirm-label="t('space.ade.reviewStep.finishAnyway.label')"
       tone="primary"
-      :testids="{ root: 'ade-confirm-dialog', cancel: 'ade-confirm-no', confirm: 'ade-confirm-yes' }"
+      :testids="{
+        root: 'ade-confirm-dialog',
+        cancel: 'ade-confirm-no',
+        confirm: 'ade-confirm-yes',
+      }"
       @confirm="confirmFinish"
       @cancel="confirmResult = null"
     />

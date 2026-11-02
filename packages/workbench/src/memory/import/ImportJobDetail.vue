@@ -94,7 +94,11 @@ async function discard(): Promise<void> {
         <Tooltip>
           <TooltipTrigger as-child>
             <Badge variant="default" data-testid="import-job-channel">{{
-              t(job.channel === 'mcp' ? 'memory.common.origin.agent.label' : 'memory.import.channel.ui.label')
+              t(
+                job.channel === 'mcp'
+                  ? 'memory.common.origin.agent.label'
+                  : 'memory.import.channel.ui.label',
+              )
             }}</Badge>
           </TooltipTrigger>
           <TooltipContent v-if="job.sessionId">{{
@@ -178,7 +182,10 @@ async function discard(): Promise<void> {
         >
       </div>
       <Alert
-        v-if="job.reason && (job.state === 'paused' || job.state === 'failed' || job.state === 'awaiting')"
+        v-if="
+          job.reason &&
+          (job.state === 'paused' || job.state === 'failed' || job.state === 'awaiting')
+        "
         :variant="job.state === 'awaiting' ? 'warn' : 'error'"
         data-testid="import-reason"
       >
@@ -193,7 +200,10 @@ async function discard(): Promise<void> {
         data-testid="import-totals"
       >
         <span>{{
-          t('memory.import.totals.files.label', { done: job.progress.filesDone, count: job.progress.filesTotal })
+          t('memory.import.totals.files.label', {
+            done: job.progress.filesDone,
+            count: job.progress.filesTotal,
+          })
         }}</span>
         <span>{{ t('memory.import.totals.added.label', { count: job.totals.added }) }}</span>
         <span>{{ t('memory.import.totals.updated.label', { count: job.totals.updated }) }}</span>

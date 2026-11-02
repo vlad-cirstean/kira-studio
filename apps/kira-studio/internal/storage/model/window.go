@@ -30,7 +30,7 @@ type WindowRecord struct {
 // since-removed module degrades to DefaultWindowMode the same way, no migration needed
 // for the same reason (the vocabulary stays here, GetMode/SetMode's own bodies hoisted to
 // appstorage.WindowRepo).
-var WindowModes = appstorage.WindowModes{Default: DefaultWindowMode, Valid: []string{"studio", "api", "automations", "docker"}}
+var WindowModes = appstorage.WindowModes{Default: DefaultWindowMode, Valid: []string{"studio", "api", "automations", "docker", "kubernetes"}}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this
 // constant deliberately agree, so there is exactly one place the default lives on each side.

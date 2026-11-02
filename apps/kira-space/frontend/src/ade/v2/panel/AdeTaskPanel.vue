@@ -157,11 +157,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         data-testid="ade-panel-shelve"
         @click="moveShelf"
       >
-        {{
-          shelfTarget === 'backlog'
-            ? t('space.common.backlog.label')
-            : t('common.later.label')
-        }}
+        {{ shelfTarget === 'backlog' ? t('space.common.backlog.label') : t('common.later.label') }}
       </Button>
       <AdeTip v-if="choices.length" :parts="reviewTip">
         <TooltipDisabledTrigger :disabled="reviewDisabled">
@@ -227,7 +223,9 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
       <AdeAutomationsBlock :task-id="card.task.id" />
       <Alert v-if="card.review" variant="info" data-testid="ade-panel-review-note"
         ><AlertDescription>{{
-          t('space.ade.taskPanel.reviewNote.body', { owner: card.task.owner || t('space.ade.taskPanel.someone.label') })
+          t('space.ade.taskPanel.reviewNote.body', {
+            owner: card.task.owner || t('space.ade.taskPanel.someone.label'),
+          })
         }}</AlertDescription></Alert
       >
     </template>

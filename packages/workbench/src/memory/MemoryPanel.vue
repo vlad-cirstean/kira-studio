@@ -131,7 +131,11 @@ const historyToggleId = useId();
       <MemoryFilters v-model:scopes="scopes" v-model:origins="origins" v-model:project="project" />
       <MemorySetupHint
         v-if="semanticNeedsSetup"
-        :message="semanticState === 'notInstalled' ? t('memory.panel.semanticOff.hint') : t('memory.panel.semanticUnavailable.hint')"
+        :message="
+          semanticState === 'notInstalled'
+            ? t('memory.panel.semanticOff.hint')
+            : t('memory.panel.semanticUnavailable.hint')
+        "
         data-testid="memory-setup-hint-semantic"
       />
       <ImportStatus />
@@ -147,7 +151,9 @@ const historyToggleId = useId();
           <EmptyState
             fill
             data-testid="memory-empty"
-            :title="query.trim() === '' ? t('memory.panel.list.empty') : t('common.state.noMatches.empty')"
+            :title="
+              query.trim() === '' ? t('memory.panel.list.empty') : t('common.state.noMatches.empty')
+            "
             :description="query.trim() !== '' ? t('memory.panel.list.emptyHint') : undefined"
           >
             <MemorySetupHint
@@ -165,12 +171,12 @@ const historyToggleId = useId();
               type="button"
               v-bind="nav.rowProps(memory.id)"
               :class="
-            cn(
-              rowVariants({ layout: 'double', selected: selectedId === memory.id }),
-              'w-full flex-col gap-1 whitespace-normal border-b border-border py-1.5 text-left',
-              memory.historical && 'opacity-50',
-            )
-          "
+                cn(
+                  rowVariants({ layout: 'double', selected: selectedId === memory.id }),
+                  'w-full flex-col gap-1 whitespace-normal border-b border-border py-1.5 text-left',
+                  memory.historical && 'opacity-50',
+                )
+              "
               :style="rowIndent(0)"
               :data-testid="`memory-row-${memory.id}`"
               @click="selectMemory(memory.id)"
@@ -178,7 +184,13 @@ const historyToggleId = useId();
               <span class="line-clamp-2 text-kira-md">{{ memory.fact }}</span>
               <span class="flex items-center gap-1">
                 <Badge
-                  :variant="memory.origin === 'user' ? 'info' : memory.origin === 'external' ? 'warn' : 'default'"
+                  :variant="
+                    memory.origin === 'user'
+                      ? 'info'
+                      : memory.origin === 'external'
+                        ? 'warn'
+                        : 'default'
+                  "
                   data-testid="memory-row-origin"
                   >{{
                     originText(memory.origin, memory.sourceTag)

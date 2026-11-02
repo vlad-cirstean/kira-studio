@@ -188,7 +188,11 @@ onBeforeUnmount(() => {
       <Separator class="my-1" />
       <div class="px-1.5 pb-1.5 text-kira-sm text-subtle" data-testid="columns-menu-footer">
         {{
-          t(caps?.projection ? 'studio.grid.columns.footerServer.hint' : 'studio.grid.columns.footerClient.hint')
+          t(
+            caps?.projection
+              ? 'studio.grid.columns.footerServer.hint'
+              : 'studio.grid.columns.footerClient.hint',
+          )
         }}
       </div>
     </div>

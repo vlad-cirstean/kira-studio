@@ -37,6 +37,8 @@ type DbMcpService struct {
 	Approvals *dbmcp.ApprovalBroker
 	// Proof backs the proof_* tools (P420).
 	Proof dbmcp.ProofStore
+	// Kube backs the kube_* tools (P440).
+	Kube dbmcp.KubeReader
 
 	embedded embedded.Service[*dbmcp.Server, DbMcpStatus]
 }
@@ -44,8 +46,8 @@ type DbMcpService struct {
 // NewDbMcpService wires the embedded lifecycle's own start/stop/status closures once, here, so
 // every other method can assume s.embedded is ready — a plain struct literal (main.go's own shape
 // before T2-13) would leave them nil.
-func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approvals *dbmcp.ApprovalBroker, proofStore dbmcp.ProofStore) *DbMcpService {
-	s := &DbMcpService{Deps: deps, Installer: installer, Approvals: approvals, Proof: proofStore}
+func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approvals *dbmcp.ApprovalBroker, proofStore dbmcp.ProofStore, kube dbmcp.KubeReader) *DbMcpService {
+	s := &DbMcpService{Deps: deps, Installer: installer, Approvals: approvals, Proof: proofStore, Kube: kube}
 	s.embedded = embedded.Service[*dbmcp.Server, DbMcpStatus]{
 		StartFn: func(mint bool) (*dbmcp.Server, error) {
 			home := config.KiraHome()
@@ -62,6 +64,8 @@ func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approval
 				Query:            s.Deps.Router,
 				Approvals:        s.Approvals,
 				Proof:            s.Proof,
+				Kube:             s.Kube,
+				Ops:              s.Deps.Router.Host(),
 				MaskRules:        s.Deps.MaskRules,
 				ExplainThreshold: s.explainThreshold,
 				PreviewResponses: s.previewResponses,
@@ -411,6 +415,21 @@ func toWireApprovalTarget(t dbmcp.ApprovalTarget) DbMcpApprovalTarget {
 	return DbMcpApprovalTarget{Color: t.Color, ReadOnly: t.ReadOnly, Host: t.Host, Database: t.Database, Path: path}
 }
 
+// DbMcpApprovalCluster is dbmcp.ApprovalCluster's wire projection.
+type DbMcpApprovalCluster struct {
+	Context   string `json:"context"`
+	Server    string `json:"server"`
+	Namespace string `json:"namespace"`
+	Operation string `json:"operation"`
+}
+
+func toWireApprovalCluster(c *dbmcp.ApprovalCluster) *DbMcpApprovalCluster {
+	if c == nil {
+		return nil
+	}
+	return &DbMcpApprovalCluster{Context: c.Context, Server: c.Server, Namespace: c.Namespace, Operation: c.Operation}
+}
+
 // DbMcpApprovalResponse is the held result's metadata.
 type DbMcpApprovalResponse struct {
 	IsError bool `json:"isError"`
@@ -436,6 +455,8 @@ type DbMcpApprovalRequest struct {
 	// Response is set only for stage "response". It carries metadata only: the result text can be
 	// MB-sized and snapshots fan out to every window, so PendingResponse serves the text.
 	Response *DbMcpApprovalResponse `json:"response"`
+	// Cluster is set for a Kubernetes read (Target is then empty), null for a database request.
+	Cluster *DbMcpApprovalCluster `json:"cluster"`
 }
 
 // DbMcpApprovalSnapshot is dbmcp.ApprovalSnapshot's wire projection.
@@ -468,6 +489,7 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 			Target:      toWireApprovalTarget(snap.Pending.Target),
 			Stage:       string(snap.Pending.Stage),
 			Response:    toWireApprovalResponse(snap.Pending.Response),
+			Cluster:     toWireApprovalCluster(snap.Pending.Cluster),
 		}
 	}
 	return out

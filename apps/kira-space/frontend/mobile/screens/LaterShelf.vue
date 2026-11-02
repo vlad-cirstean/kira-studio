@@ -109,7 +109,9 @@ useSortableReorder(
       </li>
       <li v-if="!tasks.length" class="px-3 py-4 text-kira-md text-subtle" data-testid="later-empty">
         {{
-          shelf === 'later' ? t('mobile.later.laterEmpty.empty') : t('mobile.later.backlogEmpty.empty')
+          shelf === 'later'
+            ? t('mobile.later.laterEmpty.empty')
+            : t('mobile.later.backlogEmpty.empty')
         }}
       </li>
     </ol>

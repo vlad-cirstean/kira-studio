@@ -98,7 +98,7 @@ async function clearStickyBand(page: Page, container: Locator, target: Locator):
   await container.evaluate((el, delta) => {
     el.scrollTop += delta;
   }, shortfall);
-  await page.waitForTimeout(50);
+  await settleFrames(page);
 }
 
 // The project tree is virtualized (VirtualList.vue) — a row not currently scrolled into view

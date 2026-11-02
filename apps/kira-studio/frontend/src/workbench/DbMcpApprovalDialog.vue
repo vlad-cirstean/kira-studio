@@ -15,6 +15,7 @@ import { type MessageKey, t } from '@theme/i18n';
 import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
+import KubeApprovalTarget from '../kubernetes/components/KubeApprovalTarget.vue';
 import { useDbMcpStore } from '../state/dbmcp';
 import ApprovalResponse from './ApprovalResponse.vue';
 import ApprovalStatement from './ApprovalStatement.vue';
@@ -44,9 +45,18 @@ const CLASS_BODY_KEYS: Record<string, MessageKey> = {
   unknown: 'studio.dbMcp.approval.unknown.body',
 };
 
+const KUBE_BODY_KEYS = {
+  discover: 'studio.dbMcp.approval.kube.discover.body',
+  list: 'studio.dbMcp.approval.kube.list.body',
+  describe: 'studio.dbMcp.approval.kube.describe.body',
+  logs: 'studio.dbMcp.approval.kube.logs.body',
+} as const satisfies Record<string, MessageKey>;
+
 const classBody = computed(() => {
   const pending = dbMcpStore.approval.pending;
   if (!pending) return '';
+  if (pending.cluster)
+    return t(KUBE_BODY_KEYS[pending.cluster.operation], { cluster: pending.connectionName });
   const key =
     (pending.class && CLASS_BODY_KEYS[pending.class]) || 'studio.dbMcp.approval.other.body';
   return t(key, { connection: pending.connectionName, kind: pending.kind });
@@ -107,7 +117,12 @@ async function onApprove(requestId: string): Promise<void> {
       </DialogHeader>
 
       <DialogBody>
+        <KubeApprovalTarget
+          v-if="dbMcpStore.approval.pending.cluster"
+          :cluster="dbMcpStore.approval.pending.cluster"
+        />
         <ApprovalTarget
+          v-else
           :connection-name="dbMcpStore.approval.pending.connectionName"
           :kind="dbMcpStore.approval.pending.kind"
           :target="dbMcpStore.approval.pending.target"

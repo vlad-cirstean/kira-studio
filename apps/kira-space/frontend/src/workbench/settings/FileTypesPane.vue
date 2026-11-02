@@ -123,7 +123,9 @@ const open = ref<Record<string, boolean>>({});
         </FieldDescription>
         <Disclosure
           v-model:open="open[group.id]"
-          :label="t('space.settings.fileTypes.extensions.label', { count: group.extensions.length })"
+          :label="
+            t('space.settings.fileTypes.extensions.label', { count: group.extensions.length })
+          "
           :data-testid="`file-types-disclosure-${group.id}`"
           content-class="flex flex-col gap-1 pt-1"
         >

@@ -122,7 +122,12 @@ async function submit(): Promise<void> {
           <Alert variant="warn">
             <AlertDescription>
               {{
-                t(state.existingIsAnnotated ? 'git.dialog.tag.existsAnnotated.hint' : 'git.dialog.tag.exists.hint', { name })
+                t(
+                  state.existingIsAnnotated
+                    ? 'git.dialog.tag.existsAnnotated.hint'
+                    : 'git.dialog.tag.exists.hint',
+                  { name },
+                )
               }}
             </AlertDescription>
           </Alert>

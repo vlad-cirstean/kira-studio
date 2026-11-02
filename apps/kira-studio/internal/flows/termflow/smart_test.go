@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,6 +18,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -577,26 +581,43 @@ func TestSmartScript(t *testing.T) {
 	})
 
 	t.Run("user mcp servers", func(t *testing.T) {
+		restore := claude.SetMCPListTTL(0)
+		t.Cleanup(restore)
 		app := flowharness.New(t)
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		closed := ln.Addr().String()
+		_ = ln.Close()
+		fakeMCP := filepath.Join(app.BinDir, "fake-mcp")
 		writeClaudeConfig := func(servers string) {
 			if err := os.WriteFile(filepath.Join(app.Home, ".claude.json"), []byte(`{"mcpServers":`+servers+`}`), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}
-		writeClaudeConfig(fmt.Sprintf(`{"fake":{"command":%q,"args":["--secret-arg"],"env":{"TOKEN":"hidden"}}}`, filepath.Join(app.BinDir, "fake-mcp")))
+		fake := fmt.Sprintf(`"fake":{"command":%q,"args":["--secret-arg"],"env":{"TOKEN":"SENTINEL-ENV"}}`, fakeMCP)
+		writeClaudeConfig(`{` + fake + fmt.Sprintf(`,"remote":{"type":"http","url":"http://%s/mcp","headers":{"Authorization":"Bearer SENTINEL-HDR"}},"other":{"command":%q}}`, closed, fakeMCP))
+
 		servers, err := app.W.ScriptRuns.McpServers()
-		if err != nil || len(servers) != 1 || servers[0].Name != "fake" || servers[0].Transport != "stdio" || servers[0].Target != "fake-mcp" {
+		if err != nil || len(servers) != 3 {
 			t.Fatalf("McpServers = %+v, %v", servers, err)
 		}
-		if raw, _ := json.Marshal(servers); strings.Contains(string(raw), "secret-arg") || strings.Contains(string(raw), "hidden") {
-			t.Fatalf("McpServers leaked args or env: %s", raw)
+		byName := map[string]harness.UserServer{}
+		for _, s := range servers {
+			byName[s.Name] = s
 		}
-		tools, err := app.W.ScriptRuns.McpTools(scriptruns.McpToolsArgs{Server: "fake"})
-		if err != nil || len(tools) != 2 || tools[0].Name != "echo" || tools[1].Name != "ping" || tools[0].Description != "Echo the text back." {
-			t.Fatalf("McpTools = %+v, %v", tools, err)
+		if f := byName["fake"]; f.Transport != "stdio" || f.Target != "fake-mcp" || f.Status != "connected" {
+			t.Errorf("fake = %+v", f)
 		}
-		if _, err := app.W.ScriptRuns.McpTools(scriptruns.McpToolsArgs{Server: "nope"}); err == nil || !strings.Contains(err.Error(), "could not list tools of nope") {
-			t.Fatalf("McpTools of an unknown server = %v", err)
+		if r := byName["remote"]; r.Transport != "http" || r.Target != closed || r.Status != "failed" {
+			t.Errorf("remote = %+v", r)
+		}
+		if raw, _ := json.Marshal(servers); strings.Contains(string(raw), "secret-arg") || strings.Contains(string(raw), "SENTINEL") {
+			t.Fatalf("McpServers leaked args, env or headers: %s", raw)
+		}
+		if _, err := os.Stat(filepath.Join(app.FakeDir, "mcp-list-1.args")); err != nil {
+			t.Errorf("claude was not asked for the list: %v", err)
 		}
 
 		app.Scenario(scenario(fakeagent.Action{
@@ -607,22 +628,75 @@ func TestSmartScript(t *testing.T) {
 		})
 		args := scriptruns.RunArgs{ScriptID: rec.ID}
 		id, pv := startSmart(t, app, args)
-		waitSmart(t, app, id, "done")
+		run := waitSmart(t, app, id, "done")
 		if !strings.Contains(strings.Join(pv.Allowed, " "), "mcp__fake__echo") || strings.Join(pv.MCP, ",") != "fake" {
 			t.Errorf("preview allowed = %v, mcp = %v", pv.Allowed, pv.MCP)
 		}
-		argv := callFile(t, app, 1, ".args")
-		if strings.Count(argv, "--mcp-config") != 2 {
-			t.Errorf("argv wants two --mcp-config:\n%s", argv)
+		argv := strings.Split(callFile(t, app, 1, ".args"), "\n")
+		if n := strings.Count(strings.Join(argv, " "), "--mcp-config"); n != 1 {
+			t.Errorf("argv wants one --mcp-config, has %d:\n%v", n, argv)
 		}
-		if cfg := callFile(t, app, 1, ".mcp1"); !strings.Contains(cfg, `"fake"`) || !strings.Contains(cfg, "fake-mcp") {
-			t.Errorf("user config copy = %s", cfg)
+		if i := slices.Index(argv, "--setting-sources"); i < 0 || argv[i+1] != "user" || slices.Contains(argv, "--strict-mcp-config") {
+			t.Errorf("argv wants --setting-sources user and no --strict-mcp-config:\n%v", argv)
 		}
-		if matches, _ := filepath.Glob(filepath.Join(app.KiraHome, "automations-mcp", "*")); len(matches) != 0 {
-			t.Errorf("config files left behind: %v", matches)
+		if i := slices.Index(argv, "--permission-prompts"); i < 0 || argv[i+1] != "none" {
+			t.Errorf("argv wants --permission-prompts none:\n%v", argv)
+		}
+		if got, want := callFile(t, app, 1, ".settings"), `{"disableAllHooks":true,"allowedMcpServers":[{"serverName":"kira-ade"},{"serverName":"fake"}],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}`; got != want {
+			t.Errorf("--settings = %s, want %s", got, want)
+		}
+		if i := slices.Index(argv, "--allowedTools"); i < 0 || !slices.Contains(argv[i+1:], "mcp__fake__echo") {
+			t.Errorf("argv wants mcp__fake__echo allowed:\n%v", argv)
+		}
+		if _, err := os.Stat(filepath.Join(app.KiraHome, "automations-mcp")); err == nil {
+			if matches, _ := filepath.Glob(filepath.Join(app.KiraHome, "automations-mcp", "*user*")); len(matches) != 0 {
+				t.Errorf("user config copies left behind: %v", matches)
+			}
 		}
 		if _, err := os.Stat(filepath.Join(app.FakeDir, "mcp-echo-1.json")); err != nil {
 			t.Errorf("the scripted echo call did not reach the user server: %v", err)
+		}
+
+		all := newSmart(t, app, "use every tool", func(f *scripts.CustomScriptFields) {
+			f.Name = "all"
+			f.Smart = &scripts.Smart{MCP: []scripts.MCPChoice{{Server: "fake", AllTools: true, Tools: []string{"ignored"}}}}
+		})
+		if len(all.Smart.MCP) != 1 || !all.Smart.MCP[0].AllTools || len(all.Smart.MCP[0].Tools) != 0 {
+			t.Errorf("AllTools choice = %+v, want tools normalized to none", all.Smart.MCP)
+		}
+		if got := strings.Join(previewOf(t, app, scriptruns.RunArgs{ScriptID: all.ID}).Allowed, " "); !strings.Contains(got, "mcp__fake") || strings.Contains(got, "mcp__fake__") {
+			t.Errorf("AllTools allowed = %q, want mcp__fake", got)
+		}
+		_, err = app.W.CustomScripts.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{
+			Name: "none", Kind: scripts.KindSmart, Command: "x", Color: "blue",
+			Smart: &scripts.Smart{MCP: []scripts.MCPChoice{{Server: "fake"}}},
+		}})
+		if err == nil || !strings.Contains(err.Error(), "tick at least one tool of fake") {
+			t.Errorf("no tools and no AllTools = %v", err)
+		}
+
+		var logs strings.Builder
+		page, err := app.W.ScriptRuns.ReadLog(scriptruns.ReadLogArgs{ID: id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, _ := json.Marshal(page)
+		logs.Write(raw)
+		raw, _ = json.Marshal(run)
+		logs.Write(raw)
+		if strings.Contains(logs.String(), "SENTINEL") {
+			t.Errorf("run rows leaked a credential: %s", logs.String())
+		}
+		for _, root := range []string{app.KiraHome, app.FakeDir} {
+			_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+				if err != nil || d.IsDir() {
+					return nil
+				}
+				if data, _ := os.ReadFile(path); strings.Contains(string(data), "SENTINEL") {
+					t.Errorf("%s holds a credential", path)
+				}
+				return nil
+			})
 		}
 
 		writeClaudeConfig(`{}`)

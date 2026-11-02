@@ -19,6 +19,7 @@ import (
 // permanentExemptions are `G<n> <path>` pairs that stay forever, each with its reason.
 var permanentExemptions = map[string]string{
 	"G4 apps/kira-space/internal/gitsession/incremental.go": "writes temp files into a per-call os.MkdirTemp dir that is deleted before return; nothing else reads them",
+	"G5 internal/harness/claude/sandbox.go":                 "names ~/.claude.json as a sandbox write path; Kira never opens it",
 }
 
 // testToolingPackages hold throwaway test fixtures; G4 skips any file under a directory with one
@@ -97,6 +98,7 @@ func scan(t *testing.T, root, rel string) []finding {
 	dir := filepath.ToSlash(filepath.Dir(rel))
 	inHostAdapters := strings.HasPrefix(dir, "apps/kira-space/internal/githost") || strings.HasPrefix(dir, "apps/kira-space/internal/issuetracker")
 	inDocker := dir == "internal/docker"
+	inClaude := dir == "internal/harness/claude" || strings.HasPrefix(dir, "internal/harness/claude/")
 	isCodes := filepath.ToSlash(rel) == "internal/ipcerr/codes.go"
 	var out []finding
 	add := func(rule string, pos token.Pos, msg string) {
@@ -128,6 +130,16 @@ func scan(t *testing.T, root, rel string) []finding {
 					add("G5", x.Pos(), "literal \"config.json\" (docker config can hold auths)"+g5Rule)
 				}
 			}
+			if x.Kind == token.STRING && inClaude {
+				if v, err := strconv.Unquote(x.Value); err == nil {
+					switch {
+					case strings.Contains(v, ".claude.json"):
+						add("G5", x.Pos(), "literal \".claude.json\" (holds MCP headers and env)"+g5Rule)
+					case strings.Contains(v, `json:"headers"`):
+						add("G5", x.Pos(), "struct tag json:\"headers\" (decodes stored MCP headers)"+g5Rule)
+					}
+				}
+			}
 			if x.Kind == token.STRING && inHostAdapters {
 				if v, err := strconv.Unquote(x.Value); err == nil {
 					if why := credentialLiteral(v); why != "" {
@@ -136,8 +148,15 @@ func scan(t *testing.T, root, rel string) []finding {
 				}
 			}
 		case *ast.CompositeLit:
-			if inHostAdapters && hasAuthToken(x) {
+			if inHostAdapters && hasAdjacent(x, `"auth"`, `"token"`) {
 				add("G5", x.Pos(), "gh auth token argv"+g5Rule)
+			}
+			if inClaude && hasAdjacent(x, `"mcp"`, `"get"`) {
+				add("G5", x.Pos(), "claude mcp get argv (prints stored headers and env)"+g5Rule)
+			}
+		case *ast.FuncDecl:
+			if inClaude && x.Recv != nil && x.Name.Name == "RoundTrip" {
+				add("G5", x.Pos(), "http.RoundTripper (header-injecting transport)"+g5Rule)
 			}
 		case *ast.CallExpr:
 			checkCall(x, inAdapters, inHTTPClient, add)
@@ -145,6 +164,9 @@ func scan(t *testing.T, root, rel string) []finding {
 				if why := dockerCredential(x); why != "" {
 					add("G5", x.Pos(), why+g5Rule)
 				}
+			}
+			if inClaude && isHeaderWrite(x) {
+				add("G5", x.Pos(), "request header injection"+g5Rule)
 			}
 			if inHostAdapters {
 				if why := credentialCall(x); why != "" {
@@ -173,14 +195,30 @@ func credentialLiteral(v string) string {
 	return ""
 }
 
-// hasAuthToken reports adjacent "auth", "token" elements, the `gh auth token` argv.
-func hasAuthToken(c *ast.CompositeLit) bool {
+// hasAdjacent reports adjacent elements first, second, such as the `gh auth token` argv.
+func hasAdjacent(c *ast.CompositeLit, first, second string) bool {
 	for i := 0; i+1 < len(c.Elts); i++ {
 		a, ok1 := c.Elts[i].(*ast.BasicLit)
 		b, ok2 := c.Elts[i+1].(*ast.BasicLit)
-		if ok1 && ok2 && a.Value == `"auth"` && b.Value == `"token"` {
+		if ok1 && ok2 && a.Value == first && b.Value == second {
 			return true
 		}
+	}
+	return false
+}
+
+// isHeaderWrite reports <x>.Header.Set/Add(...) and <x>.Header().Set/Add(...); Get stays allowed.
+func isHeaderWrite(x *ast.CallExpr) bool {
+	sel, ok := x.Fun.(*ast.SelectorExpr)
+	if !ok || (sel.Sel.Name != "Set" && sel.Sel.Name != "Add") {
+		return false
+	}
+	switch h := sel.X.(type) {
+	case *ast.SelectorExpr:
+		return h.Sel.Name == "Header"
+	case *ast.CallExpr:
+		inner, ok := h.Fun.(*ast.SelectorExpr)
+		return ok && inner.Sel.Name == "Header"
 	}
 	return false
 }

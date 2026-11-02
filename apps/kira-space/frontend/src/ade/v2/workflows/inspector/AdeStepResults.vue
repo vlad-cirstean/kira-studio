@@ -55,7 +55,9 @@ const targets = (next: string): WorkflowStep[] => {
           size="kira"
           class="min-w-0 flex-1 font-data"
           data-testid="ade-wf-result-id"
-          @update:model-value="(v: string | number) => draft.changeResult(step.id, r.id, { id: String(v) })"
+          @update:model-value="
+            (v: string | number) => draft.changeResult(step.id, r.id, { id: String(v) })
+          "
         />
         <Label :for="id('ok', r.id)" class="text-kira-sm text-muted-foreground">{{
           t('space.ade.workflows.results.ok.label')
@@ -86,7 +88,9 @@ const targets = (next: string): WorkflowStep[] => {
         size="kira"
         maxlength="200"
         data-testid="ade-wf-result-description"
-        @update:model-value="(v: string | number) => draft.changeResult(step.id, r.id, { description: String(v) })"
+        @update:model-value="
+          (v: string | number) => draft.changeResult(step.id, r.id, { description: String(v) })
+        "
       />
       <div class="flex flex-wrap items-center gap-2 text-kira-sm text-muted-foreground">
         <Label :for="id('route', r.id)">{{ t('space.ade.workflows.results.route.label') }}</Label>

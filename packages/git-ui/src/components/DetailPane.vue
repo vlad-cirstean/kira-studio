@@ -80,7 +80,9 @@ function onOpenFile(index: number, pinned: boolean): void {
         :actions="actions"
         :change-request-result="changeRequests?.selected.value"
         :host="changeRequests?.host.value"
-        :change-request-for-commit="changeRequests?.changeRequestForCommit(detailState.sha.value ?? '')"
+        :change-request-for-commit="
+          changeRequests?.changeRequestForCommit(detailState.sha.value ?? '')
+        "
       />
       <FileTree
         class="flex-auto min-h-0 border-y border-border"

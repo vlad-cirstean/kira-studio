@@ -548,7 +548,9 @@ const statusLine = computed(() => {
           >
             <AlertDescription>
               {{
-                t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) })
+                t('studio.cellEditor.decoded.invalid.hint', {
+                  format: formatLabel(effectiveFormat),
+                })
               }}
             </AlertDescription>
           </Alert>

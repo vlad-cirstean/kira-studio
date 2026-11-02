@@ -132,7 +132,11 @@ function onCancel(): void {
         }}</Label>
         <TooltipIconButton
           :icon="showText ? 'eye-closed' : 'eye'"
-          :label="showText ? t('studio.project.credentialPaste.hideText.tooltip') : t('studio.project.credentialPaste.showText.tooltip')"
+          :label="
+            showText
+              ? t('studio.project.credentialPaste.hideText.tooltip')
+              : t('studio.project.credentialPaste.showText.tooltip')
+          "
           data-testid="paste-credentials-toggle-text"
           @click="showText = !showText"
         />
@@ -140,7 +144,10 @@ function onCancel(): void {
       <Textarea
         ref="input"
         v-model="text"
-        :class="['font-data min-h-24 max-h-24 resize-none', showText ? '' : '[-webkit-text-security:disc]']"
+        :class="[
+          'font-data min-h-24 max-h-24 resize-none',
+          showText ? '' : '[-webkit-text-security:disc]',
+        ]"
         :placeholder="t('studio.project.credentialPaste.input.example')"
         autocomplete="off"
         autocapitalize="off"
@@ -187,7 +194,11 @@ function onCancel(): void {
         <TooltipIconButton
           v-if="row.field === 'password'"
           :icon="showPassword ? 'eye-closed' : 'eye'"
-          :label="showPassword ? t('studio.project.connectionDialog.hidePassword.label') : t('studio.project.connectionDialog.showPassword.label')"
+          :label="
+            showPassword
+              ? t('studio.project.connectionDialog.hidePassword.label')
+              : t('studio.project.connectionDialog.showPassword.label')
+          "
           data-testid="paste-credentials-toggle-password"
           @click="showPassword = !showPassword"
         />

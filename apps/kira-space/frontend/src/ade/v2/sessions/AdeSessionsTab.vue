@@ -7,15 +7,15 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeHeadlessPane from './AdeHeadlessPane.vue';
 import AdeSessionActions from './AdeSessionActions.vue';
 import AdeSessionStrip from './AdeSessionStrip.vue';
-import AdeStoppedList from './AdeStoppedList.vue';
-import AdeStoppedMenu from './AdeStoppedMenu.vue';
+import AdeSessionsList from './AdeSessionsList.vue';
+import AdeSessionsMenu from './AdeSessionsMenu.vue';
 import AdeTaskLaunchMenu from './AdeTaskLaunchMenu.vue';
 import AdeTuiPane from './AdeTuiPane.vue';
 import { byRecent, byRunningOrder } from './sessionView';
 import { useSessionViews } from './useSessionViews';
 
 // Sessions of a task (every one) or of one branch: the running ones in a strip with the selected
-// one's pane, the finished ones in a dropdown beside it. Archived tasks list them inline.
+// one's pane, every one in a dropdown beside it. Archived tasks list them inline.
 const props = defineProps<{ taskId: string; branchId?: string; archived?: boolean }>();
 
 const ui = useAdeBoardUiStore();
@@ -43,7 +43,7 @@ const stopped = computed(() =>
 const current = computed(
   () => running.value.find((v) => v.session.id === ui.sessionId) ?? running.value[0],
 );
-const stoppedOpen = ref(false);
+const menuOpen = ref(false);
 const revealed = ref<string | null>(null);
 
 // Re-runs when the lists load, since the event can land before the sessions query resolves.
@@ -54,7 +54,7 @@ watch(
     if (stopped.value.some((v) => v.session.id === id)) {
       if (!props.archived) {
         revealed.value = id;
-        stoppedOpen.value = true;
+        menuOpen.value = true;
       }
       ui.revealSessionId = null;
     } else if (running.value.some((v) => v.session.id === id)) {
@@ -63,7 +63,7 @@ watch(
   },
   { immediate: true, flush: 'post' },
 );
-watch(stoppedOpen, (open) => {
+watch(menuOpen, (open) => {
   if (!open) revealed.value = null;
 });
 </script>
@@ -81,7 +81,13 @@ watch(stoppedOpen, (open) => {
         :selected-id="current?.session.id ?? null"
         @select="(id) => (ui.sessionId = id)"
       />
-      <AdeStoppedMenu v-model:open="stoppedOpen" :views="stopped" :selected-id="revealed" />
+      <AdeSessionsMenu
+        v-model:open="menuOpen"
+        :running="running"
+        :stopped="stopped"
+        :selected-id="revealed"
+        :current-id="current?.session.id ?? null"
+      />
       <AdeSessionActions v-if="current" :view="current" />
       <span class="ml-auto flex shrink-0 items-center">
         <AdeTaskLaunchMenu :task-id="taskId" :branch-id="branchId" size="bar" />
@@ -91,7 +97,7 @@ watch(stoppedOpen, (open) => {
       <AdeHeadlessPane v-if="current.headless" :key="current.session.id" :view="current" />
       <AdeTuiPane v-else :key="current.session.id" :view="current" />
     </template>
-    <AdeStoppedList v-else-if="archived && stopped.length" :views="stopped" archived />
+    <AdeSessionsList v-else-if="archived && stopped.length" inline archived :stopped="stopped" />
     <InlineState v-else kind="empty" class="flex-1 p-3" data-testid="ade-sessions-empty">{{
       t('space.ade.sessionList.empty.empty')
     }}</InlineState>

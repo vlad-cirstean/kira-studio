@@ -185,7 +185,9 @@ async function onConfirm(): Promise<void> {
     <DialogContent size="xl" fixed-height data-testid="datagrip-import-dialog">
       <DialogHeader close-testid="datagrip-import-dialog-close">
         <DialogTitle>{{
-          report ? t('studio.project.dataGripImport.report.title') : t('studio.project.dataGripImport.dialog.title')
+          report
+            ? t('studio.project.dataGripImport.report.title')
+            : t('studio.project.dataGripImport.dialog.title')
         }}</DialogTitle>
       </DialogHeader>
 
@@ -271,7 +273,10 @@ async function onConfirm(): Promise<void> {
                   data-testid="datagrip-row-outlook"
                 >
                   {{
-                    t(OUTLOOK_KEY[row.passwordOutlook] ?? 'studio.project.dataGripImport.outlook.notSaved.label')
+                    t(
+                      OUTLOOK_KEY[row.passwordOutlook] ??
+                        'studio.project.dataGripImport.outlook.notSaved.label',
+                    )
                   }}
                 </Badge>
               </template>

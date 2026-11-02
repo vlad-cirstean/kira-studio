@@ -218,7 +218,7 @@ test('remove script confirm: title, body and buttons', async ({ relaunch }) => {
   const dialog = tid(page, 'confirm-dialog');
   await expect(dialog.getByRole('heading', { name: 'Remove script?' })).toBeVisible();
   await expect(tid(page, 'confirm-dialog-message')).toHaveText(
-    '“Build all” will no longer appear in Automations.',
+    '“Build all” will no longer appear in Runs.',
   );
   await expect(tid(page, 'confirm-dialog-cancel')).toHaveText('Cancel');
   await expect(tid(page, 'confirm-dialog-confirm')).toHaveText('Remove');

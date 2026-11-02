@@ -33,7 +33,10 @@ export function allowedToolsOf(s: SmartSettings): string[] {
       for (const p of s.bashPatterns) out.push(`Bash(${p})`);
     } else out.push(t);
   }
-  for (const c of s.mcp) for (const t of c.tools) out.push(`mcp__${c.server}__${t}`);
+  for (const c of s.mcp) {
+    if (c.allTools) out.push(`mcp__${c.server}`);
+    else for (const t of c.tools) out.push(`mcp__${c.server}__${t}`);
+  }
   return out;
 }
 
@@ -53,7 +56,12 @@ export function isBuiltinVar(name: string): boolean {
   return (BUILTIN_VARS as readonly string[]).includes(name);
 }
 
-export function withMcp(mcp: readonly McpChoice[], server: string, tools: string[]): McpChoice[] {
+export function withMcp(
+  mcp: readonly McpChoice[],
+  server: string,
+  tools: string[],
+  allTools: boolean,
+): McpChoice[] {
   const rest = mcp.filter((c) => c.server !== server);
-  return [...rest, { server, tools }];
+  return [...rest, { server, allTools, tools: allTools ? [] : tools }];
 }

@@ -3,23 +3,35 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { revealElement } from '@workbench/behaviour/focus';
+import { onMounted, ref, watch } from 'vue';
 import { useMobileTerminalsStore } from '../../../state/mobileTerminals';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
-import { ACTION_CLASS } from '../tones';
+import AdeSessionBadge from './AdeSessionBadge.vue';
 import AdeSessionTabTip from './AdeSessionTabTip.vue';
 import type { SessionView } from './sessionView';
 import { useSessionMenu } from './useSessionMenu';
 
 // Tab strip of the running sessions in scope (mockup `termTabs`): activity glyph, TUI / headless
-// badge, name; hover for state and age, right-click for Restart and Copy session ID.
-defineProps<{ views: SessionView[]; selectedId: string | null }>();
+// badge, name; hover for state and age, right-click for Restart, Close and Copy session ID.
+const props = defineProps<{ views: SessionView[]; selectedId: string | null }>();
 const emit = defineEmits<{ select: [id: string] }>();
 const phones = useMobileTerminalsStore();
 const menu = useSessionMenu();
+const strip = ref<HTMLElement | null>(null);
+
+// The strip scrolls without a bar, so a pick from the dropdown can land on a hidden tab.
+function revealSelected(): void {
+  const tab = strip.value?.querySelector('[data-selected]');
+  if (tab) revealElement(tab);
+}
+onMounted(revealSelected);
+watch(() => props.selectedId, revealSelected, { flush: 'post' });
 </script>
 
 <template>
   <div
+    ref="strip"
     class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none px-1.5 py-1"
     data-testid="ade-session-strip"
   >
@@ -29,7 +41,10 @@ const menu = useSessionMenu();
           type="button"
           variant="toolbar"
           size="kira-lg"
-          :class="[tabChipVariants({ active: v.session.id === selectedId }), 'font-data overflow-hidden']"
+          :class="[
+            tabChipVariants({ active: v.session.id === selectedId }),
+            'font-data overflow-hidden',
+          ]"
           :data-testid="`ade-session-tab-${v.session.id}`"
           :data-selected="v.session.id === selectedId || undefined"
           :data-mode="v.session.mode"
@@ -37,14 +52,7 @@ const menu = useSessionMenu();
           @contextmenu="(ev: MouseEvent) => menu.open(ev, v)"
         >
           <AdeActivityIcon :kind="v.kind" bare />
-          <span
-            class="shrink-0 rounded-kira-xs px-1 text-kira-sm"
-            :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ACTION_CLASS.agent"
-            data-testid="ade-session-badge"
-            >{{
-              v.badge
-            }}</span
-          >
+          <AdeSessionBadge :view="v" />
           <span class="min-w-0 truncate">{{ v.tabName }}</span>
           <CodiconIcon
             v-if="phones.holdOf(v.session.terminalId)"

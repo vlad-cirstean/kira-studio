@@ -1,6 +1,5 @@
 <script setup lang="ts" generic="R extends OpLogRecord">
 import type { EditorLanguageId } from '@shared/domain/editor';
-// biome-ignore lint/correctness/noUnusedImports: resolves the generic="R extends OpLogRecord" attribute above — biome only sees the <script> body, never that tag's own attribute string.
 import type { OpLogRecord } from '@shared/domain/ops';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -86,7 +85,9 @@ function stepDuration(step: OpLogStep): string {
           :label="t('common.copyCommand.label')"
           size="inline"
           :icon-size="12"
-          @click="copy(record.command ?? '', { message: t('workbench.opLog.copiedCommand.announce') })"
+          @click="
+            copy(record.command ?? '', { message: t('workbench.opLog.copiedCommand.announce') })
+          "
         />
       </div>
       <OpLogCodeBlock
@@ -142,7 +143,12 @@ function stepDuration(step: OpLogStep): string {
     <span
       v-for="(line, i) in lines"
       :key="`line-${i}`"
-      :class="cn('block font-data break-all whitespace-pre-wrap', line.tone === 'error' ? 'text-error' : 'text-muted-foreground')"
+      :class="
+        cn(
+          'block font-data break-all whitespace-pre-wrap',
+          line.tone === 'error' ? 'text-error' : 'text-muted-foreground',
+        )
+      "
       data-testid="op-detail-line"
     >
       {{ line.text }}

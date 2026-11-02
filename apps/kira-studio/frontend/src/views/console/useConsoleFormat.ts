@@ -51,7 +51,7 @@ export function useConsoleFormat(opts: {
     // inserts; statementAtOffset attributes that gap to the preceding statement. Skip past it so
     // Run statement resolves to this one.
     const target0 = target ? trimmedStatementStart(text, target) : 0;
-    void nextTick(() => opts.editorHost.value?.setCursor(target0));
+    void nextTick().then(() => opts.editorHost.value?.setCursor(target0));
   }
 
   function reportOutcome(
@@ -119,7 +119,7 @@ export function useConsoleFormat(opts: {
       }
       setText(opts.tab.value.id, result.text);
       restoreCursor(result.text, splitOptions, beforeIndex);
-      void nextTick(() => reportOutcome(result, before.length, originalText, kind));
+      void nextTick().then(() => reportOutcome(result, before.length, originalText, kind));
     })();
   }
 

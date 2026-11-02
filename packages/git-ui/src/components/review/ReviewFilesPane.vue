@@ -238,7 +238,9 @@ function onToggleWorkingReviewed(path: string): void {
           @select-file="(i) => (workingSelected = i)"
           @open-file="onOpenWorkingIndex"
           @toggle-reviewed="onToggleWorkingReviewed"
-          @toggle-reviewed-folder="(paths, reviewed) => working?.onToggleReviewedFolder(paths, reviewed)"
+          @toggle-reviewed-folder="
+            (paths, reviewed) => working?.onToggleReviewedFolder(paths, reviewed)
+          "
         />
       </section>
       <InlineState v-if="reviewFiles.loading.value && files.length === 0" kind="loading">

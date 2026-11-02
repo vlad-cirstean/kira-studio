@@ -55,7 +55,10 @@ function download(): void {
     </template>
     <template v-else-if="data.state === 'downloading'">
       <FieldDescription>{{
-        t('memory.semantic.downloading.status', { done: formatBytes(data.done), total: formatBytes(data.total) })
+        t('memory.semantic.downloading.status', {
+          done: formatBytes(data.done),
+          total: formatBytes(data.total),
+        })
       }}</FieldDescription>
       <Progress :model-value="percent" />
       <Button
@@ -91,7 +94,9 @@ function download(): void {
       </Button>
     </template>
     <FieldDescription v-else>{{
-      data.model ? t('memory.semantic.onWithModel.status', { model: data.model }) : t('memory.semantic.on.status')
+      data.model
+        ? t('memory.semantic.onWithModel.status', { model: data.model })
+        : t('memory.semantic.on.status')
     }}</FieldDescription>
   </FieldSet>
 </template>

@@ -8,6 +8,7 @@ export default defineConfig({
   site: 'https://vlad-cirstean.github.io',
   base: '/kira-studio',
   trailingSlash: 'ignore',
+  redirects: { '/docs/shared/automations': '/kira-studio/docs/shared/runs/' },
   output: 'static',
   vite: { plugins: [tailwindcss()] },
   integrations: [

@@ -33,8 +33,14 @@ function open(row: { volume: { name: string } }): void {
         fill
         data-testid="docker-list-empty"
         icon="database"
-        :title="ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.volume.none.empty')"
-        :description="ui.search.trim() ? t('docker.volume.noMatches.emptyHint') : t('docker.volume.none.emptyHint')"
+        :title="
+          ui.search.trim() ? t('common.state.noMatches.empty') : t('docker.volume.none.empty')
+        "
+        :description="
+          ui.search.trim()
+            ? t('docker.volume.noMatches.emptyHint')
+            : t('docker.volume.none.emptyHint')
+        "
       />
     </template>
     <VirtualList :rows="rows" testid="docker-volume-list" :select="open" :open="open">
@@ -42,11 +48,14 @@ function open(row: { volume: { name: string } }): void {
         <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
         <div
           :class="
-          cn(
-            rowVariants({ layout: 'tree', selected: ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name }),
-            'group/row h-full gap-1.5',
-          )
-        "
+            cn(
+              rowVariants({
+                layout: 'tree',
+                selected: ui.selection?.kind === 'volume' && ui.selection.id === row.volume.name,
+              }),
+              'group/row h-full gap-1.5',
+            )
+          "
           :style="rowIndent(0)"
           data-testid="docker-row"
           :data-id="row.volume.name"

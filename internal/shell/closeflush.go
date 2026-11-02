@@ -71,7 +71,7 @@ func (c *CloseFlushCoordinator) Ack(key string) {
 // arrives or closeFlushTimeout elapses — whichever first.
 //
 // The trap this works around: (*WebviewWindow).Close() is itself w.emit(events.Common.WindowClosing)
-// (webview_window.go:1248-1255), so a hook that unconditionally cancels and then calls Close()
+// (webview_window.go:1287-1294), so a hook that unconditionally cancels and then calls Close()
 // loops forever. `flushing` makes the hook one-shot: the first pass (the user's own close, or the
 // Dock/menu Close Window action) cancels and starts the flush wait; the second pass — this
 // goroutine's own win.Close()/win.Hide() call once the wait ends — sees flushing already true,
@@ -79,18 +79,19 @@ func (c *CloseFlushCoordinator) Ack(key string) {
 // window.
 //
 // Real-interaction fix (item 8 — a webview process outlives its window, and duplicates on
-// reopen): root-caused against the actual Wails v3 beta.16 source (vendored at
-// $GOPATH/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.16), not guessed —
+// reopen): root-caused against the actual Wails v3 source (re-read at v3.1.0, vendored at
+// $GOPATH/pkg/mod/github.com/wailsapp/wails/v3@v3.1.0), not guessed —
 //   - webview_window.go's own default WindowClosing *listener* (registered once, in NewWindow,
 //     for every window) is the entire native teardown: markAsDestroyed, impl.close,
-//     Window.Remove. On macOS, impl.close is exactly `[NSWindow close]`
-//     (webview_window_darwin.go's macosWebviewWindow.close) — nothing more.
-//     macosWebviewWindow.destroy() exists but is called from nowhere in the library, and its C
-//     body is byte-identical to close()'s; there is no exported Destroy on *WebviewWindow* at
+//     Window.Remove. On macOS, impl.close sets unconditionallyClose, then calls
+//     `[NSWindow close]` (webview_window_darwin.go's macosWebviewWindow.close) — nothing more.
+//     macosWebviewWindow.destroy() exists but nothing calls it (WebviewWindow.destroy, its only
+//     caller, has none), and there is no exported Destroy on *WebviewWindow* at
 //     all. So closing a window never guarantees its WKWebView's own WebContent/GPU/Networking
 //     XPC helper processes actually exit —
 //     confirmed as a known, unfixable-from-Go limitation of this exact Wails version, not
-//     something this app's own code was doing wrong. This is the "does not actually terminate"
+//     something this app's own code was doing wrong
+//     (not re-observed on a Mac for v3.1.0). This is the "does not actually terminate"
 //     half of the report, and it stays true for a genuine Close() below (a real limitation, not
 //     band-aided over) — what this fix changes is *how often Close() has to happen at all*.
 //   - The "duplicates on reopen" half **was** this app's own bug, and is fully fixable: closing

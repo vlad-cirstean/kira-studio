@@ -358,7 +358,11 @@ onUnmounted(() => {
     <Alert strip v-if="viewing" variant="info" data-testid="http-history-band">
       <AlertDescription>
         {{
-          t('studio.http.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.entry.method ?? '', url: viewing?.snapshot.entry.url ?? '' })
+          t('studio.http.response.viewing.status', {
+            time: viewingTime,
+            method: viewing?.snapshot.entry.method ?? '',
+            url: viewing?.snapshot.entry.url ?? '',
+          })
         }}
       </AlertDescription>
       <AlertAction>
@@ -369,7 +373,9 @@ onUnmounted(() => {
           @click="onBackToLatest"
         >
           {{
-            rt?.response ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label')
+            rt?.response
+              ? t('studio.grpc.response.backToLatest.label')
+              : t('common.action.close.label')
           }}
         </Button>
       </AlertAction>
@@ -395,7 +401,9 @@ onUnmounted(() => {
     <Alert strip v-if="bodyNotStored" variant="info" data-testid="http-history-binary-note">
       <AlertDescription>
         {{
-          t('studio.http.response.binaryNotKept.description', { size: response ? formatBytes(response.bodyBytes) : '' })
+          t('studio.http.response.binaryNotKept.description', {
+            size: response ? formatBytes(response.bodyBytes) : '',
+          })
         }}
       </AlertDescription>
     </Alert>
@@ -436,7 +444,10 @@ onUnmounted(() => {
           data-testid="http-response-headers-count"
         >
           {{
-            t('studio.http.response.headersCount.status', { shown: filteredHeaders.length, count: response.headers.length })
+            t('studio.http.response.headersCount.status', {
+              shown: filteredHeaders.length,
+              count: response.headers.length,
+            })
           }}
         </span>
         <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">

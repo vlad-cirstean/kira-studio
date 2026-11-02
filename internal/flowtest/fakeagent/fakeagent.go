@@ -11,6 +11,11 @@
 // <repo>-<n>.mcp<i>. Run as "fake-mcp" it is a stdio MCP server with tools echo and ping. A
 // scripted Action.MCP
 // call also keeps its result as mcp-<tool>-<n>.json.
+//
+// `claude mcp list` prints the servers of the user's own claude config ($CLAUDE_CONFIG_DIR or $HOME
+// .claude.json) in the real CLI's format and keeps its argv as mcp-list-<n>.args. A headless call with
+// --setting-sources user and no --strict-mcp-config also finds tools on those servers, limited to the
+// allowedMcpServers of --settings (kept as <repo>-<n>.settings). Reading that file is the CLI's job.
 package fakeagent
 
 import (
@@ -208,6 +213,9 @@ func runGh(scen Scenario, dir string, args []string) int {
 }
 
 func runClaude(scen Scenario, dir string, args []string) int {
+	if len(args) >= 2 && args[0] == "mcp" && args[1] == "list" {
+		return runMCPList(dir, args)
+	}
 	cwd, _ := os.Getwd()
 	repo := filepath.Base(filepath.Dir(cwd))
 	action := pickAction(scen, dir, repo, cwd, args)
@@ -249,6 +257,9 @@ func pickAction(scen Scenario, dir, repo, cwd string, args []string) pickedActio
 			writeFile(fmt.Sprintf("%s.mcp%d", stem, i), raw)
 		}
 	}
+	if settings := argAfter(args, "--settings"); settings != "" {
+		writeFile(stem+".settings", []byte(settings))
+	}
 	writeFile(stem+".args", []byte(strings.Join(args, "\n"))) // marker: the call is fully recorded
 	return pickedAction{Action: action, stem: stem}
 }
@@ -264,7 +275,7 @@ func runSideEffects(action Action, dir, cwd string, args []string) (code int, do
 		}
 	}
 	for _, c := range action.MCP {
-		res, err := callTool(argsAfter(args, "--mcp-config"), c.Server, c.Tool, c.Args)
+		res, err := callTool(argsAfter(args, "--mcp-config"), args, c.Server, c.Tool, c.Args)
 		if err != nil && res != nil && c.Tolerate {
 			recordMCPResult(dir, c.Tool, res)
 			continue
@@ -301,7 +312,7 @@ func runSideEffects(action Action, dir, cwd string, args []string) (code int, do
 func finishAction(action Action, args []string, headless bool) int {
 	cfg := argAfter(args, "--mcp-config")
 	finish := func(status string) int {
-		if _, err := callTool([]string{cfg}, agentmcp.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status, "reason": "summary-" + status}); err != nil {
+		if _, err := callTool([]string{cfg}, nil, agentmcp.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status, "reason": "summary-" + status}); err != nil {
 			fmt.Fprintln(os.Stderr, "finish_step:", err)
 			return 3
 		}
@@ -483,14 +494,110 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // callTool connects to server from the --mcp-config file (HTTP or stdio entry) and calls one tool.
-func callTool(cfgPaths []string, server, tool string, args map[string]any) (*mcp.CallToolResult, error) {
-	type serverEntry struct {
-		URL     string            `json:"url"`
-		Headers map[string]string `json:"headers"`
-		Command string            `json:"command"`
-		Args    []string          `json:"args"`
-		Env     map[string]string `json:"env"`
+type serverEntry struct {
+	Type    string            `json:"type"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env"`
+}
+
+// userConfigPath is the user-scope claude config the real CLI reads.
+func userConfigPath() string {
+	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+		return filepath.Join(d, ".claude.json")
 	}
+	return filepath.Join(os.Getenv("HOME"), ".claude.json")
+}
+
+func userServers() map[string]serverEntry {
+	raw, err := os.ReadFile(userConfigPath())
+	if err != nil {
+		return nil
+	}
+	var cfg struct {
+		MCPServers map[string]serverEntry `json:"mcpServers"`
+	}
+	_ = json.Unmarshal(raw, &cfg)
+	return cfg.MCPServers
+}
+
+// allowedServers is the allowedMcpServers list of --settings; limited is false when it is absent.
+func allowedServers(argv []string) (allowed map[string]bool, limited bool) {
+	var doc struct {
+		Allowed *[]struct {
+			Name string `json:"serverName"`
+		} `json:"allowedMcpServers"`
+	}
+	if json.Unmarshal([]byte(argAfter(argv, "--settings")), &doc) != nil || doc.Allowed == nil {
+		return nil, false
+	}
+	allowed = map[string]bool{}
+	for _, a := range *doc.Allowed {
+		allowed[a.Name] = true
+	}
+	return allowed, true
+}
+
+// loadsUserSettings reports whether the call makes claude load the user's own servers.
+func loadsUserSettings(argv []string) bool {
+	return slices.Contains(strings.Split(argAfter(argv, "--setting-sources"), ","), "user") && !slices.Contains(argv, "--strict-mcp-config")
+}
+
+// runMCPList plays `claude mcp list`.
+func runMCPList(dir string, args []string) int {
+	n := nextCount(dir, "mcp-list")
+	writeFile(filepath.Join(dir, fmt.Sprintf("mcp-list-%d.args", n)), []byte(strings.Join(args, "\n")))
+	servers := userServers()
+	if len(servers) == 0 {
+		fmt.Println("No MCP servers configured. Use `claude mcp add` to add a server.")
+		return 0
+	}
+	fmt.Print("Checking MCP server health…\n\n")
+	names := make([]string, 0, len(servers))
+	for name := range servers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		e := servers[name]
+		if e.Command != "" || e.Type == "stdio" {
+			ok := false
+			if _, err := exec.LookPath(e.Command); err == nil {
+				ok = true
+			}
+			fmt.Printf("%s: %s - %s\n", name, strings.TrimSpace(e.Command+" "+strings.Join(e.Args, " ")), listStatus(ok))
+			continue
+		}
+		kind := "HTTP"
+		if e.Type == "sse" {
+			kind = "SSE"
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ok := false
+		if req, err := http.NewRequestWithContext(ctx, http.MethodGet, e.URL, nil); err == nil {
+			if resp, err := http.DefaultClient.Do(req); err == nil {
+				_ = resp.Body.Close()
+				ok = true
+			}
+		}
+		cancel()
+		fmt.Printf("%s: %s (%s) - %s\n", name, e.URL, kind, listStatus(ok))
+	}
+	return 0
+}
+
+func listStatus(ok bool) string {
+	if ok {
+		return "✓ Connected"
+	}
+	return "✗ Failed to connect"
+}
+
+// callTool connects to server from the --mcp-config files (HTTP or stdio entry) or, when argv makes
+// claude load the user's servers, from the user's config, and calls one tool.
+func callTool(cfgPaths, argv []string, server, tool string, args map[string]any) (*mcp.CallToolResult, error) {
 	var entry serverEntry
 	found := false
 	for _, path := range cfgPaths {
@@ -511,6 +618,12 @@ func callTool(cfgPaths []string, server, tool string, args map[string]any) (*mcp
 			entry, found = e, true
 			break
 		}
+	}
+	if !found && loadsUserSettings(argv) {
+		entry, found = userServers()[server]
+	}
+	if allowed, limited := allowedServers(argv); limited && !allowed[server] {
+		found = false
 	}
 	if !found {
 		return nil, fmt.Errorf("server %q not in %s", server, strings.Join(cfgPaths, ", "))
@@ -549,7 +662,7 @@ func callTool(cfgPaths []string, server, tool string, args map[string]any) (*mcp
 // CallTool calls one tool on a server named in the MCP config files (paths or inline JSON), as the
 // fake claude does for finish_step; a test provider's headless role uses it with HeadlessSpec.MCPConfigs.
 func CallTool(cfgPaths []string, server, tool string, args map[string]any) error {
-	_, err := callTool(cfgPaths, server, tool, args)
+	_, err := callTool(cfgPaths, nil, server, tool, args)
 	return err
 }
 

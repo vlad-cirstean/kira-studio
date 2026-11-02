@@ -146,7 +146,7 @@ export function useSortableReorder(
       // A keyed row keeps its element across the reorder; the move can drop its focus. Refocus the
       // element that held it (a chip's inner button, not the unfocusable chip).
       const focused = e.target as HTMLElement;
-      void nextTick(() => {
+      void nextTick().then(() => {
         if (focused.isConnected) focused.focus();
       });
     });

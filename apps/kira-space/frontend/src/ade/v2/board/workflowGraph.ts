@@ -369,7 +369,7 @@ export function normalizeOrder(steps: readonly WorkflowStep[]): WorkflowStep[] {
   const rest = out.slice(1);
   while (rest.length > 0) {
     const k = rest.findIndex((s) => [...(incoming.get(s.id) ?? [])].every((p) => done.has(p)));
-    const [pick] = rest.splice(k < 0 ? 0 : k, 1) as [WorkflowStep];
+    const [pick] = rest.splice(Math.max(k, 0), 1) as [WorkflowStep];
     order.push(pick);
     done.add(pick.id);
   }

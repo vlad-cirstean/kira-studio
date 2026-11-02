@@ -324,7 +324,10 @@ const CELL_BASE =
               {{ rowIndices[vi.index] + 1 }}
             </div>
             <div
-              :class="[CELL_BASE, rowAt(rowIndices[vi.index])?.key === null && 'italic text-subtle']"
+              :class="[
+                CELL_BASE,
+                rowAt(rowIndices[vi.index])?.key === null && 'italic text-subtle',
+              ]"
               :style="{ width: `${widthFor('key')}px` }"
               data-testid="stream-key"
               data-col="key"
@@ -365,7 +368,11 @@ const CELL_BASE =
               data-testid="stream-body"
               data-col="body"
               role="option"
-              :aria-label="rowAt(rowIndices[vi.index])?.body === null ? t('studio.stream.tombstone.tooltip') : undefined"
+              :aria-label="
+                rowAt(rowIndices[vi.index])?.body === null
+                  ? t('studio.stream.tombstone.tooltip')
+                  : undefined
+              "
               tabindex="0"
               :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
               @click="onCellClickFromEvent"

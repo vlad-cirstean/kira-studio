@@ -60,11 +60,8 @@ func closeOnError(ctx context.Context, cl *kgo.Client, call func() error) error 
 	}
 }
 
-func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*kgo.Client, *kadm.Client, []kgo.Opt, error) {
-	var host string
-	var port int
-	var username, password string
-
+// brokerEndpoint resolves the seed broker and optional SASL pair from a URI or discrete fields.
+func brokerEndpoint(cfg model.ResolvedConnectionConfig) (host string, port int, username, password string, err error) {
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
 		// url.Parse is permissive where client.ts's `new URL` throws (a malformed string still
 		// "parses" with an empty Host) — the emptiness check below, not a parse error, is what
@@ -72,7 +69,7 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		// documented asymmetry).
 		u, err := url.Parse(*cfg.URI)
 		if err != nil || u.Hostname() == "" {
-			return nil, nil, nil, mapError(errors.New("could not parse the connection URI"))
+			return "", 0, "", "", mapError(errors.New("could not parse the connection URI"))
 		}
 		host = u.Hostname()
 		port = 9092
@@ -100,6 +97,14 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		if cfg.Password != nil {
 			password = *cfg.Password
 		}
+	}
+	return host, port, username, password, nil
+}
+
+func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*kgo.Client, *kadm.Client, []kgo.Opt, error) {
+	host, port, username, password, err := brokerEndpoint(cfg)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	ssl, skipVerify, err := resolveTLSOpt(cfg)

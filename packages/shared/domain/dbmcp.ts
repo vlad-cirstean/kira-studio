@@ -74,6 +74,15 @@ export const dbMcpApprovalSchema = /*#__PURE__*/ z.object({
   // The result text itself comes from dbMcpPendingResponseSchema, never the snapshot.
   stage: /*#__PURE__*/ z.enum(['query', 'response']),
   response: /*#__PURE__*/ z.object({ isError: z.boolean(), bytes: z.number() }).nullable(),
+  // P440: set for a Kubernetes read (target is then empty), null for a database request.
+  cluster: /*#__PURE__*/ z
+    .object({
+      context: z.string(),
+      server: z.string(),
+      namespace: z.string(),
+      operation: z.enum(['discover', 'list', 'describe', 'logs']),
+    })
+    .nullable(),
 });
 export type DbMcpApproval = z.infer<typeof dbMcpApprovalSchema>;
 

@@ -26,7 +26,7 @@ whatever sandbox a session happens to be in),
 
 ## Stack
 
-- The desktop shell is Wails v3 (v3.0.0-beta.28) in Go, targeting macOS 26+ on arm64 only.
+- The desktop shell is Wails v3 (v3.1.0) in Go, targeting macOS 26+ on arm64 only.
 - The window uses a custom MacTitleBar (AppearsTransparent, HideTitle, FullSizeContent, no toolbar) over a full-size-content window, not the OS-drawn bar, drawn by the shared packages/workbench/src/components/TitleBar.vue.
 - On macOS 26 AppKit picks window chrome by the executable's linked-SDK field. The SDK is the building machine's Xcode; CI and release run on `macos-26`, so dev and release both link SDK 26.
 - Each app's own frontend/src/workbench/TitleBar.vue supplies its title-bar buttons and mode tabs through the shared TitleBar shell's default slot.
@@ -160,7 +160,7 @@ whatever sandbox a session happens to be in),
 - The MCP server uses Streamable HTTP rather than stdio because it is one long-running process serving many concurrent clients and tool calls, not a process spawned per client; the SDK's auth.RequireBearerToken middleware gates every request.
 - mcp.AddTool[In, Out] derives each MCP tool's input schema from a Go struct's tags, so every tool's schema has exactly one source. A tool argument the handler needs carries no `omitempty` (schema-required). A string or array that must be non-empty also goes through `llmprompts.RequireNonEmpty`. go-sdk rejects either before the handler runs.
 - The repo-map MCP server was removed in v1.9 P97.
-- Local embeddings (P210, Kira Space memory) use ONNX Runtime 1.29.1 via yalue/onnxruntime_go v1.36.0, gomlx/go-huggingface v0.4.13 (hftokenizer + hub downloader), and model Snowflake arctic-embed-s int8 (Apache-2.0).
+- Local embeddings (P210, Kira Space memory) use ONNX Runtime 1.31.1 via yalue/onnxruntime_go v1.38.0, gomlx/go-huggingface v0.4.20 (hftokenizer + hub downloader), and model Snowflake arctic-embed-s int8 (Apache-2.0).
 - Embedding inference cgo-dlopens a bundled libonnxruntime and runs in a memory-embed worker subprocess; vectors are stored as BLOBs in memory.db and search is done in Go.
 - Declined for embeddings: hugot pure-Go backend (458 MB loaded, 1.05 GB peak, 40x slower) and its ORT backend (drags GoMLX and go-xla into go.mod for one pipeline).
 - Declined for embeddings: sqlite-vec (native extension modernc.org/sqlite cannot load; its KNN is brute force anyway), llama.cpp (second native toolchain), EmbeddingGemma (Gemma terms), jina v3 (non-commercial).
@@ -502,7 +502,7 @@ script_runs(id, script_id, script_name, color, kind, trigger_kind, state, termin
             tools_json, task_id, task_title, branch_id, branch_label)
                                                        -- P242 (Studio 0034 / Space 0026, extended by
                                                        -- 0035-0037 / 0028-0030); one row per
-                                                       -- Automations run, newest 500 kept (finished
+                                                       -- Script run, newest 500 kept (finished
                                                        -- rows only are purged). state waiting|running|
                                                        -- done|failed|cancelled|blocked|skipped;
                                                        -- outcome_json is a runoutcome.Outcome.
@@ -725,7 +725,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P175 moved jar cookies (`['httpJarCookies', url]`, fed by a debounced resolved URL), history lists/snapshots (`[domain, itemId, scratchTabId]`, `[domain+'Snapshot', id]`) and gRPC schema (`['grpcSchema', 'proto'|'reflection', ...]`, mirroring Go's descriptor cacheKey) onto TanStack Query.
 - Hidden panes refresh lazily via each query's `enabled` flag (P8 D11), and Pinia stores keep UI state only.
 - Mutations must call `cancelQueries` after the bridge call and before `setQueryData`, so an in-flight list fetch cannot resurrect a deleted row.
-- `internal/httpclient/cookiejar` is a fork of Go 1.27.1's `net/http/cookiejar` (BSD-3 LICENSE kept) because the stdlib jar lists and deletes nothing; it adds `Entries`/`Delete` in `entries.go`, and `Delete` removes by exact domain, path and name.
+- `internal/httpclient/cookiejar` is a fork of Go 1.27.3's `net/http/cookiejar` (BSD-3 LICENSE kept) because the stdlib jar lists and deletes nothing; it adds `Entries`/`Delete` in `entries.go`, and `Delete` removes by exact domain, path and name.
 - On a Go upgrade, re-copy the cookiejar's `jar.go`, `punycode.go` and their tests, then reapply the `ascii` import path change, the only difference from upstream.
 - Dotenv parsing (`BulkVariablesEditor`, `dotenv.ts`): an inline comment starts at whitespace plus `#`; a quoted value counts only when the closing quote is followed by nothing or a comment; an unmatched quote yields an unquoted value, never an error.
 
@@ -787,9 +787,9 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Kira Space's ade mode (P128 placeholder) is the app's first full-layout module, which is what the ModeDef union exists for.
 - packages/workbench/src/components/ModeSwitcher.vue, generic over M, is the shared title-bar mode switcher with markup byte-identical to Kira Studio's pre-P128 inline one; Kira Space's TitleBar.vue renders it for the first time.
 
-- The Automations entry in both apps' MODES points at one shared module, packages/workbench/src/automations/module.ts, not two hand-kept-identical copies (renamed from Terminal in P242).
+- The Runs entry in both apps' MODES points at one shared module, packages/workbench/src/automations/module.ts, not two hand-kept-identical copies (renamed from Terminal in P242).
 - Each app's App.vue builds one AutomationsModuleContext object (in its own workbench/automationsModule.ts) and provide()s it once at the root, above WorkbenchShell.vue.
-- The mode key, windows.mode and the module's tab workspace_id are all automations; real terminals in packages/workbench/src/terminal/ stay terminals, only the launching module was renamed.
+- The mode key, windows.mode and the module's tab workspace_id are all automations; real terminals in packages/workbench/src/terminal/ stay terminals, only the launching module was renamed. The module shows as Runs (P438); mode key, i18n keys, code names, test IDs and the `<app home>/automations` folder keep `automations`.
 - Script logic lives in repo-root internal/scripts (custom_scripts repo, validation, service); each app's bound bridge.CustomScriptsService keeps its own binding name and delegates to it. List answers and every mutation broadcast one Snapshot{collections, scripts}.
 - Script dirMode kira (default) runs in <app home>/automations/<script id>, created 0700 on demand; a symlink or non-directory at any level is refused with "<path> is not a real folder: remove it".
 - Script dirMode fixed is the chosen absolute folder and must exist.
@@ -813,12 +813,14 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - AutomationsPanel.vue, AutomationsStart.vue, AutomationsNewTab.vue, ScriptDialog.vue, TerminalTabView.vue and TerminalHostView.vue are the same six files in both apps, imported lazily via defineAsyncComponent so a git-only session never pays for the terminal launch chunk.
 
 - internal/runoutcome is the single run-result type shared by both stores: Outcome{status done|failed|blocked|cancelled, reason, source agent|exit|timeout|start|user|restart, reported, exitCode, lastError, summary}.
-- runoutcome.ForProcess is the only wording table for run outcomes, so ADE step runs (ade_runs.outcome_json, Space only) and Automations runs use the same wording.
+- runoutcome.ForProcess is the only wording table for run outcomes, so ADE step runs (ade_runs.outcome_json, Space only) and script runs use the same wording.
 - internal/scriptruns owns the script_runs table and the kira:scriptRuns:changed push (which carries the whole changed run), and it implements terminal.ScriptLauncher.
 - ScriptLauncher.Begin records a running run when a script terminal opens; a blocked folder records a failed run with source start and refuses the open.
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
-- The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list. The Automations panel (RunsSection.vue) lists only running and waiting runs; finished runs live in the Operations panel.
+- Recover also flags those runs `restore_pending` (migrations Space 0061, Studio 0050). `TakeRestore` hands them to an in-memory offer for the session, so a second restart does not repeat it. A user stop never flags. `RestoreState`, `Restore` and `RestoreDismiss` serve the offer; `Restore` re-checks the script hash per item (`E_CONFLICT` on drift) and resumes smart runs.
+- The Runs module shows a banner for the offer (`automations/restore/`); clicking it opens the shared restore dialog. No startup auto-open.
+- The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Runs list. The Runs panel (RunsSection.vue) lists only running and waiting runs; finished runs live in the Operations panel.
 - `runoutcome.Outcome.outputTail` holds the last 40 sanitized lines (8 KiB cap) of a failed terminal or headless script run. A `termtext.Tail` on the script session tap (`ScriptLauncher.Output`) feeds terminal runs; the headless log sink feeds the rest. It lives in `outcome_json`, so it survives tab close and restart. Copy for agent falls back to it once the terminal tab is gone.
 - `internal/termtext` is the one ANSI stripper and line sanitizer (gitprepare and scriptruns).
 - A script keeps one tab per key {scriptId, taskId, branchId} ('' when none), stored in terminal (launchKind script) and script-run tab state; packages/workbench/src/automations/scriptTabs.ts holds the rule.
@@ -828,7 +830,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - A script row click selects, double-click or Enter opens Edit; the play button, menu Run and Run now are the only starts.
 - A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/agentmcp (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
 - Smart script defaults are model sonnet, 1 USD budget (--max-budget-usd) and 15 min timeout; bounds in internal/scripts/smart.go are 20 params, 20000-char prompt, budget 0.05-25 USD, timeout 1 min-2 h.
-- Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server plus the MCP servers the script ticked, and --permission-prompts none denies instead of asking.
+- Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server, and --permission-prompts none denies instead of asking. Exception (`HeadlessSpec.UserMCP`, P444): a script that ticks a user MCP server runs with --setting-sources user and no --strict-mcp-config; --settings `{"disableAllHooks":true,"allowedMcpServers":[...],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}` limits the loaded servers to the report server plus the ticked ones, never loads project `.mcp.json` servers, and claude loads the ticked ones from its own config. The presence check (`smartBlocker`, ADE `checkMCP`) lists servers from the app home, like the picker, so a name only a folder's `.mcp.json` defines does not count. A cached list answers while it has every ticked name; a miss re-lists unless the list is under 30 s old. A failed listing reuses the last good one; the picker shows its statuses as `unknown`. The shared list flight runs detached from the first caller; each caller waits under its own context. A ticked server grants all its tools (`mcp__<server>`) or named tools.
 - A smart script's --tools and --allowedTools come from its tool allowlist (built-ins Read, Grep, Glob, Edit, Write, NotebookEdit, Bash; default Read, Grep, Glob).
 - A smart run's final report must go through finish_step; a run without it fails with the shared "no report" text.
 - Smart script params are text, select or multiselect (a text param may be secret); names are lowercase and must not use the reserved ADE built-ins task, jira, repo, branch, base, worktree; {name} in the prompt is substituted before launch.
@@ -848,10 +850,11 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - A workflow step may name smart_script plus params instead of a prompt (planSmartStep, smartOutcome, supervised by superviseAgent).
 - agentnotify.HandleScriptRun posts for smart runs only: failed under Enabled, blocked under OnNeedsInput, done under OnRunEnded, cancelled never.
 - Kira Studio MODE_ORDER is studio, api, automations, docker; Kira Space order is ade, automations, memory, git. Space opens new windows in git (WindowModes.Default), now the last tab. ModeDef.tabStrip: false hides the tab strip for modules without tabs (Docker and Space's Memory).
+- ModeSwitcher tabs are icon-only (P438): the module label is the tab's aria-label and its tooltip; no mode shortcut exists.
 - WorkbenchShell takes mainFramed (default keeps the main-panel frame); ade passes it off so each pane carries its own single frame.
-- Kira Space repo terminals and the Automations module's terminals both render through the shared TerminalTabView.vue/TerminalHostView.vue, not two parallel implementations.
+- Kira Space repo terminals and the Runs module's terminals both render through the shared TerminalTabView.vue/TerminalHostView.vue, not two parallel implementations.
 - P128 deleted views/repo/RepoTerminalView.vue, which had been a hand-kept-identical second copy of the terminal tab body for repo-scoped terminals.
-- A repo terminal differs from an Automations terminal only in the workspaceId/codeRepoId the opener stamps on the tab record: openRepoTerminalTab (repo-scoped) versus Automations' openTerminalTab (workspace-scoped, visibleWorkspace()'s id).
+- A repo terminal differs from a Runs terminal only in the workspaceId/codeRepoId the opener stamps on the tab record: openRepoTerminalTab (repo-scoped) versus Runs' openTerminalTab (workspace-scoped, visibleWorkspace()'s id).
 - TerminalTabView.vue/TerminalHostView.vue read neither workspaceId nor codeRepoId; the tab prop is typed against TerminalHostView's own prop shape, not either app's tab-record type.
 - Shift+Enter in every terminal sends `ESC CR` (meta-Enter) via one custom key handler in `terminalRenderer.ts`; a newline in Claude Code and zsh. Cmd+Enter has no binding (xterm sends `CR`).
 - Terminal links come from `@xterm/addon-web-links` (plain `http(s)` text) and xterm `linkHandler` (OSC 8, `http(s)` only). Desktop opens on Cmd-click (mac) or Ctrl-click through `LinkService.OpenExternal`, with a hover hint; plain click never opens. `window.open` does nothing in the Wails webview, hence the bridge. Phone (`linkActivation: 'tap'`) opens on tap via `window.open` with `noopener,noreferrer`. No file-path links.
@@ -868,10 +871,10 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - OpLogPanel.vue shows a live elapsed clock (op-elapsed, m:ss) for every running row, ticked by one shared VueUse interval paused while runningCount is 0; finished rows show the formatted durationMs.
 - opLogMenuItems supplies copy-command, copy-error, optional copy-details, a separator, then cancel; consumers find items by `id`.
 - toggleOperationsPanel/setOperationsHeight moved from Kira Studio's state/layout.ts into the shared createLayoutStore.ts core, used by both apps.
-- Automation runs show in both apps' Operations panel as a projection of `script_runs` (`automationOp`, id `run:<id>`), never rows in `op_log`. Panel retention for them is `script_runs`: newest 500 finished kept, newest 200 loaded.
+- Script runs show in both apps' Operations panel as a projection of `script_runs` (`automationOp`, id `run:<id>`), never rows in `op_log`. Panel retention for them is `script_runs`: newest 500 finished kept, newest 200 loaded.
 - `useAutomationOps` merges them into each app's panel list. Cancel maps to Stop (running) or Decline (waiting); the menu adds Copy for agent, Open run, Resume and Run again. A waiting run shows its state in the command cell, not the status cell, so Cancel stays reachable.
-- `opLogMatches` is the one filter predicate for op rows and automation rows. Clear sets `clearedAt`; automation runs started before it stay hidden in that window.
-- `AutomationsModuleContext.showOperations` opens the Operations dock; the Automations panel's empty state links to it.
+- `opLogMatches` is the one filter predicate for op rows and script run rows. Clear sets `clearedAt`; script runs started before it stay hidden in that window.
+- `AutomationsModuleContext.showOperations` opens the Operations dock; the Runs panel's empty state links to it.
 - No Kira-Studio import (MonacoHost, a connections store, kira-studio) may reach the shared package; this was verified by a closing-audit grep in P132 Part 1 §7.
 
 - WorkbenchShell.vue (shared) always mounts #dock; hasDock is removed, opsVisible/opsHeight are required props, and the status bar is always mt-1.
@@ -927,7 +930,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - TabStrip reads the narrow TabStripHost seam (host.ts): an optional host prop, falling back to the injected WorkbenchHost, which extends it. Optional capabilities (close*, duplicate, promote, preview, moveTab) hide their affordance when absent.
 - TabStrip has a #tab-leading slot that renders before the title, and the kind flag pinnedTitle makes a pinned chip labelled rather than icon-only.
 - Tab reorder uses vue-draggable-plus useDraggable in forceFallback mode on the scrolling row only (pinned chips sit outside it), bound to an id mirror so the library reverts its own DOM move; onUpdate commits once per drop via moveTab.
-- The reorder binding is useSortableReorder (packages/workbench/src/behaviour/sortableReorder.ts), shared with Studio's column, environment and variable lists, the Automations panel (SortableList.vue) and Space's Git panel repo list. Its keyboardHandle option limits Alt+Arrow moves to an item's own row.
+- The reorder binding is useSortableReorder (packages/workbench/src/behaviour/sortableReorder.ts), shared with Studio's column, environment and variable lists, the Runs panel (SortableList.vue) and Space's Git panel repo list. Its keyboardHandle option limits Alt+Arrow moves to an item's own row.
 - Studio's project tree and the collections tree are virtualized, so their pointer drags share workbench/behaviour/treePointerDrag.ts (VueUse pointer hit-testing, press tolerance, edge auto-scroll, Escape and pointercancel, click swallow); the caller supplies what a press may grab, where a drop resolves and what it does. Connection reorder is project/connectionReorder.ts on it (drop line). Alt+Up/Down go through the connection menu's Move up/down items.
 - Adding a tab kind takes one registry entry each in state/tabKinds.ts and workbench/tabViews.ts, not editing a dispatch chain in three files.
 - 'http-request' is the first Api-mode tab kind: TAB_KIND_MODE['http-request'] is 'api' and every other entry is 'studio'.
@@ -1331,7 +1334,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - New timestamp columns are INTEGER unix ms named *_at; older TEXT ISO columns stay as legacy, and N7 refuses new ones.
 - Migrations are named NNNN_<phase>_<slug>.sql.
 - Files a person or another program reads must be written with renameio.WriteFile; exempt are test tooling and temp snapshots (G4).
-- G5: no CLI credential access under githost/ and issuetracker/ (see CLI credentials: never touched).
+- G5: no CLI credential access under githost/, issuetracker/, internal/docker and internal/harness/claude (see CLI credentials: never touched).
 - File naming: .vue files PascalCase; .ts files camelCase with role suffixes .worker, .check; colocated tests are <module>.spec.ts, never .test.ts (N1, N2).
 - Name helper folders lib/, never util, utils or helpers (N3).
 - Stores live in state/ and workbench composables in behaviour/; a Pinia id is the export name without use/create and Store, camelCase (N4).
@@ -1628,7 +1631,7 @@ packaged app does not), where the identical application code runs unchanged over
 - As of P100 the git module (all internal/git* Go packages, internal/ghclient, internal/codeworkspace, and the consumers of packages/git-ui, git-core, git-ipc) moved from apps/kira-studio into apps/kira-space, a separate standalone macOS app.
 - Kira Space has its own binary, its own ~/.kira-space/ home (KIRA_SPACE_HOME), and its own kira.db and review.db.
 - From P100 through P127 Kira Space's window had no title-bar mode switcher; the repo workspace was the whole app, mounted directly rather than behind a 'git' AppMode.
-- P128 gave Kira Space its own module system with modules git, automations (the same shared Automations module Kira Studio uses) and ade (the app's task-planner surface).
+- P128 gave Kira Space its own module system with modules git, automations (the same shared Runs module Kira Studio uses) and ade (the app's task-planner surface).
 - In Kira Space, state/workspace.ts's visibleWorkspace() is the one function reading both the mode store and the git-only workspace store: it returns the active repo (or none) while git is active, otherwise the active module's id. host.ts's activeWorkspace and state/tabs.ts's tab-stepping actions use it.
 - Opening a repository (openRepoWorkspace) forces Kira Space's mode back to git; the boot-time fall-forward onto the last active repo (persisted per window as kira.space.lastRepo.<window>) or first restored one does not, so a relaunch into a persisted automations/ade mode stays there.
 - P116 gave Kira Space generic window chrome using shared primitives (internal/keepawake, internal/metrics, packages/workbench TitleBarWindowActions and AppMetricsItem): a native menu, keep-awake toggle, New window button, and CPU/memory status-bar item.
@@ -2348,6 +2351,10 @@ and `docs/HISTORY.md (v2.0)`.
 - A taken-over run can still call finish_step from the TUI (R14). Take over confirms when the run is live and passes stopIfRunning.
 - Sessions are window-scoped like every PTY: closing the window stops the session record, which stays resumable.
 - FocusSession raises the window that holds a session, via kira:adetask:openSession.
+- CloseSession (P436) ends a running session and keeps its history. Interactive: Tracker.Stop then CloseTerminal, so the row is stopped at once and resumable by Take over. Headless: StopRun.
+- RestartSession of a headless step run stops it and queues the next attempt resuming the same conversation (note "restarted by you"). Rebase and review runs refuse; their panels own retry.
+- The session tab menu offers Restart and Close without a confirm.
+- The Sessions dropdown (P437) lists every session in scope, Running then Finished or stopped. Enter or click selects a running tab or takes over a stopped session. The filter shows from 6 rows. The row menu comes from useSessionMenu: Take over or Resume, log toggle, Close and Restart for a running session, Copy session ID. The strip scrolls the selected tab into view.
 - The agent-hooks Stop event ends a dialog turn; the renderer's turnWatch then calls RecordMerge (merge dialog) or ArchiveTask (send-then-archive), and that pending state lives in the renderer.
 
 ### Agent sandbox (P287)
@@ -2364,7 +2371,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Sandboxed agents always read the macOS keychain; the CLI signs in from it. Keychain writes stay denied (P341).
 - A step without a sandbox block defaults to access write with network on.
 - The sandbox covers headless agents from superviseAgent (steps, review rounds, rebase runs with every stack worktree writable) and scriptruns smart runs in dir mode worktree.
-- The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode automations, or memory claude calls.
+- The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode scripts, or memory claude calls.
 - The Enforcer interface has Support, Prepare and Watch; System() is real only on darwin, elsewhere Support is Enforced:false with Reason NotEnforcedKey and Prepare still builds profile, flags and env but no wrapper.
 - sandboxtest.Fake stands in for flow tests; the flow harness defaults to a not-enforced fake so contracts do not depend on the host OS.
 - With agentmcp.Spec.Sandbox, Script emits exec /usr/bin/env -u … K=V /usr/bin/sandbox-exec -f <profile> claude … after the login shell sources the user profile.
@@ -2682,13 +2689,13 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - memory_embeddings (migration 2) holds one L2-normalised little-endian float32 vector per memory version, superseded ones too; one model at a time, rows carry the model id and search filters on it. Writing a vector never bumps memory_revision.
 - The embedding model is Snowflake arctic-embed-s int8 ONNX (Apache-2.0, 33M params, 384 dims, CLS pooling, query prefix, pinned HF revision e596f50, id arctic-embed-s-int8-e596f50), embedding only the fact text.
 - Model files (model.onnx 34 MB, tokenizer.json) download only on an explicit click in Settings > Memory to $KIRA_MEMORY_HOME/models/<id>/ with pinned SHA-256 (embed.Install, manifest written last), shared by the app and every memory-mcp process. MCP never downloads.
-- The embedding runtime (internal/memory/embed, a leaf package) uses ONNX Runtime 1.29.1 via yalue/onnxruntime_go (cgo, dlopen) and WordPiece via gomlx/go-huggingface hftokenizer.
+- The embedding runtime (internal/memory/embed, a leaf package) uses ONNX Runtime 1.31.1 via yalue/onnxruntime_go (cgo, dlopen) and WordPiece via gomlx/go-huggingface hftokenizer.
 - Embedding runs in a worker subprocess (<Kira Space executable> memory-embed --model-dir …, via appwire.RunArgvShim), spawned lazily by whichever process needs vectors, speaking NDJSON on stdin/stdout in batches of at most 32 (embed.Client).
 - The embed worker exits when its stdin closes: after 5 min idle (so the OS reclaims the model, which in-process Session.Destroy does not) and whenever the parent dies. A crash or cancelled request kills only the worker. A failed spawn is refused for 60 s (Reset clears it).
 - Worker lifecycle lives in internal/memory/workerproc; model download, SHA-256 check and manifest live in internal/memory/modelstore (embed uses both).
 - Builds with CGO_ENABLED=0 compile an embedding stub whose status is unavailable.
-- The ONNX runtime library is taken from $KIRA_ORT_LIB, else Kira Space.app/Contents/Frameworks/libonnxruntime.1.29.1.dylib, bundled arm64-only by darwin:package (scripts/fetch-onnxruntime.sh, checksum-pinned); native code is never downloaded at runtime.
-- ORT 1.29.1 has no x86_64 macOS build, so the x86_64 slice of a universal bundle reports embeddings unavailable; keyword search is unaffected.
+- The ONNX runtime library is taken from $KIRA_ORT_LIB, else Kira Space.app/Contents/Frameworks/libonnxruntime.1.31.1.dylib, bundled arm64-only by darwin:package (scripts/fetch-onnxruntime.sh, checksum-pinned); native code is never downloaded at runtime.
+- ORT 1.31.1 has no x86_64 macOS build, so the x86_64 slice of a universal bundle reports embeddings unavailable; keyword search is unaffected.
 - Search candidate pools are clamp(4 x limit, 100, 400) from each source, unioned by seq. Limit defaults to 40, max 200 (Space panel search uses 200).
 - Keyword score is bm25 (columns fact 10, keywords 6, reason 3) divided by the pool best: 0.7 x bnorm + 0.3 x term coverage, coverage restoring order under the OR query. Semantic score is cosine mapped linearly between embed.Spec.QueryFloor and QueryCeil.
 - Fusion with both sources is rel = 0.45 kw + 0.45 sem + 0.10 min(kw, sem); with no semantic, rel = kw. RRF was dropped because it kept rank only.
@@ -2885,8 +2892,26 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - Storage: tables docker_restore_engines and docker_restore_containers (migration 0044). Snapshots not updated for 30 days are pruned at start. internal/docker sees only the RestoreStore interface.
 - Restore is click-only. A Compose project starts as one unit in depends_on order (service_healthy waits up to 60 s). Deleted containers are listed, never recreated. Boot-time restore is out of scope.
 - Channel kira:docker:restore; query key ['docker-restore'] sits outside ['docker']. The banner shows only inside the Docker module.
+- The restore dialog is the shared presentational `workbench/restore/RestoreDialog.vue` (P441); docker-ui and the Runs module each wrap it with their own data and calls.
 - Flow seams: docker.WithRestoreTiming, docker.WithBootProbe, flowharness.BootGen (simulates a daemon restart). A real dockerd restart runs only with KIRA_FLOW_DOCKER_RESTART=1.
 - UI styling: start uses text-ok and stop text-error module-wide; selected rows use neutral bg-select; left-panel section tabs are the git module's ToggleGroup.
+
+## Kubernetes module (P439, Kira Studio)
+
+- The Kubernetes module is registered in Kira Studio only, next to Docker. It is read-only: the backend issues GET requests and nothing else, with no create, update, delete, exec, attach or port-forward path.
+- The backend is Go package internal/kubernetes. `Service` is the domain surface the P440 MCP tools call; `BoundService` is the Wails surface, exposed as KubernetesService. Channel: kira:kubernetes:logs.
+- Client: k8s.io/client-go, api and apimachinery v0.37.2 (Apache-2.0) with sigs.k8s.io/yaml. It adds about 25.9 MB to the stripped Studio binary (74.5 MB to 100.4 MB, same embedded frontend, `go build -ldflags="-s -w"`). `kubectl` shell-out was declined: it needs a kubectl install and parses text. The kubectl describe package was declined: it adds about 36 MB (cli-runtime, kustomize). Describe is built from unstructured objects plus an events list.
+- Environment: PATH and KUBECONFIG come from a login-shell probe (cached, `WithEnv` seam), so a Dock-launched app sees what the terminal sees. Exec credential plugins (aws, gcloud, kubelogin) run with the resolved PATH; their command is pinned to the resolved path. Interactive exec plugins are not supported.
+- Kubeconfig is loaded per call (cheap, so edits apply without restart). KUBECONFIG may list several files. A missing or invalid file is reported in `Clusters().config`, not as an error.
+- Cluster rows: one per kubeconfig context, stored in `kube_clusters` (migration 0049, unique per context and server, INTEGER ms timestamps) through `ClusterStore.Ensure`. The row id is stable and is the key P440 hangs per-cluster permissions on.
+- Connect is lazy: no cluster is probed until it is expanded or selected, so SSO plugins never fire for clusters the user does not open. Clients are built once per cluster (singleflight) and dropped by `Status{refresh: true}`.
+- Errors map to reasons (unreachable, unauthorized, forbidden, plugin, config, timeout) with details `{"reason": ...}`; the UI picks the copy by reason.
+- Lists use the server-side Table format (`Accept: application/json;as=Table;v=v1;g=meta.k8s.io`), so columns and cells match kubectl. Rows page by limit 500 and continue, capped at 5000 rows; past the cap `truncated` is true. Label selectors are validated before the call (E_BAD_REQUEST).
+- Describe returns overview fields, labels, annotations, owners, conditions, up to 200 events and a YAML manifest. Secret data and stringData become `<N bytes>`; the last-applied annotation and managedFields are dropped.
+- Logs stream per window and per stream id through a coalescer (16 ms, 500 lines). A line is capped at 64 KiB; the UI keeps the newest 20 000 lines. Follow with Tail all asks the server for 20 000 lines, because a byte limit would end the follow stream. Streams end on LogsClose, window close, service shutdown and quit.
+- Frontend: apps/kira-studio/frontend/src/kubernetes/ (app-local, no second consumer). Mode `kubernetes` has no tab strip. Server state is on TanStack Query under ['kubernetes', clusterId, ...]; lists refetch every 10 s while the document is visible. UI state is one Pinia store; the last cluster, kind and namespace per cluster persist in localStorage (kira.kubernetes.selection).
+- Flow tests run against `flowharness.KubeFake`, an in-process HTTPS API server (client-go sends no credentials over plain HTTP). It serves discovery, Table lists, objects, events, logs and an exec-plugin cluster. No real cluster is used anywhere.
+- P440: `Service.SetMcp` stores per-cluster MCP modes and description (migration 0051, above Studio's reserved 0050). `ListCapped` and `ReadLogs` (one non-follow request, 256 KiB cap) feed the MCP tools. See "Kubernetes tools (P440)" under Database MCP server.
 
 ## Database MCP server (v1.7)
 
@@ -2909,6 +2934,15 @@ An artifact is a change request, issue, branch, commit, deployment, doc or link 
 - list_children replaces the fixed-name list_databases/list_schemas pair named in the M1 row of docs/HISTORY.md (v1.7), because the adapter metadata primitive is one lazy level (Adapter.Children) and levels differ per kind, so one tool returning the node's own kind carries more information.
 - list_children, describe_table and describe_schema are gated on read-mode deny, not only run_query.
 - list_connections is deliberately not gated by read-mode deny, because its job is to show a caller a connection's configured permissions before it tries any of them.
+
+### Kubernetes tools (P440)
+
+- Six more tools register when `Config.Kube` and `Config.Ops` are set: kube_list_clusters, kube_list_namespaces, kube_list_kinds, kube_list_resources, kube_describe, kube_pod_logs. All read-only.
+- Each cluster has four modes, `deny|prompt|allow`, default prompt: discover (namespaces, kinds), list, describe, logs. Stored on `kube_clusters` (migration 0051).
+- No exposure switch. A cluster with all four modes deny is hidden and answers `no cluster %q exposed to MCP`.
+- Prompt mode uses the shared ApprovalBroker (`KindDbMcp`) with `ApprovalRequest.Cluster`. The dialog shows a kubectl-equivalent statement. It is display and op command only, never run. The cluster is re-resolved after approval.
+- Calls log as op kind `kubernetes` (connectionless), source MCP.
+- Settings: cluster tree menu "MCP access" and Settings, Database MCP pane list.
 
 ### Permissions and statement classification (M2)
 
@@ -3050,11 +3084,11 @@ Kira drives gh, az and acli but never touches their credentials. It runs the CLI
 - gh: runner passes os.Environ through plus hygiene vars; never reads GH_TOKEN or GITHUB_TOKEN. `gh auth status --hostname` is parsed for the account name only.
 - az: env passthrough. `az account show --query user.name` only.
 - acli: env passthrough. `jira auth status` parsed for site and account only. Comment body goes through a 0600 temp file.
+- claude: the MCP picker runs `claude mcp list` and keeps name, transport, host or command name and health status only. A run that ticks a user server lets claude load it (`--setting-sources user`, `--settings` with `allowedMcpServers` and `disableAllHooks`). Kira never opens `~/.claude.json` and never runs `claude mcp get`, which prints stored headers and env.
 - Setup steps are copy-only commands the user runs in their own terminal.
 - Consequence: comments carry no attachments (no driven CLI uploads one; Azure would need a bearer token).
-- Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/, and `LoadX509KeyPair`, `X509KeyPair`, `AppendCertsFromPEM` and `config.json` literals under internal/docker.
+- Guard G5 (internal/conventiontest) fails on token commands, credential env names, CLI config paths, auth headers, net/http and os.Getenv under githost/ and issuetracker/, `LoadX509KeyPair`, `X509KeyPair`, `AppendCertsFromPEM` and `config.json` literals under internal/docker, and under internal/harness/claude a `.claude.json` literal, a `json:"headers"` struct tag, a `claude mcp get` argv, `Header.Set`/`Header.Add` calls and `RoundTrip` methods. `sandbox.go` is exempt: it names `~/.claude.json` as a sandbox write path and never opens it.
 - Non-secret reads are allowed: docker context `meta.json` (name, host, SkipTLSVerify) and stat of PEM paths. Never a CLI config file that can hold credentials (`~/.docker/config.json`): ask the CLI (`docker context show`). Key material is opened only by the owning library (`go-connections/tlsconfig`).
-- Known violation, outside G5 until fixed: `usermcp.go`. See Known open items; planned v0.2.25 P443.
 
 ## Renderer security surface
 
@@ -3074,7 +3108,7 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 |---|---|
 | `contextIsolation` / `sandbox` / `nodeIntegration: false` | **No subject, strictly better.** There is no Node in the webview to isolate it from, and no `contextBridge`/`window.kira` surface at all — the renderer reaches Go only through generated bindings and the `engine` stream. |
 | DevTools in a packaged build | **Ports, by a different mechanism.** It is a Go build tag rather than a runtime option: `-tags production`, already set by `apps/kira-studio/build/darwin/Taskfile.yml`. |
-| Every Chromium permission except the clipboard | **Set; on macOS and Linux only camera and microphone are enforced.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed). Wails v3.0.0-beta.28's `permissions_darwin.go` consults it for `getUserMedia` only (`resolveMediaCapturePermission`: a denied microphone or camera is refused instead of prompting); geolocation, notifications and clipboard are not consulted there (beta.16 had no darwin code at all; `permissions_linux.go` likewise covers media capture only). On macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
+| Every Chromium permission except the clipboard | **Set; on macOS and Linux only camera and microphone are enforced.** `WebviewWindowOptions.Permissions` exists and is populated (microphone/camera/geolocation/notifications denied, `PermissionClipboardRead` allowed). Wails v3.1.0's `permissions_darwin.go` consults it for `getUserMedia` only (`resolveMediaCapturePermission`: a denied microphone or camera is refused instead of prompting); geolocation, notifications and clipboard are not consulted there (`permissions_linux.go` likewise covers media capture only). On macOS the real clipboard answer is WebKit's own user-gesture heuristics. |
 | `window.open` deny | **Partial.** `MacWebviewPreferences.JavaScriptCanOpenWindowsAutomatically` is false, which denies JS-initiated windows; there is no per-request handler (no `WKUIDelegate createWebViewWithConfiguration:`). Still zero `window.open`, zero `target="_blank"` and zero `<a href>` in `apps/kira-studio/frontend/src`/`packages/shared`, and file pickers remain native dialogs via `FilesService`, not popups. |
 | Navigation lock to the base URL | **No analogue — a real loss, already known.** There is no navigation-policy delegate on darwin at all (`webview_window_darwin.m` has no `decidePolicy`). This is weaker than the Electron `will-frame-navigate` guard plus fuses it replaces, and is recorded as a loss rather than mitigated. |
 | `webviewTag: false` | **No subject.** |
@@ -3113,10 +3147,10 @@ previous hardcoded literal broke GitHub Enterprise Server entirely, since the va
 was not really an allowlist for a GHES host).
 
 **Whether the `WKWebView` itself is configurable beyond this table — checked, and closed, at P22
-(D5).** `MacWebviewPreferences` (`webview_window_options.go:773-796`) is Wails v3.0.0-beta.28's
+(D5).** `MacWebviewPreferences` (`webview_window_options.go:773-796`) is Wails v3.1.0's
 entire macOS webview surface — ten fields, unchanged since beta.15 — and none is a compositing or
 tiling knob; the `WKWebViewConfiguration` is built and `autorelease`d inside one cgo block
-(`webview_window_darwin.go:138-195`) with no hook of any kind between "config allocated" and
+(`webview_window_darwin.go:139-197`) with no hook of any kind between "config allocated" and
 "webview created" (the whole options file has exactly one func-typed field, `KeyBindings`).
 `WindowsOptions` carries `EnabledFeatures`/`DisabledFeatures`/`AdditionalBrowserArgs` for WebView2;
 `MacOptions` has only `ActivationPolicy` and terminate-on-last-window-closed — macOS is the one
@@ -3239,7 +3273,7 @@ repo's CI runs.
 - A worker-scoped flowServers fixture spawns apps/kira-studio/bin/flowservers (built once under the shared build lock), so e2e-real and the Go flow tier share one server implementation; the serverEnv option adds environment to it.
 
 - tests/visual/ (bun run test:visual:studio) is a bounded pixel-diff tier of eight specs and 13 snapshots, reusing tests/ui/'s fixtures and mocked wire planes.
-- Seven visual specs (workbench shell, data grid, SQL console, connection dialog, Schema (DDL) editor, HTTP request view, Automations script dialog) have one at-rest screenshot each; settings.spec.ts contributes 6, one per Settings pane.
+- Seven visual specs (workbench shell, data grid, SQL console, connection dialog, Schema (DDL) editor, HTTP request view, Runs script dialog) have one at-rest screenshot each; settings.spec.ts contributes 6, one per Settings pane.
 - The visual tier is its own Playwright project, not folded into ui, mirroring ui-timing, because a different measurement contract earns a different project.
 - Capture or update visual baselines only from the ui CI job's ubuntu-latest environment, never a local macOS run, because WKWebView and WebKitGTK glyph rendering differ regardless of font choice.
 - Playwright's animations: 'disabled' default freezes the app's state-gated infinite CSS animations before visual capture.
@@ -3292,6 +3326,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Interactive exec plugins are unsupported (P439).** A kubeconfig credential plugin that prompts on a terminal fails with the `plugin` reason. Non-interactive plugins work.
 - **Studio Discover remounts still grow the renderer heap (P433).** Switching away from and back to a Kibana Discover tab adds about 0.6 MB per round after round 2 (5 rounds: 31.4, 32.3, 32.8, 33.9, 34.1 MB), and a second open/close cycle adds 1.9 MB. Close-all ends 18.5 MB over baseline, mostly first-load module code plus Monaco and KQL source strings. The Monaco `addCommand`, grammar re-registration and `usePersistedState` leaks are fixed; the rest is unattributed (V8 JIT code is the main suspect). Probe: `heap` project in Studio, `docs/DEV_ENVIRONMENT.md` "Perf probes". Find the retainer with a heap snapshot diff across rounds 3 and 5, then delete this item.
 - **Kibana search uses an internal route (P424).** `POST /internal/search/es` is not a public API; a Kibana upgrade can change its body or headers. The conformance suite runs against 9.5.3 and the 8.19 floor via `KIRA_COMPAT_IMAGE_KIBANA`.
 - **Azure Repos search covers the default project only (P423).** `SearchChangeRequests` reads 2 pages of 100 in the configured default organization and project. A PR elsewhere is not found by issue key.
@@ -3307,7 +3342,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Azure threads beyond the newest 200 are not read (P427).**
 - **Comments carry no attachments (P429).** Kira never touches a CLI's credentials, and none of gh, az, acli uploads a comment attachment. Add files on the host.
 - **Comment posting is checked against documentation only (P429).** The acli `--body-file` ADF input is not seen live; the Azure reply assumes the first comment id is 1.
-- **Kira reads and forwards Claude MCP server headers (CLI credentials rule violation).** `internal/harness/claude/usermcp.go` reads `~/.claude.json` `mcpServers`, sends their stored headers, including `Authorization`, when listing tools, and copies the raw entries (headers and env) into the run's 0600 `--mcp-config` file. Planned v0.2.25 P443.
+- **A smart run that ticks a user MCP server loads the user's Claude settings (P444).** Claude loads user MCP servers only with the `user` setting source, so the user's permission allow rules, env and plugins apply; hooks are off and only ticked servers plus `kira-ade` load. `allowManagedPermissionRulesOnly` in `--settings` does not drop the user rules (CLI 2.1.316). The picker cannot show tool names or descriptions, because Kira no longer connects to user servers; it lists what `claude mcp list` reports and health-checks every server on each call (cached 30 s). Delete once a run gets ticked servers without the user settings file.
 - **An agent's own shell `git` in a non-isolated run is not an app op (P415).** It is the agent's process; only the app's own spawns reach the op log.
 - **Jira pull requests missing from commit-only links (P417).** acli cannot list the Development field's pull requests. Rows come from code host search by issue key in the title or head branch. A pull request Jira links only through a commit message is not found; the task shows Jira's count against the rows found as a gap. Delete once acli exposes the rows.
 - **Mission Control Space switch (P396) unconfirmed on macOS.** Three-finger swipe up moves focus to another Space; code finds no app caller, trace added. Check: set log level `debug`, two Spaces each with a Kira window, swipe up/down 5 times; send log lines within 2 s of each jump (`window raise`, `prompt raise`, `app event`, `window event`) plus macOS version. Delete once the fix lands.
@@ -3584,7 +3619,7 @@ Performance:
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **Change request facts correct on the next request, not by push (P189).** No server-to-client change notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
-- **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. Delete once the project passes on the CI runner, a Mac or a faster host.
+- **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277, P443).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. P443 (2026-11-01): the same failure showed on base `6ba267359` (Playwright 1.63) at keystroke p50 53-56 ms; on Playwright 1.64.1 with an idle start (load 0.68 and 0.97) all four tests passed twice: keystroke p50 39.0 ms in the Before run, 36.0 ms in `bun run test:ui:timing:studio` (budget 50 ms, unchanged). Two passes do not clear the item; the drift from the P139 32-36 ms and the pass/fail swing between runs stay unexplained. `ui-timing` left `bun run test:ui:studio`; CI still runs it. Delete once the project passes on the CI runner, a Mac or a faster host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
 - **Docker restore: the bridge-ID boot marker is unverified on Docker Desktop, Colima and OrbStack (P334).** Measured on Linux dockerd only. Check on a Mac: restart the VM with containers running, open Docker, expect the banner. Delete once confirmed.
 - **Docker restore: engines without a default bridge network (P334)** detect a restart only when this session saw the outage. No launch-time detection.

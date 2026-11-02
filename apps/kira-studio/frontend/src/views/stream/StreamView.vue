@@ -88,11 +88,23 @@ onUnmounted(() => {
           >
           <span class="ml-auto flex items-center gap-1">
             <Badge
-              v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
+              v-if="
+                page?.visibilityTimeoutSeconds !== null &&
+                page?.visibilityTimeoutSeconds !== undefined
+              "
               data-testid="stream-visibility-timeout"
             >
               {{
-                t(isReadOnlyBatch ? 'studio.stream.visibilityQueue.status' : 'studio.stream.visibility.status', { time: t('format.duration.secondsCompact', { seconds: page.visibilityTimeoutSeconds }) })
+                t(
+                  isReadOnlyBatch
+                    ? 'studio.stream.visibilityQueue.status'
+                    : 'studio.stream.visibility.status',
+                  {
+                    time: t('format.duration.secondsCompact', {
+                      seconds: page.visibilityTimeoutSeconds,
+                    }),
+                  },
+                )
               }}
             </Badge>
           </span>

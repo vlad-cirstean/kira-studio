@@ -356,9 +356,9 @@ func TestAutomationNotifies(t *testing.T) {
 		action fakeagent.Action
 		title  string
 	}{
-		{"failed", fakeagent.Action{Name: "failed"}, "Automation failed · ask"},
-		{"needs input", fakeagent.Action{Name: "needs_input"}, "Automation needs you · ask"},
-		{"done", fakeagent.Action{Name: "done"}, "Automation done · ask"},
+		{"failed", fakeagent.Action{Name: "failed"}, "Script run failed · ask"},
+		{"needs input", fakeagent.Action{Name: "needs_input"}, "Script run needs you · ask"},
+		{"done", fakeagent.Action{Name: "done"}, "Script run done · ask"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

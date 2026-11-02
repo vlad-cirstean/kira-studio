@@ -27,6 +27,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appwire"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/kubernetes"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
@@ -56,6 +57,7 @@ type options struct {
 	clock           scriptruns.Clock
 	dockerHubAPI    string
 	dockerExtra     []docker.Option
+	kubeExtra       []kubernetes.Option
 }
 
 // Opt tweaks New.
@@ -76,6 +78,17 @@ func WithDockerHubAPI(base string) Opt { return func(o *options) { o.dockerHubAP
 // WithDockerOptions appends options to the Docker service (restore tracker timing and boot probe).
 func WithDockerOptions(opts ...docker.Option) Opt {
 	return func(o *options) { o.dockerExtra = append(o.dockerExtra, opts...) }
+}
+
+// WithKubernetesOptions appends options to the Kubernetes service (list limits, environment).
+func WithKubernetesOptions(opts ...kubernetes.Option) Opt {
+	return func(o *options) { o.kubeExtra = append(o.kubeExtra, opts...) }
+}
+
+// kubeEnv hands the Kubernetes service the test process environment instead of probing the user's
+// login shell.
+func kubeEnv() kubernetes.Env {
+	return kubernetes.Env{Path: os.Getenv("PATH"), Kubeconfig: os.Getenv("KUBECONFIG")}
 }
 
 // App is one booted Kira Studio.
@@ -183,6 +196,7 @@ func (a *App) build() {
 		Emitter:    a.Events, Browser: a.Browser, Dialogs: a.Dialogs, KeepAwakeDriver: a.KeepAwake, McpInstaller: a.McpInstaller,
 		AppName: "Kira Studio", Version: "flowtest", SmartTimeout: a.opts.smartTimeout,
 		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, DockerHubAPI: a.opts.dockerHubAPI, DockerExtra: a.opts.dockerExtra, WindowFocus: a.Focus,
+		KubernetesExtra: append([]kubernetes.Option{kubernetes.WithEnv(kubeEnv)}, a.opts.kubeExtra...),
 	})
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)

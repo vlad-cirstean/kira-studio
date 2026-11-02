@@ -1,5 +1,5 @@
 ---
-title: Automations and smart scripts
+title: Runs and smart scripts
 description: Run scripts and Claude Code prompts from collections, on demand or on a schedule.
 sources:
   - README.md
@@ -12,12 +12,12 @@ sidebar:
   order: 1
 ---
 
-Automations exist in both apps. Scripts group in collections. Each script runs in its own folder and keeps a run history with status, exit code and result.
+Runs exist in both apps. Scripts group in collections. Each script runs in its own folder and keeps a run history with status, exit code and result.
 
 ## Scripts
 
 - Create a script with **New script**.
-- Choose the run folder: the automations folder under the app home (**Use automations folder**), or **Choose folder…**.
+- Choose the run folder: the Kira scripts folder under the app home (**Use Kira scripts folder**), or **Choose folder…**.
 - Add parameters. A parameter reaches the command as a variable.
 - Open terminals beside the run history.
 - Start a script with its play button. Click a row to select it; double-click to edit.
@@ -33,6 +33,8 @@ A smart script sets:
 - Parameters: text, select or multi-select, each optionally secret. Use a token in the prompt. A secret reaches the run as a variable only, never in the prompt.
 - A model, a budget in dollars and a timeout. The budget must be above 0.
 - A list of tools and MCP servers the script may use. Bash commands take patterns such as `git status:*`.
+
+The MCP list shows the servers `claude mcp list` reports for your user config, with Claude's own health status. Opening the list starts each server briefly to check it. Tick a server to allow all its tools, or untick **All tools** and type tool names. A run that uses one of your servers loads your Claude settings file, so your permission rules, environment and plugins apply. Hooks stay off, and only the servers you ticked load.
 
 The run history lists denied tools.
 

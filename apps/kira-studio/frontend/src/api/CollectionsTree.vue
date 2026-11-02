@@ -421,10 +421,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
     <div ref="treeBodyEl" class="flex-1 min-h-0" data-testid="tree-background">
       <div
         ref="scrollEl"
-        :class="[
-          'virtual-list h-full overflow-auto',
-          drag.dragging.value && 'select-none',
-        ]"
+        :class="['virtual-list h-full overflow-auto', drag.dragging.value && 'select-none']"
         data-testid="virtual-list"
         role="tree"
         aria-multiselectable="true"

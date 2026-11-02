@@ -13,6 +13,7 @@ import {
 } from './support/copyScenarios';
 import { gutterCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
+import { loc, openKubernetes, setupKubernetes } from './support/kubernetesFixture';
 import { emitWailsEvent } from './support/mockRuntime';
 import { COMPOSITE_PK_PATH } from './support/postgresFixture';
 import { openSettings } from './support/settings';
@@ -211,4 +212,17 @@ test('settings reset control reads Reset to default', async ({ relaunch }) => {
   await expect(
     page.locator('[data-testid="settings-reset-appearance-rowDensity"]'),
   ).toHaveAttribute('aria-label', 'Reset to default');
+});
+
+test('Kubernetes unavailable states say what failed and offer Retry', async ({ relaunch }) => {
+  const { page } = await setupKubernetes(relaunch);
+  await openKubernetes(page);
+  await page.locator('[data-testid="kube-cluster-row"][data-context="bad-token"]').click();
+  const view = loc(page, 'kube-unavailable');
+  await expect(view).toContainText('Sign-in rejected');
+  await expect(view).toContainText('The cluster refused the credentials');
+  await expect(loc(page, 'kube-retry')).toHaveText('Retry');
+
+  await page.locator('[data-testid="kube-cluster-row"][data-context="plugin-ctx"]').click();
+  await expect(view).toContainText('Credential plugin failed');
 });

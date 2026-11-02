@@ -359,9 +359,13 @@ const netChanged = (name: string): boolean => {
       field="networks"
       :label="t('docker.field.networks.label')"
       mode="now"
-      :changed="ip.networks.length !== baseIp.networks.length || ip.networks.some((n) => netChanged(n.name))"
+      :changed="
+        ip.networks.length !== baseIp.networks.length || ip.networks.some((n) => netChanged(n.name))
+      "
       :error="errors.networks"
-      :description="networkLocked ? t('docker.edit.networkLocked.hint') : t('docker.edit.aliasesChange.hint')"
+      :description="
+        networkLocked ? t('docker.edit.networkLocked.hint') : t('docker.edit.aliasesChange.hint')
+      "
       class="@2xl:col-span-2"
       v-slot="{ invalid }"
     >

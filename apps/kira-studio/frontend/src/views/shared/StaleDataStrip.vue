@@ -19,7 +19,11 @@ defineEmits<{ reconnect: [] }>();
         @click="$emit('reconnect')"
       >
         {{
-          t(reconnectOnly ? 'studio.common.reconnect.label' : 'studio.common.reconnectAndLoad.label')
+          t(
+            reconnectOnly
+              ? 'studio.common.reconnect.label'
+              : 'studio.common.reconnectAndLoad.label',
+          )
         }}
       </Button>
     </AlertAction>

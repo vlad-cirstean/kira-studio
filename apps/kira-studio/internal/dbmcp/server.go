@@ -113,6 +113,9 @@ type Config struct {
 	PreviewResponses func() bool
 	// Proof backs the proof_* tools (P420); nil leaves them unregistered.
 	Proof ProofStore
+	// Kube backs the kube_* tools and Ops records their op-log rows; nil Kube leaves them unregistered.
+	Kube KubeReader
+	Ops  OpRunner
 	// Prompts resolves the editable instruction and tool texts; nil means the registry defaults.
 	Prompts llmprompts.Source
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
@@ -261,6 +264,9 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	}, withPanicRecovery(s, "explain_query", s.explainQuery))
 	if s.cfg.Proof != nil {
 		s.addProofTools(srv, src)
+	}
+	if s.cfg.Kube != nil && s.cfg.Ops != nil {
+		s.addKubeTools(srv, src)
 	}
 
 	return srv

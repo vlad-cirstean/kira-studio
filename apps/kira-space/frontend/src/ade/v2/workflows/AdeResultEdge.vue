@@ -91,7 +91,11 @@ const label = computed(() => `${d.value.results.join(', ')}${d.value.loop ? ' â†
     <path
       :d="geometry.path"
       class="fill-none"
-      :class="[TONE_STROKE[d.tone], d.loop ? '[stroke-dasharray:6_4]' : '', d.selected ? 'stroke-[3px]' : 'stroke-2']"
+      :class="[
+        TONE_STROKE[d.tone],
+        d.loop ? '[stroke-dasharray:6_4]' : '',
+        d.selected ? 'stroke-[3px]' : 'stroke-2',
+      ]"
       :marker-end="`url(#${TONE_MARKER[d.tone]})`"
     />
     <path :d="geometry.path" class="fill-none stroke-transparent stroke-[16px]" />

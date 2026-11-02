@@ -51,7 +51,11 @@ const used = computed(() => parts.value.length > 1);
       :hover-at="hover"
       :invalid="!!error"
       :aria-describedby="error ? errorId : undefined"
-      :placeholder="isSmart ? t('automations.script.promptExample.example') : t('automations.script.commandExample.example')"
+      :placeholder="
+        isSmart
+          ? t('automations.script.promptExample.example')
+          : t('automations.script.commandExample.example')
+      "
       class="w-full"
       data-testid="script-dialog-command"
     />

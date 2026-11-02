@@ -1100,6 +1100,9 @@ export interface TakeOverArgs {
 export interface RestartSessionArgs {
   sessionId: string;
 }
+export interface CloseSessionArgs {
+  sessionId: string;
+}
 export interface LaunchStepArgs {
   taskId: string;
   message: string;

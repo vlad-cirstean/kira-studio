@@ -402,6 +402,7 @@ test('pane InlineState: response formatting is hidden at 100 ms and visible with
   });
   await page.click('[data-testid="http-send"]');
   const pending = page.locator('[data-testid="http-response-formatting"]');
+  // Behavior under test: the formatting indicator shows only after a delay.
   await page.waitForTimeout(100);
   await expect(pending).toHaveCount(0);
   await expect(pending).toBeVisible({ timeout: 1_000 });

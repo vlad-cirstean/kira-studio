@@ -15,7 +15,7 @@ const banner = (page: import('@playwright/test').Page) =>
 
 async function openDialog(page: import('@playwright/test').Page): Promise<void> {
   await page.locator('[data-testid="docker-restore-review"]').click();
-  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="restore-dialog"]')).toBeVisible();
 }
 
 test('a pending restore shows the banner; Review lists projects, running and deleted containers', async ({
@@ -28,19 +28,20 @@ test('a pending restore shows the banner; Review lists projects, running and del
   await expect(banner(page)).toContainText('5 containers were running before');
   await openDialog(page);
 
-  const project = page.locator('[data-testid="docker-restore-project"][data-project="shop-run"]');
+  const project = page.locator('[data-testid="restore-row"][data-id="project:shop-run"]');
   await expect(project).toHaveCount(1);
-  await expect(project.locator('[data-testid="docker-restore-member"]')).toHaveCount(2);
+  await expect(project.locator('[data-testid="restore-member"]')).toHaveCount(2);
   await expect(
-    page.locator('[data-testid="docker-restore-row"][data-id="id-solo"] [data-slot="checkbox"]'),
+    page.locator('[data-testid="restore-row"][data-id="id-solo"] [data-slot="checkbox"]'),
   ).toHaveAttribute('data-state', 'checked');
+  await expect(page.locator('[data-testid="restore-selection"]')).toHaveText('2 of 2 selected');
 
-  await page.locator('[data-testid="docker-restore-back-toggle"]').click();
+  await page.locator('[data-testid="restore-unavailable-toggle"]').click();
   await expect(
-    page.locator('[data-testid="docker-restore-row"][data-id="id-keeper"][data-status="back"]'),
-  ).toBeVisible();
+    page.locator('[data-testid="restore-row"][data-id="id-keeper"][data-status="back"]'),
+  ).toContainText('Already running');
   await expect(
-    page.locator('[data-testid="docker-restore-row"][data-id="id-doomed"][data-status="gone"]'),
+    page.locator('[data-testid="restore-row"][data-id="id-doomed"][data-status="gone"]'),
   ).toContainText('Not recreated');
 });
 
@@ -57,7 +58,7 @@ test('Restore sends the contract args and clears the banner', async ({ relaunch 
   await openDocker(page);
   await openDialog(page);
 
-  await page.locator('[data-testid="docker-restore-submit"]').click();
+  await page.locator('[data-testid="restore-submit"]').click();
 
   await expect(banner(page)).toHaveCount(0);
   expect(docker.calls('RestoreContainers')[0]?.args).toEqual(argsFixture());
@@ -81,12 +82,12 @@ test('a failed container shows its error inline and keeps the dialog open', asyn
   await openDocker(page);
   await openDialog(page);
 
-  await page.locator('[data-testid="docker-restore-submit"]').click();
+  await page.locator('[data-testid="restore-submit"]').click();
 
-  await expect(page.locator('[data-testid="docker-restore-error"]')).toContainText(
+  await expect(page.locator('[data-testid="restore-row-error"]')).toContainText(
     'port is already allocated',
   );
-  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="restore-dialog"]')).toBeVisible();
 });
 
 test('Dismiss calls RestoreDismiss with the engine id and clears the banner', async ({
@@ -103,7 +104,7 @@ test('Dismiss calls RestoreDismiss with the engine id and clears the banner', as
   await openDocker(page);
   await openDialog(page);
 
-  await page.locator('[data-testid="docker-restore-dismiss"]').click();
+  await page.locator('[data-testid="restore-dismiss"]').click();
 
   await expect(banner(page)).toHaveCount(0);
   expect(docker.calls('RestoreDismiss')[0]?.args).toEqual({
@@ -133,10 +134,10 @@ test('unchecking the project row drops both members from the call', async ({ rel
   await openDialog(page);
 
   await page
-    .locator('[data-testid="docker-restore-project"] [data-slot="checkbox"]')
+    .locator('[data-testid="restore-row"][data-id="project:shop-run"] [data-slot="checkbox"]')
     .first()
     .click();
-  await page.locator('[data-testid="docker-restore-submit"]').click();
+  await page.locator('[data-testid="restore-submit"]').click();
 
   await expect.poll(() => docker.calls('RestoreContainers').length).toBe(1);
   const sent = docker.calls('RestoreContainers')[0]?.args as { ids: string[] };
@@ -155,12 +156,12 @@ test('a rejected Restore call shows its error in the dialog', async ({ relaunch 
   await openDocker(page);
   await openDialog(page);
 
-  await page.locator('[data-testid="docker-restore-submit"]').click();
+  await page.locator('[data-testid="restore-submit"]').click();
 
-  await expect(page.locator('[data-testid="docker-restore-call-error"]')).toContainText(
+  await expect(page.locator('[data-testid="restore-call-error"]')).toContainText(
     'No restore is pending for this engine.',
   );
-  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="restore-dialog"]')).toBeVisible();
 });
 
 test('the banner text and Review button never overlap, wide or narrow', async ({ relaunch }) => {

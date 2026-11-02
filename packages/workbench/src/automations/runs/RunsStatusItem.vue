@@ -24,7 +24,7 @@ function show(): void {
     {{ t('common.state.runningCount.status', { count: running }) }}
     <template #tip>
       <TooltipDetails
-        :title="t('workbench.statusBar.runs.tooltip')"
+        :title="t('common.scriptRuns.label')"
         :rows="[{ label: t('common.state.running.status'), value: String(running) }]"
         :hint="t('workbench.statusBar.runs.open.hint')"
       />

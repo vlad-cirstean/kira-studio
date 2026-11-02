@@ -10,7 +10,9 @@ const props = defineProps<{
 <template>
   <div
     data-slot="alert-title"
-    :class="cn('font-medium [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-fg', props.class)"
+    :class="
+      cn('font-medium [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-fg', props.class)
+    "
   >
     <slot />
   </div>

@@ -1,7 +1,9 @@
 package ade
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -93,7 +95,26 @@ func (s *smartStep) mcpNames() []string {
 	return names
 }
 
-// spec is the process spec of a smart step run; the caller adds the MCP config paths.
+// checkMCP fails with harness.ErrServerGone when a ticked user server is missing from the agent's
+// list for the scripts home (the picker's folder, never a project's `.mcp.json`), so a removed server stops the step instead of running it without its tools.
+func (s *smartStep) checkMCP(ctx context.Context, agent harness.Provider, home string) error {
+	names := s.mcpNames()
+	if len(names) == 0 {
+		return nil
+	}
+	have, _, err := agent.UserMCPPresence(ctx, home, names, true)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if !slices.ContainsFunc(have, func(u harness.UserServer) bool { return u.Name == name }) {
+			return harness.ErrServerGone{Name: name, Agent: agent.Label()}
+		}
+	}
+	return nil
+}
+
+// spec is the process spec of a smart step run; the caller adds the MCP config and user servers.
 func (s *smartStep) spec(agent harness.Provider, base harness.HeadlessSpec, space bool) harness.HeadlessSpec {
 	extra := harness.ToolNames(agent, agentmcp.FinishStep, agentmcp.RunOutcome)
 	if space {

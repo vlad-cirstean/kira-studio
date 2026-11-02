@@ -186,6 +186,17 @@ export const IPC = {
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
 
+  // P439: the Kubernetes module's bound surface; log batches are events, no entry.
+  kubernetesClusters: 'kira:kubernetes:clusters',
+  kubernetesDescribe: 'kira:kubernetes:describe',
+  kubernetesKinds: 'kira:kubernetes:kinds',
+  kubernetesList: 'kira:kubernetes:list',
+  kubernetesLogsClose: 'kira:kubernetes:logsClose',
+  kubernetesLogsOpen: 'kira:kubernetes:logsOpen',
+  kubernetesNamespaces: 'kira:kubernetes:namespaces',
+  kubernetesSetMcp: 'kira:kubernetes:setMcp',
+  kubernetesStatus: 'kira:kubernetes:status',
+
   // P200: the Docker module's bound surface; pushes (changed/stats/logs/exec) are events, no entry.
   dockerContainerEditSpec: 'kira:docker:containerEditSpec',
   dockerContainerSize: 'kira:docker:containerSize',
@@ -278,12 +289,14 @@ export const IPC = {
   scriptRunsStop: 'kira:scriptRuns:stop',
   scriptRunsResume: 'kira:scriptRuns:resume',
   scriptRunsResumeCommand: 'kira:scriptRuns:resumeCommand',
+  scriptRunsRestoreState: 'kira:scriptRuns:restoreState',
+  scriptRunsRestore: 'kira:scriptRuns:restore',
+  scriptRunsRestoreDismiss: 'kira:scriptRuns:restoreDismiss',
   scriptRunsResolveDir: 'kira:scriptRuns:resolveDir',
   scriptRunsPreview: 'kira:scriptRuns:preview',
   scriptRunsStart: 'kira:scriptRuns:start',
   scriptRunsReadLog: 'kira:scriptRuns:readLog',
   scriptRunsMcpServers: 'kira:scriptRuns:mcpServers',
-  scriptRunsMcpTools: 'kira:scriptRuns:mcpTools',
   // The titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape restated. Real wire channel string verbatim
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never

@@ -73,6 +73,7 @@ test('the graph saves on Save, never on its own, with ids unchanged', async ({ r
   await expect(page.locator(t('ade-wf-form'))).toBeVisible();
   const name = page.locator(t('ade-wf-form-name'));
   await name.fill('Standard feature v2');
+  // Absence of an autosave: spans the longest debounce; no event to await.
   await page.waitForTimeout(1200);
   expect(calls(control, IPC.adeTaskSaveWorkflow)).toHaveLength(0);
   await page.locator(t('ade-wf-save')).click();

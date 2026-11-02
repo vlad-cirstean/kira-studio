@@ -121,7 +121,9 @@ function setReview(value: string): void {
       v-model="draft.mcpAutoExplain"
       :disabled="!draft.mcpEnabled || !explainSupported"
       :label="t('studio.project.connectionDialog.mcp.plan.label')"
-      :description="explainSupported ? undefined : t('studio.project.connectionDialog.mcp.plan.description')"
+      :description="
+        explainSupported ? undefined : t('studio.project.connectionDialog.mcp.plan.description')
+      "
       testid="connection-mcp-auto-explain"
     />
 
@@ -141,7 +143,9 @@ function setReview(value: string): void {
     </Field>
     <FieldDescription class="w-full">
       {{
-        t('studio.project.connectionDialog.mcp.strictest.description', { tab: t('common.advanced.label') })
+        t('studio.project.connectionDialog.mcp.strictest.description', {
+          tab: t('common.advanced.label'),
+        })
       }}
     </FieldDescription>
 

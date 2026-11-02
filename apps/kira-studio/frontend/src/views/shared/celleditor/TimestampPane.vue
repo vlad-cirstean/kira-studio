@@ -103,7 +103,7 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 // PopoverPanel's own implicit behavior) restores a real element inside `.editor-body` to blur from.
 const { focused: triggerFocused } = useFocus(computed(() => calendarTriggerEl.value?.$el));
 watch(calendarOpen, (open) => {
-  if (!open) void nextTick(() => (triggerFocused.value = true));
+  if (!open) void nextTick().then(() => (triggerFocused.value = true));
 });
 </script>
 

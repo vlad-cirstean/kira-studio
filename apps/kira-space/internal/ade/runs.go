@@ -33,6 +33,7 @@ const (
 	noteWaitingSetup   = "waiting for worktree setup"
 	noteSetupFailed    = "worktree setup failed"
 	noteResumed        = "resumed after restart"
+	noteRestarted      = "restarted by you"
 	noteWorktreeGone   = "worktree missing"
 	settingSourcesUser = "user"
 	settingSourcesAll  = "user,project,local"
@@ -764,6 +765,12 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		}
 		complete(end)
 	}
+	if l.smart != nil {
+		if err := l.smart.checkMCP(ctx, l.agent, b.deps.ScriptsHome); err != nil {
+			fail(err)
+			return
+		}
+	}
 	sbx, err := b.prepareSandbox(ctx, run, l)
 	if err != nil {
 		fail(err)
@@ -795,14 +802,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	if l.smart != nil {
 		spec = l.smart.spec(agent, spec, space)
 		if names := l.smart.mcpNames(); len(names) > 0 {
-			path, relUser, err := agent.WriteUserMCPConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
-			if err != nil {
-				release()
-				fail(err)
-				return
-			}
-			defer relUser()
-			spec.MCPConfigs = append(spec.MCPConfigs, path)
+			spec.UserMCP, spec.GrantMCP = names, []string{agentmcp.ServerName}
 		}
 	}
 	spec = b.applySandbox(spec, sbx, l)
@@ -1233,25 +1233,9 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	if run.Purpose == model.AdeRunPurposeReview {
 		return b.resumeReviewRound(ctx, run)
 	}
-	tc, err := b.loadTaskCtx(run.TaskID)
-	if err != nil {
-		return err
-	}
-	plan, err := b.plan(tc)
-	if err != nil {
-		return err
-	}
-	idx := stepIndex(plan, run.StepID)
-	if idx < 0 {
-		return invalid("the run's step is no longer in the workflow")
-	}
-	latest, ok := plan[idx].Runs[run.BranchID]
-	if !ok || latest.ID != run.ID {
-		return invalid("run %s is not the latest attempt", runID)
-	}
 	line := llmprompts.RunResumeLine.Text(b.prompts(), llmprompts.ResumeVars{App: appName})
 	spec := model.AdeRunLaunch{ResumeID: run.Launch.ResumeID, Prompt: line, Note: noteResumed}
-	if _, err := b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops, Launch: spec}); err != nil {
+	if _, err := b.queueResumeLocked(ctx, run, spec); err != nil {
 		return err
 	}
 	// Clear only after queueing: a failed queue keeps the stuck run resumable.
@@ -1261,6 +1245,66 @@ func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	}
 	b.emitRuns(cleared)
 	return nil
+}
+
+// queueResumeLocked queues the next attempt of run's step, continuing spec.ResumeID. taskMu is
+// held by the caller.
+func (b *TaskBoard) queueResumeLocked(ctx context.Context, run model.AdeRun, spec model.AdeRunLaunch) (model.AdeRun, error) {
+	tc, err := b.loadTaskCtx(run.TaskID)
+	if err != nil {
+		return model.AdeRun{}, err
+	}
+	plan, err := b.plan(tc)
+	if err != nil {
+		return model.AdeRun{}, err
+	}
+	idx := stepIndex(plan, run.StepID)
+	if idx < 0 {
+		return model.AdeRun{}, invalid("the run's step is no longer in the workflow")
+	}
+	latest, ok := plan[idx].Runs[run.BranchID]
+	if !ok || latest.ID != run.ID {
+		return model.AdeRun{}, invalid("run %s is not the latest attempt", run.ID)
+	}
+	return b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops, Launch: spec})
+}
+
+// restartHeadless stops a running step run and queues its next attempt on the same conversation.
+func (b *TaskBoard) restartHeadless(ctx context.Context, rec *model.AdeSession) (adewire.Launch, error) {
+	if rec.State != model.AdeSessionStateRunning || rec.RunID == "" {
+		return adewire.Launch{}, invalid("the session is not running")
+	}
+	if rec.AgentSessionID == "" {
+		return adewire.Launch{}, invalid("the session has no conversation id yet")
+	}
+	run, err := b.deps.Tasks.GetRun(rec.RunID)
+	if err != nil {
+		return adewire.Launch{}, err
+	}
+	if run.Purpose != "" {
+		return adewire.Launch{}, invalid("this run restarts from its own panel")
+	}
+	if run.State != model.AdeRunRunning {
+		return adewire.Launch{}, invalid("the run is not running")
+	}
+	if err := b.StopRun(ctx, run.ID); err != nil {
+		return adewire.Launch{}, err
+	}
+	mu := b.taskMu(run.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	if run, err = b.deps.Tasks.GetRun(run.ID); err != nil {
+		return adewire.Launch{}, err
+	}
+	if run.State != model.AdeRunStuck {
+		return adewire.Launch{}, invalid("the run is not running")
+	}
+	line := llmprompts.RunResumeLine.Text(b.prompts(), llmprompts.ResumeVars{App: appName})
+	next, err := b.queueResumeLocked(ctx, run, model.AdeRunLaunch{ResumeID: rec.AgentSessionID, Prompt: line, Note: noteRestarted})
+	if err != nil {
+		return adewire.Launch{}, err
+	}
+	return adewire.Launch{SessionID: next.SessionID, Cwd: rec.Cwd}, nil
 }
 
 // StepDone ends the current manual step: the task enters the next step, or finishes after the last.

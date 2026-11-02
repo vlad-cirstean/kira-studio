@@ -107,7 +107,9 @@ onUnmounted(() => {
     <template #options>
       <TooltipIconButton
         icon="filter"
-        :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
+        :label="
+          t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')
+        "
         :aria-label="t('studio.search.filterRows.tooltip')"
         :pressed="filtering"
         data-testid="stream-search-filter-rows"
@@ -117,7 +119,10 @@ onUnmounted(() => {
       <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
         <template v-if="filtering && filteredRowCount !== null">
           {{
-            t('studio.search.scopeFilteredRows.status', { shown: formatCount(filteredRowCount), count: loadedRowCount })
+            t('studio.search.scopeFilteredRows.status', {
+              shown: formatCount(filteredRowCount),
+              count: loadedRowCount,
+            })
           }}
         </template>
         <template v-else>{{

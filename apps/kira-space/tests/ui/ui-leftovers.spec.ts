@@ -188,6 +188,7 @@ test('file tree folder expansion survives a reload', async ({ relaunch }) => {
   await row('dir').click();
   if (!(await row('dir/b.ts').isVisible())) await page.keyboard.press('ArrowRight');
   await expect(row('dir/b.ts')).toBeVisible();
+  // Persisting the expansion is debounced and has no observable end before the reload.
   await page.waitForTimeout(500);
 
   await page.reload();

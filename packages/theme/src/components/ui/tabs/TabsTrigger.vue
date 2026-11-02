@@ -15,7 +15,12 @@ const forwardedProps = useForwardProps(delegatedProps);
 <template>
   <TabsTrigger
     data-slot="tabs-trigger"
-    :class="cn('inline-flex items-center justify-center whitespace-nowrap disabled:pointer-events-none disabled:opacity-50', props.class)"
+    :class="
+      cn(
+        'inline-flex items-center justify-center whitespace-nowrap disabled:pointer-events-none disabled:opacity-50',
+        props.class,
+      )
+    "
     v-bind="forwardedProps"
   >
     <slot />

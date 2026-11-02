@@ -269,7 +269,12 @@ function refresh(): Promise<void> {
               v-for="l in links"
               :key="l.section"
               type="button"
-              :class="cn(rowVariants({ layout: 'menu' }), 'h-control-lg w-full cursor-default gap-2 rounded-none px-3 text-left')"
+              :class="
+                cn(
+                  rowVariants({ layout: 'menu' }),
+                  'h-control-lg w-full cursor-default gap-2 rounded-none px-3 text-left',
+                )
+              "
               :data-testid="`docker-overview-link-${l.section}`"
               @click="openSection(l.section)"
             >

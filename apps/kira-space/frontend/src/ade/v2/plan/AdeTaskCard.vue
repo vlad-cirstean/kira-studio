@@ -249,7 +249,9 @@ const boxClass = computed(() => {
             disabled-trigger
             :disabled="reviewCode.pending.value || choices.every((c) => c.disabled)"
             data-testid="ade-card-review"
-            @click.stop="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
+            @click.stop="
+              (ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)
+            "
           >
             <VarText :parts="reviewTip" />
             <Kbd>{{ formatShortcut('ade.reviewCode') }}</Kbd>

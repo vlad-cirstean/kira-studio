@@ -9,7 +9,12 @@ const props = defineProps<{ class?: HTMLAttributes['class'] }>();
 <template>
   <dl
     data-slot="key-value-list"
-    :class="cn('m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-kira-md [&>dd]:m-0 [&>dd]:min-w-0 [&>dt]:text-muted-foreground', props.class)"
+    :class="
+      cn(
+        'm-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-kira-md [&>dd]:m-0 [&>dd]:min-w-0 [&>dt]:text-muted-foreground',
+        props.class,
+      )
+    "
   >
     <slot />
   </dl>

@@ -45,7 +45,10 @@ const mem = computed(() => history.value.map((s) => s.memUsage));
               formatBytes(latest.memUsage)
             }}</span>
             <span class="text-kira-sm text-muted-foreground">{{
-              t('docker.stats.memOf.label', { limit: formatBytes(latest.memLimit), percent: formatPercent(latest.memPercent) })
+              t('docker.stats.memOf.label', {
+                limit: formatBytes(latest.memLimit),
+                percent: formatPercent(latest.memPercent),
+              })
             }}</span>
           </div>
           <StatsSparkline :values="mem" :max="latest.memLimit" height-class="h-24" />

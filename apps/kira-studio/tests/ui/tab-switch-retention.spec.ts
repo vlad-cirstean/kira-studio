@@ -59,6 +59,7 @@ test('a key-value tab re-reads nothing on a tab switch', async ({ relaunch }) =>
 
   await tabs.nth(1).click();
   await expect(rows.first()).toBeVisible();
+  // Absence of a stream op: no event to await.
   await page.waitForTimeout(500);
   expect(await rows.count()).toBe(shown);
   expect((await stream.ops()).length).toBe(before);
@@ -147,6 +148,7 @@ test('a gRPC tab keeps its schema and history after six minutes away', async ({ 
     control.log().filter((e) => e.channel === IPC.grpcDescribe || e.channel === IPC.grpcHistoryList)
       .length;
   await expect.poll(reads).toBeGreaterThan(0);
+  // The mount reads land in a burst with no DOM signal for its end; the baseline needs it done.
   await page.waitForTimeout(500);
   const before = reads();
 
@@ -155,6 +157,7 @@ test('a gRPC tab keeps its schema and history after six minutes away', async ({ 
   await modeTab(page, 'api').click();
 
   await expect(page.locator('[data-testid="grpc-request-view"]')).toBeVisible();
+  // Absence of a read: no event to await.
   await page.waitForTimeout(500);
   expect(reads()).toBe(before);
 });

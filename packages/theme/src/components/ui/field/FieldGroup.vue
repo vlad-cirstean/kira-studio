@@ -10,10 +10,12 @@ const props = defineProps<{
 <template>
   <div
     data-slot="field-group"
-    :class="cn(
-      'flex flex-row items-start gap-3 [&>[data-slot=field]]:flex-1 [&>[data-slot=field]]:min-w-0',
-      props.class,
-    )"
+    :class="
+      cn(
+        'flex flex-row items-start gap-3 [&>[data-slot=field]]:flex-1 [&>[data-slot=field]]:min-w-0',
+        props.class,
+      )
+    "
   >
     <slot />
   </div>

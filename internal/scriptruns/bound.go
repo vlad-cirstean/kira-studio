@@ -144,21 +144,9 @@ func (b *Bound) ReadLog(args ReadLogArgs) (LogPage, error) {
 	return ipcerr.InternalResult(b.Svc.Runs.ReadLog(args.ID, args.AfterSeq))
 }
 
-// McpServers lists the MCP servers of the user's agent config.
+// McpServers lists the MCP servers the agent's CLI reports.
 func (b *Bound) McpServers() ([]harness.UserServer, error) {
-	return ipcerr.InternalResult(b.Svc.McpServers())
-}
-
-type McpToolsArgs struct {
-	Server string `json:"server"`
-}
-
-// McpTools lists the tools of one of those servers.
-func (b *Bound) McpTools(args McpToolsArgs) ([]harness.UserTool, error) {
-	if args.Server == "" {
-		return nil, ipcerr.Required("server")
-	}
-	return ipcerr.InternalResult(b.Svc.McpTools(context.Background(), args.Server))
+	return ipcerr.InternalResult(b.Svc.McpServers(context.Background()))
 }
 
 // NextFiresArgs asks for the next fire instants of a cron expression.
@@ -246,5 +234,29 @@ func (b *Bound) ConfirmDecline(args IDArgs) error {
 		return ipcerr.Required("id")
 	}
 	b.Svc.ConfirmDecline(args.ID)
+	return nil
+}
+
+// RestoreState lists the runs the last quit or crash ended, planned against their scripts now.
+func (b *Bound) RestoreState() (RestoreState, error) {
+	state, err := b.Svc.RestoreState()
+	if err != nil {
+		return RestoreState{}, ipcerr.Wrap(err)
+	}
+	return state, nil
+}
+
+// Restore starts the runs the user confirmed from that offer.
+func (b *Bound) Restore(args RestoreArgs) (RestoreResult, error) {
+	res, err := b.Svc.Restore(args)
+	if err != nil {
+		return RestoreResult{}, ipcerr.Wrap(err)
+	}
+	return res, nil
+}
+
+// RestoreDismiss forgets the offer.
+func (b *Bound) RestoreDismiss() error {
+	b.Svc.RestoreDismiss()
 	return nil
 }

@@ -89,10 +89,10 @@ function open(e: MouseEvent, url: string): void {
           <div class="text-kira-sm text-subtle" data-testid="ade-task-issue-prs">
             {{
               issue.summary.known || issue.changeRequests.length > 0
-              ? t('space.ade.taskTab.issueLine.prs.label', {
-                  count: Math.max(issue.summary.count, issue.changeRequests.length),
-                })
-              : t('space.ade.taskTab.issueLine.prsNone.label')
+                ? t('space.ade.taskTab.issueLine.prs.label', {
+                    count: Math.max(issue.summary.count, issue.changeRequests.length),
+                  })
+                : t('space.ade.taskTab.issueLine.prsNone.label')
             }}
           </div>
           <ul

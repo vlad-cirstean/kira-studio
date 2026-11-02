@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paletteColorSchema } from './color';
 import { runOutcomeSchema } from './runOutcome';
 import { scriptDirSchema } from './scripts';
 
@@ -30,7 +31,7 @@ export const scriptRunSchema = /*#__PURE__*/ z.object({
   id: z.string(),
   scriptId: z.string(),
   scriptName: z.string(),
-  color: z.string(),
+  color: paletteColorSchema,
   kind: z.enum(['script', 'smart']),
   trigger: z.enum(['terminal', 'manual', 'ade', 'scheduled']),
   state: scriptRunStateSchema,
@@ -161,3 +162,61 @@ export const scriptRunStartedSchema = /*#__PURE__*/ z.object({
   terminal: z.object({ token: z.string(), cwd: z.string() }).nullable(),
 });
 export type ScriptRunStarted = z.infer<typeof scriptRunStartedSchema>;
+
+// Mirrors scriptruns.RestoreItem: a run a quit or crash ended, planned against its script as it is now.
+export const scriptRunRestoreStatusSchema = /*#__PURE__*/ z.enum([
+  'ready',
+  'running',
+  'needsInput',
+  'gone',
+  'blocked',
+]);
+export type ScriptRunRestoreStatus = z.infer<typeof scriptRunRestoreStatusSchema>;
+
+export const scriptRunRestoreItemSchema = /*#__PURE__*/ z.object({
+  runId: z.string(),
+  scriptId: z.string(),
+  scriptName: z.string(),
+  color: paletteColorSchema,
+  kind: z.enum(['script', 'smart']),
+  trigger: z.enum(['terminal', 'manual', 'ade', 'scheduled']),
+  taskId: z.string(),
+  taskTitle: z.string(),
+  branchId: z.string(),
+  branchLabel: z.string(),
+  // What the new run would use, not what the old one did; a smart run's command is a prompt excerpt.
+  cwd: z.string(),
+  command: z.string(),
+  model: z.string(),
+  // A smart run continues its saved conversation.
+  resume: z.boolean(),
+  params: z.array(scriptRunParamSchema),
+  endedAt: z.number(),
+  hash: z.string(),
+  status: scriptRunRestoreStatusSchema,
+  reason: z.string(),
+});
+export type ScriptRunRestoreItem = z.infer<typeof scriptRunRestoreItemSchema>;
+
+export const scriptRunRestoreStateSchema = /*#__PURE__*/ z.object({
+  items: z.array(scriptRunRestoreItemSchema),
+});
+export type ScriptRunRestoreState = z.infer<typeof scriptRunRestoreStateSchema>;
+
+// Mirrors scriptruns.RestoreChoice: an offered run and the plan hash the person saw.
+export interface ScriptRunRestoreChoice {
+  runId: string;
+  hash: string;
+}
+
+export const scriptRunRestoreResultSchema = /*#__PURE__*/ z.object({
+  items: z.array(
+    z.object({
+      runId: z.string(),
+      started: scriptRunStartedSchema.nullable(),
+      code: z.string(),
+      error: z.string(),
+    }),
+  ),
+});
+export type ScriptRunRestoreResult = z.infer<typeof scriptRunRestoreResultSchema>;

@@ -19,10 +19,12 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
   <DropdownMenuRadioItem
     data-slot="dropdown-menu-radio-item"
     v-bind="forwarded"
-    :class="cn(
-      'focus:bg-hover focus:text-fg focus:**:text-fg h-control gap-1.5 rounded-kira-sm px-1.5 text-kira-md data-inset:pl-7 [&_svg:not([class*=size-])]:size-4 flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
-      props.class,
-    )"
+    :class="
+      cn(
+        'focus:bg-hover focus:text-fg focus:**:text-fg h-control gap-1.5 rounded-kira-sm px-1.5 text-kira-md data-inset:pl-7 [&_svg:not([class*=size-])]:size-4 flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+        props.class,
+      )
+    "
   >
     <slot />
     <span

@@ -44,6 +44,7 @@ export type ScriptParam = z.infer<typeof scriptParamSchema>;
 // Mirrors scripts.MCPChoice.
 export const mcpChoiceSchema = /*#__PURE__*/ z.object({
   server: z.string(),
+  allTools: z.boolean(),
   tools: z.array(z.string()),
 });
 export type McpChoice = z.infer<typeof mcpChoiceSchema>;
@@ -139,18 +140,12 @@ export const scriptDirSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptDir = z.infer<typeof scriptDirSchema>;
 
-// scriptMcpServerSchema mirrors agentmcp.UserServer — a server of the user's Claude config,
-// never its args, env or headers.
+// scriptMcpServerSchema mirrors harness.UserServer — a server `claude mcp list` reports, never its
+// args, env or headers. status is claude's own health report.
 export const scriptMcpServerSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   transport: z.string(),
   target: z.string(),
+  status: z.enum(['connected', 'failed', 'needsAuth', 'pending', 'unknown']),
 });
 export type ScriptMcpServer = z.infer<typeof scriptMcpServerSchema>;
-
-// scriptMcpToolSchema mirrors agentmcp.UserTool.
-export const scriptMcpToolSchema = /*#__PURE__*/ z.object({
-  name: z.string(),
-  description: z.string(),
-});
-export type ScriptMcpTool = z.infer<typeof scriptMcpToolSchema>;

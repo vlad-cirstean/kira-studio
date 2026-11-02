@@ -23,6 +23,25 @@ const CONNECTION_ID = 'conn-mode-switch';
 const FIXTURE = orderItemsFixture(CONNECTION_ID);
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Mode DB', 'blue');
 
+// MODE_ORDER cannot be imported across the web/node tsconfig boundary; the DOM is the source.
+const KNOWN_MODES = ['studio', 'api', 'automations', 'docker'];
+const KNOWN_NAMES: Record<string, string> = {
+  studio: 'Studio',
+  api: 'API',
+  automations: 'Runs',
+  docker: 'Docker',
+};
+
+function anyModeTab(page: Page, mode: string): Locator {
+  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
+}
+
+async function renderedModes(page: Page): Promise<string[]> {
+  return page
+    .locator('[data-testid="mode-tab"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-mode') ?? ''));
+}
+
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
@@ -75,14 +94,14 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, 'database:kira_test/schema:app');
 }
 
-test('mode switch — four mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
+test('mode switch — the mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  // 1. four mode tabs (P91 §2: Terminal joins Studio/Api as a third peer, P200 Docker a fourth),
-  // Studio active by default.
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
+  // 1. the known mode tabs in order (count-agnostic: further modes may follow), Studio active by default.
+  const rendered = await renderedModes(page);
+  expect(rendered.filter((m) => KNOWN_MODES.includes(m))).toEqual(KNOWN_MODES);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Connections');
@@ -249,13 +268,27 @@ test('switching mode reaches windowsSetMode eventually, never synchronously (P22
   expect(setModeCalls()[1]?.args).toMatchObject({ mode: 'api' });
 });
 
-// The box-level fix (a real fixed-size icon box and a real <span> label, both real flex items
-// with a measurable rect) came with a guard that held *by construction*: the icon box centres
-// each glyph's own advance, not its ink, so the guard could never see the two things a user
-// reads — this is the reason the same complaint came back a third time.
-// This replaces both of that guard's assertions with an ink measurement: screenshot the icon
-// and the label, find each one's own painted pixels (differing from its own sampled background)
-// rather than trust the fixed box each sits in, and compare the ink itself.
+test('every mode tab is icon-only, named, with a tooltip', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+
+  const modes = await renderedModes(page);
+  expect(modes.length).toBeGreaterThanOrEqual(KNOWN_MODES.length);
+  for (const mode of modes) {
+    const tab = anyModeTab(page, mode);
+    expect((await tab.innerText()).trim()).toBe('');
+    await expect(tab).toHaveAccessibleName(/\S/);
+    const expected = KNOWN_NAMES[mode];
+    if (expected) await expect(tab).toHaveAccessibleName(expected);
+  }
+
+  await modeTab(page, 'automations').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText('Runs');
+  await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'studio')).toHaveAttribute('aria-pressed', 'true');
+});
+
+// Ink measurement: screenshot the icon, find its painted pixels (differing from its own sampled
+// background) rather than trust the fixed box it sits in, and compare the ink itself.
 async function inkBounds(
   locator: Locator,
 ): Promise<{ top: number; bottom: number; left: number; right: number } | null> {
@@ -277,8 +310,8 @@ async function inkBounds(
     if (!ctx) throw new Error('mode-tab ink measurement: no 2d context');
     ctx.drawImage(img, 0, 0);
     const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // The crop's own corner pixel is its background — the icon box and .mode-label paint no fill
-    // of their own, so this is whatever sits behind them (the tab's own ground either way).
+    // The crop's own corner pixel is its background — the icon box paints no fill of its own, so this
+    // is whatever sits behind it (the tab's own ground).
     const bg = [data[0], data[1], data[2]];
     const THRESHOLD = 24; // per-channel delta that counts as "ink", tolerant of anti-aliasing
     let minX = Number.POSITIVE_INFINITY;
@@ -315,63 +348,34 @@ async function inkBounds(
 
 async function modeTabInk(
   page: Page,
-  mode: 'studio' | 'api' | 'automations' | 'docker',
-): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
-  const tab = modeTab(page, mode);
+  mode: string,
+): Promise<{ centreOffsetX: number; centreOffsetY: number; iconRightInset: number }> {
+  const tab = anyModeTab(page, mode);
+  const tabBox = await tab.boundingBox();
   const iconBoxLocator = tab.locator('[data-testid="mode-tab-icon"]');
   const iconBox = await iconBoxLocator.boundingBox();
   const iconInk = await inkBounds(iconBoxLocator);
-  const labelInk = await inkBounds(tab.locator('.mode-label'));
-  if (!iconBox || !iconInk || !labelInk) {
-    throw new Error(`mode tab "${mode}" has no measurable icon/label ink`);
+  if (!tabBox || !iconBox || !iconInk) {
+    throw new Error(`mode tab "${mode}" has no measurable icon ink`);
   }
   return {
-    iconCentreY: (iconInk.top + iconInk.bottom) / 2,
-    labelCentreY: (labelInk.top + labelInk.bottom) / 2,
-    // The icon box's own trailing edge to the glyph's own rightmost ink — how much of the box a
-    // rendered-at-native-size glyph fills, the direct, verifiable claim
-    // ("the codicon's own 16-unit design grid and its 16px slot coincide"). At 13px-in-16px this
-    // always carried (16-13)/2 = 1.5px of pure box slack *in addition to* the glyph's own side
-    // bearing; at 16px only the glyph's own bearing remains.
+    centreOffsetX: Math.abs((iconInk.left + iconInk.right) / 2 - (tabBox.x + tabBox.width / 2)),
+    centreOffsetY: Math.abs((iconInk.top + iconInk.bottom) / 2 - (tabBox.y + tabBox.height / 2)),
+    // Icon box trailing edge to the glyph's rightmost ink: how much of the 16px box the glyph fills.
     iconRightInset: iconBox.x + iconBox.width - iconInk.right,
   };
 }
 
-test('a mode tab’s icon renders at its own design size, with its ink lined up against the label (P22 D5/D6)', async ({
+test('a mode tab’s icon renders at its own design size, centred in its tab (P22 D5/D6, P438)', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: [] });
 
-  const studio = await modeTabInk(page, 'studio');
-  const api = await modeTabInk(page, 'api');
-  // P91 §17.3: Terminal is a third real .mode-tab — same ink guard extended to it as it was to
-  // Studio/Api.
-  const terminal = await modeTabInk(page, 'automations');
-  const docker = await modeTabInk(page, 'docker');
-
-  // (a) both icons render close to filling their own 16px box — measured, not merely inferred
-  // from the font's stated design grid. Before, with a 13px glyph in a 16px box, this sandbox's
-  // own headless-Chromium render measures a 4px inset on "database" alone, purely from the
-  // box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at native
-  // size that mismatch is gone and only the glyph's own (smaller) bearing remains.
-  for (const { iconRightInset } of [studio, api, terminal, docker]) {
+  for (const mode of await renderedModes(page)) {
+    const { centreOffsetX, centreOffsetY, iconRightInset } = await modeTabInk(page, mode);
     expect(iconRightInset).toBeLessThanOrEqual(3.5);
+    // Tabs are icon-only: the glyph's ink sits at the tab box centre on both axes.
+    expect(centreOffsetX).toBeLessThanOrEqual(2.5);
+    expect(centreOffsetY).toBeLessThanOrEqual(2.5);
   }
-
-  // (b) the icon's ink and the label's ink are vertically centred on the same line, on both tabs
-  // — not merely the fixed boxes they sit in (a box-level guard can't see this).
-  // A generous tolerance: the residual is sub-pixel on the two words this app
-  // renders ("Studio" has no descender, "Api" does — a real, permanent, per-word difference in
-  // ink extent that a shared line-height can't and shouldn't erase). Terminal's own icon glyph
-  // carries a real, permanent extra ~1-2px of its own vertical bearing on top of that (measured
-  // 1px on macOS WebKit, 2px on CI's WebKitGTK) — the guard was extended to it without
-  // re-tuning this bound for its own glyph.
-  for (const { iconCentreY, labelCentreY } of [studio, api, terminal, docker]) {
-    expect(Math.abs(iconCentreY - labelCentreY)).toBeLessThanOrEqual(2.5);
-  }
-
-  // "database" and "globe" are drawn with genuinely different side bearings at any shared box size,
-  // their icon-to-label gaps are not expected to match pixel-for-pixel without normalizing the
-  // icon vocabulary itself (inline SVG) — that residual is deliberately not asserted here as a
-  // "must match" quantity.
 });

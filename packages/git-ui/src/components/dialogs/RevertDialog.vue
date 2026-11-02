@@ -78,7 +78,11 @@ function confirm(): void {
       <DialogBody>
         <DialogDescription>
           {{
-            t(isMultiSha ? 'git.dialog.revert.multiple.description' : 'git.dialog.revert.description')
+            t(
+              isMultiSha
+                ? 'git.dialog.revert.multiple.description'
+                : 'git.dialog.revert.description',
+            )
           }}
         </DialogDescription>
 

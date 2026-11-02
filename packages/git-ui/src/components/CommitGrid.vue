@@ -629,7 +629,7 @@ let ancestryRebuildPending = false;
 function scheduleAncestryRebuild(): void {
   if (ancestryRebuildPending) return;
   ancestryRebuildPending = true;
-  void nextTick(() => {
+  void nextTick().then(() => {
     ancestryRebuildPending = false;
     // P74 §4.2/§4.3: rebuilds the ancestry derivation the detail pane's `changeRequestForCommit` reads.
     if (props.changeRequests) props.changeRequests.rebuildAncestry(props.graphView.store);
@@ -741,7 +741,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     container.querySelector<HTMLElement>(`.slick-row[data-row="${row}"]`);
   // When that row is scrolled out of the rendered range (or hidden in a collapsed group), the
   // first rendered row takes the tab stop instead, so a keyboard user can always reach the grid.
-  let tabbableRow = selectedRow >= 0 ? selectedRow : 0;
+  let tabbableRow = Math.max(selectedRow, 0);
   if (tabbableRow < from || tabbableRow > to || rowNodeAt(tabbableRow) === null) {
     tabbableRow = -1;
     for (let row = from; row <= to; row++) {
@@ -1243,7 +1243,7 @@ function focusGrid(): void {
   if (!grid || plan().length === 0) return;
   const selectedStoreRow = props.selection.row.value;
   const selectedDisplayRow = selectedStoreRow >= 0 ? plan().displayRowOf(selectedStoreRow) : -1;
-  const row = selectedDisplayRow >= 0 ? selectedDisplayRow : 0;
+  const row = Math.max(selectedDisplayRow, 0);
   grid.scrollRowIntoView(row);
   pendingFocusRow = row;
   grid.invalidateRows([row]);

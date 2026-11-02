@@ -129,7 +129,11 @@ function copy(): void {
       >
       <AdeChip
         v-if="rebase"
-        :label="rebase.verified ? t('space.ade.outcome.verified.status') : t('space.ade.outcome.notVerified.status')"
+        :label="
+          rebase.verified
+            ? t('space.ade.outcome.verified.status')
+            : t('space.ade.outcome.notVerified.status')
+        "
         :tone="rebase.verified ? 'green' : 'amber'"
       />
       <AdeRunSandboxBadge

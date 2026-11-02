@@ -96,6 +96,7 @@ async function dragTo(
   await expect(async () => {
     nudge += 1;
     await page.mouse.move(end.x + (nudge % 4), end.y, { steps: 2 });
+    // Sortable emulates dragover on a 50ms tick; the nudge needs a tick between moves.
     await page.waitForTimeout(80);
     await landed();
   }).toPass({ timeout: 10_000 });
@@ -178,6 +179,7 @@ export function registerOrderScenarios(env: Env, options: Options): void {
     );
     await page.keyboard.press('Escape');
     await page.mouse.up();
+    // Absence of a move call: no event to await.
     await page.waitForTimeout(100);
 
     expect(calls(control, IPC.customScriptsMove)).toHaveLength(0);
@@ -262,6 +264,7 @@ export function registerOrderScenarios(env: Env, options: Options): void {
       steps: 20,
     });
     await page.mouse.up();
+    // Absence of a move call: no event to await.
     await page.waitForTimeout(100);
     expect(calls(control, IPC.customScriptsMove)).toHaveLength(0);
 

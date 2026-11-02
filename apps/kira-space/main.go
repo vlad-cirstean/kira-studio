@@ -123,7 +123,7 @@ func main() {
 			fatalErr, ok := err.(*application.FatalError)
 			if !ok {
 				// Wails reports a deferred or portal global shortcut failure only here; match its own
-				// message prefixes (wails v3 beta.28 global_shortcut_manager.go, ..._linux_portal.go).
+				// message prefixes (wails v3 3.1.0 global_shortcut_manager.go, ..._linux_portal.go).
 				if msg := err.Error(); strings.HasPrefix(msg, "failed to register global shortcut") || strings.HasPrefix(msg, "global shortcuts:") {
 					bridge.CaptureReportShortcutError(wired.Capture, err)
 				}

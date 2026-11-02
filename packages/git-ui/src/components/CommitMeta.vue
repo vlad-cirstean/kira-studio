@@ -335,11 +335,13 @@ const changeRequestIcon = computed(() => {
             variant="toolbar"
             size="inline"
             :class="cn('ml-auto leading-none', CHANGE_REQUEST_ICON_CLASS[changeRequestIcon!.state])"
-            :aria-label="t('git.changeRequest.open.aria', {
+            :aria-label="
+              t('git.changeRequest.open.aria', {
                 changeRequestNoun: words.changeRequestNoun,
                 number: String(changeRequestIcon!.number),
                 label: words.label,
-              })"
+              })
+            "
             data-testid="commit-meta-change-request-icon"
             @click="openChangeRequest(changeRequestIcon!.number)"
           >
@@ -354,7 +356,9 @@ const changeRequestIcon = computed(() => {
                 title: changeRequestIcon!.title,
               })
             "
-            :rows="[{ label: t('git.changeRequest.state.label'), value: changeRequestIcon!.stateLabel }]"
+            :rows="[
+              { label: t('git.changeRequest.state.label'), value: changeRequestIcon!.stateLabel },
+            ]"
           />
         </TooltipContent>
       </Tooltip>

@@ -87,8 +87,8 @@ function openCheck(c: Check): void {
         data-testid="host-view-mergeable"
         >{{
           detail.mergeable === 'conflicting'
-          ? t('space.hostView.mergeable.conflicting.status')
-          : t('space.hostView.mergeable.clean.status')
+            ? t('space.hostView.mergeable.conflicting.status')
+            : t('space.hostView.mergeable.clean.status')
         }}</p
       >
     </section>

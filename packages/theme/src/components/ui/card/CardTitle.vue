@@ -11,7 +11,12 @@ const props = withDefaults(defineProps<{ class?: HTMLAttributes['class']; as?: s
   <component
     :is="as"
     data-slot="card-title"
-    :class="cn('min-w-0 truncate font-medium group-data-[variant=section]/card:text-kira-sm group-data-[variant=section]/card:font-normal group-data-[variant=section]/card:uppercase group-data-[variant=section]/card:tracking-wider group-data-[variant=section]/card:text-subtle', props.class)"
+    :class="
+      cn(
+        'min-w-0 truncate font-medium group-data-[variant=section]/card:text-kira-sm group-data-[variant=section]/card:font-normal group-data-[variant=section]/card:uppercase group-data-[variant=section]/card:tracking-wider group-data-[variant=section]/card:text-subtle',
+        props.class,
+      )
+    "
   >
     <slot />
   </component>

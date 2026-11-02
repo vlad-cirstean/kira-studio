@@ -158,7 +158,7 @@ watch(
   () => rows.value.length,
   (next, prev) => {
     if (next <= prev) return;
-    void nextTick(() => {
+    void nextTick().then(() => {
       const last = containerRef.value?.querySelector('.field-row:last-child');
       if (last) revealElement(last);
     });
@@ -333,7 +333,9 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
             :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
-            :candidates="valueCandidatesFor ? rowValueCandidates(entry.row) : valueVariableSupport.candidates"
+            :candidates="
+              valueCandidatesFor ? rowValueCandidates(entry.row) : valueVariableSupport.candidates
+            "
             :token-at="valueCandidatesFor ? headerValueToken : templateToken"
             :range-highlights="valueVariableSupport.rangeHighlights"
             :hover-at="valueVariableSupport.hoverAt"

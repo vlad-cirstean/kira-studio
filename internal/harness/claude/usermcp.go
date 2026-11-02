@@ -1,216 +1,228 @@
 package claude
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"regexp"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/google/renameio/v2"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
-const (
-	listToolsTimeout = 15 * time.Second
-	maxListedTools   = 200
+const mcpListTimeout = 30 * time.Second
+
+var (
+	mcpListTTL = 30 * time.Second
+	// mcpPresenceTTL is how long the presence check reuses a list: names change rarely, while the
+	// picker wants fresh health status.
+	mcpPresenceTTL = 5 * time.Minute
 )
 
-type rawServer struct {
-	Type    string            `json:"type"`
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Env     map[string]string `json:"env"`
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers"`
+// SetMCPListTTL replaces how long a `claude mcp list` result is reused, for the picker and the
+// presence check alike, and returns the restore func (a flow test passes 0 to see a config change at once).
+func SetMCPListTTL(d time.Duration) (restore func()) {
+	prevList, prevPresence := mcpListTTL, mcpPresenceTTL
+	mcpListTTL, mcpPresenceTTL = d, d
+	return func() { mcpListTTL, mcpPresenceTTL = prevList, prevPresence }
 }
 
-func (r rawServer) transport() string {
-	switch r.Type {
-	case "http", "sse":
-		return r.Type
-	case "", "stdio":
-		if r.Command == "" && r.URL != "" {
-			return "http"
-		}
-		return "stdio"
-	}
-	return r.Type
-}
+// mcpListArgs is the argv after claude: the only way Kira learns the user's servers.
+var mcpListArgs = []string{"mcp", "list"}
 
-// userConfigPath is the Claude user-scope config file: $CLAUDE_CONFIG_DIR/.claude.json, else
-// $HOME/.claude.json.
-func userConfigPath(env func(string) string) string {
-	if d := env("CLAUDE_CONFIG_DIR"); d != "" {
-		return filepath.Join(d, ".claude.json")
-	}
-	return filepath.Join(env("HOME"), ".claude.json")
-}
+// errMCPList is the only error a failed listing surfaces; claude's output never reaches it.
+var errMCPList = errors.New("could not list your Claude MCP servers")
 
-// readUserServers reads the top-level mcpServers of the user's Claude config. The file is never
-// written. A missing file is no servers.
-func readUserServers(env func(string) string) (map[string]json.RawMessage, error) {
-	data, err := os.ReadFile(userConfigPath(env))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not read your Claude config: %w", err)
-	}
-	var doc struct {
-		MCPServers map[string]json.RawMessage `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("could not read your Claude config: %w", err)
-	}
-	return doc.MCPServers, nil
-}
+var listLine = regexp.MustCompile(`^([A-Za-z0-9_-]+): (.*?) - [^\s\p{L}\p{N}]+ (.*)$`)
 
-// UserMCPServers lists the MCP servers of the user's Claude config (user scope only), by name.
-func (*Provider) UserMCPServers(env func(string) string) ([]harness.UserServer, error) {
-	raw, err := readUserServers(env)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]harness.UserServer, 0, len(raw))
-	for name, msg := range raw {
-		var r rawServer
-		if json.Unmarshal(msg, &r) != nil {
+// parseMCPList reads `claude mcp list` output: one `<name>: <target> - <glyph> <status>` line per
+// server. Lines of any other shape (banner, blank, claude.ai connectors whose names have spaces) are
+// skipped. Only name, transport, host or command name and a status class are kept: never args, paths,
+// query strings or the rest of a line.
+func parseMCPList(out string) []harness.UserServer {
+	servers := []harness.UserServer{}
+	for _, line := range strings.Split(out, "\n") {
+		m := listLine.FindStringSubmatch(strings.TrimRight(line, "\r"))
+		if m == nil {
 			continue
 		}
-		s := harness.UserServer{Name: name, Transport: r.transport()}
+		target := strings.TrimSpace(m[2])
+		s := harness.UserServer{Name: m[1], Transport: "stdio", Status: statusOf(m[3])}
+		switch {
+		case strings.HasSuffix(target, " (HTTP)"):
+			s.Transport, target = "http", strings.TrimSuffix(target, " (HTTP)")
+		case strings.HasSuffix(target, " (SSE)"):
+			s.Transport, target = "sse", strings.TrimSuffix(target, " (SSE)")
+		}
 		if s.Transport == "stdio" {
-			s.Target = filepath.Base(r.Command)
-		} else if u, err := url.Parse(r.URL); err == nil {
+			first, _, _ := strings.Cut(target, " ")
+			s.Target = filepath.Base(first)
+		} else if u, err := url.Parse(strings.TrimSpace(target)); err == nil {
 			s.Target = u.Host
 		}
-		out = append(out, s)
+		servers = append(servers, s)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out, nil
+	return servers
 }
 
-type headerTransport struct {
-	headers map[string]string
-	base    http.RoundTripper
+func statusOf(text string) string {
+	t := strings.ToLower(strings.TrimSpace(text))
+	switch {
+	case strings.HasPrefix(t, "connected"):
+		return "connected"
+	case strings.Contains(t, "authenticat"):
+		return "needsAuth"
+	case strings.HasPrefix(t, "failed"):
+		return "failed"
+	case strings.HasPrefix(t, "pending"), strings.HasPrefix(t, "connecting"):
+		return "pending"
+	}
+	return "unknown"
 }
 
-func (h headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r = r.Clone(r.Context())
-	for k, v := range h.headers {
-		r.Header.Set(k, v)
-	}
-	return h.base.RoundTrip(r)
+type listCache struct {
+	mu      sync.Mutex
+	entries map[string]listEntry
+	flight  singleflight.Group
 }
 
-// UserMCPTools connects to one user MCP server as a client and lists its tools. cwd is the working
-// directory of a stdio server.
-func (*Provider) UserMCPTools(ctx context.Context, env func(string) string, name, cwd string) ([]harness.UserTool, error) {
-	tools, err := listTools(ctx, env, name, cwd)
-	if err != nil {
-		return nil, fmt.Errorf("could not list tools of %s: %w", name, err)
-	}
-	return tools, nil
+type listEntry struct {
+	servers []harness.UserServer
+	at      time.Time
 }
 
-func listTools(ctx context.Context, env func(string) string, name, cwd string) ([]harness.UserTool, error) {
-	all, err := readUserServers(env)
-	if err != nil {
-		return nil, err
-	}
-	msg, ok := all[name]
-	if !ok {
-		return nil, errors.New("it is not in your Claude config")
-	}
-	var r rawServer
-	if err := json.Unmarshal(msg, &r); err != nil {
-		return nil, errors.New("its config is not valid")
-	}
-	ctx, cancel := context.WithTimeout(ctx, listToolsTimeout)
-	defer cancel()
-
-	var transport mcp.Transport
-	switch r.transport() {
-	case "stdio":
-		if r.Command == "" {
-			return nil, errors.New("it has no command")
+// UserMCPServers asks `claude mcp list` from dir for the MCP servers claude loads there. Kira never
+// opens claude's config files or runs `claude mcp get`, which prints stored headers and env. Claude
+// health-checks every server on each call, so the result is cached per dir for a short while. A failed
+// listing falls back to the last good one for that dir, with every status reset to unknown.
+func (p *Provider) UserMCPServers(ctx context.Context, dir string) ([]harness.UserServer, error) {
+	servers, stale, err := p.userServers(ctx, dir, mcpListTTL)
+	if stale {
+		for i := range servers {
+			servers[i].Status = "unknown"
 		}
-		cmd := exec.CommandContext(ctx, r.Command, r.Args...)
-		cmd.Dir = cwd
-		cmd.Env = os.Environ()
-		for k, v := range r.Env {
-			cmd.Env = append(cmd.Env, k+"="+v)
-		}
-		transport = &mcp.CommandTransport{Command: cmd, TerminateDuration: time.Second}
-	case "http":
-		transport = &mcp.StreamableClientTransport{Endpoint: r.URL, HTTPClient: &http.Client{Transport: headerTransport{r.Headers, http.DefaultTransport}}, MaxRetries: -1}
-	case "sse":
-		transport = &mcp.SSEClientTransport{Endpoint: r.URL, HTTPClient: &http.Client{Transport: headerTransport{r.Headers, http.DefaultTransport}}}
-	default:
-		return nil, fmt.Errorf("transport %q is not supported", r.Type)
 	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "kira", Version: "1"}, nil)
-	session, err := client.Connect(ctx, transport, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer session.Close()
+	return servers, err
+}
 
-	var out []harness.UserTool
-	for t, err := range session.Tools(ctx, nil) {
+// UserMCPPresence is the list for the presence check of the want names. A cached list younger than
+// mcpPresenceTTL answers when it has every name; a miss is a reason to re-list, not a verdict, unless
+// the list is younger than the picker's TTL. With wait false it never blocks: it refreshes in the
+// background and returns the cached list only when that list has every name, else known=false.
+func (p *Provider) UserMCPPresence(ctx context.Context, dir string, want []string, wait bool) (servers []harness.UserServer, known bool, err error) {
+	c := &p.mcpList
+	c.mu.Lock()
+	e, have := c.entries[dir]
+	c.mu.Unlock()
+	age := time.Since(e.at)
+	complete := have && hasAll(e.servers, want)
+	if have && ((complete && age < mcpPresenceTTL) || age < mcpListTTL) {
+		return append([]harness.UserServer{}, e.servers...), true, nil
+	}
+	if wait || mcpPresenceTTL <= 0 {
+		servers, _, err = p.userServers(ctx, dir, mcpListTTL)
+		return servers, err == nil, err
+	}
+	go func() {
+		_, _, _ = p.userServers(context.Background(), dir, 0)
+	}()
+	if complete {
+		return append([]harness.UserServer{}, e.servers...), true, nil
+	}
+	return nil, false, nil
+}
+
+func hasAll(servers []harness.UserServer, want []string) bool {
+	for _, name := range want {
+		if !slices.ContainsFunc(servers, func(u harness.UserServer) bool { return u.Name == name }) {
+			return false
+		}
+	}
+	return true
+}
+
+type listResult struct {
+	servers []harness.UserServer
+	stale   bool
+}
+
+// userServers lists dir, reusing a result younger than ttl. stale is true when a failed listing fell
+// back to the last good one. The shared flight runs on a context detached from the first caller, so
+// one caller stopping never fails the others; each caller waits under its own ctx.
+func (p *Provider) userServers(ctx context.Context, dir string, ttl time.Duration) (servers []harness.UserServer, stale bool, err error) {
+	c := &p.mcpList
+	c.mu.Lock()
+	if e, ok := c.entries[dir]; ok && time.Since(e.at) < ttl {
+		c.mu.Unlock()
+		return append([]harness.UserServer{}, e.servers...), false, nil
+	}
+	c.mu.Unlock()
+	flightCtx := context.WithoutCancel(ctx)
+	ch := c.flight.DoChan(dir, func() (any, error) {
+		servers, err := p.runMCPList(flightCtx, dir)
 		if err != nil {
+			// A slow or hung server must not block runs: reuse the last good list.
+			c.mu.Lock()
+			old, ok := c.entries[dir]
+			c.mu.Unlock()
+			if ok {
+				return listResult{old.servers, true}, nil
+			}
 			return nil, err
 		}
-		if len(out) == maxListedTools {
-			break
+		c.mu.Lock()
+		if c.entries == nil {
+			c.entries = map[string]listEntry{}
 		}
-		out = append(out, harness.UserTool{Name: t.Name, Description: firstLine(t.Description)})
+		c.entries[dir] = listEntry{servers, time.Now()}
+		c.mu.Unlock()
+		return listResult{servers, false}, nil
+	})
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	case r := <-ch:
+		if r.Err != nil {
+			return nil, false, r.Err
+		}
+		res := r.Val.(listResult)
+		return append([]harness.UserServer{}, res.servers...), res.stale, nil
 	}
-	return out, nil
 }
 
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
-	if r := []rune(line); len(r) > 200 {
-		return string(r[:200]) + "…"
+func (p *Provider) runMCPList(ctx context.Context, dir string) ([]harness.UserServer, error) {
+	if _, err := p.Locate(ctx, ""); err != nil {
+		return nil, errMCPList
 	}
-	return line
-}
-
-// WriteUserMCPConfig copies the named servers from the user's Claude config into a 0600 --mcp-config
-// file under dir (0700). release removes the file.
-func (*Provider) WriteUserMCPConfig(env func(string) string, dir, runID string, names []string) (path string, release func(), err error) {
-	all, err := readUserServers(env)
-	if err != nil {
-		return "", nil, err
-	}
-	picked := map[string]json.RawMessage{}
-	for _, n := range names {
-		msg, ok := all[n]
-		if !ok {
-			return "", nil, harness.ErrServerGone{Name: n, Agent: "Claude"}
+	ctx, cancel := context.WithTimeout(ctx, mcpListTimeout)
+	defer cancel()
+	shell, login := loginshell.ResolveShell(os.Getenv, loginshell.IsExecutableFile)
+	argv := loginshell.BuildArgv(shell, login, "exec claude "+strings.Join(mcpListArgs, " "))
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = dir
+	cmd.Env = p.ScrubEnv(os.Environ())
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("%w: timed out", errMCPList)
 		}
-		picked[n] = msg
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return nil, fmt.Errorf("%w: exit code %d", errMCPList, ee.ExitCode())
+		}
+		return nil, errMCPList
 	}
-	body, err := json.Marshal(map[string]any{"mcpServers": picked})
-	if err != nil {
-		return "", nil, err
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", nil, fmt.Errorf("claude: config dir: %w", err)
-	}
-	path = filepath.Join(dir, runID+"-user.mcp.json")
-	if err := renameio.WriteFile(path, body, 0o600); err != nil {
-		return "", nil, fmt.Errorf("claude: write user mcp config: %w", err)
-	}
-	return path, func() { _ = os.Remove(path) }, nil
+	return parseMCPList(out.String()), nil
 }

@@ -311,7 +311,10 @@ onUnmounted(() => {
         }}</span>
         <span class="text-kira-sm text-subtle" data-testid="grpc-message-summary">
           {{
-            t('studio.grpc.response.summary.status', { count: messageCount, size: formatBytes(messageBytes) })
+            t('studio.grpc.response.summary.status', {
+              count: messageCount,
+              size: formatBytes(messageBytes),
+            })
           }}
         </span>
       </template>
@@ -347,7 +350,10 @@ onUnmounted(() => {
 
     <Alert strip v-if="viewing" variant="info" data-testid="grpc-history-band">
       <AlertDescription>{{
-        t('studio.grpc.response.viewing.status', { time: viewingTime, method: viewing?.snapshot.method ?? '' })
+        t('studio.grpc.response.viewing.status', {
+          time: viewingTime,
+          method: viewing?.snapshot.method ?? '',
+        })
       }}</AlertDescription>
       <AlertAction>
         <Button
@@ -357,7 +363,9 @@ onUnmounted(() => {
           @click="onBackToLatest"
         >
           {{
-            rt?.result ? t('studio.grpc.response.backToLatest.label') : t('common.action.close.label')
+            rt?.result
+              ? t('studio.grpc.response.backToLatest.label')
+              : t('common.action.close.label')
           }}
         </Button>
       </AlertAction>
@@ -374,7 +382,10 @@ onUnmounted(() => {
     >
       <AlertDescription>
         {{
-          t('studio.grpc.response.firstMessages.description', { shown: messages.length, total: viewing.snapshot.entry.messageCount })
+          t('studio.grpc.response.firstMessages.description', {
+            shown: messages.length,
+            total: viewing.snapshot.entry.messageCount,
+          })
         }}
       </AlertDescription>
     </Alert>
@@ -409,7 +420,10 @@ onUnmounted(() => {
     <Alert strip v-if="liveMessagesElided" variant="info" data-testid="grpc-live-messages-elided">
       <AlertDescription>
         {{
-          t('studio.grpc.response.recentMessages.description', { shown: messages.length, total: rt?.trueMessageCount ?? 0 })
+          t('studio.grpc.response.recentMessages.description', {
+            shown: messages.length,
+            total: rt?.trueMessageCount ?? 0,
+          })
         }}
       </AlertDescription>
     </Alert>
@@ -467,12 +481,19 @@ onUnmounted(() => {
                  box-sizing. -->
             <button
               type="button"
-              :class="cn(rowVariants(), 'box-border w-full rounded-none border-0 border-b border-border bg-none px-1.5')"
+              :class="
+                cn(
+                  rowVariants(),
+                  'box-border w-full rounded-none border-0 border-b border-border bg-none px-1.5',
+                )
+              "
               :style="{ height: `${messageRowHeight}px` }"
               @click="toggleExpanded(entry.m.seq)"
             >
               <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">{{
-                t('studio.grpc.response.offset.status', { duration: formatDuration(entry.m.offsetMs) })
+                t('studio.grpc.response.offset.status', {
+                  duration: formatDuration(entry.m.offsetMs),
+                })
               }}</span>
               <span class="text-kira-sm text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">

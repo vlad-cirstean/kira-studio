@@ -296,7 +296,11 @@ async function onDeleteMessage(): Promise<void> {
         <TooltipIconButton
           v-if="gate.canInsertCaps.value"
           :icon="ICON.add"
-          :label="gate.stale.value ? t('studio.common.connectionLost.tooltip') : t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
+          :label="
+            gate.stale.value
+              ? t('studio.common.connectionLost.tooltip')
+              : t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')
+          "
           disabled-trigger
           :disabled="gate.stale.value"
           :aria-label="t('studio.stream.addMessage.aria')"

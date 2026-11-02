@@ -574,13 +574,13 @@ same release as Kira Studio's own disk image** — one `release.yml` build job, 
 
 **ONNX Runtime (P210).** `darwin:package` and `darwin:package:universal` depend on `fetch:onnxruntime`
 (`scripts/fetch-onnxruntime.sh osx-arm64`: MIT release tgz, SHA-256 pinned, extracted to the gitignored
-`apps/kira-space/build/onnxruntime/osx-arm64/`). `create:app:bundle` copies `libonnxruntime.1.29.1.dylib`
+`apps/kira-space/build/onnxruntime/osx-arm64/`). `create:app:bundle` copies `libonnxruntime.1.31.1.dylib`
 into `Contents/Frameworks/` and its LICENSE and ThirdPartyNotices into `Contents/Resources/`, before
-`codesign:adhoc`, and fails loudly if the dylib is missing. The dylib is arm64-only (ORT 1.29.1 has no
+`codesign:adhoc`, and fails loudly if the dylib is missing. The dylib is arm64-only (ORT 1.31.1 has no
 x86_64 macOS build); the universal bundle's x86_64 slice reports embeddings unavailable. Adds about
 43 MB to the bundle. `memory-embed` is the same executable run as a subcommand, so no extra binary
 needs signing. Mac verification is a human item (see `docs/ARCHITECTURE.md` Known open items):
-`Contents/Frameworks/libonnxruntime.1.29.1.dylib` present, `codesign --verify --deep --strict` passes,
+`Contents/Frameworks/libonnxruntime.1.31.1.dylib` present, `codesign --verify --deep --strict` passes,
 worker footprint in Activity Monitor at most 150 MB.
 
 **Not yet run in this environment** for the same reason as Kira Studio's own §3/§4: this sandbox is

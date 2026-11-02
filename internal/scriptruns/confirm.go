@@ -42,7 +42,7 @@ func (s *Service) ConfirmAccept(runID, hash string, secrets map[string][]string)
 	} else if active != nil {
 		return Started{}, ipcerr.New(string(ipcerr.CodeConflict), overlapText(*rec, *active))
 	}
-	p, err := s.plan(scheduleArgs(*rec, secrets), planOpts{headless: true})
+	p, err := s.plan(s.lifeCtx(), scheduleArgs(*rec, secrets), planOpts{headless: true})
 	if err != nil {
 		return Started{}, err
 	}
@@ -68,7 +68,7 @@ func (s *Service) RunScheduleNow(scriptID, hash string, secrets map[string][]str
 	} else if active != nil {
 		return Started{}, ipcerr.New(string(ipcerr.CodeConflict), overlapText(*rec, *active))
 	}
-	p, err := s.plan(scheduleArgs(*rec, secrets), planOpts{headless: true})
+	p, err := s.plan(s.lifeCtx(), scheduleArgs(*rec, secrets), planOpts{headless: true})
 	if err != nil {
 		return Started{}, err
 	}

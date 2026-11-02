@@ -156,10 +156,12 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         :chip="hostLabels.chipOf(hostLink)"
         :text="hostLink?.ref ?? ''"
         :url="hostLink ? task.hostUrl : ''"
-        :placeholder="t('space.ade.taskTab.linkPlaceholder.placeholder', {
+        :placeholder="
+          t('space.ade.taskTab.linkPlaceholder.placeholder', {
             labels: hostLabels.labels.value,
             shorts: hostLabels.shorts.value,
-          })"
+          })
+        "
         :error="links.hostError.value"
         :viewable="hostLink?.kind === 'changeRequest' && !!task.hostUrl"
         @view="fireAndForget(openView.mutateAsync(task.hostUrl), 'hostView.open')"

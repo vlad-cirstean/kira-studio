@@ -77,6 +77,8 @@ export default defineConfig({
       fullyParallel: true,
       workers: '100%',
     },
+    // CI runs this with `--no-deps` (pr.yml). Locally it is out of `test:ui:studio`: it needs an
+    // idle host, so run `bun run test:ui:timing:studio` alone (P443).
     {
       name: 'ui-timing',
       testDir: './tests/ui',

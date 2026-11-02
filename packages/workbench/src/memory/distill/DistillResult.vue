@@ -105,7 +105,7 @@ function importDocument(): void {
         >
           <CodiconIcon name="check" :size="12" />
         </Checkbox>
-        <Label for="distill-select-all">{{ t('memory.distill.selectAll.label') }}</Label>
+        <Label for="distill-select-all">{{ t('common.action.selectAll.label') }}</Label>
       </div>
       <ul class="m-0 flex list-none flex-col gap-1 p-0">
         <li v-for="(line, i) in lines" :key="i" class="flex items-start gap-1.5">

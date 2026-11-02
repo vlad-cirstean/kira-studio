@@ -11,7 +11,9 @@ import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { formatDateTime } from '@workbench/behaviour/format';
-import { computed, useId } from 'vue';
+import { computed, ref, useId } from 'vue';
+import ClusterMcpDialog from '../../kubernetes/components/ClusterMcpDialog.vue';
+import { useClusters } from '../../kubernetes/queries';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
@@ -124,6 +126,17 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
 
 // P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
+// P440: Kubernetes clusters get the same read-only glance; the dialog edits modes and description.
+const kubeClusters = useClusters();
+const kubeList = computed(() => kubeClusters.data.value?.clusters ?? []);
+const kubeEditId = ref('');
+const kubeEditOpen = computed({
+  get: () => kubeEditId.value !== '',
+  set: (v) => {
+    if (!v) kubeEditId.value = '';
+  },
+});
+
 const dbMcpEnabledId = useId();
 const dbMcpPreviewId = useId();
 const dbMcpFocusId = useId();
@@ -229,7 +242,9 @@ const dbMcpFocusId = useId();
         {{
           dbMcpTokenExpired
             ? t('studio.settings.dbMcp.tokenExpired.body')
-            : t('studio.settings.dbMcp.tokenValid.body', { date: formatDateTime(dbMcpStore.status.expiresAt) })
+            : t('studio.settings.dbMcp.tokenValid.body', {
+                date: formatDateTime(dbMcpStore.status.expiresAt),
+              })
         }}
       </FieldDescription>
     </template>
@@ -251,11 +266,16 @@ const dbMcpFocusId = useId();
           <div class="flex flex-col min-w-0 gap-0.5">
             <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
             <FieldDescription>{{
-              t(conn.mcpAutoExplain ? 'studio.settings.dbMcp.modesPlans.status' : 'studio.settings.dbMcp.modes.status', {
-                read: conn.mcpReadMode,
-                write: conn.mcpWriteMode,
-                ddl: conn.mcpDdlMode,
-              })
+              t(
+                conn.mcpAutoExplain
+                  ? 'studio.settings.dbMcp.modesPlans.status'
+                  : 'studio.settings.dbMcp.modes.status',
+                {
+                  read: conn.mcpReadMode,
+                  write: conn.mcpWriteMode,
+                  ddl: conn.mcpDdlMode,
+                },
+              )
             }}</FieldDescription>
             <FieldDescription
               v-if="conn.mcpReviewResults !== 'inherit'"
@@ -278,7 +298,9 @@ const dbMcpFocusId = useId();
               v-if="maskRuleCountsQuery.data.value?.[conn.id]"
               :data-testid="`db-mcp-connection-masked-${conn.id}`"
               >{{
-                t('studio.settings.dbMcp.masked.status', { count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0 })
+                t('studio.settings.dbMcp.masked.status', {
+                  count: maskRuleCountsQuery.data.value?.[conn.id] ?? 0,
+                })
               }}</FieldDescription
             >
           </div>
@@ -293,6 +315,50 @@ const dbMcpFocusId = useId();
     <FieldDescription v-else data-testid="db-mcp-connections-empty">
       {{ t('studio.settings.dbMcp.empty.empty') }}
     </FieldDescription>
+
+    <FieldLegend>{{ t('studio.settings.dbMcp.kube.legend.label') }}</FieldLegend>
+    <FieldDescription>{{ t('studio.settings.dbMcp.kube.intro.description') }}</FieldDescription>
+    <ul
+      v-if="kubeList.length"
+      class="flex flex-col m-0 p-0 list-none gap-0.5"
+      data-testid="db-mcp-kube-list"
+    >
+      <li v-for="cluster in kubeList" :key="cluster.id">
+        <Card
+          variant="list"
+          class="flex-row items-center justify-between gap-1.5"
+          :data-testid="`db-mcp-kube-row-${cluster.id}`"
+        >
+          <div class="flex flex-col min-w-0 gap-0.5">
+            <span class="break-words text-fg text-kira-md">{{ cluster.context }}</span>
+            <FieldDescription>{{
+              t('studio.settings.dbMcp.kube.modes.status', {
+                discover: cluster.mcp.discover,
+                list: cluster.mcp.list,
+                describe: cluster.mcp.describe,
+                logs: cluster.mcp.logs,
+              })
+            }}</FieldDescription>
+            <FieldDescription v-if="cluster.mcp.description">{{
+              cluster.mcp.description.split('\n', 1)[0]
+            }}</FieldDescription>
+          </div>
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            :data-testid="`db-mcp-kube-edit-${cluster.id}`"
+            @click="kubeEditId = cluster.id"
+          >
+            {{ t('common.action.edit.label') }}
+          </Button>
+        </Card>
+      </li>
+    </ul>
+    <FieldDescription v-else data-testid="db-mcp-kube-empty">
+      {{ t('studio.settings.dbMcp.kube.empty.empty') }}
+    </FieldDescription>
+    <ClusterMcpDialog v-if="kubeEditId" v-model:open="kubeEditOpen" :cluster-id="kubeEditId" />
+
     <Alert v-if="actionError" variant="error" data-testid="settings-action-error">
       <AlertDescription>{{ actionError }}</AlertDescription>
     </Alert>

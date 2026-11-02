@@ -288,7 +288,13 @@ function onCloseSearch(): void {
             <div ref="previewAnchorRef" class="relative">
               <TooltipIconButton
                 icon="eye"
-                :label="stale ? t('studio.common.connectionLost.tooltip') : isWritable ? t('studio.grid.previewCommand.label') : t('studio.common.connectionReadOnly.tooltip')"
+                :label="
+                  stale
+                    ? t('studio.common.connectionLost.tooltip')
+                    : isWritable
+                      ? t('studio.grid.previewCommand.label')
+                      : t('studio.common.connectionReadOnly.tooltip')
+                "
                 :aria-label="t('studio.grid.previewCommand.label')"
                 disabled-trigger
                 data-testid="toolbar-preview-command"
@@ -309,7 +315,11 @@ function onCloseSearch(): void {
           />
           <TooltipIconButton
             icon="save"
-            :label="stale ? t('studio.common.connectionLost.tooltip') : t('studio.grid.commitPending.label')"
+            :label="
+              stale
+                ? t('studio.common.connectionLost.tooltip')
+                : t('studio.grid.commitPending.label')
+            "
             :aria-label="t('studio.grid.commitPending.label')"
             disabled-trigger
             variant="toolbar-primary"

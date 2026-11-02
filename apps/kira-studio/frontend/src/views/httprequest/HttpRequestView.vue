@@ -176,13 +176,14 @@ const variables = computed(() =>
   variableSupport(colRows.data.value ?? [], envRows.data.value ?? []),
 );
 
-const unresolvedRefs = computed(() => {
+const resolvedTab = computed(() => {
   const { values, secretNames } = mergeVariableRows(
     colRows.data.value ?? [],
     envRows.data.value ?? [],
   );
-  return unresolvedOf(resolveTabState(props.tab.state, values, secretNames).refs);
+  return resolveTabState(props.tab.state, values, secretNames);
 });
+const unresolvedRefs = computed(() => unresolvedOf(resolvedTab.value.refs));
 const saveTooltip = computed(() => {
   if (incognito.value) return t('studio.api.common.save.incognito.tooltip');
   if (unresolved.value) return t('studio.api.common.save.checking.tooltip');
@@ -261,13 +262,7 @@ const effectiveSslVerify = computed(
 const effectiveDisableCookieJar = computed(
   () => props.tab.state.settings.disableCookieJar ?? settingsStore.api.disableCookieJar,
 );
-const resolvedCookiesUrl = computed(() => {
-  const { values, secretNames } = mergeVariableRows(
-    colRows.data.value ?? [],
-    envRows.data.value ?? [],
-  );
-  return resolveTabState(props.tab.state, values, secretNames).url;
-});
+const resolvedCookiesUrl = computed(() => resolvedTab.value.url);
 const cookiesUrl = refDebounced(resolvedCookiesUrl, TIMING.preview);
 const jarCookies = useJarCookies(cookiesUrl, () => !effectiveDisableCookieJar.value);
 function toggleFieldFilter(): void {
@@ -459,7 +454,11 @@ onUnmounted(() => {
         />
         <TooltipIconButton
           icon="eye-closed"
-          :label="incognito ? t('studio.api.common.incognitoOff.tooltip') : t('studio.api.common.incognitoOn.tooltip')"
+          :label="
+            incognito
+              ? t('studio.api.common.incognitoOff.tooltip')
+              : t('studio.api.common.incognitoOn.tooltip')
+          "
           :aria-label="t('studio.tabs.incognito.label')"
           :pressed="incognito"
           data-testid="http-incognito-toggle"
@@ -486,7 +485,11 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="showFieldFilterToggle"
         icon="note"
-        :label="tab.state.fieldDescriptions ? t('studio.api.common.descriptionsHide.tooltip') : t('studio.api.common.descriptionsShow.tooltip')"
+        :label="
+          tab.state.fieldDescriptions
+            ? t('studio.api.common.descriptionsHide.tooltip')
+            : t('studio.api.common.descriptionsShow.tooltip')
+        "
         :aria-label="t('studio.api.common.descriptions.aria')"
         :pressed="tab.state.fieldDescriptions"
         data-testid="http-field-descriptions-toggle"

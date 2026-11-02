@@ -293,7 +293,11 @@ const breadcrumb = computed(() => {
            all — a find-in-document bar for Source, a plain substring filter for Structure. -->
       <TooltipIconButton
         :icon="ICON.search"
-        :label="pane === 'source' ? t('studio.definition.search.source.tooltip') : t('studio.definition.structureFilter.placeholder')"
+        :label="
+          pane === 'source'
+            ? t('studio.definition.search.source.tooltip')
+            : t('studio.definition.structureFilter.placeholder')
+        "
         :aria-label="t('common.action.search.label')"
         :data-active="searchOpen"
         data-testid="definition-search-toggle"

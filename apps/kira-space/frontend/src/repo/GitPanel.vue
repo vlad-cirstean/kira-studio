@@ -162,7 +162,9 @@ onUnmounted(() => {
       <template #actions>
         <TooltipIconButton
           icon="search"
-          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
+          :label="
+            showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')
+          "
           :pressed="showSearch"
           data-testid="toggle-search"
           @click="toggleSearch"
@@ -170,7 +172,11 @@ onUnmounted(() => {
         <TooltipIconButton
           v-if="tab === 'repos' && (visibility.hasHidden || visibility.showHidden)"
           :icon="visibility.showHidden ? 'eye' : 'eye-closed'"
-          :label="visibility.showHidden ? t('space.repo.panel.hideHidden.tooltip') : t('space.repo.panel.showHidden.tooltip')"
+          :label="
+            visibility.showHidden
+              ? t('space.repo.panel.hideHidden.tooltip')
+              : t('space.repo.panel.showHidden.tooltip')
+          "
           :pressed="visibility.showHidden"
           data-testid="repos-show-hidden"
           @click="visibility.showHidden = !visibility.showHidden"

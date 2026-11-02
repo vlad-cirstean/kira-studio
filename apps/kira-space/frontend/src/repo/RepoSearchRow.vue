@@ -68,13 +68,7 @@ function onDblClick(): void {
   <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
   <div
     v-if="row.kind === 'file'"
-    :class="
-      cn(
-        rowVariants({ layout: 'tree', selected }),
-        'h-row',
-        props.class,
-      )
-    "
+    :class="cn(rowVariants({ layout: 'tree', selected }), 'h-row', props.class)"
     :style="rowIndent(0)"
     data-testid="repo-search-file-row"
     :data-path="row.path"
@@ -106,13 +100,7 @@ function onDblClick(): void {
   <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
   <div
     v-else
-    :class="
-      cn(
-        rowVariants({ layout: 'tree', selected }),
-        'h-row font-data',
-        props.class,
-      )
-    "
+    :class="cn(rowVariants({ layout: 'tree', selected }), 'h-row font-data', props.class)"
     :style="rowIndent(1)"
     data-testid="repo-search-match-row"
     :data-path="row.path"

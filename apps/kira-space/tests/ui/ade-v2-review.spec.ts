@@ -505,8 +505,10 @@ reviewTest(
     await expect.poll(reads).toBeGreaterThan(before);
     const after = reads();
     await emitAgentEvent(page, agent.session.terminalId, 'PostToolUse', '/tmp/elsewhere');
-    await page.waitForTimeout(600);
-    expect(reads()).toBe(after);
+    // The matching event is the barrier: exactly one more read proves the elsewhere one caused none.
+    await emitAgentEvent(page, agent.session.terminalId, 'PostToolUse', `${target.worktree}/src`);
+    await expect.poll(reads).toBeGreaterThan(after);
+    expect(reads()).toBe(after + 1);
   },
 );
 
@@ -523,6 +525,7 @@ reviewTest(
     await expect.poll(reads).toBeGreaterThan(0);
     const before = reads();
     await emitWailsEvent(page, IPC.adeTaskBoardChanged, null);
+    // Absence of a read: this event has no matching one to use as a barrier.
     await page.waitForTimeout(600);
     expect(reads()).toBe(before);
   },
@@ -836,10 +839,10 @@ reviewTest('a ref change of the repo rechecks the head', async ({ relaunch }) =>
   await expect(page.locator(t('ade-review-head'))).toBeVisible();
   const before = await checks();
   await gitStreamEmit(page, 'repo.changed', { repoId: 'other-repo', kind: 'refsChanged' });
-  await page.waitForTimeout(600);
-  expect(await checks()).toBe(before);
+  // The matching event is the barrier: exactly one more check proves the other repo's caused none.
   await gitStreamEmit(page, 'repo.changed', { repoId: target.gitRepoId, kind: 'refsChanged' });
   await expect.poll(checks).toBeGreaterThan(before);
+  expect(await checks()).toBe(before + 1);
 });
 
 reviewTest('no head indicator without a change request', async ({ relaunch }) => {

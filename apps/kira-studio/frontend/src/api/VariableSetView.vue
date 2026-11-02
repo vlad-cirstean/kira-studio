@@ -421,7 +421,7 @@ watch(
     const isInitialLoad = !hasLoadedOnce;
     hasLoadedOnce = true;
     if (isInitialLoad || next <= prev) return;
-    void nextTick(() => {
+    void nextTick().then(() => {
       const last = listRef.value?.querySelector('.variable-row:last-child');
       if (last) revealElement(last);
     });
@@ -533,7 +533,9 @@ function onBulkClose(): void {
            grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same allowlist gap as .overview-row
            (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue) -->
       <div
-        :class="cn(tableHeadRowClass, 'grid gap-1 px-1.5 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]')"
+        :class="
+          cn(tableHeadRowClass, 'grid gap-1 px-1.5 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]')
+        "
       >
         <span></span>
         <span :class="headCell">{{ t('common.field.name.label') }}</span>
@@ -554,7 +556,9 @@ function onBulkClose(): void {
         :duplicate="duplicateFor(row)"
         :trailing="row.id === ''"
         :filtered="isFiltered"
-        :secrets-unavailable="!!connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
+        :secrets-unavailable="
+          !!connectionsStore.secretStorage && !connectionsStore.secretStorage.available
+        "
         @update:name="onUpdateName(row.id, $event)"
         @update:value="onUpdateValue(row.id, $event)"
         @update:is-secret="onUpdateSecret(row.id, $event)"

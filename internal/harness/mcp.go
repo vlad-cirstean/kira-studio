@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// MCPHost renders MCP wiring in the provider's formats and reads the user's own MCP servers.
+// MCPHost renders MCP wiring in the provider's formats and lists the user's own MCP servers.
 type MCPHost interface {
 	// MCPConfig is the provider's config document for servers.
 	MCPConfig(servers []MCPServer) ([]byte, error)
@@ -12,13 +12,11 @@ type MCPHost interface {
 	MCPToolName(t MCPTool) string
 	// ToolArgs renders a smart script's tool policy as built-ins and allowed tools.
 	ToolArgs(p ToolPolicy) (tools, allowed []string)
-	// UserMCPServers lists the MCP servers in the user's own agent config, without secrets.
-	UserMCPServers(getenv func(string) string) ([]UserServer, error)
-	// UserMCPTools lists the tools one of those servers offers.
-	UserMCPTools(ctx context.Context, getenv func(string) string, name, cwd string) ([]UserTool, error)
-	// WriteUserMCPConfig copies the named user servers into a private config file under dir. release
-	// removes it. A name that left the user's config is an ErrServerGone.
-	WriteUserMCPConfig(getenv func(string) string, dir, runID string, names []string) (path string, release func(), err error)
+	// UserMCPServers lists the MCP servers the agent's own CLI reports for dir, without secrets.
+	UserMCPServers(ctx context.Context, dir string) ([]UserServer, error)
+	// UserMCPPresence is UserMCPServers for a presence check of the want names: reused for longer
+	// while it has them all, and with wait false it never blocks (known is false then).
+	UserMCPPresence(ctx context.Context, dir string, want []string, wait bool) (servers []UserServer, known bool, err error)
 	// MCPInstaller registers MCP servers with the agent's own CLI.
 	MCPInstaller() MCPInstaller
 }
@@ -47,7 +45,9 @@ type ToolPolicy struct {
 // MCPTools is the ticked tools of one user server.
 type MCPTools struct {
 	Server string
-	Tools  []string
+	// AllTools grants every tool of the server; Tools is then empty.
+	AllTools bool
+	Tools    []string
 }
 
 // ToolNames renders ts in the provider's permission-list names.
@@ -66,16 +66,12 @@ type UserServer struct {
 	Transport string `json:"transport"`
 	// Target is the command's base name or the URL host. Never args, env or headers.
 	Target string `json:"target"`
+	// Status is the agent's own health report: connected, failed, needsAuth, pending or unknown.
+	Status string `json:"status"`
 }
 
-// UserTool is one tool a user MCP server offers.
-type UserTool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// ErrServerGone is returned by WriteUserMCPConfig when a named server left the user's config.
-// Agent is the provider's display label.
+// ErrServerGone means a named server is not in the agent's MCP list. Agent is the provider's
+// display label.
 type ErrServerGone struct{ Name, Agent string }
 
 func (e ErrServerGone) Error() string {

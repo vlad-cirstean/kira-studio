@@ -6,16 +6,11 @@ import (
 	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
-// McpServers lists the MCP servers of the user's agent config.
-func (s *Service) McpServers() ([]harness.UserServer, error) {
-	servers, err := s.Agent.Active().UserMCPServers(s.getenv)
+// McpServers lists the MCP servers the agent's CLI reports from the app home.
+func (s *Service) McpServers(ctx context.Context) ([]harness.UserServer, error) {
+	servers, err := s.Agent.Active().UserMCPServers(ctx, s.Home)
 	if servers == nil {
 		servers = []harness.UserServer{}
 	}
 	return servers, err
-}
-
-// McpTools lists the tools one of those servers offers.
-func (s *Service) McpTools(ctx context.Context, server string) ([]harness.UserTool, error) {
-	return s.Agent.Active().UserMCPTools(ctx, s.getenv, server, s.Home)
 }

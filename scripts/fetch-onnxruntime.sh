@@ -14,16 +14,16 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=./lib.sh
 . "$SCRIPT_DIR/lib.sh"
 
-ORT_VERSION="1.29.1"
+ORT_VERSION="1.31.1"
 PLATFORM="${1:-osx-arm64}"
 
 case "$PLATFORM" in
   osx-arm64)
-    SHA256="c845ad2f4340669dc454c0ae092ccef7270d5bf858281890aef3c9bbf7da41e9"
+    SHA256="2e1344a1926ee50eb25b38153cb6992c3567515aef0e677a1a520a1798896d6f"
     LIB="libonnxruntime.$ORT_VERSION.dylib"
     ;;
   linux-x64)
-    SHA256="a28d7d65acafc06fb0f416cb409998773f5314c7eebf77caf907812831cdfc67"
+    SHA256="c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9"
     LIB="libonnxruntime.so.$ORT_VERSION"
     ;;
   *)

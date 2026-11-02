@@ -156,7 +156,11 @@ const onSubmitKey = shortcutKeydown(['form.submit'], run);
             data-testid="schedule-confirm-ade"
           >
             <CatalogText
-              :k="ade.branchLabel ? 'automations.run.taskOnBranch.label' : 'automations.run.taskOnly.label'"
+              :k="
+                ade.branchLabel
+                  ? 'automations.run.taskOnBranch.label'
+                  : 'automations.run.taskOnly.label'
+              "
             >
               <template #task
                 ><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template

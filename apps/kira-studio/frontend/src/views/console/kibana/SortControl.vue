@@ -52,14 +52,20 @@ function onSize(value: unknown): void {
     >
       <option :value="DEFAULT">
         {{
-          timeField ? t('studio.kibana.sort.timeField.option', { field: timeField }) : t('studio.kibana.sort.score.option')
+          timeField
+            ? t('studio.kibana.sort.timeField.option', { field: timeField })
+            : t('studio.kibana.sort.score.option')
         }}
       </option>
       <option v-for="f in sortable" :key="f.name" :value="f.name">{{ f.name }}</option>
     </NativeSelect>
     <TooltipIconButton
       :icon="current?.order === 'asc' ? 'arrow-up' : 'arrow-down'"
-      :label="current?.order === 'asc' ? t('studio.kibana.sort.ascending.tooltip') : t('studio.kibana.sort.descending.tooltip')"
+      :label="
+        current?.order === 'asc'
+          ? t('studio.kibana.sort.ascending.tooltip')
+          : t('studio.kibana.sort.descending.tooltip')
+      "
       :disabled="!current"
       data-testid="kibana-sort-order"
       @click="flip"

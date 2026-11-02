@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -20,7 +20,11 @@
       "!.claude",
       "!packages/shared/protocol/wire.ts",
       "!packages/shared/protocol/wire",
-      "!packages/git-ipc/src/generated"
+      "!packages/git-ipc/src/generated",
+      "!**/*.md",
+      "!**/*.mdx",
+      "!**/*.yml",
+      "!**/*.yaml"
     ]
   },
   "formatter": {
@@ -38,7 +42,8 @@
         "noAccumulatingSpread": "error",
         "noDelete": "error",
         "noDynamicNamespaceImportAccess": "error",
-        "noReExportAll": "error"
+        "noReExportAll": "error",
+        "useDomNodeTextContent": "off"
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": {

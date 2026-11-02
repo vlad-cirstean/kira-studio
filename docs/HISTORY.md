@@ -7337,3 +7337,41 @@ Two review rounds. Round 1 found 8, round 2 found 4; all fixed. Fixes included d
 ### v0.2.24 P435 (Done)
 Final verification: typecheck, `lint:all`, `go test ./...`, flows, Space UI 938 and Studio UI 682 pass. Fixed terminal unregister ordering (flaky `TestTwoWindowsIsolation`), the i18n catalog test for the stage settings catalog, and the Discover retention spec. Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.24/` removed. PR opened to `main`.
 <!-- /chapter v0.2.24 -->
+
+<!-- chapter v0.2.25 -->
+## v0.2.25
+Source: docs/v0.2.25/ at 40ee6f75a. 11 phases.
+
+### v0.2.25 P436 (Done)
+Close and Restart in the ADE session tab menu beside Copy session ID. Backend `CloseSession`, frontend `useCloseSession`; flow tests and UI spec cover TUI and background tabs.
+
+### v0.2.25 P437 (Done)
+Sessions dropdown rebuilt as `AdeSessionsMenu`/`List`/`Row` with filter, keyboard and context-menu support; `AdeStopped*` removed. Script run wording fixed. New UI spec (9 tests), `ade-sessions-menu` baseline.
+
+### v0.2.25 P438 (Done)
+Module tabs icon-only (shadcn-vue tooltip, `aria-label`). Automations reads Runs in UI copy, READMEs, site (`shared/runs` with redirect) and docs. Mode key `automations`, i18n keys, test IDs and `<app home>/automations` stay.
+
+### v0.2.25 P439 (Done)
+Read-only Kubernetes module in Kira Studio: cluster store (migration 0049), client-go backend (namespaces, kinds, resources, describe with Secret redaction, logs), `KubernetesService`, UI with filtering. Fake HTTPS API server, flow tests, UI spec (9). Binary +25.9 MB.
+
+### v0.2.25 P440 (Done)
+Kubernetes MCP tools (`kube_list_clusters`, discover, list, describe, logs) in the Studio DB MCP server. Per-cluster description and per-operation off/ask/allow, default ask (migration 0051). Bounded reads, shared approval broker, flow test, settings and approval UI, real `claude` test.
+
+### v0.2.25 P441 (Done)
+Shared restore dialog (`packages/workbench/src/restore`) for Docker and a new Runs restore banner. Scripts running at quit recorded (Studio migration 0050, Space 0061) and offered for restart on next start.
+
+### v0.2.25 P442 (Done)
+Wails v3.1.0, Go 1.27.3, golangci-lint v2.15, Go modules, onnxruntime_go 1.38.0, Biome 2.6, JS packages, bun 1.4.4, actions/cache v6.1.0 (workflow edits as `docs/pending-changes` patches). Deferred: TypeScript 7, backoff v5, go-git v6, flatbuffers 25.12, k8s 0.38, Docker test images. 18 visual baselines re-recorded for Playwright 1.64. Mac packaging and Wails smoke test pending (user-run).
+
+### v0.2.25 P443 (Done)
+Slow test audit. Suite wall time did not drop (Studio `ui` 1009.7 s to 1043.8 s, Space `ui` 1160.0 s to 1038.3 s; 6% noise); no dominant cost. Fixed sleeps 60 to 33 (Studio), 14 to 8 (Space); shared drag helper. `bun run test:ui:changed` selects app suites by path; `ui-timing` moved to `bun run test:ui:timing:studio`. Timings in the removed `plans/P443-timings.md`.
+
+### v0.2.25 P444 (Done)
+Kira no longer reads `~/.claude.json` or forwards MCP headers. Picker lists servers from `claude mcp list`; a ticked server grants all tools or named tools. A run that ticks a user server uses `--setting-sources user` plus `--settings`; claude loads the server itself. Guard G5 now covers `internal/harness/claude`. Known open item: such a run loads the user's Claude settings.
+
+### v0.2.25 P445 (Done)
+Two review rounds over the full diff since `main`: round 1 found 9, round 2 found 8; all fixed. Fixes centred on the user MCP presence check (shared `claude mcp list` flight, stale fallback, project-server blocking), Runs restore, ADE smart step with a missing ticked server, Kubernetes log tail and config cache.
+
+### v0.2.25 P446 (Done)
+Chapter folded by hand into this file; `docs/v0.2.25/` removed.
+<!-- /chapter v0.2.25 -->

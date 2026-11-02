@@ -142,22 +142,8 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		abandon()
 		return Started{}, ipcerr.InternalErr(err)
 	}
-	var extra []string
-	releaseUser := func() {}
-	if len(p.mcp) > 0 {
-		path, rel, err := p.agent.WriteUserMCPConfig(s.getenv, filepath.Join(s.Home, "automations-mcp"), runID, p.mcp)
-		if err != nil {
-			releaseGrant()
-			releaseTarget()
-			sbx.cleanup()
-			abandon()
-			return Started{}, ipcerr.BadRequest(err.Error())
-		}
-		extra, releaseUser = []string{path}, rel
-	}
 	if err := s.begin(run, existing); err != nil {
 		releaseGrant()
-		releaseUser()
 		releaseTarget()
 		sbx.cleanup()
 		abandon()
@@ -174,9 +160,9 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
 	env = append(env, p.envList...)
 	spec := harness.HeadlessSpec{
-		Dir: p.dir.Path, Prompt: p.sent, SessionID: sessionID, Resume: p.resume, MCPConfigs: append([]string{cfg}, extra...),
+		Dir: p.dir.Path, Prompt: p.sent, SessionID: sessionID, Resume: p.resume, MCPConfigs: []string{cfg},
 		Model: p.smart.Model, MaxBudgetUSD: p.smart.MaxBudgetUSD, Tools: pv.Tools, AllowedTools: pv.Allowed,
-		Isolated: true, Timeout: timeout, Env: env,
+		Isolated: true, UserMCP: p.mcp, GrantMCP: []string{agentmcp.ServerName}, Timeout: timeout, Env: env,
 	}
 	spec = s.applySandbox(spec, sbx, agent)
 	go func() {
@@ -195,7 +181,6 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		}
 		sink.flush()
 		releaseGrant()
-		releaseUser()
 		releaseTarget()
 		sbx.cleanup()
 		out := decide(decision{
@@ -253,6 +238,9 @@ func (s *Service) Live() int {
 func (s *Service) Close() {
 	s.mu.Lock()
 	s.closed = true
+	if s.endLife != nil {
+		s.endLife()
+	}
 	runs := make([]*bgRun, 0, len(s.smart)+len(s.bg))
 	for _, r := range s.smart {
 		runs = append(runs, r)

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
@@ -296,7 +299,7 @@ func TestAutomationRun(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RebasePreview: %v", err)
 		}
-		if len(rp.Blockers) == 0 || !strings.Contains(rp.Blockers[0].Text, "automation audit is running in feat/api-login") {
+		if len(rp.Blockers) == 0 || !strings.Contains(rp.Blockers[0].Text, "script run audit is running in feat/api-login") {
 			t.Fatalf("rebase blockers = %+v, want the automation", rp.Blockers)
 		}
 		if _, err := f.app.W.AdeTask.StartBranch(ctx, adewire.StartBranchArgs{BranchID: f.apiBr.ID}); err == nil {
@@ -308,7 +311,7 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatalf("Approve: %v", err)
 		}
 		held, ok := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
-		if !ok || held.State != "pending" || held.Note != "waiting for automation audit" {
+		if !ok || held.State != "pending" || held.Note != "waiting for script run audit" {
 			t.Fatalf("step run while a script works = %+v, want pending behind the automation", held)
 		}
 		f.app.Contract(t, "ade-automation", "AdeTaskService.Run#waiting", held, flowharness.Mask("createdAt", "startedAt", "finishedAt", "sessionId"))
@@ -348,6 +351,36 @@ func TestAutomationRun(t *testing.T) {
 		}
 		if r, _ := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID); r.State != "pending" {
 			t.Fatalf("step run = %+v, want pending", r)
+		}
+		release(t, f.gateTwo)
+		release(t, f.gateOne)
+		f.app.Restart()
+		if _, err := f.app.W.AdeTask.Board(ctx); err != nil {
+			t.Fatal(err)
+		}
+		testx.WaitUntil(t, waitFor, func() bool {
+			r, ok := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
+			return ok && r.State != "pending"
+		})
+	})
+
+	t.Run("a run held by an older version survives a restart", func(t *testing.T) {
+		f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false)
+		rec := f.script(t, smartFields("audit", "Audit {branch}"))
+		args := scriptruns.RunArgs{ScriptID: rec.ID, TaskID: f.task, BranchID: f.apiBr.ID}
+		f.start(t, args)
+		waitCall(t, f.app, "api", 2)
+		step := adewire.StepArgs{TaskID: f.task, StepID: "two"}
+		if err := f.app.W.AdeTask.Approve(ctx, step); err != nil {
+			t.Fatal(err)
+		}
+		r, _ := stepRunOn(t, f.app, f.task, "two", f.apiBr.ID)
+		if r.State != "pending" {
+			t.Fatalf("step run = %+v, want pending", r)
+		}
+		old := "waiting for automation audit"
+		if _, err := (&repos.AdeTaskRepo{DB: f.app.DB()}).UpdateRun(r.ID, model.AdeRunPatch{Note: &old}); err != nil {
+			t.Fatal(err)
 		}
 		release(t, f.gateTwo)
 		release(t, f.gateOne)
@@ -488,6 +521,49 @@ func TestAutomationStep(t *testing.T) {
 		}
 		if got := fakeFile(t, f.app, "api-1.env"); !strings.Contains(got, "KIRA_PARAM_LEVEL=high") || !strings.Contains(got, "KIRA_BRANCH=feat/api-lint") {
 			t.Errorf("env = %q", got)
+		}
+	})
+
+	t.Run("user mcp server", func(t *testing.T) {
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done", MCP: []fakeagent.MCPCall{{Server: "fake", Tool: "echo", Args: map[string]any{"text": "hi"}}}}}, lintStep("    params:\n      level: high\n"))
+		cfg := fmt.Sprintf(`{"mcpServers":{"fake":{"command":%q,"env":{"TOKEN":"SENTINEL-ENV"}}}}`, filepath.Join(f.app.BinDir, "fake-mcp"))
+		if err := os.WriteFile(filepath.Join(f.app.Home, ".claude.json"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		smart(f, "lint", "Lint {level}", level, func(s *scripts.Smart) { s.MCP = []scripts.MCPChoice{{Server: "fake", AllTools: true}} })
+		if r := runOnly(t, f, "feat/api-mcp"); r.State != "done" {
+			t.Fatalf("run = %+v", r)
+		}
+		args := fakeFile(t, f.app, "api-1.args")
+		if n := strings.Count(args, "--mcp-config"); n != 1 || strings.Contains(args, "--strict-mcp-config") || !strings.Contains(args, "--setting-sources\nuser") || !strings.Contains(args, "mcp__fake") {
+			t.Errorf("argv:\n%s", args)
+		}
+		if got, want := fakeFile(t, f.app, "api-1.settings"), `{"disableAllHooks":true,"allowedMcpServers":[{"serverName":"kira-ade"},{"serverName":"fake"}],"enableAllProjectMcpServers":false,"enabledMcpjsonServers":[]}`; got != want {
+			t.Errorf("--settings = %s, want %s", got, want)
+		}
+		if _, err := os.Stat(filepath.Join(f.app.FakeDir, "mcp-echo-1.json")); err != nil {
+			t.Errorf("the echo call did not reach the user server: %v", err)
+		}
+		if strings.Contains(args, "SENTINEL") || strings.Contains(fakeFile(t, f.app, "api-1.mcp0"), "SENTINEL") {
+			t.Error("a user credential reached the run's argv or config")
+		}
+		_ = filepath.WalkDir(f.app.SpaceHome, func(path string, d fs.DirEntry, err error) error {
+			if err == nil && strings.HasSuffix(path, "-user.mcp.json") {
+				t.Errorf("user config copy left: %s", path)
+			}
+			return nil
+		})
+	})
+
+	t.Run("user mcp server removed fails the step", func(t *testing.T) {
+		f := newRunFixture(t, []fakeagent.Action{{Name: "done"}}, lintStep("    params:\n      level: high\n"))
+		cfg := fmt.Sprintf(`{"mcpServers":{"other":{"command":%q}}}`, filepath.Join(f.app.BinDir, "fake-mcp"))
+		if err := os.WriteFile(filepath.Join(f.app.Home, ".claude.json"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		smart(f, "lint", "Lint {level}", level, func(s *scripts.Smart) { s.MCP = []scripts.MCPChoice{{Server: "fake", AllTools: true}} })
+		if r := runOnly(t, f, "feat/api-gone"); r.State != "failed" {
+			t.Fatalf("run = %+v, want failed", r)
 		}
 	})
 

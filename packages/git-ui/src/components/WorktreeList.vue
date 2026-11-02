@@ -191,7 +191,9 @@ async function confirmRemove(): Promise<void> {
       <DialogContent :aria-describedby="undefined" size="md" :dirty="typedToken !== ''">
         <DialogHeader>
           <DialogTitle>{{
-            pendingRemove ? t('git.worktree.removeConfirm.title', { path: pendingRemove.entry.path }) : ''
+            pendingRemove
+              ? t('git.worktree.removeConfirm.title', { path: pendingRemove.entry.path })
+              : ''
           }}</DialogTitle>
         </DialogHeader>
         <DialogBody>

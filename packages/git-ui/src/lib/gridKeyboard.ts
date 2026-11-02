@@ -50,10 +50,10 @@ function handleNavKey(
       deps.moveSelection(length - 1);
       return true;
     case 'PageUp':
-      deps.moveSelection((currentDisplayRow < 0 ? 0 : currentDisplayRow) - deps.pageSize());
+      deps.moveSelection(Math.max(currentDisplayRow, 0) - deps.pageSize());
       return true;
     case 'PageDown':
-      deps.moveSelection((currentDisplayRow < 0 ? 0 : currentDisplayRow) + deps.pageSize());
+      deps.moveSelection(Math.max(currentDisplayRow, 0) + deps.pageSize());
       return true;
   }
   return undefined; // unreachable — NAV_KEYS.has(event.key) above already matched one of the six.

@@ -60,7 +60,7 @@ func (s *Service) SchedulePreview(scriptID string, secrets map[string][]string) 
 	if err != nil {
 		return Preview{}, err
 	}
-	p, err := s.plan(scheduleArgs(*rec, secrets), planOpts{headless: true})
+	p, err := s.plan(s.lifeCtx(), scheduleArgs(*rec, secrets), planOpts{headless: true, informational: true})
 	if err != nil {
 		return Preview{}, err
 	}

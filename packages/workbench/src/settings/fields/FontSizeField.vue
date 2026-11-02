@@ -69,7 +69,10 @@ const fieldId = useId();
       {{ fontSizeError }}
     </FieldError>
     <FieldDescription v-else>{{
-      t('workbench.settings.fontSizeRange.label', { min: FONT_SIZE_RANGE.min, max: FONT_SIZE_RANGE.max })
+      t('workbench.settings.fontSizeRange.label', {
+        min: FONT_SIZE_RANGE.min,
+        max: FONT_SIZE_RANGE.max,
+      })
     }}</FieldDescription>
   </Field>
 </template>

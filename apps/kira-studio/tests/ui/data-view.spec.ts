@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/dataOps';
+import { boxCenter, sortableHover } from '@workbench/testing/ui/drag';
 import type { ControlSnapshot, LogicalPage } from '../ipc/support/types';
 import { MD5_ROWS } from '../support/seeds/md5Rows';
 import { expect, test } from './fixtures';
@@ -27,7 +28,7 @@ import {
   NULLS_PATH,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { findRow } from './support/tree';
+import { findRow, settleFrames } from './support/tree';
 
 // Ported from tests/e2e/data-view.spec.ts (P57 D16), against a real captured app.big_rows
 // (1,000,000 rows, id/hash=md5(id) — packages/db-fixtures/fixtures/0001_seed.sql) and app.nulls_and_unicode,
@@ -1012,7 +1013,7 @@ async function scrollGridToBottom(page: Page): Promise<void> {
   await grid.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  await page.waitForTimeout(50);
+  await settleFrames(page);
 }
 
 async function firstGutterNumber(page: Page): Promise<string> {
@@ -1172,6 +1173,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   const countsBeforeRefresh = await readOpsCount(stream, DATA_OP.count);
   await page.click('[data-testid="toolbar-refresh"]');
+  // Refresh invalidates the count asynchronously; no DOM signal marks it done before the count click.
   await page.waitForTimeout(200);
   await countButton.click();
   await expect.poll(() => readOpsCount(stream, DATA_OP.count)).toBe(countsBeforeRefresh + 1);
@@ -1267,11 +1269,10 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
       .locator(`[data-testid="columns-menu-row"][data-name="${to}"]`)
       .boundingBox();
     if (!src || !dst) throw new Error('columns menu row has no box');
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, { steps: 5 });
-    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, { steps: 15 });
-    await page.waitForTimeout(300);
+    await sortableHover(page, boxCenter(src), {
+      x: dst.x + dst.width / 2,
+      y: dst.y + dst.height * 0.25,
+    });
     await page.mouse.up();
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-testid="columns-menu"]')).toHaveCount(0);

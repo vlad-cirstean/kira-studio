@@ -60,6 +60,9 @@ import type {
   ScriptRunLogChunk,
   ScriptRunLogPage,
   ScriptRunPreview,
+  ScriptRunRestoreChoice,
+  ScriptRunRestoreResult,
+  ScriptRunRestoreState,
   ScriptRunStarted,
 } from '@shared/domain/scriptRuns';
 import type {
@@ -68,7 +71,6 @@ import type {
   ScriptCollection,
   ScriptDir,
   ScriptMcpServer,
-  ScriptMcpTool,
   ScriptsSnapshot,
 } from '@shared/domain/scripts';
 import { CHANNEL } from '@shared/protocol/events';
@@ -150,6 +152,11 @@ const spaceControl = {
     ),
   scriptRunsResume: (id: string): Promise<ScriptRunStarted> =>
     unwrap(ScriptRunsService.Resume({ id })).then((r) => trust<ScriptRunStarted>(r)),
+  scriptRunsRestoreState: (): Promise<ScriptRunRestoreState> =>
+    unwrap(ScriptRunsService.RestoreState()).then((r) => trust<ScriptRunRestoreState>(r)),
+  scriptRunsRestore: (items: ScriptRunRestoreChoice[]): Promise<ScriptRunRestoreResult> =>
+    unwrap(ScriptRunsService.Restore({ items })).then((r) => trust<ScriptRunRestoreResult>(r)),
+  scriptRunsRestoreDismiss: (): Promise<void> => unwrap(ScriptRunsService.RestoreDismiss()),
   scriptRunsResumeCommand: (runId: string): Promise<string> =>
     unwrap(ScriptRunsService.ResumeCommand({ runId })),
   scriptRunsReadLog: (id: string, afterSeq: number): Promise<ScriptRunLogPage> =>
@@ -192,8 +199,6 @@ const spaceControl = {
     unwrap(ScriptRunsService.ConfirmDecline({ id: runId })),
   scriptRunsMcpServers: (): Promise<ScriptMcpServer[]> =>
     unwrap(ScriptRunsService.McpServers()).then((r) => trust<ScriptMcpServer[]>(r ?? [])),
-  scriptRunsMcpTools: (server: string): Promise<ScriptMcpTool[]> =>
-    unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 
   // P120: openExternal (LinkService) moved off createCoreControl.ts's now-deleted shared `link` binding —
   // Kira Studio never had a real use for it, so this app's own LinkService.OpenExternal call
@@ -515,6 +520,8 @@ const spaceControl = {
     unwrap(AdeTaskService.TakeOver(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskRestartSession: (args: V2.RestartSessionArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.RestartSession(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskCloseSession: (args: V2.CloseSessionArgs): Promise<void> =>
+    unwrap(AdeTaskService.CloseSession(args)),
   adeTaskLaunchStep: (args: V2.LaunchStepArgs): Promise<V2.Launch> =>
     unwrap(AdeTaskService.LaunchStep(args)).then((r) => trust<V2.Launch>(r)),
   adeTaskStartBranch: (args: V2.StartBranchArgs): Promise<V2.Launch> =>

@@ -109,6 +109,8 @@ needs.
   already-namespaced image (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`,
   `localstack/localstack`) mirrors at the same path with no prefix. Confirmed for every image this
   repo uses. ClickHouse needs one further workaround on top — see the ClickHouse section below.
+- **Docker Hub `429 toomanyrequests`** fails Go and `e2e-real` tests that pull `confluentinc/cp-kafka`, kibana or postgres.
+  Not a code fault. Run `bun run test:images` (mirror pull) first, then rerun later if it persists.
 - **Bun's `testcontainers` integration hangs indefinitely in this sandbox** on images that pull and
   run fine under plain Node with the identical image (confirmed fine on real hardware — a Bun-here
   quirk, not a real bug). Postgres is a confirmed instance. Workaround, already applied in
@@ -339,7 +341,8 @@ historical prose.
   code whose whole purpose is to work on a path nobody exercises interactively, prefer a pure-Go
   implementation this container can build and test — `internal/startupfail` chose an argv-only
   `osascript` spawn over a cgo `NSAlert` shim for exactly this reason, and it's checkable in CI as
-  a result.
+  a result. Wails 3.1's build guard rejects `CGO_ENABLED=0` on darwin without `-tags purego` (or
+  `server`): add `-tags purego` to the vet/build line above.
 - **Regenerate bindings via `wails3 task common:generate:bindings`** (or `scripts/setup.sh`, which
   calls it) — never a hand-typed `wails3 generate bindings` flag list, which has already drifted
   from the task's real flags once. `scripts/setup.sh` now calls the task **unconditionally on every
@@ -430,6 +433,7 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   `bun run test:e2e-real:studio`, which builds `apps/kira-studio/bin/flowservers` (gitignored), the
   HTTP, HTTPS and gRPC servers the Go flows also use.
 - Run `go test` with `CGO_ENABLED=1`.
+- Fake `claude` also plays `claude mcp list` (reads `$HOME/.claude.json`, records `mcp-list-<n>.args`) and, for `--setting-sources user`, finds tools on those servers within `--settings` `allowedMcpServers`. A test that changes the config sets `claude.SetMCPListTTL(0)`.
 - Docker flows need a daemon; if `docker ps` fails, start one with
   `setsid nohup dockerd > /tmp/dockerd.log 2>&1 < /dev/null &`. Without one they skip, or fail under
   `KIRA_FLOW_DOCKER=require`. They pull `mirror.gcr.io/library/alpine:3.20`; labelled leftovers older
@@ -439,6 +443,13 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   Enter that follows a cursor-position reply. Test-side workaround, not a product bug.
 - `terminal-real.spec.ts` uses a temp `HOME` removed at process exit, not in `afterAll`: with `fullyParallel`
   `afterAll` runs between tests of one worker.
+
+## Kubernetes flow tests (P439)
+
+- `go test ./apps/kira-studio/internal/flows/kubeflow` needs no cluster and no kubectl. `flowharness.KubeFake`
+  is an HTTPS API server; `KubeFake.WriteKubeconfig` writes the kubeconfig and the exec-plugin script.
+- The harness reads PATH and KUBECONFIG from the process environment at call time (`kubeEnv`), so a test sets them with `t.Setenv`.
+- Rewrite `apps/kira-studio/tests/contract/kubernetes.json` with `KIRA_CONTRACT=write`, then rerun without it; the UI spec `kubernetes-module.spec.ts` reads the same file.
 
 ## Contract fixtures (P249)
 
@@ -511,6 +522,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
   skips, not fails, when `claude` is missing or `claude -p` cannot run under the temp `HOME`.
 - Rule: after changing code in an area below, run that row before calling the change done. Append `-count=1`: `go test` caches a passing run and prints the old spend.
 - Resume rows (P279, CLI 2.1.296): a held `hold.sh` Bash call, app restart, Resume. Prompts say the call is safe to rerun and to inspect nothing first; haiku otherwise runs `ps`/`ls`, gets denied (no approval surface) and stops as blocked. The CLI's "interrupted" `tool_result` is not in the run log; the check is the shared Claude session id. Hand probe recipe: temp `HOME` with an onboarding-done `.claude.json`, parent `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_REMOTE_SESSION_ID`, `CLAUDECODE` unset, SIGKILL the child's process group mid tool call, then `claude -p --resume <id>`.
+- P444 (CLI 2.1.316): `TestSmartScriptRun/user_MCP_server_loads_through_claude` runs real `claude mcp list` plus one haiku run, a few cents.
 - Spend, measured on 2026-10-09 (CLI 2.1.295, haiku): `claude -p` results of the Space suite 0.014 USD, TUI sessions (about 4 at 1 to 2 haiku prompts) an estimated 0.02 USD, Studio suite under 0.01 USD, memory gate smoke a few cents, import smoke 0.14 USD (P211), memory docs test 0.01 USD (P276). Space suite about 75 s, Studio about 12 s. The Space run prints its measured `claude -p` spend. P279 (CLI 2.1.296): resume rows 0.0067 USD per run of the three (about 55 s), whole Space ADE and smart set 0.020 USD (about 156 s). P296: `comment` subtest of the memory docs test 0.006 USD (about 16 s), prompt-registry row of the Space suite 0.083 USD (about 427 s). P297 (CLI 2.1.302): `TestMemoryDistill` 0.03 USD (about 21 s), `TestMemoryDistillBridge` 0.03 USD (about 13 s), `TestMemoryMcpFollowsDocs` 0.022 USD (about 85 s), prompt-registry row 0.082 USD (about 444 s); `TestMemoryGate` now also checks rule kind (about 32 s). Eval subset round `round-p297-01` 1.50 USD (ledger `spend-p297.jsonl`, needs `KIRA_EVAL_PHASE_CAP_USD` above the run cap plus 2); a shallow clone must first `git fetch --depth=1 origin <corpus commit>`.
 - `scripts/docshistory` (docs chapter fold, P299): needs the logged-in `claude` CLI, builds `kira-space` itself
   (or `--binary`), gives each unit temp `KIRA_MEMORY_HOME`/`KIRA_SPACE_HOME` and never touches your memory DB.
@@ -531,7 +543,7 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | Memory gate: `internal/memory/{agentrunner.go,gate*.go,service.go}`, `internal/harness/claude/structured.go` | `bun run test:claude:space -run TestMemoryGate` |
 | Memory import and ingest: `internal/memory/importer/**`, `internal/harness/claude/structured.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia'` (import about 50 s, 0.14 USD, P211; ingest P274; the `TestMemoryDistill` prefix also runs `TestMemoryDistillRewrite`, P315) |
 | Memory ingest eval (P285): `internal/llmprompts` memory.import.* prompts, `internal/memory/importer/{chunk,extract,finalize}*.go` quality | `bun run eval:memory` with `KIRA_EVAL_MODE=run KIRA_EVAL_ROUND=<name>` (see ARCHITECTURE "Memory ingest eval"). Opt-in, never in hooks or CI. Costs about 4 to 5 USD per tuning run (8 to 10 min), judge included; P285 spent 57.9 USD in all; Part 2 spent 28.5 USD (ledger `spend-p2.jsonl`). Part 3 spent about 5.4 USD on the eval (ledger `spend-p3.jsonl`). P289 spent about 8.9 USD on the 5-source subset (ledger `spend-p289.jsonl`; `KIRA_EVAL_ONLY=plan-p257,spec-chunk-go,doc-arch-prompts,cmt-runner-go,json-ade-errors`, about 1.5 USD per round); run the test binary from `apps/kira-space/tests/claude` (`go test -c`) to keep a tree edit from changing a round midway. `KIRA_EVAL_MODE=footprint` with `KIRA_EVAL_ROUNDS=<r1,r2>` re-renders stored facts of past rounds and costs nothing. P291 (retrieval and telegraph eval) spent 14.04 USD of 20 (ledger `P291-runs/spend-p291.jsonl`, set `KIRA_EVAL_RUNS_DIR=P291-runs KIRA_EVAL_LEDGER=spend-p291.jsonl`); modes `questions`, `keys`, `telegraph`, `score` (with `KIRA_EVAL_STYLE=tele`) are paid, `retrieval` and `compare` are free and need `KIRA_ORT_LIB` (`sh scripts/fetch-onnxruntime.sh linux-x64`). Not a pass/fail row: it scores quality. |
-| DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go`, `apps/kira-studio/internal/proof/**`, `apps/kira-studio/internal/bridge/proof.go` | `bun run test:claude:studio` |
+| DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/kubernetes/**`, `apps/kira-studio/internal/bridge/dbmcp.go`, `apps/kira-studio/internal/proof/**`, `apps/kira-studio/internal/bridge/proof.go` | `bun run test:claude:studio` (`TestKubeMcpThroughClaude` covers the kube tools, P440) |
 | Prompt registry, store, templates: `internal/llmprompts/**` (after a default rewrite run the whole row; regenerate goldens with `go test ./internal/llmprompts -run TestGolden -update` and contracts with `KIRA_CONTRACT=write`) | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeAdHocSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeSandbox\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
 | Any other `internal/harness/**` change | `bun run test:claude` |
 | Claude CLI upgrade | `bun run test:claude` |
@@ -580,10 +592,20 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
 
 - **Test speed on this box (P294).** 4 cores. Go: `bun run test:go:containers` (81s) and `bun run test:go:rest`
   (134s) split `go test ./...` for CI; leave `-count=1` off to reuse the test cache. `ade` (44s) never caches.
-  `--project=ui` costs about 10 min (546 tests); `--shard=N/4` costs about 2.5 min each (CI runs 4 shards). Re-run failures with
+  Playwright `ui` costs about 17 min per app on an idle host (P443): Studio 701 tests, 1044 s; Space 953 tests,
+  1038 s; 4 workers (`'100%'`), parallelism 3.9. 2 or 3 workers cost more wall (sweep: 3 workers up to +4%, 2 workers
+  +13-21%); more than 4 cannot be set from the CLI because each project's `workers` caps the pool. Per-test median
+  is 4.2 s against 1.5 s for the cheapest test, so boot is not the whole cost; fixed sleeps are under a minute
+  of it. `--shard=N/4` splits the same cores, so it saves nothing on one host (CI runs 4 shards on 4 machines).
+  `bun run test:ui:changed` runs only the app suites a change can affect (`ui_target_of` in `scripts/hook-scope.sh`:
+  `packages/**`, config, `scripts/` and unknown paths run both; Go, docs and `*.md` run none;
+  `--dry-run` prints the choice; one-app change saves about 17 min). Space `ui` runs in no CI job, so a local
+  run is its only gate. Re-run failures with
   `playwright test --last-failed`; `--only-changed=<ref>` selects spec and support files only, since app code is a
   built bundle. Hooks run no UI test: pre-commit lints and typechecks only the staged files (full run when config,
   a lockfile, `scripts/` or a shared package changed), pre-push builds, lints and tests only changed Go packages.
+  Timing report: `PLAYWRIGHT_JSON_OUTPUT_NAME=out.json playwright test ... --reporter=json`, then
+  `bun scripts/ui-timings.ts <label> out.json` (per-project table, slowest files and tests).
   `sh scripts/prepare-ui-tests.sh` also installs the chromium headless shell `ipc-frontend` needs.
 - **`nohup` makes SIGHUP ignored, and children inherit it.** The terminal package resets that for its shells (P294). Other code relying on a hang-up misbehaves in a `nohup` run.
 - **Run one heavy suite at a time.** The sandbox has 4 CPUs. Two Go suites, or a Go suite beside Playwright,
@@ -597,10 +619,11 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
   wait 60 s and retry. This covers `bun run lint:go`, `lint:claude` and the pre-push hook.
 - **`bun run lint:go` needs `bun run build:space-mobile` once per checkout** (`main.go` embeds
   `frontend/dist-mobile`; absent, typecheck of the Go module fails).
-- **`ui-timing` needs an idle machine** (load below ~1, nothing else running). `--project=ui-timing` also runs the
-  whole `ui` project first. Check no `playwright`, `chrome` or `webkit` process is left before it starts.
-  The WebKit sandbox is slow (measured 1.8x on JS and 2.9x on DOM work against Chromium on the same host), so a few p50/p95 budgets
-  fail even idle; the list is in `ARCHITECTURE.md` Known open items.
+- **`ui-timing` needs an idle machine** (load below ~1, nothing else running). It is out of `bun run test:ui:studio`
+  (P443); run `bun run test:ui:timing:studio` alone (4 tests, about 70 s; CI runs the same `--no-deps` command). Check
+  no `playwright`, `chrome` or `webkit` process is left before it starts. The WebKit sandbox is slow (measured 1.8x
+  on JS and 2.9x on DOM work against Chromium on the same host); the open budget failures, if any, are in
+  `ARCHITECTURE.md` Known open items.
 - **Docker flow tests need `dockerd` started by hand** (section above) and `KIRA_FLOW_DOCKER=require`, or
   they skip and report green.
 - **Check `df -h /` before a build.** Aim for 6 GB free. The Go build cache once reached 8 GB and filled the
@@ -677,7 +700,7 @@ exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install 
   {KIRA_MEMORY_HOME: <tmp>}}`. `printf '' | <binary> memory-mcp` exits 0. The macOS app-bundle binary
   is unchecked (Known open items).
 - Semantic search (P210): the ONNX Runtime library is not in the repo. `sh scripts/fetch-onnxruntime.sh
-  linux-x64` downloads the pinned 1.29.1 build (checksum-verified, idempotent) to
+  linux-x64` downloads the pinned 1.31.1 build (checksum-verified, idempotent) to
   `apps/kira-space/build/onnxruntime/linux-x64/` (gitignored) and prints the library path; set
   `KIRA_ORT_LIB` to it for any process that should embed (the server-tag app, `memory-mcp`). Without it
   the status is `unavailable` and search stays keyword-only. Hugging Face is reachable through the agent
@@ -708,28 +731,28 @@ the pass split. Here: the container quirk that blocked two prior attempts, and t
 pre-push design.
 
 - **The preinstalled `/usr/local/bin/golangci-lint` (2.5.0, built with go1.25.1) refuses this repo**
-  outright: `go.mod` pins `go 1.27.1`, and golangci-lint's config loader rejects targeting a Go
+  outright: `go.mod` pins `go 1.27.3`, and golangci-lint's config loader rejects targeting a Go
   version newer than the one it was itself built with. `go install .../golangci-lint@latest` does
   not fix this — it produces a binary built with **go1.26.8**, one minor version short, every time.
-- **Why:** `go version` in this container reports `go1.27.1` only because `GOTOOLCHAIN=auto` reads
+- **Why:** `go version` in this container reports `go1.27.3` only because `GOTOOLCHAIN=auto` reads
   *this repo's* `go.mod` and downloads that toolchain on demand for commands run inside the module.
   `GOTOOLCHAIN=local go version` reports the container's real default: **go1.24.7**. `go install
   pkg@version` runs in module-aware mode *ignoring the current module* — it resolves only
   golangci-lint's own `go.mod` directive (`go 1.26.0`, no `toolchain` line), and `auto` downloads
-  the minimum toolchain satisfying that — go1.26.8, not the 1.27.1 already sitting in the module
+  the minimum toolchain satisfying that — go1.26.8, not the 1.27.3 already sitting in the module
   cache. `@latest` doesn't help either; it just moves which release hits the same gap.
 - **The fix**, pin `GOTOOLCHAIN` explicitly to the version this repo actually wants, on the install
   itself:
   ```sh
-  GOTOOLCHAIN=go1.27.1 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+  GOTOOLCHAIN=go1.27.3 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
   ```
   `scripts/install-golangci-lint.sh` does exactly this, validating a cached `GOPATH/bin` binary
   against the pinned version+toolchain string before trusting it (the same pattern
   `scripts/setup.sh` already uses for `wails3`). No `go.mod` change, no Go version bump, no source
   checkout needed — install only, same as any other `go install` target.
 - **No prebuilt release binary works, and neither does `golangci-lint-action`.** Every official
-  v2.13.2 release binary is itself built with go1.26.8 and fails identically. Build from source
-  everywhere, including CI — `actions/setup-go` with `go-version-file: go.mod` already makes 1.27.1
+  v2.15.0 release binary is itself built with go1.26.8 and fails identically. Build from source
+  everywhere, including CI — `actions/setup-go` with `go-version-file: go.mod` already makes 1.27.3
   the runner's default toolchain there, so a plain `go install` in CI already builds correctly; the
   `GOTOOLCHAIN` pin in the script is belt-and-braces so the same one command works locally too.
 - **Pre-commit stays exactly `bun run lint` + `bun run typecheck`** (~15s) — golangci-lint and knip
@@ -975,7 +998,7 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_USER_STATUSLINE` | The user's own statusline command the hook shim chains to | `harness/claude/hooks` shim |
 | `KIRA_ASKPASS_SOCK`, `KIRA_ASKPASS_TOKEN`, `KIRA_ASKPASS_OPID`, `KIRA_ASKPASS_TIMEOUT_MS` | Git askpass helper reaches the prompt broker; per-op id and timeout | `gitaskpass` broker. `loginshell` strips the first two |
 | `KIRA_PREPARE`, `KIRA_WORKTREE_PATH`, `KIRA_WORKTREE_BRANCH`, `KIRA_REPO_ROOT`, `KIRA_REPO_COMMON_DIR` | Worktree prepare script context. `KIRA_WORKTREE_BRANCH` is omitted on a detached head | `gitprepare` |
-| `KIRA_TASK`, `KIRA_REPO`, `KIRA_BRANCH`, `KIRA_BASE`, `KIRA_<NAME>` | Built-in vars of an automation script (`scripts.BuiltinEnv`) | `adeflow` automations |
+| `KIRA_TASK`, `KIRA_REPO`, `KIRA_BRANCH`, `KIRA_BASE`, `KIRA_<NAME>` | Built-in vars of a script (`scripts.BuiltinEnv`) | `adeflow` script runs |
 | `KIRA_PARAM_<NAME>` | Smart-script parameter value; a multiselect is newline-joined | `scripts` smart runs |
 | `KIRA_IPC_FIXTURES` | `write` regenerates IPC fixtures | you |
 | `KIRA_GIT_FIXTURES` | `write` regenerates the porcelain golden corpus | you |

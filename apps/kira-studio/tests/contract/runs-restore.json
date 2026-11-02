@@ -1,0 +1,137 @@
+{
+  "ScriptRunsService.Restore": {
+    "items": [
+      {
+        "code": "",
+        "error": "",
+        "runId": "<id:4>",
+        "started": {
+          "runId": "",
+          "terminal": {
+            "cwd": "<kira>/automations/<id:3>",
+            "token": "<masked>"
+          }
+        }
+      },
+      {
+        "code": "",
+        "error": "",
+        "runId": "<id:8>",
+        "started": {
+          "runId": "<id:9>",
+          "terminal": null
+        }
+      }
+    ]
+  },
+  "ScriptRunsService.RestoreState#pending": {
+    "items": [
+      {
+        "branchId": "",
+        "branchLabel": "",
+        "color": "blue",
+        "command": "sleep 60",
+        "cwd": "<kira>/automations/<id:1>",
+        "endedAt": 0,
+        "hash": "<masked>",
+        "kind": "script",
+        "model": "",
+        "params": [
+          {
+            "name": "who",
+            "value": "world"
+          }
+        ],
+        "reason": "",
+        "resume": false,
+        "runId": "<id:2>",
+        "scriptId": "<id:1>",
+        "scriptName": "param",
+        "status": "ready",
+        "taskId": "",
+        "taskTitle": "",
+        "trigger": "manual"
+      },
+      {
+        "branchId": "",
+        "branchLabel": "",
+        "color": "blue",
+        "command": "sleep 60",
+        "cwd": "<kira>/automations/<id:3>",
+        "endedAt": 0,
+        "hash": "<masked>",
+        "kind": "script",
+        "model": "",
+        "params": [],
+        "reason": "",
+        "resume": false,
+        "runId": "<id:4>",
+        "scriptId": "<id:3>",
+        "scriptName": "plain",
+        "status": "ready",
+        "taskId": "",
+        "taskTitle": "",
+        "trigger": "terminal"
+      },
+      {
+        "branchId": "",
+        "branchLabel": "",
+        "color": "blue",
+        "command": "sleep 60",
+        "cwd": "<kira>/automations/<id:5>",
+        "endedAt": 0,
+        "hash": "<masked>",
+        "kind": "script",
+        "model": "",
+        "params": [
+          {
+            "name": "token",
+            "value": "••••"
+          }
+        ],
+        "reason": "Needs values for: token. Kira never stores secrets, so start it yourself.",
+        "resume": false,
+        "runId": "<id:6>",
+        "scriptId": "<id:5>",
+        "scriptName": "secret",
+        "status": "needsInput",
+        "taskId": "",
+        "taskTitle": "",
+        "trigger": "manual"
+      },
+      {
+        "branchId": "",
+        "branchLabel": "",
+        "color": "blue",
+        "command": "Say hi",
+        "cwd": "<kira>/automations/<id:7>",
+        "endedAt": 0,
+        "hash": "<masked>",
+        "kind": "smart",
+        "model": "sonnet",
+        "params": [],
+        "reason": "",
+        "resume": true,
+        "runId": "<id:8>",
+        "scriptId": "<id:7>",
+        "scriptName": "smart",
+        "status": "ready",
+        "taskId": "",
+        "taskTitle": "",
+        "trigger": "manual"
+      }
+    ]
+  },
+  "args:ScriptRunsService.Restore": {
+    "items": [
+      {
+        "hash": "<masked>",
+        "runId": "<id:4>"
+      },
+      {
+        "hash": "<masked>",
+        "runId": "<id:8>"
+      }
+    ]
+  }
+}

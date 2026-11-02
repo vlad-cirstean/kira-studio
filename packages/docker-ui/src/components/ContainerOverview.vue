@@ -109,7 +109,11 @@ const rows = (): Array<[string, string]> => [
           </DetailSection>
 
           <p
-            v-if="!detail.container.ports.length && !detail.networkAttachments.length && !detail.mounts.length"
+            v-if="
+              !detail.container.ports.length &&
+              !detail.networkAttachments.length &&
+              !detail.mounts.length
+            "
             class="px-1 text-muted-foreground"
             data-testid="docker-overview-bare"
             >{{
@@ -126,7 +130,9 @@ const rows = (): Array<[string, string]> => [
           <div
             v-for="(entry, i) in detail.env"
             :key="i"
-            :class="cn(rowVariants({ layout: 'tree' }), 'group/env -mx-1 rounded-kira-sm pl-1 font-data')"
+            :class="
+              cn(rowVariants({ layout: 'tree' }), 'group/env -mx-1 rounded-kira-sm pl-1 font-data')
+            "
             data-testid="docker-env-row"
           >
             <span class="shrink-0 text-muted-foreground">{{ splitEnv(entry).key }}=</span>
@@ -135,7 +141,9 @@ const rows = (): Array<[string, string]> => [
             }}</span>
             <TooltipIconButton
               :icon="revealed.has(i) ? 'eye-closed' : 'eye'"
-              :label="revealed.has(i) ? t('common.hideValue.label') : t('docker.env.revealValue.tooltip')"
+              :label="
+                revealed.has(i) ? t('common.hideValue.label') : t('docker.env.revealValue.tooltip')
+              "
               data-testid="docker-env-reveal"
               @click="toggle(i)"
             />

@@ -20,7 +20,12 @@ import {
 import { isActiveDescendantKey, useActiveDescendant } from '../behaviour/activeDescendant';
 import { revealElement } from '../behaviour/focus';
 import { TIMING } from '../behaviour/timing';
-import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../editor/fieldCompletion';
+import {
+  type Completion,
+  MAX_VISIBLE,
+  rankCandidates,
+  tokenAt as wordTokenAt,
+} from '../editor/fieldCompletion';
 import { monacoLanguageIdFor } from '../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../editor/paintSpans';
 import type { RangeHighlight } from '../editor/ranges';
@@ -196,7 +201,7 @@ function close(): void {
 
 function recompute(el: HTMLInputElement | HTMLTextAreaElement): void {
   const cursor = el.selectionStart ?? el.value.length;
-  const token = (props.tokenAt ?? tokenAt)(el.value, cursor);
+  const token = (props.tokenAt ?? wordTokenAt)(el.value, cursor);
   wordStart.value = token?.from ?? cursor;
   currentWord.value = token?.word ?? '';
   tokenActive.value = token !== null;
@@ -231,7 +236,7 @@ function accept(completion: Completion): void {
   text.value = `${el.value.slice(0, wordStart.value)}${insertText}${el.value.slice(cursor)}`;
   emit('accept', completion);
   close();
-  void nextTick(() => {
+  void nextTick().then(() => {
     const pos = wordStart.value + insertText.length - (completion.caretOffsetFromEnd ?? 0);
     el.setSelectionRange(pos, pos);
     el.focus();

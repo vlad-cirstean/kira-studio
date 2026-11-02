@@ -25,7 +25,12 @@ const open = defineModel<boolean>('open', { default: false });
 <template>
   <Collapsible v-model:open="open" data-slot="disclosure" :class="props.class">
     <CollapsibleTrigger
-      :class="cn('flex w-full min-w-0 cursor-default items-center gap-1 text-left text-kira-md', props.triggerClass)"
+      :class="
+        cn(
+          'flex w-full min-w-0 cursor-default items-center gap-1 text-left text-kira-md',
+          props.triggerClass,
+        )
+      "
       :aria-label="label || $slots.label ? undefined : t('theme.disclosure.toggle.label')"
     >
       <CodiconIcon :name="open ? 'chevron-down' : 'chevron-right'" :size="12" class="shrink-0" />

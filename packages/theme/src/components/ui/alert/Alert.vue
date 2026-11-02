@@ -24,7 +24,13 @@ const iconName = computed(() => {
 <template>
   <div
     data-slot="alert"
-    :class="cn(alertVariants({ variant, strip }), iconName === null && 'grid-cols-[minmax(0,1fr)] *:col-start-1', props.class)"
+    :class="
+      cn(
+        alertVariants({ variant, strip }),
+        iconName === null && 'grid-cols-[minmax(0,1fr)] *:col-start-1',
+        props.class,
+      )
+    "
     role="alert"
   >
     <CodiconIcon

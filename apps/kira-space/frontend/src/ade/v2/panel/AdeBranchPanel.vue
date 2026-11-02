@@ -269,7 +269,9 @@ function deployNote(d: Deployment): string {
           data-testid="ade-panel-title"
         >
           {{
-            row.draft ? t('space.ade.branchPanel.draftTitle.title', { repo: row.repo }) : branch.name
+            row.draft
+              ? t('space.ade.branchPanel.draftTitle.title', { repo: row.repo })
+              : branch.name
           }}
         </h3>
       </div>
@@ -384,7 +386,9 @@ function deployNote(d: Deployment): string {
         <dt>{{ words.changeRequestShort }}</dt>
         <dd class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
           <AdeChip
-            :label="changeRequest ? prStateLabel(changeRequest.state) : t('common.state.none.option')"
+            :label="
+              changeRequest ? prStateLabel(changeRequest.state) : t('common.state.none.option')
+            "
             :tone="changeRequest ? (PR_TONE[changeRequest.state] ?? 'grey') : 'grey'"
             wide
           />
@@ -450,7 +454,9 @@ function deployNote(d: Deployment): string {
             @click="dialogs.merge(branch.id, i.target)"
           >
             {{
-              i.status === 'stale' ? t('space.ade.needs.action.reMerge.label') : t('common.merge.label')
+              i.status === 'stale'
+                ? t('space.ade.needs.action.reMerge.label')
+                : t('common.merge.label')
             }}
           </Button>
         </div>

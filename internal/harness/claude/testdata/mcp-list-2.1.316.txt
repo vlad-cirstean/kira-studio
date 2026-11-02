@@ -1,0 +1,10 @@
+Checking MCP server health…
+
+local: python3 /srv/mcp.py - √ Connected
+remote: http://127.0.0.1:9/mcp (HTTP) - × Failed to connect — ECONNREFUSED: Unable to connect. Is the computer able to access the url?
+stream: http://127.0.0.1:9/sse (SSE) - × Failed to connect — SSE error: ECONNREFUSED: Unable to connect. Is the computer able to access the url?
+authy: https://mcp.example.com:8443/mcp?x=1 (HTTP) - × Failed to connect — Dynamic Client Registration rejected (HTTP 401):
+my_srv-2: /bin/true  - × Failed to connect — CONNECTION_CLOSED: Connection closed
+tick: /usr/local/bin/npx -y pkg - ✓ Connected
+cross: node /a/b.js - ✗ Failed to connect
+claude.ai Gmail: https://gmail.mcp.claude.com/mcp - ! Needs authentication

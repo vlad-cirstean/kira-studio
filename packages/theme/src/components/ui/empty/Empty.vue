@@ -10,10 +10,9 @@ const props = defineProps<{
 <template>
   <div
     data-slot="empty"
-    :class="cn(
-      'flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center',
-      props.class,
-    )"
+    :class="
+      cn('flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center', props.class)
+    "
   >
     <slot />
   </div>

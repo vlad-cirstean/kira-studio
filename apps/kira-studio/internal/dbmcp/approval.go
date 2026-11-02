@@ -143,6 +143,8 @@ type ApprovalRequest struct {
 	// Plan is the heavy-query evidence (M3 §6.1/§6.2), nil for an ordinary permission prompt with
 	// no plan attached (auto-force-explain off, or the statement was not explainable).
 	Plan *ApprovalPlan
+	// Cluster is set for a Kubernetes read; Target is then empty.
+	Cluster *ApprovalCluster
 }
 
 // ApprovalSnapshot is emitted on every queue change: the head request (nil when empty) plus how
@@ -345,4 +347,13 @@ func (b *ApprovalBroker) closePrompt(requestID string) {
 	if b.Prompts != nil {
 		b.Prompts.Close(prompts.ID(prompts.KindDbMcp, requestID))
 	}
+}
+
+// ApprovalCluster names the Kubernetes read a request would run; nil on a database request.
+type ApprovalCluster struct {
+	Context   string
+	Server    string
+	Namespace string // "" means all namespaces, or none for discovery
+	// Operation is the permission group: discover, list, describe or logs.
+	Operation string
 }

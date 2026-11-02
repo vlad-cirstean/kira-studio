@@ -98,7 +98,11 @@ async function removeFromStack(branch: string): Promise<void> {
           variant="toolbar"
           size="kira"
           :disabled="!group.summary.needsRestack"
-          @click="requestRestack(group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base)"
+          @click="
+            requestRestack(
+              group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base,
+            )
+          "
         >
           {{ t('git.common.restack.label') }}
         </Button>

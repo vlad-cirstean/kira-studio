@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { sortableHover } from '@workbench/testing/ui/drag';
 import { registerOrderScenarios } from '@workbench/testing/ui/scenarios/automationsOrder';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
@@ -85,11 +86,7 @@ async function drag(
   if (!src || !dst) throw new Error('row has no box');
   const home = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
   const drop = { x: dst.x + dst.width / 2, y: dst.y + dst.height * 0.25 };
-  await page.mouse.move(home.x, home.y);
-  await page.mouse.down();
-  await page.mouse.move(home.x, home.y + 10, { steps: 5 });
-  await page.mouse.move(drop.x, drop.y, { steps: 15 });
-  await page.waitForTimeout(300);
+  await sortableHover(page, home, drop);
   if (landed) {
     await expect(async () => {
       try {
@@ -168,13 +165,13 @@ test('Alt+Arrow moves within the set; the first script of a collection never mov
 
   await row(page, 't1').focus();
   await page.keyboard.press('Alt+ArrowUp');
-  await page.waitForTimeout(100);
-  expect(calls(control, IPC.customScriptsReorderCollections)).toHaveLength(0);
-  expect(calls(control, IPC.customScriptsReorder)).toHaveLength(0);
-  expect(await groupIds(page)).toEqual(['col-x', 'col-y']);
 
+  // The Alt+ArrowDown call is the barrier: exactly one reorder call proves the Alt+ArrowUp above
+  // sent none.
   await page.keyboard.press('Alt+ArrowDown');
   await expect.poll(() => calls(control, IPC.customScriptsReorder)).toHaveLength(1);
+  expect(calls(control, IPC.customScriptsReorderCollections)).toHaveLength(0);
+  expect(await groupIds(page)).toEqual(['col-x', 'col-y']);
   await expect(row(page, 't1')).toBeFocused();
 
   await header(page, 'col-x').focus();

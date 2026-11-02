@@ -1,4 +1,4 @@
-import { dragTab } from '../../../kira-studio/tests/ui/support/tabs';
+import { dragTab } from '@workbench/testing/ui/drag';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';

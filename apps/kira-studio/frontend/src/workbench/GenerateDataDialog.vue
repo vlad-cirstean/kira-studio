@@ -263,7 +263,9 @@ function onSequenceStartChange(index: number, start: number): void {
             group-class="h-control-lg"
             data-testid="generate-data-row-count"
             :disabled="running"
-            @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
+            @update:model-value="
+              (v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))
+            "
           />
           <Label class="p-0 text-muted-foreground">{{ t('studio.generateData.seed.label') }}</Label>
           <NumberStepperInput
@@ -279,7 +281,10 @@ function onSequenceStartChange(index: number, start: number): void {
             data-testid="generate-data-batch-note"
           >
             {{
-              t('studio.generateData.batches.status', { count: Math.ceil(rowCount / BATCH_SIZE), size: BATCH_SIZE })
+              t('studio.generateData.batches.status', {
+                count: Math.ceil(rowCount / BATCH_SIZE),
+                size: BATCH_SIZE,
+              })
             }}
           </span>
         </div>
@@ -341,7 +346,10 @@ function onSequenceStartChange(index: number, start: number): void {
                     group-class="h-control-lg"
                     :data-testid="`generate-data-sequence-start-${plan.column.name}`"
                     :disabled="running"
-                    @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
+                    @update:model-value="
+                      (v: string | number) =>
+                        onSequenceStartChange(index, Math.trunc(Number(v)) || 0)
+                    "
                   />
                 </TableCell>
               </TableRow>
@@ -378,7 +386,9 @@ function onSequenceStartChange(index: number, start: number): void {
             @click="onTogglePreview"
           >
             {{
-              previewOpen ? t('studio.generateData.hidePreview.label') : t('studio.grid.previewCommand.title')
+              previewOpen
+                ? t('studio.generateData.hidePreview.label')
+                : t('studio.grid.previewCommand.title')
             }}
           </Button>
           <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">

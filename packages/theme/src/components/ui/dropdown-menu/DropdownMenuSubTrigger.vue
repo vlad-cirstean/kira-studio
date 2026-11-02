@@ -19,10 +19,12 @@ const forwardedProps = useForwardProps(delegatedProps);
     data-slot="dropdown-menu-sub-trigger"
     :data-inset="inset ? '' : undefined"
     v-bind="forwardedProps"
-    :class="cn(
-      'focus:bg-hover focus:text-fg data-open:bg-hover data-open:text-fg not-data-[variant=danger]:focus:**:text-fg h-control gap-1.5 rounded-kira-sm px-1.5 text-kira-md data-inset:pl-7 [&_svg:not([class*=size-])]:size-4 flex cursor-default items-center outline-hidden select-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
-      props.class,
-    )"
+    :class="
+      cn(
+        'focus:bg-hover focus:text-fg data-open:bg-hover data-open:text-fg not-data-[variant=danger]:focus:**:text-fg h-control gap-1.5 rounded-kira-sm px-1.5 text-kira-md data-inset:pl-7 [&_svg:not([class*=size-])]:size-4 flex cursor-default items-center outline-hidden select-none [&_svg]:pointer-events-none [&_svg]:shrink-0',
+        props.class,
+      )
+    "
   >
     <slot />
     <ChevronRightIcon class="cn-rtl-flip ml-auto" />

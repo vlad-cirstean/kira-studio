@@ -12,7 +12,7 @@ import (
 
 // ORTVersion is the pinned ONNX Runtime release. scripts/fetch-onnxruntime.sh and the macOS
 // bundle task pin the same value; scripts/verify-packaging.sh S12 keeps them equal.
-const ORTVersion = "1.29.1"
+const ORTVersion = "1.31.1"
 
 // ErrNoRuntime means this build or platform cannot run the embedding model.
 var ErrNoRuntime = errors.New("no embedding runtime for this platform")

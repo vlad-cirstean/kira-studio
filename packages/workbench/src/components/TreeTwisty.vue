@@ -40,11 +40,13 @@ function onClick(e: MouseEvent): void {
   <button
     type="button"
     tabindex="-1"
-    :class="cn(
-      'flex size-3.5 shrink-0 items-center justify-center border-0 bg-transparent p-0 text-muted-foreground',
-      !hasChildren && 'invisible',
-      props.class,
-    )"
+    :class="
+      cn(
+        'flex size-3.5 shrink-0 items-center justify-center border-0 bg-transparent p-0 text-muted-foreground',
+        !hasChildren && 'invisible',
+        props.class,
+      )
+    "
     :aria-label="expanded ? t('common.action.collapse.label') : t('common.action.expand.label')"
     :aria-expanded="ariaExpanded"
     :data-testid="testid"

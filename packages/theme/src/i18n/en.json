@@ -39,7 +39,7 @@
           "title": "Edit smart script"
         },
         "homeNotice": {
-          "description": "Runs in your home folder {home}, the old default. New scripts use the Kira automations folder."
+          "description": "Runs in your home folder {home}, the old default. New scripts use the Kira scripts folder."
         },
         "nameExample": {
           "example": "Build"
@@ -63,7 +63,7 @@
           "label": "Run in the task’s worktree when started from ADE"
         },
         "useKira": {
-          "label": "Use automations folder"
+          "label": "Use Kira scripts folder"
         }
       }
     },
@@ -75,7 +75,7 @@
         "label": "Home folder"
       },
       "kira": {
-        "label": "Kira automations folder"
+        "label": "Kira scripts folder"
       }
     },
     "error": {
@@ -160,6 +160,24 @@
       },
       "title": {
         "label": "Parameters"
+      }
+    },
+    "restore": {
+      "banner": {
+        "body": "{count} script was running when {app} closed. | {count} scripts were running when {app} closed.",
+        "review": {
+          "label": "Review scripts"
+        }
+      },
+      "dialog": {
+        "description": "These were running when {app} closed. Nothing starts until you confirm.",
+        "title": "Restart scripts"
+      },
+      "params": {
+        "label": "{count} param | {count} params"
+      },
+      "resume": {
+        "label": "Continues its conversation"
       }
     },
     "run": {
@@ -289,7 +307,7 @@
     },
     "runs": {
       "none": {
-        "emptyHint": "No automation is running. Finished runs are in the operations panel."
+        "emptyHint": "No script is running. Finished runs are in the operations panel."
       },
       "showHistory": {
         "label": "Show history"
@@ -467,11 +485,29 @@
       "mcp": {
         "label": "MCP tools"
       },
+      "mcpAllTools": {
+        "label": "All tools"
+      },
       "mcpHint": {
-        "hint": "Only servers from your user {agent} config are listed."
+        "hint": "Servers {agent} reports for your user config. A run that uses one loads your {agent} settings."
       },
       "mcpNone": {
         "emptyHint": "No MCP servers."
+      },
+      "mcpStatusConnected": {
+        "status": "Online"
+      },
+      "mcpStatusFailed": {
+        "status": "Unreachable"
+      },
+      "mcpStatusNeedsAuth": {
+        "status": "Needs sign-in"
+      },
+      "mcpStatusPending": {
+        "status": "Connecting"
+      },
+      "mcpStatusUnknown": {
+        "status": "Status unknown"
       },
       "model": {
         "label": "Model"
@@ -717,6 +753,12 @@
         },
         "promptTooLong": {
           "body": "The prompt is longer than {max} characters."
+        },
+        "restoreNeedsInput": {
+          "body": "Needs values for: {names}. Kira never stores secrets, so start it yourself."
+        },
+        "restoreNotOffered": {
+          "body": "That run isn’t on the restore list."
         },
         "resumeCommandNone": {
           "body": "Only a smart run with a saved conversation can continue in a terminal."
@@ -968,13 +1010,13 @@
       "automation": {
         "body": "Open Kira Space to see the run.",
         "done": {
-          "title": "Automation done · {name}"
+          "title": "Script run done · {name}"
         },
         "failed": {
-          "title": "Automation failed · {name}"
+          "title": "Script run failed · {name}"
         },
         "needsYou": {
-          "title": "Automation needs you · {name}"
+          "title": "Script run needs you · {name}"
         }
       },
       "rebase": {
@@ -1951,6 +1993,41 @@
           "body": "Unsupported URL scheme: {scheme}."
         }
       },
+      "kubernetes": {
+        "badMcpMode": {
+          "error": "Unknown MCP permission: {mode}"
+        },
+        "badSelector": {
+          "error": "Invalid label selector: {message}"
+        },
+        "config": {
+          "error": "The kubeconfig can’t be used: {message}"
+        },
+        "forbidden": {
+          "error": "The cluster denied access: {message}"
+        },
+        "mcpDescriptionTooLong": {
+          "error": "The MCP description is longer than {max} characters."
+        },
+        "notFound": {
+          "error": "Not found in the cluster: {message}"
+        },
+        "plugin": {
+          "error": "The credential plugin failed: {message}"
+        },
+        "pluginInteractive": {
+          "error": "The credential plugin needs a terminal. Sign in once from a terminal, then retry."
+        },
+        "timeout": {
+          "error": "The cluster did not answer in time: {message}"
+        },
+        "unauthorized": {
+          "error": "The cluster rejected the credentials: {message}"
+        },
+        "unreachable": {
+          "error": "The cluster is unreachable: {message}"
+        }
+      },
       "proof": {
         "notPng": {
           "body": "The screenshot is not a PNG image."
@@ -2214,6 +2291,12 @@
       },
       "select": {
         "label": "Select"
+      },
+      "selectAll": {
+        "label": "Select all"
+      },
+      "selectNone": {
+        "label": "Select none"
       },
       "send": {
         "label": "Send"
@@ -2593,7 +2676,7 @@
     },
     "module": {
       "automations": {
-        "label": "Automations"
+        "label": "Runs"
       },
       "branches": {
         "label": "Branches"
@@ -2730,6 +2813,9 @@
       },
       "kiraStudio": {
         "label": "Kira Studio"
+      },
+      "kubernetes": {
+        "label": "Kubernetes"
       }
     },
     "progressPercent": {
@@ -2761,6 +2847,9 @@
     },
     "script": {
       "label": "Script"
+    },
+    "scriptRuns": {
+      "label": "Script runs"
     },
     "searching": {
       "loading": "Searching…"
@@ -3504,14 +3593,10 @@
         },
         "description": "Docker restarted. Choose which containers to start again.",
         "gone": {
-          "body": "Deleted. Not recreated.",
-          "title": "Deleted"
+          "body": "Deleted. Not recreated."
         },
         "project": {
           "label": "Compose project {name}"
-        },
-        "submit": {
-          "label": "Restore {count} container | Restore {count} containers"
         },
         "title": "Restore containers",
         "waiting": {
@@ -5587,6 +5672,227 @@
       }
     }
   },
+  "kubernetes": {
+    "cluster": {
+      "copyContext": {
+        "label": "Copy context name"
+      },
+      "current": {
+        "label": "Current context"
+      },
+      "state": {
+        "error": {
+          "label": "Unavailable"
+        },
+        "ok": {
+          "label": "Connected"
+        },
+        "unknown": {
+          "label": "Not connected"
+        }
+      }
+    },
+    "config": {
+      "invalid": {
+        "body": "{message}. Fix the kubeconfig, then refresh.",
+        "title": "The kubeconfig can’t be read"
+      },
+      "missing": {
+        "body": "Looked in {paths}. Set {env} or create {path}.",
+        "title": "No kubeconfig found"
+      }
+    },
+    "describe": {
+      "copyManifest": {
+        "label": "Copy manifest"
+      },
+      "field": {
+        "apiVersion": {
+          "label": "API version"
+        },
+        "uid": {
+          "label": "UID"
+        }
+      },
+      "filter": {
+        "placeholder": "Filter details"
+      },
+      "noEvents": {
+        "empty": "No events"
+      },
+      "section": {
+        "annotations": {
+          "label": "Annotations"
+        },
+        "conditions": {
+          "label": "Conditions"
+        },
+        "events": {
+          "label": "Events"
+        },
+        "manifest": {
+          "label": "Manifest"
+        },
+        "owners": {
+          "label": "Owners"
+        }
+      }
+    },
+    "detail": {
+      "close": {
+        "label": "Close details"
+      },
+      "resize": {
+        "label": "Resize details"
+      },
+      "tab": {
+        "describe": {
+          "label": "Describe"
+        }
+      }
+    },
+    "kind": {
+      "category": {
+        "access": {
+          "label": "Access control"
+        },
+        "cluster": {
+          "label": "Cluster"
+        },
+        "config": {
+          "label": "Config"
+        },
+        "custom": {
+          "label": "Custom resources"
+        },
+        "storage": {
+          "label": "Storage"
+        },
+        "workloads": {
+          "label": "Workloads"
+        }
+      }
+    },
+    "list": {
+      "count": {
+        "status": "{count} row | {count} rows"
+      },
+      "empty": {
+        "empty": "No resources"
+      },
+      "emptyHint": {
+        "emptyHint": "Nothing of this kind in the chosen namespace."
+      },
+      "filter": {
+        "placeholder": "Filter rows"
+      },
+      "labelSelector": {
+        "label": "Filter rows by label",
+        "placeholder": "Label selector"
+      },
+      "truncated": {
+        "status": "Showing the first {count} rows"
+      }
+    },
+    "logs": {
+      "container": {
+        "label": "Container name"
+      },
+      "ended": {
+        "status": "Stream ended"
+      },
+      "filter": {
+        "placeholder": "Filter lines"
+      },
+      "initContainer": {
+        "option": "{name} (init)"
+      },
+      "matches": {
+        "status": "{shown} of {total} lines"
+      }
+    },
+    "mcp": {
+      "describeNote": {
+        "label": "Whole objects with events and manifest; secret values stay hidden"
+      },
+      "descriptionNote": {
+        "label": "What this cluster is for, read verbatim by MCP clients"
+      },
+      "dialog": {
+        "description": "Choose what AI clients may read from this cluster through the database MCP server.",
+        "title": "MCP access · {cluster}"
+      },
+      "discover": {
+        "label": "Discovery"
+      },
+      "discoverNote": {
+        "label": "Namespaces and resource kinds"
+      },
+      "list": {
+        "label": "List"
+      },
+      "listNote": {
+        "label": "Object names, labels and status columns"
+      },
+      "logsNote": {
+        "label": "Container log output"
+      },
+      "menu": {
+        "label": "MCP settings…"
+      }
+    },
+    "namespace": {
+      "all": {
+        "option": "All namespaces"
+      },
+      "picker": {
+        "search": {
+          "placeholder": "Find a namespace"
+        }
+      },
+      "restricted": {
+        "hint": "Your account can’t list namespaces. Type a name to use it."
+      }
+    },
+    "panel": {
+      "none": {
+        "empty": "No contexts"
+      },
+      "noneHint": {
+        "emptyHint": "The kubeconfig lists no contexts."
+      }
+    },
+    "start": {
+      "body": "Expand a context in the sidebar and choose a resource kind.",
+      "title": "Browse a cluster"
+    },
+    "unavailable": {
+      "config": {
+        "hint": "This context is incomplete or invalid in the kubeconfig.",
+        "title": "Context can’t be used"
+      },
+      "forbidden": {
+        "hint": "Your account is not allowed to read this cluster.",
+        "title": "Access denied"
+      },
+      "plugin": {
+        "hint": "The kubeconfig credential plugin did not return a token. Run it in a terminal, then retry.",
+        "title": "Credential plugin failed"
+      },
+      "timeout": {
+        "hint": "The request timed out. Retry in a moment.",
+        "title": "The cluster did not answer"
+      },
+      "unauthorized": {
+        "hint": "The cluster refused the credentials. Sign in again, then retry.",
+        "title": "Sign-in rejected"
+      },
+      "unreachable": {
+        "hint": "Check the server address, your network connection and any proxy.",
+        "title": "Can’t reach the cluster"
+      }
+    }
+  },
   "llmPrompts": {
     "applies": {
       "newSession": {
@@ -6351,9 +6657,6 @@
       },
       "run": {
         "label": "Run distill"
-      },
-      "selectAll": {
-        "label": "Select all"
       },
       "selection": {
         "label": "Distill selection"
@@ -7217,9 +7520,6 @@
         "restore": {
           "hint": "Restore to edit."
         },
-        "resume": {
-          "tooltip": "Restores the task, then continues this session"
-        },
         "snapshot": {
           "hint": "Taken when the task was archived."
         }
@@ -7304,7 +7604,7 @@
           "label": "{name} · needs you"
         },
         "none": {
-          "empty": "No automations yet"
+          "empty": "No scripts yet"
         }
       },
       "baseMarker": {
@@ -7631,7 +7931,7 @@
             "label": "Review code"
           },
           "runAutomation": {
-            "label": "Run automation"
+            "label": "Run a script"
           },
           "showSessions": {
             "label": "Show sessions"
@@ -7734,7 +8034,7 @@
         },
         "source": {
           "automation": {
-            "label": "Automation"
+            "label": "Script run"
           },
           "run": {
             "label": "Run · {step}"
@@ -8612,6 +8912,9 @@
         "empty": {
           "empty": "Nothing running"
         },
+        "filter": {
+          "placeholder": "Filter sessions"
+        },
         "interactive": {
           "label": "Interactive"
         },
@@ -8624,13 +8927,22 @@
         "stopped": {
           "label": "Finished or stopped"
         },
+        "trigger": {
+          "label": "Sessions"
+        },
         "waitingId": {
           "status": "Waiting for session ID"
         }
       },
       "sessionTab": {
+        "close": {
+          "label": "Close session"
+        },
         "copyId": {
           "label": "Copy session ID"
+        },
+        "restart": {
+          "label": "Restart session"
         }
       },
       "setup": {
@@ -9638,7 +9950,7 @@
         "label": "Background {count}"
       },
       "clearHint": {
-        "hint": "Clears this window’s list only. History is kept 30 days. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
+        "hint": "Clears this window’s list only. History is kept 30 days. Script runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "empty": {
         "hint": "Git commands, agent sessions and MCP calls from every module show here."
@@ -11643,6 +11955,23 @@
         "heavy": {
           "body": "{connection} ({kind}) wants to run a query estimated to read {count} row, over your threshold of {threshold}. | {connection} ({kind}) wants to run a query estimated to read {count} rows, over your threshold of {threshold}."
         },
+        "kube": {
+          "describe": {
+            "body": "An MCP client wants to describe an object in {cluster} through the database MCP server."
+          },
+          "discover": {
+            "body": "An MCP client wants to list namespaces and resource kinds in {cluster} through the database MCP server."
+          },
+          "list": {
+            "body": "An MCP client wants to list resources in {cluster} through the database MCP server."
+          },
+          "logs": {
+            "body": "An MCP client wants to read pod logs in {cluster} through the database MCP server."
+          },
+          "target": {
+            "aria": "Target cluster"
+          }
+        },
         "other": {
           "body": "{connection} ({kind}) wants to run a statement through the database MCP server."
         },
@@ -13214,7 +13543,7 @@
     },
     "operations": {
       "clear": {
-        "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Automation runs come from the run history (newest 500 kept) and are hidden here, not deleted."
+        "hint": "Clears the in-memory ring only. Retention of op_log is automatic. Script runs come from the run history (newest 500 kept) and are hidden here, not deleted."
       },
       "commandTruncated": {
         "status": "Command truncated at 64 kibibytes, can’t be re-run"
@@ -14154,6 +14483,20 @@
           "description": "When a query or result waits for approval, show the window and switch to its desktop.",
           "label": "Bring Kira Studio forward for approvals"
         },
+        "kube": {
+          "empty": {
+            "empty": "No kubeconfig clusters found"
+          },
+          "intro": {
+            "description": "Clusters from your kubeconfig. Every operation asks first until you change it."
+          },
+          "legend": {
+            "label": "Kubernetes clusters"
+          },
+          "modes": {
+            "status": "Discover {discover} · list {list} · describe {describe} · logs {logs}"
+          }
+        },
         "masked": {
           "status": "{count} masked column | {count} masked columns"
         },
@@ -14940,6 +15283,20 @@
       },
       "title": "Quit {app}?"
     },
+    "restore": {
+      "dismiss": {
+        "label": "Don’t restore"
+      },
+      "selection": {
+        "status": "{selected} of {total} selected"
+      },
+      "submit": {
+        "label": "Restore {count}"
+      },
+      "unavailable": {
+        "title": "Not restored ({count})"
+      }
+    },
     "search": {
       "matchCase": {
         "label": "Match case"
@@ -15016,8 +15373,7 @@
       "runs": {
         "open": {
           "hint": "Click to show the runs list."
-        },
-        "tooltip": "Automation runs"
+        }
       }
     },
     "tabStrip": {

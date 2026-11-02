@@ -27,12 +27,22 @@ const { busy, error, confirm } = useConfirmRun(
   <ConfirmDialogView
     :open="target !== null"
     :title="t('space.ade.forcePushConfirm.title')"
-    :message="t('space.ade.forcePushConfirm.body', { branch: target?.branchName ?? '', repo: target?.repo ?? '' })"
+    :message="
+      t('space.ade.forcePushConfirm.body', {
+        branch: target?.branchName ?? '',
+        repo: target?.repo ?? '',
+      })
+    "
     :confirm-label="t('common.forcePush.label')"
     tone="danger"
     :pending="busy"
     :error="error ?? ''"
-    :testids="{ root: 'ade-confirm-dialog', cancel: 'ade-confirm-no', confirm: 'ade-confirm-yes', error: 'ade-confirm-error' }"
+    :testids="{
+      root: 'ade-confirm-dialog',
+      cancel: 'ade-confirm-no',
+      confirm: 'ade-confirm-yes',
+      error: 'ade-confirm-error',
+    }"
     @confirm="confirm"
     @cancel="emit('close')"
   />

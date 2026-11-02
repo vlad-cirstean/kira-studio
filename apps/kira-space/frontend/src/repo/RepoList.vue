@@ -426,9 +426,12 @@ useTreeShortcuts(nav, {
       <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
       <div
         :class="[
-        cn(rowVariants({ layout: 'tree', selected: isActive(repo.id), muted: repo.hidden }), 'h-row'),
-        { active: isActive(repo.id) },
-      ]"
+          cn(
+            rowVariants({ layout: 'tree', selected: isActive(repo.id), muted: repo.hidden }),
+            'h-row',
+          ),
+          { active: isActive(repo.id) },
+        ]"
         :style="rowIndent(0)"
         data-testid="repo-row"
         :data-repo-id="repo.id"
@@ -533,7 +536,10 @@ useTreeShortcuts(nav, {
           {{ worktreesStore.worktreesError(repo.id) }}
         </InlineState>
         <InlineState
-          v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
+          v-else-if="
+            worktreesStore.worktreesLoading(repo.id) &&
+            worktreesStore.worktreeEntries(repo.id).length === 0
+          "
           kind="loading"
           :style="rowIndent(1)"
         >

@@ -403,7 +403,9 @@ onUnmounted(() => {
           </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>{{
-          !running && tab.state.service && tab.state.method && !methodResolved ? t('studio.grpc.call.waitingSchema.tooltip') : t('studio.grpc.call.label')
+          !running && tab.state.service && tab.state.method && !methodResolved
+            ? t('studio.grpc.call.waitingSchema.tooltip')
+            : t('studio.grpc.call.label')
         }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto" />
@@ -411,7 +413,11 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5 min-w-0">
         <TooltipIconButton
           icon="eye-closed"
-          :label="incognito ? t('studio.api.common.incognitoOff.tooltip') : t('studio.api.common.incognitoOn.tooltip')"
+          :label="
+            incognito
+              ? t('studio.api.common.incognitoOff.tooltip')
+              : t('studio.api.common.incognitoOn.tooltip')
+          "
           :aria-label="t('studio.tabs.incognito.label')"
           :pressed="incognito"
           data-testid="grpc-incognito-toggle"
@@ -445,7 +451,11 @@ onUnmounted(() => {
       <TooltipIconButton
         v-if="tab.state.requestPane === 'metadata'"
         icon="note"
-        :label="tab.state.fieldDescriptions ? t('studio.api.common.descriptionsHide.tooltip') : t('studio.api.common.descriptionsShow.tooltip')"
+        :label="
+          tab.state.fieldDescriptions
+            ? t('studio.api.common.descriptionsHide.tooltip')
+            : t('studio.api.common.descriptionsShow.tooltip')
+        "
         :aria-label="t('studio.api.common.descriptions.aria')"
         :pressed="tab.state.fieldDescriptions"
         data-testid="grpc-field-descriptions-toggle"

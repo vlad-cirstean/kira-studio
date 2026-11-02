@@ -9,7 +9,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { expandRow, findRow, openRowMenu } from './support/tree';
+import { expandRow, findRow, openRowMenu, settleFrames } from './support/tree';
 
 // Ported from tests/e2e/definition.spec.ts, against real captured
 // treeDefinition responses (scripts/capture-postgres-tree.ts). Scenario 10 ("session restore")
@@ -182,7 +182,7 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
 
   const idColumnRow = columnsSection.locator('tr', { has: page.getByText('id', { exact: true }) });
   await idColumnRow.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
+  await settleFrames(page);
   await idColumnRow.click({ button: 'right' });
   const contextMenu = page.locator('[data-testid="context-menu"]');
   await expect(contextMenu).toBeVisible();

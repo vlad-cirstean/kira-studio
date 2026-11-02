@@ -24,6 +24,7 @@
       "maxBudgetUsd": 1,
       "mcp": [
         {
+          "allTools": false,
           "server": "fake",
           "tools": [
             "echo"

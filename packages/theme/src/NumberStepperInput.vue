@@ -45,13 +45,20 @@ function stepBy(dir: 1 | -1): void {
   <div ref="containerRef" class="contents">
     <InputGroup
       variant="default"
-      :class="cn('h-control-lg w-full rounded-kira-sm border-border-strong bg-field', props.groupClass)"
+      :class="
+        cn('h-control-lg w-full rounded-kira-sm border-border-strong bg-field', props.groupClass)
+      "
     >
       <InputGroupInput
         type="number"
         :model-value="props.modelValue"
         v-bind="attrs"
-        :class="cn('h-full font-data [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none', props.inputClass)"
+        :class="
+          cn(
+            'h-full font-data [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none',
+            props.inputClass,
+          )
+        "
       />
       <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
         <Tooltip>

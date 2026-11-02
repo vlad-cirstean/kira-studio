@@ -319,7 +319,9 @@ const activeDevices = computed(() =>
               :data-testid="`mobile-device-terminals-${device.id}`"
             >
               {{
-                t('space.settings.mobileAccess.devices.terminals.status', { count: phones.countFor(device.id) })
+                t('space.settings.mobileAccess.devices.terminals.status', {
+                  count: phones.countFor(device.id),
+                })
               }}
             </span>
           </span>
@@ -340,7 +342,9 @@ const activeDevices = computed(() =>
                 :model-value="device.canAgentInput"
                 :disabled="!store.status.agentInput"
                 :data-testid="`mobile-device-agent-input-${device.id}`"
-                @update:model-value="(v) => onSetPermissions(device.id, device.canWrite, v === true)"
+                @update:model-value="
+                  (v) => onSetPermissions(device.id, device.canWrite, v === true)
+                "
               />
             </Label>
             <TooltipIconButton

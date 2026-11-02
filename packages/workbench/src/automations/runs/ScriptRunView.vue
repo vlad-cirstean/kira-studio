@@ -72,7 +72,9 @@ async function rerun(): Promise<void> {
       data-testid="script-run-missing"
     >
       {{
-        query.isPending.value ? t('common.state.loading.loading') : t('automations.run.missing.emptyHint')
+        query.isPending.value
+          ? t('common.state.loading.loading')
+          : t('automations.run.missing.emptyHint')
       }}
     </InlineState>
     <template v-else>

@@ -134,7 +134,9 @@ onUnmounted(() => {
       <template #actions>
         <TooltipIconButton
           :icon="ICON.search"
-          :label="showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')"
+          :label="
+            showSearch ? t('common.action.hideSearch.label') : t('common.action.search.label')
+          "
           :aria-label="t('common.action.search.label')"
           :pressed="showSearch"
           data-testid="toggle-search"
