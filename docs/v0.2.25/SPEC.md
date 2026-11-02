@@ -15,8 +15,8 @@ Source: user request. Phases run top to bottom, two phases in parallel where fil
 | P442 | Dependency update, incl. Wails | Done |
 | P443 | Slow test audit and speed-up: UI suites wait 30+ min per phase | Done |
 | P444 | Remove CLI credential reads: claude MCP headers | Done |
-| P445 | Code review (2 rounds) | Todo |
-| P446 | Close chapter v0.2.25 | Todo |
+| P445 | Code review (2 rounds) | Done |
+| P446 | Close chapter v0.2.25 | Done |
 
 ## Rows
 
@@ -107,6 +107,10 @@ Result: Kira no longer reads `~/.claude.json` or forwards MCP headers. The picke
 
 Two rounds. Each round: one Opus review over the full diff since `main`, findings file under `plans/`, then one Sonnet fixer.
 
+Result: 2 rounds over the full diff since `main`. Round 1 found 9, round 2 found 8 (round 1 fixer commits read as unreviewed code); all fixed, per-group commits. Fixes centred on the user MCP presence check (shared `claude mcp list` flight, stale fallback, project-server blocking), Runs restore, ADE smart step with a missing ticked server, and Kubernetes log tail and config cache. Details in `plans/P445-review-r1.md` and `plans/P445-review-r2.md`.
+
 ### P446 Close chapter v0.2.25
 
 Hand-written close per CLAUDE.md "Closing a chapter". Push, open PR to `main`.
+
+Result: Chapter folded by hand into `docs/HISTORY.md`; `docs/v0.2.25/` removed. No Known open item resolved in this chapter. Push and PR left to the orchestrator.
